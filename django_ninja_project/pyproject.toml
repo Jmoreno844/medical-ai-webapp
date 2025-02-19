@@ -1,0 +1,38 @@
+[project]
+name = "django-ninja-project"
+version = "0.1.0"
+description = ""
+requires-python = ">=3.10"
+dependencies = ["django (>=5.1.6,<6.0.0)", "django-ninja (>=1.3.0,<2.0.0)", "uvicorn (>=0.34.0,<0.35.0)", "python-dotenv (>=1.0.1,<2.0.0)", "psycopg2 (>=2.9.10,<3.0.0)", "pyjwt (>=2.10.1,<3.0.0)"]
+authors = [
+    {name = "jmoreno84417", email = "jmoreno84417@gitlab.com"}
+]
+
+[tool.poetry]
+name = "django_ninja_project"
+version = "0.1.0"
+description = "A Django Ninja REST API project"
+authors = ["Your Name <your.email@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+django = "^5.1.6"
+django-ninja = "^1.3.0"
+psycopg2 = "^2.9.10"
+uvicorn = "^0.34.0"
+python-dotenv = "^1.0.1"
+pyjwt = ">=2.10.1,<3.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^4.1.0"
+ruff = "^0.9.6"
+pytest = "^8.3.4"
+pytest-django = "^4.10.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"

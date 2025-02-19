@@ -1,0 +1,6 @@
+django_ninja_project/.venv
+.env
+.pycache
+__pycache__
+*.pyc
+django_ninja_project/commands.sh
