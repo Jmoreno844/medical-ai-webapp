@@ -17,6 +17,10 @@ export default {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        // Added custom colors
+        main: "#3b82f6",
+        main_light: "#7FB7D7",
+        main_dark: "#2563eb",
       },
       borderRadius: {
         lg: "var(--radius)",
