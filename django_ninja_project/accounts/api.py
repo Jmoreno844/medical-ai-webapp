@@ -7,8 +7,10 @@ from ninja.security import django_auth
 from typing import List
 from datetime import datetime, timedelta
 import jwt
+import os
+from django.conf import settings
 
-from .models import User
+from .models import User, UserRole
 from .schemas import (
     UserRegistrationIn,
     UserRegistrationOut,
@@ -20,6 +22,14 @@ from .schemas import (
 
 router = Router()
 
+def create_token(user):
+    expiration = datetime.utcnow() + timedelta(hours=1)
+    secret_key = os.getenv('JWT_SECRET_KEY', settings.SECRET_KEY)
+    payload = {
+        "user_id": user.id,
+        "exp": expiration,
+    }
+    return jwt.encode(payload, secret_key, algorithm="HS256")
 
 @router.post("/registro", response={201: UserRegistrationOut, 400: dict})
 def register_user(request, data: UserRegistrationIn):
@@ -28,41 +38,35 @@ def register_user(request, data: UserRegistrationIn):
         return 400, {"message": "Email already registered"}
 
     user = User.objects.create(
-        username=data.email,
         email=data.email,
         password=make_password(data.password),
         name=data.name,
         lastName=data.lastName,
-        role="medico",  # Force role as 'medico'
+        role=UserRole.MEDICO,
     )
     return 201, user
 
 
 @router.post("/login", response={200: AuthTokenOut, 401: dict})
 def login_user(request, data: UserLoginIn):
-    """Login user and return session token"""
-    user = authenticate(request, username=data.email, password=data.password)
+    """Login user and return JWT token"""
+    user = authenticate(request, email=data.email, password=data.password)
     if user is None:
         return 401, {"message": "Invalid credentials"}
 
-    login(request, user)
-    return 200, {"token": "session-authenticated"}
+    token = create_token(user)
+    return 200, {"token": token}
 
 
 @router.post("/jwt-token", response={200: AuthTokenOut, 401: dict})
 def create_jwt_token(request, data: UserLoginIn):
     """Create JWT token for external services"""
-    user = authenticate(request, username=data.email, password=data.password)
+    user = authenticate(request, email=data.email, password=data.password)
     if user is None:
         return 401, {"message": "Invalid credentials"}
 
-    payload = {
-        "user_id": user.id,
-        "exp": datetime.utcnow() + timedelta(days=1),
-        "iat": datetime.utcnow(),
-    }
-    token = jwt.encode(payload, "your-secret-key", algorithm="HS256")
-    return {"token": token}
+    token = create_token(user)
+    return 200, {"token": token}
 
 
 @router.get("/users", response=List[UserProfileOut], auth=django_auth)

@@ -11,14 +11,13 @@ def test_user_data():
         "lastName": "User",
         "email": "test@example.com",
         "password": "testpass123",
-        "role": "medico",
     }
 
 
 @pytest.mark.django_db
 def test_register_user(client, test_user_data):
     response = client.post(
-        "/api/auth/register",
+        "/api/auth/registro",
         data=json.dumps(test_user_data),
         content_type="application/json",
     )
@@ -30,13 +29,13 @@ def test_register_user(client, test_user_data):
 def test_register_duplicate_email(client, test_user_data):
     # First registration
     client.post(
-        "/api/auth/register",
+        "/api/auth/registro",
         data=json.dumps(test_user_data),
         content_type="application/json",
     )
     # Second registration with same email
     response = client.post(
-        "/api/auth/register",  # Changed from /api/accounts/register
+        "/api/auth/registro",  # Changed from /api/accounts/register
         data=json.dumps(test_user_data),
         content_type="application/json",
     )
@@ -47,7 +46,7 @@ def test_register_duplicate_email(client, test_user_data):
 def test_login(client, test_user_data):
     # Create user first
     client.post(
-        "/api/auth/register",  # Changed from /api/accounts/register
+        "/api/auth/registro",  # Changed from /api/accounts/register
         data=json.dumps(test_user_data),
         content_type="application/json",
     )
@@ -71,7 +70,7 @@ def test_login(client, test_user_data):
 def test_jwt_token(client, test_user_data):
     # Create user first
     client.post(
-        "/api/auth/register",  # Changed from /api/accounts/register
+        "/api/auth/registro",  # Changed from /api/accounts/register
         data=json.dumps(test_user_data),
         content_type="application/json",
     )

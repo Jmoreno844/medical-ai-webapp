@@ -1,82 +1,110 @@
-Rules for the medical dashboard application using Django and Django Ninja, designed to handle sensitive medical data with robust security and performance in production.
+Code Structure & Best Practices
+Architecture
 
-Instructions
+Follow Django's app-based structure for modularity
+Implement service-layer pattern to separate business logic from views
+Use dependency injection where appropriate
+Ensure proper separation of concerns
 
-# Backend Rules (Enhanced Readability & Additional Security Notes)
+API Design
 
-## Medical Dashboard & Django Ninja
+Implement RESTful principles consistently
+Use proper HTTP status codes and methods
+Structure endpoints logically (e.g., /api/v1/patients/{id}/recordings)
+Implement pagination for list endpoints
+Return clear error messages and validation feedback
 
-### Django Best Practices
+Code Style
 
-- **Project Structure**  
-  Follow Django’s standard structure (settings, modular apps, etc.). Keep apps within `medical_dashboard/` if applicable.
-- **Built-in Security**  
-  Rely on Django’s CSRF, session management, and HTTPS enforcement. Reference official Django security docs.
+Follow PEP 8 standards
+Use type hints throughout the codebase
+Write descriptive variable and function names
+Keep functions small and focused (single responsibility)
+Use Django's built-in functionality where possible
 
-### Django Ninja Best Practices
+Documentation Requirements
+API Documentation
 
-- **Schema Validation**  
-  Utilize Pydantic models for input validation; always use type hints.
-- **OpenAPI Documentation**  
-  Keep API endpoints well-documented, auto-generating docs from Ninja.
+Add comprehensive docstrings to all API endpoints
+Include parameter descriptions, types, and example values
+Document possible response codes and their meanings
+Use Django Ninja's automatic OpenAPI documentation features
 
-### Security Features
+Code Documentation
 
-- **Role-Based Access Control (RBAC)**  
-  Use `django.contrib.auth` for roles (e.g., doctors, admins).
-- **Token-Based Auth**  
-  Integrate Django Ninja’s `HttpBearer` or OAuth2 in sync with Django’s authentication backend.
-- **ORM Safety**  
-  Lean on Django ORM for queries; avoid raw SQL to reduce injection risks.
+Write clear docstrings for all non-trivial functions and classes
+Document complex algorithms or business rules with comments
+Include usage examples for reusable components
+Document assumptions and edge cases
 
-### Error Handling & Logging
+Project Documentation
 
-- **Exceptions**  
-  Use Django middleware or Ninja’s exception handlers. Avoid leaking sensitive data in error messages.
-- **Secure Logging**  
-  Redact PII; align logs with HIPAA/GDPR if handling medical data.
+Create clear README.md with setup instructions
+Document environment variables and configuration options
+Include database schema diagrams or descriptions
+Add deployment guides and requirements
 
-### Performance Optimization
+Security Best Practices
+Authentication & Authorization
 
-- **Caching**  
-  Use `django-redis` or external backends for caching and keep data encrypted at rest.
-- **Environment Variables**  
-  Store secrets in `.env` files or a vault (e.g., AWS Secrets Manager).
+Implement proper JWT token handling with expiration
+Use refresh tokens with secure rotation
+Implement role-based access control
+Never store sensitive data in tokens
+Implement MFA for admin accounts
 
-### File Handling
+Data Protection
 
-- **Encrypted Storage**  
-  Consider `django-storages` with AWS S3 or similar, ensuring encryption in transit and at rest.
-- **Access Controls**  
-  Restrict file access to authorized users only.
+Encrypt sensitive data at rest in the database
+Use HTTPS for all API communication
+Implement proper field-level permissions
+Sanitize all user inputs
+Implement audit logging for PHI access
 
-### Maintenance
+HIPAA Compliance
 
-- **Continuous Updates**  
-  Apply Django security patches. Use tools (e.g., Dependabot) to keep dependencies secure.
-- **Static Analysis**  
-  Use Bandit or similar to catch vulnerabilities early.
+Implement comprehensive audit trails
+Include required HIPAA fields in logs (who, what, when, where)
+Use proper data retention policies
+Implement data export capabilities for patient requests
+Add automatic session timeouts
 
-### Component Structure
+Code Security
 
-- **Models**  
-  Keep indexes and constraints on sensitive tables.
-- **Schemas**  
-  Validate request/response data in Pydantic models.
-- **Views/APIs**  
-  Integrate authentication checks (`@permission_required`) or custom decorators.
-- **Helpers**  
-  Centralize encryption/decryption or utility methods to standardize usage.
+Prevent SQL injection via Django ORM and parametrized queries
+Implement rate limiting for API endpoints
+Add CSRF protection for browser-based access
+Set secure cookie flags
+Regularly update dependencies
 
-### Additional Security Considerations
+Testing Focus
 
-- **HTTPS & HSTS**  
-  Enable `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, and `SECURE_HSTS_SECONDS`.
-- **Database Security**  
-  Ensure TLS, field-level crypto for sensitive data, and robust indexing.
-- **Rate Limiting**  
-  Throttle API calls to prevent DDoS or brute-force attempts.
-- **Auditing & Compliance**  
-  Conduct regular security audits and store credentials securely (HashiCorp Vault, AWS Secrets Manager, etc.).
-- **WAF & CDN**  
-  Consider Cloudflare or similar for DDoS protection and additional filtering.
+Write comprehensive unit tests (aim for >80% coverage)
+Include security-focused tests (authentication bypass, injection)
+Test authorization edge cases
+Write integration tests for critical flows
+Implement API contract testing
+
+Database Considerations
+
+Use migrations properly
+Implement indexes for frequently queried fields
+Design with performance in mind (avoid N+1 queries)
+Use proper constraints (foreign keys, unique constraints)
+Consider table partitioning for large datasets
+
+Error Handling
+
+Implement global exception handling
+Log errors with appropriate context
+Return user-friendly error messages
+Include correlation IDs for tracking issues
+Handle expected errors gracefully
+
+Performance
+
+Cache frequently accessed data
+Use select_related and prefetch_related to avoid N+1 queries
+Optimize database access patterns
+Consider async views for long-running operations
+Implement database connection pooling
