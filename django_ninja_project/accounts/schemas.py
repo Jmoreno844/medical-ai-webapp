@@ -7,7 +7,6 @@ class UserRegistrationIn(Schema):
     password: str
     name: str
     lastName: str
-    role: str
 
 
 class UserRegistrationOut(Schema):

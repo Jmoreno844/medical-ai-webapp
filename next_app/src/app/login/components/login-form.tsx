@@ -12,18 +12,17 @@ import { Label } from "@/components/ui/label";
 export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const { login } = useAuth();
+  const { login, error, loading } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      console.log('Attempting login...'); // Debug log
       await login({ email, password });
-
-      router.push("/home"); //success redirect
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      router.push("/home");
     } catch (err) {
-      // Error is handled in hook state, optionally display an error
+      console.error('Login error:', err); // Debug log
     }
   };
 
@@ -55,6 +54,11 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
         </p>
       </div>
       <div className="grid gap-6">
+        {error && (
+          <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md">
+            {error}
+          </div>
+        )}
         <div className="grid gap-2">
           <Label htmlFor="email">Email</Label>
           <Input
@@ -85,8 +89,12 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
-        <Button type="submit" className="w-full bg-main hover:bg-main_dark">
-          Login
+        <Button 
+          type="submit" 
+          className="w-full bg-main hover:bg-main_dark"
+          disabled={loading}
+        >
+          {loading ? 'Iniciando sesión...' : 'Login'}
         </Button>
       </div>
       <div className="text-center text-sm">

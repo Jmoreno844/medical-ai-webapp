@@ -20,7 +20,8 @@ from .schemas import (
 
 router = Router()
 
-@router.post("/register", response={201: UserRegistrationOut, 400: dict})
+
+@router.post("/registro", response={201: UserRegistrationOut, 400: dict})
 def register_user(request, data: UserRegistrationIn):
     """Register a new user"""
     if User.objects.filter(email=data.email).exists():
@@ -32,7 +33,7 @@ def register_user(request, data: UserRegistrationIn):
         password=make_password(data.password),
         name=data.name,
         lastName=data.lastName,
-        role=data.role,
+        role="medico",  # Force role as 'medico'
     )
     return 201, user
 
@@ -91,3 +92,19 @@ def delete_user(request, user_id: int):
     """Delete a user"""
     User.objects.get(id=user_id).delete()
     return {"success": True}
+
+
+@router.get("/me", response={200: bool, 401: dict})
+def me(request):
+    """Return True if session validated, else False"""
+    if request.user and request.user.is_authenticated:
+        return True
+    return 401, {"message": "Session not validated"}
+
+
+@router.get("/me/data", response={200: UserProfileOut, 401: dict})
+def me_data(request):
+    """Return user profile data if session validated, else return error"""
+    if request.user and request.user.is_authenticated:
+        return request.user
+    return 401, {"message": "Session not validated"}

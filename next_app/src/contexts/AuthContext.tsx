@@ -4,14 +4,18 @@ import { useRouter, usePathname } from "next/navigation";
 import axiosInstance from "../utils/axiosInstance";
 import LoadingCircle from "../components/ui/loading_circle";
 
+// Define the shape of our authentication context
 export interface AuthContextType {
   isAuthenticated: boolean;
-  setAuthenticated: (auth: boolean) => void;
+  isAuthLoading: boolean;
+  setIsAuthenticated: (auth: boolean) => void;
 }
 
+// Create context with default values
 export const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
-  setAuthenticated: () => {},
+  isAuthLoading: false, // Add this line to match the interface
+  setIsAuthenticated: () => {},
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -20,46 +24,46 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  const setAuthenticated = (auth: boolean) => {
-    setIsAuthenticated(auth);
-  };
-
+  // Memoize public routes to prevent unnecessary re-renders
   const publicRoutes = useMemo(
     () => ["/login", "/registro", "/forgot-password"],
     []
   );
 
-  // Check auth status via axios on mount after reload
+  // Initial authentication check on mount
   useEffect(() => {
     axiosInstance
       .get("api/auth/me")
       .then(() => {
-        setAuthenticated(true);
+        setIsAuthenticated(true);
       })
-      .catch(() => {
-        setAuthenticated(false);
+      .catch((error) => {
+        console.error("Auth check failed:", error);
+        setIsAuthenticated(false);
       })
       .finally(() => {
         setIsAuthLoading(false);
       });
   }, []);
 
+  // Handle 401 unauthorized responses globally
   useEffect(() => {
     const interceptor = axiosInstance.interceptors.response.use(
       (response) => response,
       (error) => {
-        if (error.response && error.response.status === 401) {
+        if (error.response?.status === 401) {
           router.refresh();
         }
         return Promise.reject(error);
       }
     );
+    // Cleanup interceptor on unmount
     return () => {
       axiosInstance.interceptors.response.eject(interceptor);
     };
   }, [router]);
 
-  // Redirect on non-public routes if not authenticated
+  // Protected route navigation guard
   useEffect(() => {
     if (
       !isAuthLoading &&
@@ -70,16 +74,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [isAuthenticated, router, pathname, isAuthLoading, publicRoutes]);
 
-  // Use LoadingCircle component for fallback UI
-  if (isAuthLoading) {
-    return <LoadingCircle />;
-  }
-  if (!isAuthenticated && !publicRoutes.includes(pathname)) {
+  // Show loading state while checking authentication
+  if (isAuthLoading || (!isAuthenticated && !publicRoutes.includes(pathname))) {
     return <LoadingCircle />;
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, setAuthenticated }}>
+    <AuthContext.Provider
+      value={{ isAuthenticated, isAuthLoading, setIsAuthenticated }}
+    >
       {children}
     </AuthContext.Provider>
   );

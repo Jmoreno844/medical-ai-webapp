@@ -29,7 +29,7 @@ export const useAuth = () => {
         email,
         password,
       });
-      authContext.setAuthenticated(true);
+      authContext.setIsAuthenticated(true);
       return response.data;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al iniciar sesión");
