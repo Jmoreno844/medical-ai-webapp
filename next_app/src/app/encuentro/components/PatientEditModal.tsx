@@ -52,6 +52,14 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
     null
   );
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
+  // Add a flag to prevent re-searching after selection
+  const [justSelected, setJustSelected] = useState(false);
+  // Track the selected patient's name to compare with input changes
+  const [selectedPatientName, setSelectedPatientName] = useState<string>("");
+  // Cache for previously found patients to enable automatic reselection
+  const [foundPatientsCache, setFoundPatientsCache] = useState<
+    Map<string, number>
+  >(new Map());
 
   // For edit mode (when patient is already connected)
   const [connectedName, setConnectedName] = useState("");
@@ -73,15 +81,55 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
         setPatientName("");
         setSelectedPatientId(null);
         setSearchResults([]);
+        setJustSelected(false);
+        setSelectedPatientName("");
+        // Keep the cache to allow selecting previously found patients
       }
     }
   }, [isOpen, isPatientConnected, currentEncounterName, currentPatientName]);
+
+  /**
+   * Handle changes to patient name input
+   * - Clear selection if text doesn't match selected patient
+   * - Auto-select if the text exactly matches a known patient
+   */
+  useEffect(() => {
+    // Skip if in connected mode or if search is already in progress
+    if (isPatientConnected || justSelected) return;
+
+    // If we had a patient selected, but the text no longer matches, clear the selection
+    if (selectedPatientId !== null && patientName !== selectedPatientName) {
+      setSelectedPatientId(null);
+      setSelectedPatientName("");
+    }
+
+    // If text exactly matches a patient in our cache, auto-select that patient
+    const cachedPatientId = foundPatientsCache.get(patientName.toLowerCase());
+    if (cachedPatientId && !selectedPatientId) {
+      setSelectedPatientId(cachedPatientId);
+      setSelectedPatientName(patientName);
+      setSearchResults([]);
+    }
+  }, [
+    patientName,
+    selectedPatientId,
+    selectedPatientName,
+    foundPatientsCache,
+    isPatientConnected,
+    justSelected,
+  ]);
 
   /**
    * Debounced patient search
    */
   useEffect(() => {
     if (!isPatientConnected) {
+      // Skip search if a patient was just selected
+      if (justSelected) {
+        setJustSelected(false);
+        return;
+      }
+
       const handler = setTimeout(() => {
         if (patientName.length > 2) {
           handleSearch(patientName);
@@ -94,7 +142,7 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
         clearTimeout(handler);
       };
     }
-  }, [patientName, isPatientConnected]);
+  }, [patientName, isPatientConnected, justSelected]);
 
   // ========== EVENT HANDLERS ==========
   /**
@@ -104,6 +152,13 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
     if (query.length > 2) {
       const results = await searchPatients(query);
       setSearchResults(results);
+
+      // Update our cache of known patients
+      const updatedCache = new Map(foundPatientsCache);
+      results.forEach((patient) => {
+        updatedCache.set(patient.nombre.toLowerCase(), patient.id);
+      });
+      setFoundPatientsCache(updatedCache);
     }
   };
 
@@ -113,7 +168,12 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
   const handleSelectResult = (id: number, name: string) => {
     setSelectedPatientId(id);
     setPatientName(name);
+    setSelectedPatientName(name); // Store the selected name for comparison
     setSearchResults([]);
+    setJustSelected(true);
+
+    // Add to our cache of known patients
+    setFoundPatientsCache((prev) => new Map(prev).set(name.toLowerCase(), id));
   };
 
   /**
@@ -156,6 +216,14 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
       );
       onClose();
     }
+  };
+
+  /**
+   * Handle input changes in the patient name field
+   */
+  const handlePatientNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setPatientName(newValue);
   };
 
   // Don't render if the modal is not open
@@ -208,7 +276,7 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
               type="text"
               id="patientName"
               value={patientName}
-              onChange={(e) => setPatientName(e.target.value)}
+              onChange={handlePatientNameChange}
               className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="Buscar paciente existente o ingresar nuevo"
               data-testid="patient-name-input"
@@ -234,7 +302,8 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
           </div>
         ) : (
           !isPatientConnected &&
-          searchResults.length > 0 && (
+          searchResults.length > 0 &&
+          !selectedPatientId && ( // Don't show results if a patient is already selected
             <div
               className="mb-4 max-h-40 overflow-y-auto border border-gray-200 rounded"
               role="listbox"
@@ -285,7 +354,9 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
               <button
                 className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-blue-300"
                 onClick={handleCreatePatient}
-                disabled={!patientName.trim() || isLoading}
+                disabled={
+                  !patientName.trim() || isLoading || selectedPatientId !== null
+                }
                 data-testid="create-patient-button"
               >
                 {isLoading ? "Creando..." : "Crear paciente"}
