@@ -16,7 +16,7 @@ class Encuentro(models.Model):
         blank=True,
     )
     nombre_encuentro = models.CharField(max_length=255, null=True, blank=True)
-    fecha = models.DateField()
+    fecha = models.DateTimeField()  # Changed from DateField to DateTimeField
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

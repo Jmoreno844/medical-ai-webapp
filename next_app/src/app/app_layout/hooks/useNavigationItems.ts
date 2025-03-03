@@ -1,4 +1,4 @@
-import { useNuevoEncuentro } from "./useNuevoEncuentro";
+import { useNuevoEncuentro } from "./Encuentros/useNuevoEncuentro";
 import { useEffect } from "react";
 
 type NavigationItem = {

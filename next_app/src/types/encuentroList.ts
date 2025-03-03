@@ -1,4 +1,4 @@
-export interface Encounter {
+export interface Encuentro {
   id: number;
   id_medico: number;
   id_paciente?: number;

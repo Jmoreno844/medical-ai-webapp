@@ -3,6 +3,7 @@ from django.urls import path
 from ninja import NinjaAPI
 from apps.users.api import router as accounts_router
 from apps.encuentro.api import router as encuentro_router
+from apps.pacientes.api import router as pacientes_router
 
 api = NinjaAPI(
     title="Medical API",
@@ -12,7 +13,7 @@ api = NinjaAPI(
 
 api.add_router("/auth/", accounts_router)
 api.add_router("/", encuentro_router)
-
+api.add_router("/", pacientes_router)
 
 urlpatterns = [
     path("admin/", admin.site.urls),

@@ -11,8 +11,8 @@ javascript
 Ajuste
 Copiar
 constructor(props) {
-  super(props);
-  this.handleClick = this.handleClick.bind(this);
+super(props);
+this.handleClick = this.handleClick.bind(this);
 }
 Lifecycle Methods
 Use componentDidMount for initial data fetching and setup.
@@ -31,11 +31,11 @@ javascript
 Ajuste
 Copiar
 export default function handler(req, res) {
-  const { name } = req.body;
-  if (!name || typeof name !== 'string') {
-    return res.status(400).json({ error: 'Invalid name' });
-  }
-  // Proceed with sanitized input
+const { name } = req.body;
+if (!name || typeof name !== 'string') {
+return res.status(400).json({ error: 'Invalid name' });
+}
+// Proceed with sanitized input
 }
 Data Fetching
 Use getServerSideProps for server-side rendering (SSR).
@@ -43,12 +43,6 @@ Use getStaticProps for static generation.
 Ensure secure data fetching by validating and sanitizing data from external sources.
 javascript
 Ajuste
-Copiar
-export async function getServerSideProps(context) {
-  const res = await fetch('https://api.example.com/data');
-  const data = await res.json();
-  return { props: { data } };
-}
 Security Best Practices
 Preventing XSS
 Sanitize user input using libraries like DOMPurify to prevent cross-site scripting (XSS).

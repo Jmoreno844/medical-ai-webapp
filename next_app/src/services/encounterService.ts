@@ -1,13 +1,13 @@
 import axiosInstance from "@/utils/axiosInstance";
-import { Encounter } from "@/types/encounter";
+import { Encuentro } from "@/types/encuentroList";
 
 /**
  * Fetches all encounters for a specific doctor
  * @returns Promise with an array of encounters
  */
-export const getDoctorEncounters = async (): Promise<Encounter[]> => {
+export const getDoctorEncounters = async (): Promise<Encuentro[]> => {
   try {
-    const response = await axiosInstance.get<Encounter[]>(`/api/encuentros`);
+    const response = await axiosInstance.get<Encuentro[]>(`/api/encuentros`);
     return response.data;
   } catch (error) {
     console.error("Error fetching doctor encounters:", error);
@@ -22,9 +22,9 @@ export const getDoctorEncounters = async (): Promise<Encounter[]> => {
  */
 export const getEncounterById = async (
   encounterId: number
-): Promise<Encounter> => {
+): Promise<Encuentro> => {
   try {
-    const response = await axiosInstance.get<Encounter>(
+    const response = await axiosInstance.get<Encuentro>(
       `/api/encuentros/${encounterId}`
     );
     return response.data;

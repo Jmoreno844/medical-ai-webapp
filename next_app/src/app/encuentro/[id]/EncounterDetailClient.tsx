@@ -1,0 +1,262 @@
+"use client";
+import React, { useState } from "react";
+import TopBar from "../components/TopBar";
+import { useEncuentroDetail } from "../../app_layout/hooks/Encuentros/useEncuentroDetail";
+import { useEncounter } from "../hooks/useEncounter";
+import { usePatients } from "../hooks/usePatients";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import ErrorDisplay from "@/components/ErrorDisplay";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+
+/**
+ * Props for the EncounterDetailClient component
+ */
+interface EncounterDetailClientProps {
+  /** Encounter ID from URL params */
+  id: string;
+}
+
+/**
+ * Structure for status messages
+ */
+interface StatusMessage {
+  /** Type of message - success or error */
+  type: "success" | "error";
+  /** Message content to display */
+  message: string;
+}
+
+/**
+ * Main client component for the encounter detail page
+ *
+ * Handles loading encounter data, patient management, and
+ * UI state for the encounter detail view
+ *
+ * @param props - Component props
+ * @returns React component
+ */
+export function EncounterDetailClient({ id }: EncounterDetailClientProps) {
+  // Convert string ID to number
+  const encounterId = parseInt(id);
+
+  // ========== HOOKS ==========
+  // Fetch encounter data
+  const { encuentro, loading, error, refetch } =
+    useEncuentroDetail(encounterId);
+
+  // Manage encounter updates
+  const {
+    updateEncounter,
+    isLoading: isUpdatingEncounter,
+    error: updateEncounterError,
+  } = useEncounter(encounterId);
+
+  // Manage patient updates
+  const {
+    updatePatient,
+    isLoading: isUpdatingPatient,
+    error: updatePatientError,
+  } = usePatients();
+
+  // Combined loading state
+  const isUpdating = isUpdatingEncounter || isUpdatingPatient;
+
+  // Status message state for operation feedback
+  const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
+    null
+  );
+
+  // ========== UTILITY FUNCTIONS ==========
+  /**
+   * Format datetime to a readable format
+   *
+   * @param dateTimeStr - ISO date string
+   * @returns Formatted date string
+   */
+  const formatDateTime = (dateTimeStr: string): string => {
+    try {
+      return format(new Date(dateTimeStr), "dd MMMM yyyy HH:mm", {
+        locale: es,
+      });
+    } catch {
+      return dateTimeStr;
+    }
+  };
+
+  // ========== EVENT HANDLERS ==========
+  /**
+   * Handle updating patient information for an encounter
+   *
+   * @param patientId - ID of the patient to connect
+   * @param patientName - Name to use for the patient/encounter
+   */
+  const handleUpdatePatient = async (
+    patientId: number,
+    patientName: string
+  ) => {
+    setStatusMessage(null);
+    console.log(
+      `Updating encounter ${encounterId} with patient ${patientId} (${patientName})`
+    );
+
+    try {
+      // Create update payload
+      const updateData = {
+        id_paciente: patientId,
+        nombre_encuentro: patientName,
+        paciente_conectado: true, // Explicitly connect patient
+      };
+
+      console.log("Update data being sent:", updateData);
+
+      // Update the encounter
+      const success = await updateEncounter(encounterId, updateData);
+
+      if (success) {
+        setStatusMessage({
+          type: "success",
+          message: `Paciente actualizado: ${patientName}`,
+        });
+
+        // Refresh data
+        await refetch();
+      } else {
+        setStatusMessage({
+          type: "error",
+          message: updateEncounterError || "Error al actualizar el paciente",
+        });
+      }
+    } catch (err) {
+      console.error("Error in handleUpdatePatient:", err);
+      setStatusMessage({
+        type: "error",
+        message: err instanceof Error ? err.message : "Error desconocido",
+      });
+    }
+  };
+
+  /**
+   * Handle updating both patient name and encounter name
+   *
+   * @param patientId - ID of the patient to update
+   * @param patientName - New name for the patient
+   * @param encounterName - New name for the encounter
+   */
+  const handleUpdatePatientAndEncounter = async (
+    patientId: number,
+    patientName: string,
+    encounterName: string
+  ) => {
+    setStatusMessage(null);
+
+    try {
+      console.log(`Updating patient ${patientId} name to "${patientName}"`);
+      console.log(
+        `Updating encounter ${encounterId} name to "${encounterName}"`
+      );
+
+      // First, update the patient's name
+      const patientUpdateSuccess = await updatePatient(patientId, patientName);
+
+      if (!patientUpdateSuccess) {
+        setStatusMessage({
+          type: "error",
+          message:
+            updatePatientError || "Error al actualizar nombre del paciente",
+        });
+        return;
+      }
+
+      // Then, update the encounter name
+      const updateData = {
+        id_paciente: patientId,
+        nombre_encuentro: encounterName,
+        paciente_conectado: true,
+      };
+
+      const encounterUpdateSuccess = await updateEncounter(
+        encounterId,
+        updateData
+      );
+
+      if (!encounterUpdateSuccess) {
+        setStatusMessage({
+          type: "error",
+          message:
+            updateEncounterError || "Error al actualizar nombre del encuentro",
+        });
+        return;
+      }
+
+      setStatusMessage({
+        type: "success",
+        message: `Paciente y encuentro actualizados correctamente`,
+      });
+
+      // Refresh the encounter data to see the changes
+      await refetch();
+    } catch (err) {
+      console.error("Error in handleUpdatePatientAndEncounter:", err);
+      setStatusMessage({
+        type: "error",
+        message: err instanceof Error ? err.message : "Error desconocido",
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <>
+        <TopBar
+          encounterName="Cargando encuentro..."
+          encounterDate="Cargando fecha..."
+        />
+        <div className="flex justify-center items-center h-[calc(100vh-64px)]">
+          <LoadingSpinner />
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <TopBar encounterName="Error al cargar" encounterDate="--" />
+        <ErrorDisplay
+          message="No se pudo cargar la información del encuentro"
+          details={error}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <TopBar
+        encounterName={encuentro?.nombre_encuentro || "Consulta médica"}
+        encounterDate={
+          encuentro?.fecha ? formatDateTime(encuentro.fecha) : "Sin fecha"
+        }
+        onUpdatePatient={handleUpdatePatient}
+        onUpdatePatientAndEncounter={handleUpdatePatientAndEncounter}
+        isUpdating={isUpdating}
+        isPatientConnected={!!encuentro?.paciente_conectado}
+        patientId={encuentro?.id_paciente || 0}
+        patientName={encuentro?.nombre_paciente || ""}
+      />
+
+      {statusMessage && (
+        <div
+          className={`p-3 mx-6 my-2 ${
+            statusMessage.type === "success"
+              ? "bg-green-100 text-green-800"
+              : "bg-red-100 text-red-800"
+          } rounded-md transition-opacity duration-300`}
+        >
+          {statusMessage.message}
+        </div>
+      )}
+    </>
+  );
+}

@@ -17,17 +17,21 @@ interface BaseLayoutProps {
  * @param {React.ReactNode} props.children - The child components to render.
  * @returns {JSX.Element} The layout content.
  */
-const LayoutContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const LayoutContent: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const { isExpanded } = useSidebar();
-  
+
   return (
     <div className="flex min-h-screen">
       <aside className="fixed inset-y-0 left-0 z-50">
         <Sidebar />
       </aside>
-      <main className={`flex-1 transition-all duration-300 ${
-        isExpanded ? 'ml-[200px] lg:ml-[224px]' : 'ml-12 lg:ml-14'
-      }`}>
+      <main
+        className={`flex-1 transition-all duration-300 ${
+          isExpanded ? "ml-[200px] lg:ml-[224px]" : "ml-12 lg:ml-14"
+        }`}
+      >
         {children}
       </main>
     </div>

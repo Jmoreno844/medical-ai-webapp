@@ -3,7 +3,7 @@ import Icon from "@/components/icons/Icon";
 import IconButton from "@/components/IconButton";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useActivePath } from "@/app/app_layout/hooks/useActivePath";
-import { useEncountersSidebar } from "../hooks/useEncountersSidebar";
+import { useEncountersSidebar } from "../hooks/Encuentros/useEncountersSidebar";
 import { useNavigationItems } from "../hooks/useNavigationItems";
 import { EncountersSidebar } from "./EncountersSidebar";
 import Link from "next/link";
