@@ -4,13 +4,15 @@ import { AxiosError } from "axios";
 
 /**
  * Patient data structure returned from API
+ * Matches the PacienteResponse schema from the backend
  */
 export interface Patient {
   /** Unique identifier for the patient */
   id: number;
   /** Full name of the patient */
   nombre: string;
-  // Add other patient properties as needed
+  /** Optional summary or notes about the patient */
+  resumen?: string | null;
 }
 
 /**
@@ -60,9 +62,20 @@ export const usePatients = () => {
     setError(null);
 
     try {
+      // Call the correct endpoint with the search parameter
       const response = await axiosInstance.get(
-        `/api/pacientes/search?q=${encodeURIComponent(query)}`
+        `api/pacientes/search?name=${encodeURIComponent(query)}`
       );
+
+      // Validate the response data
+      if (!Array.isArray(response.data)) {
+        console.warn(
+          "Expected array response from patient search:",
+          response.data
+        );
+        return [];
+      }
+
       return response.data;
     } catch (err) {
       console.error("Error searching patients:", err);
@@ -84,7 +97,7 @@ export const usePatients = () => {
     setError(null);
 
     try {
-      const response = await axiosInstance.post("/api/pacientes", {
+      const response = await axiosInstance.post("/paciente", {
         nombre: patientName,
       });
 
@@ -118,7 +131,7 @@ export const usePatients = () => {
     setError(null);
 
     try {
-      await axiosInstance.put(`/api/paciente/${patientId}`, {
+      await axiosInstance.put(`/paciente/${patientId}`, {
         nombre: patientName,
       });
 

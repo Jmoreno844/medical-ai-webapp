@@ -2,6 +2,7 @@ from ninja import Router
 from typing import List
 from django.shortcuts import get_object_or_404
 from django.http import HttpRequest
+from django.db.models import Q
 from .schemas import PacienteCreate, PacienteResponse, PacienteUpdate
 from .models import Paciente, PacienteMedico
 from apps.users.models import User
@@ -63,3 +64,38 @@ def update_paciente(request: HttpRequest, paciente_id: int, data: PacienteUpdate
     paciente.save()
 
     return paciente
+
+
+@router.get("/pacientes/search", response=List[PacienteResponse], auth=django_auth)
+def search_pacientes(request: HttpRequest, name: str = ""):
+    """
+    Search for patients by name.
+
+    This endpoint allows doctors to search for patients by name and only returns
+    patients that are associated with the authenticated doctor.
+
+    Args:
+        name: The search string to match against patient names
+
+    Returns:
+        A list of patients matching the search criteria and associated with the doctor
+
+    Raises:
+        403: If the user is not a doctor
+    """
+    user = request.auth
+
+    # Check if the user has the right role
+    if user.role != "medico":
+        return {"detail": "Only doctors can search patients"}, 403
+
+    # Get all patients associated with this doctor and matching the search term
+    # Using case-insensitive contains lookup
+    pacientes = Paciente.objects.filter(
+        # Join through the PacienteMedico relationship table
+        pacientemedico__id_medico=user,
+        # Filter by name containing the search term (case insensitive)
+        nombre__icontains=name,
+    ).distinct()  # Use distinct to avoid duplicates
+
+    return list(pacientes)

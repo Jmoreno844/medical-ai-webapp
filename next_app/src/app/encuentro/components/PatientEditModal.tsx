@@ -3,6 +3,28 @@ import { PatientEditModalProps } from "../utils/TopBarInterface";
 import { usePatients, Patient } from "../hooks/usePatients";
 
 /**
+ * Component to render a single patient search result
+ */
+const PatientSearchResult: React.FC<{
+  patient: Patient;
+  onSelect: (id: number, name: string) => void;
+}> = ({ patient, onSelect }) => (
+  <li
+    key={patient.id}
+    className="p-2 hover:bg-gray-100 cursor-pointer"
+    onClick={() => onSelect(patient.id, patient.nombre)}
+    role="option"
+  >
+    <div>
+      <span className="font-medium">{patient.nombre}</span>
+      {patient.resumen && (
+        <p className="text-xs text-gray-500 truncate mt-1">{patient.resumen}</p>
+      )}
+    </div>
+  </li>
+);
+
+/**
  * Modal component for editing patient and encounter information
  *
  * This component has two modes:
@@ -219,14 +241,11 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
             >
               <ul>
                 {searchResults.map((result) => (
-                  <li
+                  <PatientSearchResult
                     key={result.id}
-                    className="p-2 hover:bg-gray-100 cursor-pointer"
-                    onClick={() => handleSelectResult(result.id, result.nombre)}
-                    role="option"
-                  >
-                    {result.nombre}
-                  </li>
+                    patient={result}
+                    onSelect={handleSelectResult}
+                  />
                 ))}
               </ul>
             </div>
