@@ -3,19 +3,22 @@ import React, { createContext, useState, useEffect, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import axiosInstance from "../utils/axiosInstance";
 import LoadingCircle from "../components/ui/loading_circle";
+import { getCookie } from "../utils/cookieUtils";
 
 // Define the shape of our authentication context
 export interface AuthContextType {
   isAuthenticated: boolean;
   isAuthLoading: boolean;
   setIsAuthenticated: (auth: boolean) => void;
+  csrfToken: string | null;
 }
 
 // Create context with default values
 export const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
-  isAuthLoading: false, // Add this line to match the interface
+  isAuthLoading: false,
   setIsAuthenticated: () => {},
+  csrfToken: null,
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -23,6 +26,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [csrfToken, setCsrfToken] = useState<string | null>(null);
 
   // Memoize public routes to prevent unnecessary re-renders
   const publicRoutes = useMemo(
@@ -30,12 +34,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     []
   );
 
-  // Initial authentication check on mount
+  // Initial authentication check and CSRF token setup on mount
   useEffect(() => {
+    // Get initial CSRF token if it exists
+    const initialToken = getCookie("csrftoken");
+    if (initialToken) {
+      setCsrfToken(initialToken);
+    }
+
     axiosInstance
       .get("api/auth/me")
-      .then(() => {
+      .then((response) => {
         setIsAuthenticated(true);
+
+        // Check for CSRF token in cookies after successful auth
+        const token = getCookie("csrftoken");
+        if (token) {
+          setCsrfToken(token);
+        }
       })
       .catch((error) => {
         console.error("Auth check failed:", error);
@@ -81,7 +97,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated, isAuthLoading, setIsAuthenticated }}
+      value={{
+        isAuthenticated,
+        isAuthLoading,
+        setIsAuthenticated,
+        csrfToken,
+      }}
     >
       {children}
     </AuthContext.Provider>

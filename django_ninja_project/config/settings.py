@@ -29,7 +29,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG") == "True"
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 
 # Application definition
@@ -42,13 +42,16 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "accounts.apps.AccountsConfig",  # Make sure this is included
+    "apps.users.apps.UsersConfig",
+    "apps.encuentro.apps.EncuentroConfig",
+    "apps.pacientes.apps.PacientesConfig",
 ]
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
 ]
 
+CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 CORS_ALLOW_CREDENTIALS = True  # Probably false in production
 
 CORS_ALLOW_METHODS = [
@@ -162,4 +165,4 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Add this setting to use your custom user model
-AUTH_USER_MODEL = "accounts.User"
+AUTH_USER_MODEL = "users.User"

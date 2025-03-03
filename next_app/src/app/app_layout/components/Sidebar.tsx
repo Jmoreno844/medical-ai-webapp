@@ -2,7 +2,7 @@
 import Icon from "@/components/icons/Icon";
 import IconButton from "@/components/IconButton";
 import { useSidebar } from "@/contexts/SidebarContext";
-import { useActivePath } from "@/app/app_layout/components/useActivePath";
+import { useActivePath } from "@/app/app_layout/hooks/useActivePath";
 import { useEncountersSidebar } from "../hooks/useEncountersSidebar";
 import { useNavigationItems } from "../hooks/useNavigationItems";
 import { EncountersSidebar } from "./EncountersSidebar";
@@ -11,13 +11,14 @@ import Link from "next/link";
 /**
  * Sidebar component that displays the navigation sidebar with toggle functionality.
  * It handles expand/collapse actions and renders navigation items as well as optional right sidebar.
- * 
+ *
  * Security note: Ensure that any dynamic data passed into navigation items is properly validated and sanitized.
  */
 const Sidebar = () => {
   const { isExpanded, setIsExpanded } = useSidebar();
   const { isActivePath } = useActivePath();
-  const { showRightSidebar, toggleSidebar, closeSidebar } = useEncountersSidebar();
+  const { showRightSidebar, toggleSidebar, closeSidebar } =
+    useEncountersSidebar();
   const navigationItems = useNavigationItems(toggleSidebar, showRightSidebar);
 
   /**
@@ -84,30 +85,69 @@ const Sidebar = () => {
                 }`}
               >
                 {!item.isToggle ? (
-                  <Link href={item.path} className="flex items-center w-full">
-                    <div className="w-10 md:w-12 lg:w-14 flex items-center justify-center">
-                      <Icon
-                        src={item.icon}
-                        className={`h-8 w-4 md:h-5 md:w-5 ${
-                          isActivePath(item.path)
-                            ? "filter invert brightness-0 saturate-100"
-                            : "text-black"
-                        }`}
-                        alt={item.label}
-                      />
-                    </div>
-                    {isExpanded && (
-                      <span
-                        className={`pr-4 text-xs md:text-sm whitespace-nowrap ${
-                          isActivePath(item.path)
-                            ? "text-white font-medium"
-                            : "text-black"
-                        }`}
-                      >
-                        {item.label}
-                      </span>
-                    )}
-                  </Link>
+                  item.action ? (
+                    // If there's an action, use a button instead of a Link
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        item.action?.();
+                      }}
+                      className="flex items-center w-full focus:outline-none"
+                    >
+                      <div className="w-10 md:w-12 lg:w-14 flex items-center justify-center">
+                        <Icon
+                          src={item.icon}
+                          className={`h-8 w-4 md:h-5 md:w-5 ${
+                            isActivePath(item.path)
+                              ? "filter invert brightness-0 saturate-100"
+                              : "text-black"
+                          }`}
+                          alt={item.label}
+                        />
+                      </div>
+                      {isExpanded && (
+                        <span
+                          className={`pr-4 text-xs md:text-sm whitespace-nowrap ${
+                            isActivePath(item.path)
+                              ? "text-white font-medium"
+                              : "text-black"
+                          }`}
+                        >
+                          {item.label}
+                        </span>
+                      )}
+                    </button>
+                  ) : (
+                    // If there's a path but no action, use a Link
+                    <Link
+                      href={item.path || "#"} // Adding fallback to prevent undefined href
+                      className="flex items-center w-full"
+                    >
+                      <div className="w-10 md:w-12 lg:w-14 flex items-center justify-center">
+                        <Icon
+                          src={item.icon}
+                          className={`h-8 w-4 md:h-5 md:w-5 ${
+                            isActivePath(item.path)
+                              ? "filter invert brightness-0 saturate-100"
+                              : "text-black"
+                          }`}
+                          alt={item.label}
+                        />
+                      </div>
+                      {isExpanded && (
+                        <span
+                          className={`pr-4 text-xs md:text-sm whitespace-nowrap ${
+                            isActivePath(item.path)
+                              ? "text-white font-medium"
+                              : "text-black"
+                          }`}
+                        >
+                          {item.label}
+                        </span>
+                      )}
+                    </Link>
+                  )
                 ) : (
                   <div className="flex items-center w-full justify-between">
                     <div className="flex items-center">

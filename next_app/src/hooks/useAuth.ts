@@ -3,6 +3,7 @@
 import { useState, useContext } from "react";
 import axiosInstance from "../utils/axiosInstance";
 import { AuthContext } from "../contexts/AuthContext";
+import { getCookie } from "../utils/cookieUtils";
 
 interface LoginCredentials {
   email: string;
@@ -29,6 +30,15 @@ export const useAuth = () => {
         email,
         password,
       });
+
+      // After successful login, the server should set the CSRF token as a cookie
+      // We'll check if it's been set
+      const csrfToken = getCookie("csrftoken");
+      console.log("CSRF token after login:", csrfToken);
+      if (!csrfToken) {
+        console.warn("No CSRF token found after login");
+      }
+
       authContext.setIsAuthenticated(true);
       return response.data;
     } catch (err) {

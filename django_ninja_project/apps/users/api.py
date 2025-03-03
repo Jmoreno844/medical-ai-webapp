@@ -1,5 +1,4 @@
 # api/api.py
-from django.urls import path
 from ninja import Router
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.hashers import make_password
@@ -9,6 +8,7 @@ from datetime import datetime, timedelta
 import jwt
 import os
 from django.conf import settings
+from django.middleware.csrf import get_token
 
 from .models import User, UserRole
 from .schemas import (
@@ -22,14 +22,16 @@ from .schemas import (
 
 router = Router()
 
+
 def create_token(user):
     expiration = datetime.utcnow() + timedelta(hours=1)
-    secret_key = os.getenv('JWT_SECRET_KEY', settings.SECRET_KEY)
+    secret_key = os.getenv("JWT_SECRET_KEY", settings.SECRET_KEY)
     payload = {
         "user_id": user.id,
         "exp": expiration,
     }
     return jwt.encode(payload, secret_key, algorithm="HS256")
+
 
 @router.post("/registro", response={201: UserRegistrationOut, 400: dict})
 def register_user(request, data: UserRegistrationIn):
@@ -47,15 +49,22 @@ def register_user(request, data: UserRegistrationIn):
     return 201, user
 
 
-@router.post("/login", response={200: AuthTokenOut, 401: dict})
+@router.post("/login", response={200: dict, 401: dict})
 def login_user(request, data: UserLoginIn):
-    """Login user and return JWT token"""
+    """Login user using session authentication"""
     user = authenticate(request, email=data.email, password=data.password)
     if user is None:
         return 401, {"message": "Invalid credentials"}
 
-    token = create_token(user)
-    return 200, {"token": token}
+    login(request, user)
+    return 200, {"message": "Successfully logged in"}
+
+
+@router.post("/logout")
+def logout_user(request):
+    """Logout the current user"""
+    logout(request)
+    return {"message": "Successfully logged out"}
 
 
 @router.post("/jwt-token", response={200: AuthTokenOut, 401: dict})
@@ -102,7 +111,7 @@ def delete_user(request, user_id: int):
 def me(request):
     """Return True if session validated, else False"""
     if request.user and request.user.is_authenticated:
-        return True
+        return 200, True
     return 401, {"message": "Session not validated"}
 
 
@@ -110,5 +119,12 @@ def me(request):
 def me_data(request):
     """Return user profile data if session validated, else return error"""
     if request.user and request.user.is_authenticated:
-        return request.user
+        return 200, request.user
     return 401, {"message": "Session not validated"}
+
+
+@router.get("/csrf-token", response={200: dict})
+def get_csrf_token(request):
+    """Get a CSRF token for use in forms and API requests"""
+    csrf_token = get_token(request)
+    return {"csrfToken": csrf_token}
