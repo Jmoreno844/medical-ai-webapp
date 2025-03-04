@@ -1,6 +1,6 @@
 "use client";
-import React, { useState } from "react";
-import TopBar from "../components/EncuentroHeader/EncuentroHeader";
+import React from "react";
+import EncuentroHeader from "../components/EncuentroHeader/EncuentroHeader";
 import { useEncuentroDetail } from "../../app_layout/hooks/Encuentros/useEncuentroDetail";
 import { useEncounter } from "../hooks/useEncounter";
 import { usePatients } from "../hooks/usePatients";
@@ -15,16 +15,6 @@ import { es } from "date-fns/locale";
 interface EncounterDetailClientProps {
   /** Encounter ID from URL params */
   id: string;
-}
-
-/**
- * Structure for status messages
- */
-interface StatusMessage {
-  /** Type of message - success or error */
-  type: "success" | "error";
-  /** Message content to display */
-  message: string;
 }
 
 /**
@@ -62,11 +52,6 @@ export function EncounterDetailClient({ id }: EncounterDetailClientProps) {
   // Combined loading state
   const isUpdating = isUpdatingEncounter || isUpdatingPatient;
 
-  // Status message state for operation feedback
-  const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(
-    null
-  );
-
   // ========== UTILITY FUNCTIONS ==========
   /**
    * Format datetime to a readable format
@@ -95,7 +80,6 @@ export function EncounterDetailClient({ id }: EncounterDetailClientProps) {
     patientId: number,
     patientName: string
   ) => {
-    setStatusMessage(null);
     console.log(
       `Updating encounter ${encounterId} with patient ${patientId} (${patientName})`
     );
@@ -114,25 +98,11 @@ export function EncounterDetailClient({ id }: EncounterDetailClientProps) {
       const success = await updateEncounter(encounterId, updateData);
 
       if (success) {
-        setStatusMessage({
-          type: "success",
-          message: `Paciente actualizado: ${patientName}`,
-        });
-
         // Refresh data
         await refetch();
-      } else {
-        setStatusMessage({
-          type: "error",
-          message: updateEncounterError || "Error al actualizar el paciente",
-        });
       }
     } catch (err) {
       console.error("Error in handleUpdatePatient:", err);
-      setStatusMessage({
-        type: "error",
-        message: err instanceof Error ? err.message : "Error desconocido",
-      });
     }
   };
 
@@ -148,8 +118,6 @@ export function EncounterDetailClient({ id }: EncounterDetailClientProps) {
     patientName: string,
     encounterName: string
   ) => {
-    setStatusMessage(null);
-
     try {
       console.log(`Updating patient ${patientId} name to "${patientName}"`);
       console.log(
@@ -160,11 +128,6 @@ export function EncounterDetailClient({ id }: EncounterDetailClientProps) {
       const patientUpdateSuccess = await updatePatient(patientId, patientName);
 
       if (!patientUpdateSuccess) {
-        setStatusMessage({
-          type: "error",
-          message:
-            updatePatientError || "Error al actualizar nombre del paciente",
-        });
         return;
       }
 
@@ -180,35 +143,19 @@ export function EncounterDetailClient({ id }: EncounterDetailClientProps) {
         updateData
       );
 
-      if (!encounterUpdateSuccess) {
-        setStatusMessage({
-          type: "error",
-          message:
-            updateEncounterError || "Error al actualizar nombre del encuentro",
-        });
-        return;
+      if (encounterUpdateSuccess) {
+        // Refresh the encounter data to see the changes
+        await refetch();
       }
-
-      setStatusMessage({
-        type: "success",
-        message: `Paciente y encuentro actualizados correctamente`,
-      });
-
-      // Refresh the encounter data to see the changes
-      await refetch();
     } catch (err) {
       console.error("Error in handleUpdatePatientAndEncounter:", err);
-      setStatusMessage({
-        type: "error",
-        message: err instanceof Error ? err.message : "Error desconocido",
-      });
     }
   };
 
   if (loading) {
     return (
       <>
-        <TopBar
+        <EncuentroHeader
           encounterName="Cargando encuentro..."
           encounterDate="Cargando fecha..."
         />
@@ -222,7 +169,7 @@ export function EncounterDetailClient({ id }: EncounterDetailClientProps) {
   if (error) {
     return (
       <>
-        <TopBar encounterName="Error al cargar" encounterDate="--" />
+        <EncuentroHeader encounterName="Error al cargar" encounterDate="--" />
         <ErrorDisplay
           message="No se pudo cargar la información del encuentro"
           details={error}
@@ -232,31 +179,17 @@ export function EncounterDetailClient({ id }: EncounterDetailClientProps) {
   }
 
   return (
-    <>
-      <TopBar
-        encounterName={encuentro?.nombre_encuentro || "Consulta médica"}
-        encounterDate={
-          encuentro?.fecha ? formatDateTime(encuentro.fecha) : "Sin fecha"
-        }
-        onUpdatePatient={handleUpdatePatient}
-        onUpdatePatientAndEncounter={handleUpdatePatientAndEncounter}
-        isUpdating={isUpdating}
-        isPatientConnected={!!encuentro?.paciente_conectado}
-        patientId={encuentro?.id_paciente || 0}
-        patientName={encuentro?.nombre_paciente || ""}
-      />
-
-      {statusMessage && (
-        <div
-          className={`p-3 mx-6 my-2 ${
-            statusMessage.type === "success"
-              ? "bg-green-100 text-green-800"
-              : "bg-red-100 text-red-800"
-          } rounded-md transition-opacity duration-300`}
-        >
-          {statusMessage.message}
-        </div>
-      )}
-    </>
+    <EncuentroHeader
+      encounterName={encuentro?.nombre_encuentro || "Consulta médica"}
+      encounterDate={
+        encuentro?.fecha ? formatDateTime(encuentro.fecha) : "Sin fecha"
+      }
+      onUpdatePatient={handleUpdatePatient}
+      onUpdatePatientAndEncounter={handleUpdatePatientAndEncounter}
+      isUpdating={isUpdating}
+      isPatientConnected={!!encuentro?.paciente_conectado}
+      patientId={encuentro?.id_paciente || 0}
+      patientName={encuentro?.nombre_paciente || ""}
+    />
   );
 }

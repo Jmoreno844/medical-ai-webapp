@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "apps.users.apps.UsersConfig",
     "apps.encuentro.apps.EncuentroConfig",
     "apps.pacientes.apps.PacientesConfig",
+    "apps.plantillas.apps.PlantillasConfig",
 ]
 
 CORS_ALLOWED_ORIGINS = [
