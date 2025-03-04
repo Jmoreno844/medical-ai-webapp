@@ -46,6 +46,8 @@ INSTALLED_APPS = [
     "apps.encuentro.apps.EncuentroConfig",
     "apps.pacientes.apps.PacientesConfig",
     "apps.plantillas.apps.PlantillasConfig",
+    "apps.documentos.apps.DocumentosConfig",
+    "apps.generative_ai.apps.GenerativeAIConfig",
 ]
 
 CORS_ALLOWED_ORIGINS = [

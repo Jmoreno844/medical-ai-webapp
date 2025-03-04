@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import EncuentroHeader from "../components/EncuentroHeader/EncuentroHeader";
+import { DocumentArea } from "../components/DocumentArea";
 import { useEncuentroDetail } from "../../app_layout/hooks/Encuentros/useEncuentroDetail";
 import { useEncounter } from "../hooks/useEncounter";
 import { usePatients } from "../hooks/usePatients";
@@ -179,17 +180,22 @@ export function EncounterDetailClient({ id }: EncounterDetailClientProps) {
   }
 
   return (
-    <EncuentroHeader
-      encounterName={encuentro?.nombre_encuentro || "Consulta médica"}
-      encounterDate={
-        encuentro?.fecha ? formatDateTime(encuentro.fecha) : "Sin fecha"
-      }
-      onUpdatePatient={handleUpdatePatient}
-      onUpdatePatientAndEncounter={handleUpdatePatientAndEncounter}
-      isUpdating={isUpdating}
-      isPatientConnected={!!encuentro?.paciente_conectado}
-      patientId={encuentro?.id_paciente || 0}
-      patientName={encuentro?.nombre_paciente || ""}
-    />
+    <>
+      <EncuentroHeader
+        encounterName={encuentro?.nombre_encuentro || "Consulta médica"}
+        encounterDate={
+          encuentro?.fecha ? formatDateTime(encuentro.fecha) : "Sin fecha"
+        }
+        onUpdatePatient={handleUpdatePatient}
+        onUpdatePatientAndEncounter={handleUpdatePatientAndEncounter}
+        isUpdating={isUpdating}
+        isPatientConnected={!!encuentro?.paciente_conectado}
+        patientId={encuentro?.id_paciente || 0}
+        patientName={encuentro?.nombre_paciente || ""}
+      />
+      <div className="p-4">
+        <DocumentArea encounterId={encounterId} />
+      </div>
+    </>
   );
 }

@@ -5,14 +5,15 @@ from apps.users.api import router as accounts_router
 from apps.encuentro.api import router as encuentro_router
 from apps.pacientes.api import router as pacientes_router
 from apps.plantillas.api import router as plantillas_router
+from apps.documentos.api import router as documentos_router
 
 api = NinjaAPI(
     title="Medical API",
     version="1.0.0",
     urls_namespace="medical_api",
-    csrf=False,
 )
 
+api.add_router("/", documentos_router)
 api.add_router("/auth/", accounts_router)
 api.add_router("/", encuentro_router)
 api.add_router("/", pacientes_router)
