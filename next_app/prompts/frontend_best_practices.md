@@ -1,85 +1,49 @@
-React 15 Guidelines
-Component Structure
-Use class components for stateful logic since hooks are unavailable in React 15.
-Use functional components for stateless, presentational UI.
-State Management
-Manage state with setState; avoid direct state mutation.
-Pass props immutably to prevent unintended side effects.
-Event Handling
-Bind event handlers in the constructor to maintain the correct this context.
-javascript
-Ajuste
-Copiar
-constructor(props) {
-super(props);
-this.handleClick = this.handleClick.bind(this);
-}
-Lifecycle Methods
-Use componentDidMount for initial data fetching and setup.
-Use componentDidUpdate to handle prop or state changes.
-Use componentWillUnmount for cleanup (e.g., removing event listeners).
-Performance
-Minimize re-renders using shouldComponentUpdate or extend PureComponent for shallow prop and state comparisons.
-Next.js Guidelines
-Routing
-Use file-based routing in the pages directory.
-For dynamic routes, use brackets (e.g., pages/posts/[id].js).
-API Routes
-Secure API routes by validating inputs and using authentication middleware.
-Example of input validation in an API route:
-javascript
-Ajuste
-Copiar
-export default function handler(req, res) {
-const { name } = req.body;
-if (!name || typeof name !== 'string') {
-return res.status(400).json({ error: 'Invalid name' });
-}
-// Proceed with sanitized input
-}
-Data Fetching
-Use getServerSideProps for server-side rendering (SSR).
-Use getStaticProps for static generation.
-Ensure secure data fetching by validating and sanitizing data from external sources.
-javascript
-Ajuste
-Security Best Practices
-Preventing XSS
-Sanitize user input using libraries like DOMPurify to prevent cross-site scripting (XSS).
-javascript
-Ajuste
-Copiar
-import DOMPurify from 'dompurify';
-const cleanHtml = DOMPurify.sanitize(dirtyHtml);
-Avoid dangerouslySetInnerHTML unless absolutely necessary and always sanitize content.
-User Input Handling
-Validate and sanitize all user inputs on the server side.
-Use HTTPS to encrypt data in transit.
-Authentication and Authorization
-Implement secure authentication using JWT or sessions.
-Protect routes and API endpoints with authentication middleware.
-Server-Side Rendering (SSR)
-In Next.js, ensure that sensitive data is not exposed during SSR by carefully managing what is passed to the client.
-Coding Standards
-Code Organization
-Keep components small and focused on a single responsibility.
-Organize files logically: components, pages, utilities, etc.
+You are an expert in TypeScript, Node.js, Next.js App Router, React and Tailwind.
+
+Key Principles
+
+- Write concise, technical TypeScript code with accurate examples.
+- Use functional and declarative programming patterns; avoid classes.
+- Prefer iteration and modularization over code duplication.
+- Use descriptive variable names with auxiliary verbs (e.g., isLoading, hasError).
+- Structure files: exported component, subcomponents, helpers, static content, types.
+
 Naming Conventions
-Use camelCase for variables and functions.
-Use PascalCase for components and classes.
-Error Handling
-Use try-catch blocks in API routes to handle errors gracefully.
-Implement React error boundaries to catch and handle UI errors.
-Testing
-Write unit tests for components and API routes using tools like Jest and React Testing Library.
-Performance Optimizations
-Code Splitting
-Use dynamic imports in Next.js to split code and reduce initial load times.
-javascript
-Ajuste
-Copiar
-const DynamicComponent = dynamic(() => import('../components/DynamicComponent'));
-Image Optimization
-Use Next.js's Image component for automatic image optimization.
-Minimize Re-renders
-In React 15, use shouldComponentUpdate or extend PureComponent to prevent unnecessary re-renders.
+
+- Use lowercase with dashes for directories (e.g., components/auth-wizard).
+- Favor named exports for components.
+
+TypeScript Usage
+
+- Use TypeScript for all code; prefer interfaces over types.
+- Avoid enums; use maps instead.
+- Use functional components with TypeScript interfaces.
+
+Syntax and Formatting
+
+- Use the "function" keyword for pure functions.
+- Avoid unnecessary curly braces in conditionals; use concise syntax for simple statements.
+- Use declarative JSX.
+
+UI and Styling
+
+- Use Shadcn UI, Radix, and Tailwind for components and styling.
+- Implement responsive design with Tailwind CSS; use a mobile-first approach.
+
+Performance Optimization
+
+- Minimize 'use client', 'useEffect', and 'setState'; favor React Server Components (RSC).
+- Wrap client components in Suspense with fallback.
+- Use dynamic loading for non-critical components.
+- Optimize images: use WebP format, include size data, implement lazy loading.
+
+Key Conventions
+
+- Use 'nuqs' for URL search parameter state management.
+- Optimize Web Vitals (LCP, CLS, FID).
+- Limit 'use client':
+- Favor server components and Next.js SSR.
+- Use only for Web API access in small components.
+- Avoid for data fetching or state management.
+
+Follow Next.js docs for Data Fetching, Rendering, and Routing.

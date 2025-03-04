@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { PatientEditModalProps } from "../utils/TopBarInterface";
+import { PatientEditModalProps } from "../utils/EncuentroHeaderInterface";
 import { usePatients, Patient } from "../hooks/usePatients";
 
 /**
@@ -209,8 +209,10 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
    */
   const handleUpdateEncounter = () => {
     if (connectedName.trim()) {
+      const patientIdToUse = currentPatientId !== null ? currentPatientId : 0;
+
       onUpdatePatientAndEncounter(
-        currentPatientId,
+        patientIdToUse,
         connectedName.trim(),
         connectedName.trim()
       );
@@ -239,8 +241,8 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
         {/* Modal header */}
         <h2 className="text-xl font-semibold mb-4">
           {isPatientConnected
-            ? "Editar encuentro y paciente"
-            : "Editar paciente"}
+            ? "Editar nombre del paciente"
+            : "Enlazar paciente"}
         </h2>
 
         {/* Modal content based on mode */}

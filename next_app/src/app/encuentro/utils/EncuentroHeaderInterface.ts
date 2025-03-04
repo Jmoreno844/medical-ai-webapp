@@ -61,7 +61,7 @@ export interface PatientEditModalProps {
   /** Current name of the encounter */
   currentEncounterName?: string;
   /** Current patient ID if a patient is connected */
-  currentPatientId?: number;
+  currentPatientId?: number | null;
   /** Current patient name if a patient is connected */
   currentPatientName?: string;
   /** Function to update both patient and encounter names */

@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import TopBar from "../components/TopBar";
+import TopBar from "../components/EncuentroHeader/EncuentroHeader";
 import { useEncuentroDetail } from "../../app_layout/hooks/Encuentros/useEncuentroDetail";
 import { useEncounter } from "../hooks/useEncounter";
 import { usePatients } from "../hooks/usePatients";

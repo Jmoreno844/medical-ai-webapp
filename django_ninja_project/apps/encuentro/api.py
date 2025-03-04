@@ -114,3 +114,15 @@ def update_encuentro(request, encuentro_id: int, payload: EncuentroUpdate):
         "nombre_encuentro": encuentro.nombre_encuentro,
         "fecha": encuentro.fecha,
     }
+
+
+@router.delete("/encuentros/{encuentro_id}", response=dict, auth=django_auth)
+def delete_encuentro(request, encuentro_id: int):
+    encuentro = get_object_or_404(Encuentro, id=encuentro_id)
+
+    # Verify the doctor owns this encounter
+    if encuentro.id_medico_id != request.user.id:
+        raise PermissionError("No puede eliminar encuentros de otro médico")
+
+    encuentro.delete()
+    return {"success": True}

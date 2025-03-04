@@ -6,7 +6,7 @@ import { AxiosError } from "axios";
  * Interface for encounter update data
  */
 interface EncounterUpdateData {
-  id_paciente?: number;
+  id_paciente?: number | null;
   nombre_encuentro?: string;
   paciente_conectado?: boolean;
 }
@@ -117,8 +117,64 @@ export const useEncounter = (encounterId?: number) => {
     }
   };
 
+  /**
+   * Deletes an encounter
+   *
+   * @param encounterIdToDelete - The ID of the encounter to delete
+   * @returns An object with success flag and data if available
+   */
+  const deleteEncounter = async (
+    encounterIdToDelete: number = encounterId || 0
+  ): Promise<{ success: boolean; data?: any }> => {
+    if (!encounterIdToDelete) {
+      setError("No se especificó un ID de encuentro para eliminar");
+      return { success: false };
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      console.log(`Deleting encounter ${encounterIdToDelete}`);
+
+      const response = await axiosInstance.delete(
+        `/api/encuentros/${encounterIdToDelete}`
+      );
+
+      console.log("Delete response:", response.data);
+
+      // Check if the response contains a success indicator
+      const success = response.data?.success === true;
+
+      return {
+        success,
+        data: response.data,
+      };
+    } catch (err) {
+      const errorMessage = getErrorMessage(err);
+      setError(errorMessage);
+
+      // More detailed error logging
+      if (err instanceof AxiosError) {
+        console.error("Error deleting encounter:", {
+          status: err.response?.status,
+          statusText: err.response?.statusText,
+          data: err.response?.data,
+          message: errorMessage,
+        });
+      } else {
+        console.error("Error deleting encounter:", errorMessage, err);
+      }
+
+      return { success: false };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     updateEncounter,
+    deleteEncounter,
     isLoading,
     error,
   };
