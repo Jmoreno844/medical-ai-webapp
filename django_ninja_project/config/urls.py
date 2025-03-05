@@ -6,6 +6,7 @@ from apps.encuentro.api import router as encuentro_router
 from apps.pacientes.api import router as pacientes_router
 from apps.plantillas.api import router as plantillas_router
 from apps.documentos.api import router as documentos_router
+from apps.generative_ai.api import router as generative_ai_router
 
 api = NinjaAPI(
     title="Medical API",
@@ -18,6 +19,7 @@ api.add_router("/auth/", accounts_router)
 api.add_router("/", encuentro_router)
 api.add_router("/", pacientes_router)
 api.add_router("/", plantillas_router)
+api.add_router("/", generative_ai_router)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
