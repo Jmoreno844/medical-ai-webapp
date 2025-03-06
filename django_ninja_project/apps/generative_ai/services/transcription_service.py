@@ -32,8 +32,12 @@ def transcribe_audio(
         # Get the model - need to use model that supports audio transcription
         model = get_gemini_model(model_name)
 
-        # Create audio part from file path
-        audio_part = Part.from_file(audio_file_path, mime_type=mime_type)
+        # Read file data - we need to read it into memory since the API doesn't support streaming directly from disk
+        with open(audio_file_path, "rb") as f:
+            audio_data = f.read()
+
+        # Create Part object with the file data
+        audio_part = Part.from_data(data=audio_data, mime_type=mime_type)
 
         # Format prompt based on requested transcript format
         use_timestamps = True
@@ -71,15 +75,13 @@ def transcribe_audio(
         # Prepare content for generation
         contents = [audio_part, prompt]
 
-        # Create generation config with audio timestamp settings
-        config_dict = create_generation_config(
-            temperature=0.2,  # Lower temperature for more deterministic output
-            max_output_tokens=8192,
-        )._asdict()
-
-        # Add audio timestamp parameter based on format setting
+        # Create generation config directly with all parameters
         generation_config = GenerationConfig(
-            **config_dict, audio_timestamp=use_timestamps
+            temperature=0.2,  # Lower temperature for more deterministic output
+            top_p=0.95,
+            max_output_tokens=8192,
+            candidate_count=1,
+            audio_timestamp=use_timestamps,
         )
 
         # Generate transcription

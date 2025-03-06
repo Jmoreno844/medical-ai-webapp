@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import EncuentroHeader from "../components/EncuentroHeader/EncuentroHeader";
 import { DocumentArea } from "../components/DocumentArea";
 import { useEncuentroDetail } from "../../app_layout/hooks/Encuentros/useEncuentroDetail";
@@ -30,6 +30,11 @@ interface EncounterDetailClientProps {
 export function EncounterDetailClient({ id }: EncounterDetailClientProps) {
   // Convert string ID to number
   const encounterId = parseInt(id);
+
+  // State to store transcription document ID
+  const [transcriptionDocId, setTranscriptionDocId] = useState<
+    number | undefined
+  >();
 
   // ========== HOOKS ==========
   // Fetch encounter data
@@ -153,6 +158,11 @@ export function EncounterDetailClient({ id }: EncounterDetailClientProps) {
     }
   };
 
+  // Handler for receiving transcription document ID
+  const handleTranscriptionDocFound = (docId: number) => {
+    setTranscriptionDocId(docId);
+  };
+
   if (loading) {
     return (
       <>
@@ -192,9 +202,13 @@ export function EncounterDetailClient({ id }: EncounterDetailClientProps) {
         isPatientConnected={!!encuentro?.paciente_conectado}
         patientId={encuentro?.id_paciente || 0}
         patientName={encuentro?.nombre_paciente || ""}
+        transcriptionDocId={transcriptionDocId}
       />
       <div className="p-4">
-        <DocumentArea encounterId={encounterId} />
+        <DocumentArea
+          encounterId={encounterId}
+          onTranscriptionDocumentFound={handleTranscriptionDocFound}
+        />
       </div>
     </>
   );

@@ -10,6 +10,7 @@ from .schemas import (
     EmptyEncuentroResponse,
 )
 from datetime import date, datetime
+from apps.documentos.models import Documento  # Import the Documento model
 
 router = Router(tags=["encuentros"])
 
@@ -59,12 +60,30 @@ def get_encuentro(request, encuentro_id: int):
 
 @router.post("/encuentros", response=EmptyEncuentroResponse, auth=django_auth)
 def create_empty_encuentro(request):
+    # Create the encounter
     encuentro = Encuentro.objects.create(
         id_medico_id=request.user.id,
         id_paciente_id=None,  # Will be set later
         nombre_encuentro="Encuentro Nuevo",
         fecha=datetime.now(),
     )
+
+    # Create contexto document
+    Documento.objects.create(
+        id_encuentro=encuentro,
+        tipo="contexto",
+        contenido="",
+        id_medico=request.user,
+    )
+
+    # Create transcripcion document
+    Documento.objects.create(
+        id_encuentro=encuentro,
+        tipo="transcripcion",
+        contenido="",
+        id_medico=request.user,
+    )
+
     return {"id": encuentro.id}
 
 

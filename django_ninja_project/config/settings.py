@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "apps.plantillas.apps.PlantillasConfig",
     "apps.documentos.apps.DocumentosConfig",
     "apps.generative_ai.apps.GenerativeAIConfig",
+    "django_celery_results",  # Added django_celery_results app
 ]
 
 CORS_ALLOWED_ORIGINS = [
@@ -169,3 +170,20 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Add this setting to use your custom user model
 AUTH_USER_MODEL = "users.User"
+
+# Celery Configuration
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+CELERY_ACCEPT_CONTENT = ["application/json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = os.getenv("CELERY_TIMEZONE", "UTC")
+
+# Optional Celery configurations
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes timeout
+CELERY_TASK_SOFT_TIME_LIMIT = 15 * 60  # 15 minutes soft timeout
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_SEND_SENT_EVENT = True
+
+# For django-celery-results
+CELERY_RESULT_EXTENDED = True

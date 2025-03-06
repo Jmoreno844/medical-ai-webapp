@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useCallback, useEffect } from "react";
 import TabBar from "./TabBar/TabBar";
 import TextArea from "./TextArea/TextArea";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -7,9 +7,13 @@ import { useDocuments } from "../../hooks/useDocuments";
 
 interface DocumentAreaProps {
   encounterId: number;
+  onTranscriptionDocumentFound?: (documentId: number) => void;
 }
 
-const DocumentArea: React.FC<DocumentAreaProps> = ({ encounterId }) => {
+const DocumentArea: React.FC<DocumentAreaProps> = ({
+  encounterId,
+  onTranscriptionDocumentFound,
+}) => {
   const {
     documents,
     activeDocument,
@@ -29,6 +33,18 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({ encounterId }) => {
   const currentEditorSaveRef = useRef<
     ((force?: boolean) => Promise<void>) | null
   >(null);
+
+  // Find and emit transcription document ID when documents load
+  useEffect(() => {
+    if (!loading && documents.length > 0 && onTranscriptionDocumentFound) {
+      const transcriptionDoc = documents.find(
+        (doc) => doc.tipo === "transcripcion"
+      );
+      if (transcriptionDoc) {
+        onTranscriptionDocumentFound(transcriptionDoc.id);
+      }
+    }
+  }, [documents, loading, onTranscriptionDocumentFound]);
 
   // Register a save function provided by the TextArea component
   const registerSaveFunction = useCallback(

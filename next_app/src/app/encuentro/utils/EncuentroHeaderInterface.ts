@@ -12,6 +12,8 @@ export interface TimerDisplayProps {
 export interface MicrophoneIconProps {
   /** Whether the microphone is actively recording */
   isRecording: boolean;
+  /** Whether recording is paused */
+  isPaused?: boolean;
 }
 
 /**
@@ -21,6 +23,18 @@ export interface StartStopButtonProps {
   /** Whether recording is in progress */
   isRecording: boolean;
   /** Function to toggle recording state */
+  onClick: () => void;
+}
+
+/**
+ * Props for the PauseResumeButton component
+ */
+export interface PauseResumeButtonProps {
+  /** Whether recording is in progress */
+  isRecording: boolean;
+  /** Whether recording is paused */
+  isPaused: boolean;
+  /** Function to toggle pause/resume state */
   onClick: () => void;
 }
 

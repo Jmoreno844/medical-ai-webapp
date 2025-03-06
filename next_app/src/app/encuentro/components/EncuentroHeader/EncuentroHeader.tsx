@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import PatientInfo from "./subcomponents/PatientInfo";
 import VoiceRecorder from "./subcomponents/VoiceRecorder";
 import PatientEditModal from "../PatientEditModal";
 import Modal from "../../../../components/Modal";
-import { useEncounter } from "../../hooks/useEncounter";
-import { useRouter } from "next/navigation";
-import useEncuentroList from "../../../app_layout/hooks/Encuentros/useEncuentroList";
+import { useEncuentroHeader } from "../../hooks/useEncuentroHeader";
 
 /**
  * Props for the EncuentroHeader component
@@ -31,6 +29,8 @@ interface EncuentroHeaderProps {
   patientId?: number | null;
   /** Name of the connected patient if any */
   patientName?: string;
+  /** ID of the transcription document if available */
+  transcriptionDocId?: number;
 }
 
 /**
@@ -51,197 +51,47 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
   isPatientConnected = false,
   patientId = null,
   patientName = "",
+  transcriptionDocId,
 }) => {
-  // State to control modals visibility
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isUnlinkModalOpen, setIsUnlinkModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(
-    null
-  );
-
-  // New states for success feedback
-  const [deleteSuccess, setDeleteSuccess] = useState(false);
-  const [redirectInfo, setRedirectInfo] = useState<{
-    path: string;
-    name: string;
-  } | null>(null);
-  const [redirectCountdown, setRedirectCountdown] = useState(0.5);
-  const [progressPercentage, setProgressPercentage] = useState(0);
-
   // Get the current URL to extract the encounter ID
   const urlParts =
     typeof window !== "undefined" ? window.location.pathname.split("/") : [];
-  const encounterIdFromUrl = parseInt(urlParts[urlParts.length - 1]);
+  const encounterIdFromUrl = parseInt(urlParts[urlParts.length - 1]) || 0;
 
-  // Hook for encounter operations
+  // Use our custom hook with fixed parameter order
   const {
-    updateEncounter,
-    deleteEncounter,
-    isLoading: isEncounterUpdating,
-  } = useEncounter(encounterIdFromUrl);
-
-  // Hook for encounter list to get the first encounter for redirection
-  const { encuentros } = useEncuentroList();
-
-  // Router for navigation
-  const router = useRouter();
-
-  // Effect for countdown and redirect after successful deletion
-  useEffect(() => {
-    let countdownTimer: NodeJS.Timeout;
-    let progressTimer: NodeJS.Timeout;
-
-    if (deleteSuccess && redirectInfo) {
-      // Handle the countdown (0.5 second)
-      if (redirectCountdown > 0) {
-        countdownTimer = setTimeout(() => {
-          setRedirectCountdown(0);
-        }, 500);
-      } else {
-        router.push(redirectInfo.path);
-      }
-
-      // Handle the progress bar animation (updates every 0.1 seconds - 5 updates total)
-      if (progressPercentage < 100) {
-        progressTimer = setTimeout(() => {
-          setProgressPercentage((prev) => Math.min(prev + 20, 100));
-        }, 100);
-      }
-    }
-
-    return () => {
-      if (countdownTimer) clearTimeout(countdownTimer);
-      if (progressTimer) clearTimeout(progressTimer);
-    };
-  }, [
+    // Modal states
+    isModalOpen,
+    isUnlinkModalOpen,
+    isDeleteModalOpen,
+    deleteErrorMessage,
     deleteSuccess,
     redirectInfo,
-    redirectCountdown,
     progressPercentage,
-    router,
-  ]);
 
-  /**
-   * Open the patient edit modal
-   */
-  const handleEditClick = () => {
-    setIsModalOpen(true);
-  };
+    // Modal actions
+    setIsModalOpen,
+    setIsUnlinkModalOpen,
+    setIsDeleteModalOpen,
 
-  /**
-   * Handle patient selection from modal
-   */
-  const handleSelectPatient = (patientId: number, patientName: string) => {
-    console.log(`Selected patient: ID=${patientId}, Name=${patientName}`);
-    onUpdatePatient(patientId, patientName);
-  };
+    // Event handlers
+    handleEditClick,
+    handleSelectPatient,
+    handleCreatePatient,
+    handleUpdatePatientAndEncounter,
+    handleUnlinkClick,
+    handleUnlinkConfirm,
+    handleDeleteClick,
+    handleDeleteConfirm,
 
-  /**
-   * Handle patient creation from modal
-   */
-  const handleCreatePatient = (patientName: string) => {
-    console.log(`New patient created: ${patientName}`);
-    // The actual update is handled in handleSelectPatient which is also called
-  };
-
-  /**
-   * Handle updating both patient and encounter names
-   */
-  const handleUpdatePatientAndEncounter = (
-    patientId: number,
-    patientName: string,
-    encounterName: string
-  ) => {
-    console.log(
-      `Updating both patient and encounter: PatientID=${patientId}, PatientName=${patientName}, EncounterName=${encounterName}`
-    );
-    onUpdatePatientAndEncounter(patientId, patientName, encounterName);
-  };
-
-  /**
-   * Opens the unlink confirmation modal
-   */
-  const handleUnlinkClick = () => {
-    setIsUnlinkModalOpen(true);
-  };
-
-  /**
-   * Handles the patient unlinking process
-   * Removes the patient connection from the encounter
-   */
-  const handleUnlinkConfirm = async () => {
-    // Get the encounter ID from URL or props
-    const urlParts = window.location.pathname.split("/");
-    const encounterIdFromUrl = parseInt(urlParts[urlParts.length - 1]);
-
-    const success = await updateEncounter(encounterIdFromUrl, {
-      paciente_conectado: false,
-      id_paciente: null, // Use undefined instead of null
-      nombre_encuentro: "Encuentro Nuevo", // Reset encounter name
-    });
-
-    if (success) {
-      // Update local state - this would typically trigger a page refresh or state update
-      console.log("Patient unlinked successfully");
-      // Here you would update local state or refresh the page
-      window.location.reload(); // Simple reload for now
-    }
-
-    setIsUnlinkModalOpen(false);
-  };
-
-  /**
-   * Opens the delete confirmation modal
-   */
-  const handleDeleteClick = () => {
-    setIsDeleteModalOpen(true);
-    setDeleteErrorMessage(null);
-  };
-
-  /**
-   * Handles the encounter deletion process
-   */
-  const handleDeleteConfirm = async () => {
-    const result = await deleteEncounter();
-
-    if (result.success) {
-      console.log("Encounter deleted successfully");
-      setDeleteSuccess(true);
-      setProgressPercentage(0); // Reset progress percentage
-
-      // Determine where to redirect
-      if (encuentros.length > 0) {
-        // Find the first encounter that is not the current one
-        const nextEncounter = encuentros.find(
-          (e) => e.id !== encounterIdFromUrl
-        );
-
-        if (nextEncounter) {
-          setRedirectInfo({
-            path: `/encuentro/${nextEncounter.id}`,
-            name: nextEncounter.nombre_encuentro,
-          });
-        } else {
-          setRedirectInfo({
-            path: "/dashboard",
-            name: "Panel Principal",
-          });
-        }
-      } else {
-        setRedirectInfo({
-          path: "/dashboard",
-          name: "Panel Principal",
-        });
-      }
-    } else {
-      // Handle deletion error
-      setDeleteErrorMessage(
-        "Error al eliminar el encuentro. Por favor intente nuevamente."
-      );
-      console.error("Error deleting encounter:", result);
-    }
-  };
+    // Status
+    isEncounterUpdating,
+  } = useEncuentroHeader(
+    encounterIdFromUrl,
+    onUpdatePatient,
+    onUpdatePatientAndEncounter,
+    transcriptionDocId
+  );
 
   return (
     <>
@@ -263,7 +113,7 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
               <div className="ml-3 inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-purple-500"></div>
             )}
           </div>
-          <VoiceRecorder />
+          <VoiceRecorder transcriptionDocId={transcriptionDocId} />
         </div>
       </nav>
 

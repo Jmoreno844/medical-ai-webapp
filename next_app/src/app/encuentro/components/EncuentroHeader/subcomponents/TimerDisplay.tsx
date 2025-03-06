@@ -1,7 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import { TimerDisplayProps } from "../../../utils/EncuentroHeaderInterface";
-import { formatTime } from "../../../hooks/useEncuentroHeader";
+import { formatTime } from "../../../hooks/useVoiceRecorder";
 
 /**
  * Displays the recording timer
