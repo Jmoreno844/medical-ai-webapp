@@ -1,9 +1,0 @@
-from ninja import NinjaAPI
-
-# ...existing code...
-from apps.documentos.urls import router as documentos_router
-
-api = NinjaAPI()
-# ...existing code...
-api.add_router("/documentos/", documentos_router)
-# ...existing code...

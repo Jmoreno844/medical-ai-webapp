@@ -86,7 +86,7 @@ def transcribir_documento(
 ):
     """
     Transcribe an uploaded audio file and update the specified document's content.
-    Uses Celery to process the transcription asynchronously.
+    This endpoint processes the transcription synchronously in the request.
 
     This endpoint:
     1. Verifies user authentication
@@ -102,7 +102,7 @@ def transcribir_documento(
         format: The format for transcript output (default: "speakers")
 
     Returns:
-        Dict containing success status and message
+        Dict containing the transcription result and metadata
 
     Security:
         - Requires authentication
@@ -140,10 +140,26 @@ def transcribir_documento(
         # First check if the document exists and the user has permission
         from apps.generative_ai.services.document_transcription_service import (
             get_document_for_transcription,
+            transcribe_document_with_uploaded_file,
         )
 
         try:
+            # Validate document and permissions
             documento = get_document_for_transcription(documento_id, user_id)
+
+            # Process the transcription directly
+            result = transcribe_document_with_uploaded_file(
+                documento_id, user_id, file, format
+            )
+
+            return 200, {
+                "success": True,
+                "document_id": documento_id,
+                "transcript": result.get("transcript", ""),
+                "duration": result.get("duration", 0),
+                "message": "Document transcription completed successfully",
+            }
+
         except Http404:
             return 404, {"detail": "Document not found"}
         except PermissionDenied:
@@ -153,27 +169,10 @@ def transcribir_documento(
         except ValueError as e:
             return 400, {"detail": str(e)}
 
-        # Save the uploaded file to a temporary location
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_file:
-            for chunk in file.chunks():
-                temp_file.write(chunk)
-            temp_file_path = temp_file.name
-
-        # Import and queue the Celery task
-        from apps.generative_ai.tasks import process_transcription_task
-
-        task = process_transcription_task.delay(documento_id, temp_file_path, format)
-
-        return 200, {
-            "success": True,
-            "message": "Document transcription started",
-            "document_id": documento_id,
-            "task_id": task.id,
-        }
-
     except Exception as e:
         # Log the error but don't expose internal details
+        logger = logging.getLogger(__name__)
         logger.error(
-            f"Error initiating transcription for document {documento_id}: {str(e)}"
+            f"Error processing transcription for document {documento_id}: {str(e)}"
         )
-        return 500, {"detail": "Failed to start transcription process"}
+        return 500, {"detail": "Failed to process transcription"}
