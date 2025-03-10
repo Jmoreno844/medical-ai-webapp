@@ -5,6 +5,11 @@ from django.shortcuts import get_object_or_404
 from django.http import Http404
 
 from ninja.security import django_auth
+from utils.auth import JWTAuth
+import jwt
+from django.conf import settings
+from datetime import datetime, timedelta
+
 from apps.documentos.models import Documento
 from apps.documentos.schemas import (
     DocumentoIn,
@@ -14,6 +19,10 @@ from apps.documentos.schemas import (
     DocumentoContentOut,
 )
 from apps.encuentro.models import Encuentro
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = Router()
 
@@ -109,35 +118,88 @@ def get_documentos_by_encuentro(request, encuentro_id: int):
         raise HttpError(404, "Encuentro no encontrado")
 
 
-@router.patch("/documento/{documento_id}", response=SuccessResponse, auth=django_auth)
-def update_documento_content(request, documento_id: int, payload: DocumentoUpdateIn):
+# This endpoint uses Django auth
+@router.post("/autorizar-documento/{documento_id}", auth=django_auth)
+def authorize_transcription(request, documento_id: int):
+    """Endpoint that requires Django auth and generates a JWT token"""
+    # Check if user is authenticated (Django auth)
+    if not request.user.is_authenticated:
+        return {"success": False, "error": "Authentication required"}
+
+    # Your ownership verification logic
+    # ...
+
+    # Generate JWT token
+    payload = {
+        "user_id": request.user.id,
+        "document_id": documento_id,
+        "exp": datetime.utcnow() + timedelta(minutes=15),
+        "purpose": "transcription",
+    }
+
+    token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
+
+    return {"success": True, "token": token}
+
+
+@router.patch("/documento/{documento_id}", response=SuccessResponse, auth=JWTAuth())
+def update_documento_content(
+    request, documento_id: int, payload: DocumentoUpdateIn, auth=None
+):
     """
     Update the content of an existing document.
-
-    Parameters:
-    - documento_id: ID of the document to update
-    - payload: Contains the new content for the document
-
-    Returns:
-    - Success status and message
-
-    Raises:
-    - 404 HttpError if the document doesn't exist
-    - 403 HttpError if the authenticated doctor doesn't own the document
+    Authentication is via JWT Bearer token in the Authorization header.
     """
-    doctor = request.user
+    logger.info(f"Update documento {documento_id} request received")
+    logger.info(f"Auth: {auth}")
+    logger.info(f"Headers: {dict(request.headers)}")
+
+    # Failsafe: If auth is None but there's an Authorization header, try manual token extraction and decoding
+    if not auth and "Authorization" in request.headers:
+        try:
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                token = auth_header.split(" ")[1]
+                logger.info(f"Attempting manual token decode: {token[:10]}...")
+
+                auth = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
+                logger.info(f"Manual token decode successful: {auth}")
+        except Exception as e:
+            logger.error(f"Manual token decode failed: {str(e)}")
+
+    if not auth:
+        logger.error("Authentication required but not provided")
+        raise HttpError(401, "Authentication required")
+
+    document_id_from_token = auth.get("document_id")
+    doctor_id_from_token = auth.get("user_id")
+
+    logger.info(
+        f"Token contains: doc_id={document_id_from_token}, user_id={doctor_id_from_token}"
+    )
 
     try:
         # Get the document and verify it exists
         documento = get_object_or_404(Documento, id=documento_id)
+        logger.info(f"Found documento with id {documento_id}")
 
         # Verify the document belongs to the authenticated doctor
-        if documento.id_medico.id != doctor.id:
+        if documento.id_medico.id != doctor_id_from_token:
+            logger.warning(
+                f"Permission denied: documento doctor {documento.id_medico.id} != token doctor {doctor_id_from_token}"
+            )
+            raise HttpError(403, "No tienes permiso para modificar este documento")
+
+        if int(document_id_from_token) != int(documento_id):
+            logger.warning(
+                f"Document ID mismatch: token doc_id {document_id_from_token} != requested doc_id {documento_id}"
+            )
             raise HttpError(403, "No tienes permiso para modificar este documento")
 
         # Update only the content field
         documento.contenido = payload.contenido
         documento.save()
+        logger.info(f"Successfully updated documento {documento_id}")
 
         # Return simple success response
         return {
@@ -145,7 +207,14 @@ def update_documento_content(request, documento_id: int, payload: DocumentoUpdat
             "message": f"Documento {documento_id} actualizado exitosamente",
         }
     except Http404:
+        logger.error(f"Documento {documento_id} not found")
         raise HttpError(404, "Documento no encontrado")
+
+
+@router.get("/debug-auth")
+def debug_auth(request):
+    headers = {key: value for key, value in request.headers.items()}
+    return {"headers": headers}
 
 
 @router.get("/documento/{documento_id}", response=DocumentoContentOut, auth=django_auth)

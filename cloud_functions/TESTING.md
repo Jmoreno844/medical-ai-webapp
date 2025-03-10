@@ -59,3 +59,13 @@ To summarize medical text:
 ### Expected Response
 
 You should receive a JSON response similar to:
+
+## Testing Document Update Feature
+
+You can test updating a document in your Django application by including a `document_id` in your request:
+
+## Troubleshooting Common Errors
+
+### UsageMetadata Errors
+
+If you encounter an error like:

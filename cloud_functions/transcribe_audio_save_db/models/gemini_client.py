@@ -6,6 +6,7 @@ import os
 import logging
 from typing import Dict, Any, Optional
 import google.auth
+import time
 
 import vertexai
 from vertexai.generative_models import GenerationConfig, GenerativeModel
@@ -121,25 +122,48 @@ def generate_content(prompt: str, model_name: Optional[str] = None) -> Dict[str,
         # Create generation config
         config = create_generation_config()
 
-        # Generate content
+        logger.info("Sending request to Gemini API - starting to wait for response")
+        start_time = time.time()
+
+        # Generate content - this is a synchronous call that will wait for the response
         response = model.generate_content(prompt, generation_config=config)
 
-        return {
+        end_time = time.time()
+        logger.info(
+            f"Received response from Gemini API after {end_time - start_time:.2f} seconds"
+        )
+
+        # Extract usage data safely - completely reworked to avoid the error
+        result = {
             "success": True,
             "text": response.text,
             "model": _current_model_name,
-            "usage": {
-                "prompt_tokens": getattr(response, "usage_metadata", {}).get(
-                    "prompt_token_count", 0
-                ),
-                "candidates_token_count": getattr(response, "usage_metadata", {}).get(
-                    "candidates_token_count", 0
-                ),
-                "total_token_count": getattr(response, "usage_metadata", {}).get(
-                    "total_token_count", 0
-                ),
-            },
+            "process_time_seconds": round(end_time - start_time, 2),
+        }
+
+        # Only add usage data if it's available
+        try:
+            if hasattr(response, "usage_metadata"):
+                result["usage"] = {
+                    "prompt_tokens": response.usage_metadata.prompt_token_count,
+                    "candidates_token_count": response.usage_metadata.candidates_token_count,
+                    "total_token_count": response.usage_metadata.total_token_count,
+                }
+            else:
+                result["usage"] = {"available": False}
+        except Exception as usage_error:
+            logger.warning(f"Error extracting usage metadata: {str(usage_error)}")
+            result["usage"] = {"error": str(usage_error)}
+
+        return result
+
+    except TimeoutError as e:
+        logger.error(f"Timeout error when calling Gemini API: {str(e)}")
+        return {
+            "success": False,
+            "error": "Request to Gemini API timed out. Please try again later.",
+            "model": _current_model_name,
         }
     except Exception as e:
-        logger.error(f"Error generating content: {str(e)}")
+        logger.error(f"Error generating content: {str(e)}", exc_info=True)
         return {"success": False, "error": str(e), "model": _current_model_name}

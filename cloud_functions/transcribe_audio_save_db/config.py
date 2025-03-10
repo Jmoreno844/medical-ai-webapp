@@ -26,6 +26,12 @@ Summarize the following text in a clear, comprehensive manner. Focus on extracti
 {text}
 """
 
+# Define Django API connection defaults (will be overridden by environment variables)
+DJANGO_API_DEFAULTS = {
+    "base_url": "http://localhost:8000/api",  # Default for local development
+    "timeout": 30,  # Default timeout in seconds
+}
+
 
 def get_environment():
     """Determine the current environment"""

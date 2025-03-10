@@ -13,9 +13,14 @@ services:
       - ./transcribe_audio_save_db/.env.local
     volumes:
       - ./credentials:/app/credentials:ro
-    networks:
-      - cloud-function-network
-
-networks:
-  cloud-function-network:
-    driver: bridge
+    # Use host network mode for Linux
+    network_mode: "host"
+    # Remove or comment out these when using host network mode
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
+    # networks:
+    #   - cloud-function-network
+# Remove or comment out this when using host network mode
+# networks:
+#   cloud-function-network:
+#     driver: bridge

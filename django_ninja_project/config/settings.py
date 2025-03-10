@@ -24,6 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 SECRET_KEY = os.getenv("SECRET_KEY")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 # SECURITY WARNING: keep the secret key used in production secret!
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -169,3 +170,43 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Add this setting to use your custom user model
 AUTH_USER_MODEL = "users.User"
+
+# Add detailed logging configuration
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "loggers": {
+        "": {  # Root logger
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+        "apps": {  # App logger
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "utils": {  # Utils logger
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+    },
+}
