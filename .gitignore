@@ -1,6 +1,13 @@
 django_ninja_project/.venv
 .env
+.env.local
+.env.test
+.env.production
 .pycache
 __pycache__
 *.pyc
 django_ninja_project/commands.sh
+
+**/credentials/**/*.json
+/credentials/*.json
+**/credentials/*.json

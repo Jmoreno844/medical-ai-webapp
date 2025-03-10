@@ -11,6 +11,7 @@ from django.http import Http404
 
 from apps.generative_ai.services.transcription_service import process_uploaded_audio
 from apps.generative_ai.schemas import TranscriptionResponse, GeminiResponse
+from apps.generative_ai.services.cloud_gemini_service import generate_content
 
 # Define allowed file types for security
 ALLOWED_AUDIO_MIME_TYPES = [
@@ -176,3 +177,48 @@ def transcribir_documento(
             f"Error processing transcription for document {documento_id}: {str(e)}"
         )
         return 500, {"detail": "Failed to process transcription"}
+
+
+@router.post(
+    "/generate-content", auth=django_auth, response={200: Dict, 400: Dict, 500: Dict}
+)
+def generate_content_endpoint(request, data: Dict):
+    """
+    Generate content using Gemini AI via the Cloud Function.
+
+    Args:
+        request: The HTTP request
+        data: Dictionary containing prompt and optional parameters
+
+    Returns:
+        Dict containing the generated content
+
+    Raises:
+        HttpError: If the request is invalid or processing fails
+    """
+    # Verify user is authenticated
+    if not request.user.is_authenticated:
+        return 401, {"detail": "Authentication required"}
+
+    # Extract parameters
+    prompt = data.get("prompt")
+    if not prompt:
+        return 400, {"detail": "Prompt is required"}
+
+    model_name = data.get("model")
+    generation_config = data.get("generation_config")
+
+    try:
+        # Call the Cloud Function via our service
+        result = generate_content(prompt, model_name, generation_config)
+        return 200, result
+    except ConnectionError as e:
+        return 503, {"detail": str(e)}
+    except ValueError as e:
+        return 400, {"detail": str(e)}
+    except Exception as e:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error generating content: {str(e)}")
+        return 500, {"detail": "Failed to generate content"}
