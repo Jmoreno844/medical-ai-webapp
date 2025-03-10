@@ -6,8 +6,8 @@ import { SidebarProvider, useSidebar } from "@/contexts/SidebarContext";
 import Sidebar from "./components/Sidebar";
 
 interface BaseLayoutProps {
-  children: React.ReactNode;
-  metadata?: Metadata;
+    children: React.ReactNode;
+    metadata?: Metadata;
 }
 
 /**
@@ -18,24 +18,24 @@ interface BaseLayoutProps {
  * @returns {JSX.Element} The layout content.
  */
 const LayoutContent: React.FC<{ children: React.ReactNode }> = ({
-  children,
+    children,
 }) => {
-  const { isExpanded } = useSidebar();
+    const { isExpanded } = useSidebar();
 
-  return (
-    <div className="flex min-h-screen">
-      <aside className="fixed inset-y-0 left-0 z-50">
-        <Sidebar />
-      </aside>
-      <main
-        className={`flex-1 transition-all duration-300 ${
-          isExpanded ? "ml-[200px] lg:ml-[224px]" : "ml-12 lg:ml-14"
-        }`}
-      >
-        {children}
-      </main>
-    </div>
-  );
+    return (
+        <div className="flex min-h-screen">
+            <aside className="fixed inset-y-0 left-0 z-50">
+                <Sidebar />
+            </aside>
+            <main
+                className={`flex-1 transition-all duration-300 ${
+                    isExpanded ? "ml-[200px] lg:ml-[224px]" : "ml-12 lg:ml-14"
+                }`}
+            >
+                {children}
+            </main>
+        </div>
+    );
 };
 
 /**
@@ -45,19 +45,19 @@ const LayoutContent: React.FC<{ children: React.ReactNode }> = ({
  * @returns {JSX.Element} The base layout wrapping component.
  */
 const BaseLayout: React.FC<BaseLayoutProps> = ({ children, metadata }) => {
-  if (metadata) {
-    // Attach metadata to the global object for potential dynamic usage
-    // @ts-expect-error
-    globalThis.metadata = metadata;
-  }
+    if (metadata) {
+        // Attach metadata to the global object for potential dynamic usage
+        // @ts-expect-error Dont remember
+        globalThis.metadata = metadata;
+    }
 
-  return (
-    <AuthProvider>
-      <SidebarProvider>
-        <LayoutContent>{children}</LayoutContent>
-      </SidebarProvider>
-    </AuthProvider>
-  );
+    return (
+        <AuthProvider>
+            <SidebarProvider>
+                <LayoutContent>{children}</LayoutContent>
+            </SidebarProvider>
+        </AuthProvider>
+    );
 };
 
 export default BaseLayout;
