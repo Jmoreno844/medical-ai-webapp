@@ -33,13 +33,16 @@ def get_api_auth_token():
     return token
 
 
-def update_document_content(document_id: int, content: str) -> Dict[str, Any]:
+def update_document_content(
+    document_id: int, content: str, auth_token: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Update a document's content in the Django API.
 
     Args:
         document_id: The ID of the document to update
         content: The new content (summary) to save
+        auth_token: Authentication token for the Django API (overrides env var if provided)
 
     Returns:
         Dictionary containing the API response or error information
@@ -60,17 +63,54 @@ def update_document_content(document_id: int, content: str) -> Dict[str, Any]:
 
     base_url = get_api_base_url()
     api_url = f"{base_url}/documento/{document_id}"
-    auth_token = get_api_auth_token()
 
-    # Prepare headers
+    # More detailed debugging for auth token
+    if auth_token:
+        logger.info(
+            f"Received auth token in update_document_content (length: {len(auth_token)})"
+        )
+        # Check if token looks like JWT (format: xxx.yyy.zzz)
+        if "." in auth_token and len(auth_token.split(".")) == 3:
+            logger.info("Token appears to be in JWT format")
+        else:
+            logger.warning(
+                "Token doesn't appear to be in standard JWT format (xxx.yyy.zzz)"
+            )
+    else:
+        logger.warning("No auth token provided to update_document_content function")
+        auth_token = get_api_auth_token()
+        if auth_token:
+            logger.info("Using fallback token from environment")
+        else:
+            logger.error(
+                "⚠️ No auth token available from any source - request will likely fail"
+            )
+
+    # Prepare headers with improved token handling
     headers = {
         "Content-Type": "application/json",
     }
 
-    # Add authorization if token is available
+    # Improved token handling logic
     if auth_token:
-        headers["Authorization"] = f"Bearer {auth_token}"
-        logger.debug("Added authorization header")
+        # For JWT tokens, always use Bearer format
+        if "." in auth_token and len(auth_token.split(".")) == 3:
+            if not auth_token.startswith("Bearer "):
+                headers["Authorization"] = f"Bearer {auth_token}"
+                logger.info("Added 'Bearer' prefix to JWT token")
+            else:
+                headers["Authorization"] = auth_token
+                logger.info("Using JWT token with existing Bearer prefix")
+        else:
+            # For non-JWT tokens, use as-is
+            headers["Authorization"] = auth_token
+            logger.info("Using non-JWT token as-is")
+
+        logger.info(
+            f"Final Authorization header: {headers.get('Authorization', '')[:15]}..."
+        )
+    else:
+        logger.error("⚠️ No authorization header will be sent - expect 401 Unauthorized")
 
     # Prepare payload
     payload = {"contenido": content}
@@ -120,10 +160,32 @@ def update_document_content(document_id: int, content: str) -> Dict[str, Any]:
         error_msg = f"Error updating document {document_id}: {str(e)}"
         logger.error(error_msg)
 
-        # Try to get status code if available
-        status_code = (
-            getattr(e.response, "status_code", None) if hasattr(e, "response") else None
-        )
+        # Try to get status code and response details
+        status_code = None
+        response_text = None
+        if hasattr(e, "response"):
+            status_code = getattr(e.response, "status_code", None)
+            try:
+                response_text = e.response.text
+            except:
+                pass
+
+        # Provide more helpful error info for authentication errors
+        if status_code == 401:
+            logger.error(
+                "🔐 Authentication failed (401 Unauthorized) - Check your token!"
+            )
+            if auth_token:
+                logger.error(f"Token used (first 10 chars): {auth_token[:10]}...")
+            if response_text:
+                logger.error(f"Response from server: {response_text}")
+
+            return {
+                "success": False,
+                "error": "Authentication failed - invalid or expired token",
+                "status_code": 401,
+                "details": response_text or "No error details available",
+            }
 
         return {"success": False, "error": error_msg, "status_code": status_code}
 

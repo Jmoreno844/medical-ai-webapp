@@ -36,7 +36,7 @@ def gemini_handler(request):
         headers = {
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "POST, GET",
-            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",  # Added Authorization
             "Access-Control-Max-Age": "3600",
         }
         return ("", 204, headers)
@@ -66,6 +66,9 @@ def gemini_handler(request):
 
         if not request_json:
             return (json.dumps({"error": "No JSON data provided"}), 400, headers)
+
+        # Debug log the entire request payload for troubleshooting
+        logger.info(f"Received request payload: {json.dumps(request_json)[:200]}...")
 
         # Handle test request
         if request_json.get("test") == True:
@@ -98,6 +101,52 @@ def gemini_handler(request):
         # Get document_id, handling both string and integer formats
         document_id = request_json.get("document_id")
 
+        # Extract auth token with explicit debugging to catch payload issues
+        auth_token = None
+
+        # Debug actual request body keys to check if auth_token is present
+        logger.info(f"Request JSON keys: {list(request_json.keys())}")
+
+        # First check Authorization header
+        auth_header = request.headers.get("Authorization")
+        if auth_header:
+            logger.info(f"Found Authorization header: {auth_header[:10]}...")
+            if auth_header.startswith("Bearer "):
+                auth_token = auth_header.split("Bearer ", 1)[1].strip()
+                logger.info(
+                    f"Extracted token from Authorization header: {auth_token[:10]}..."
+                )
+            else:
+                auth_token = auth_header
+                logger.info(
+                    "Authorization header doesn't start with 'Bearer ', using as-is"
+                )
+
+        # Specifically check for auth_token in request body with more debugging
+        elif "auth_token" in request_json:
+            auth_token = request_json.get("auth_token")
+            logger.info(
+                f"Found auth_token in request body: {auth_token[:10] if auth_token else 'None'}..."
+            )
+
+        # If still no token, check other common fields
+        if not auth_token:
+            for token_field in ["token", "jwt", "jwtToken", "access_token"]:
+                if token_field in request_json:
+                    auth_token = request_json.get(token_field)
+                    logger.info(
+                        f"Found token in request body field '{token_field}': {auth_token[:10] if auth_token else 'None'}..."
+                    )
+                    break
+
+        # Final check - did we find a token?
+        if auth_token:
+            logger.info(
+                f"✅ Successfully extracted auth token (length: {len(auth_token)})"
+            )
+        else:
+            logger.warning("⚠️ No auth token found in request (neither header nor body)")
+
         # Add specific logging for document_id
         if document_id is not None:
             logger.info(
@@ -124,7 +173,15 @@ def gemini_handler(request):
                 summary_text = result.get("summary", "")
                 logger.info(f"Summary length: {len(summary_text)} characters")
 
-                update_result = update_document_content(document_id, summary_text)
+                # Log token presence before making API call
+                if auth_token:
+                    logger.info("Sending request to Django with auth token...")
+                else:
+                    logger.warning("No auth token available for Django API request")
+
+                update_result = update_document_content(
+                    document_id, summary_text, auth_token
+                )
 
                 # Add the update result to the response
                 result["document_update"] = update_result
@@ -163,7 +220,6 @@ def gemini_handler(request):
 @functions_framework.cloud_event
 def gemini_event_handler(cloud_event):
     """
-    Cloud Event handler for processing Pub/Sub messages.
 
     Args:
         cloud_event: The Cloud Event object
