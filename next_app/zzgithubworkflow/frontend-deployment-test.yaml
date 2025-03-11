@@ -8,9 +8,9 @@ on:
 
 env:
     GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-    SERVICE_NAME: medwebapp-frontend-test
+    SERVICE_NAME: medwebapp-frontend-container-test
     REGION: us-east1
-    ENVIRONMENT: test
+    NODE_ENV: test
 
 jobs:
     build-and-deploy:
@@ -31,11 +31,11 @@ jobs:
               run: gcloud auth configure-docker
 
             - name: Build and push Docker image
+              working-directory: ./next_app # This specifies to work in the Next.js directory
               run: |
                   docker build \
-                    --build-arg NODE_ENV=production \
-                    --build-arg ENVIRONMENT=test \
-                    --build-arg NEXT_PUBLIC_API_URL=${{ secrets.TEST_API_URL }} \
+                    --build-arg NODE_ENV=${{ env.NODE_ENV }} \
+                    --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} \
                     --tag gcr.io/${{ env.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
                     .
                   docker push gcr.io/${{ env.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
@@ -47,7 +47,6 @@ jobs:
                   image: gcr.io/${{ env.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
                   region: ${{ env.REGION }}
                   env_vars: |
-                      NODE_ENV=production
-                      ENVIRONMENT=test
-                      NEXT_PUBLIC_API_URL=${{ secrets.TEST_API_URL }}
+                      NODE_ENV=${{ env.NODE_ENV }}
+                      NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
                   flags: "--allow-unauthenticated"

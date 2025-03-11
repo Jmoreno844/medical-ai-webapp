@@ -5,9 +5,8 @@
     "scripts": {
         "dev": "next dev",
         "build": "next build",
-        "start": "node server.js",
-        "lint": "next lint",
-        "start:next": "next start"
+        "start": "next start",
+        "lint": "next lint"
     },
     "dependencies": {
         "@lexical/code": "^0.27.0",
@@ -35,8 +34,7 @@
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "tailwind-merge": "^3.0.1",
-        "tailwindcss-animate": "^1.0.7",
-        "@google-cloud/secret-manager": "^4.1.4"
+        "tailwindcss-animate": "^1.0.7"
     },
     "devDependencies": {
         "@eslint/eslintrc": "^3",

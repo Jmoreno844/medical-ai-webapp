@@ -4,15 +4,14 @@ FROM node:18-alpine AS base
 # Set working directory
 WORKDIR /app
 
-# Install Google Cloud SDK in production builds
 FROM base AS dependencies
 WORKDIR /app
 
-# Copy package.json (without requiring yarn.lock)
-COPY package.json ./
+# Copy both package.json and package-lock.json 
+COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm ci --no-fund --no-audit --prefer-offline
 
 # Copy the rest of your app's source code
 FROM dependencies AS builder
@@ -28,39 +27,35 @@ ENV NODE_ENV=$NODE_ENV
 ARG ENVIRONMENT=test
 ENV ENVIRONMENT=$ENVIRONMENT
 
+# API URL will be set via build args
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 RUN npm run build
 
 # Production image, copy only the necessary files
 FROM node:18-alpine AS runner
 WORKDIR /app
 
-# The NODE_ENV will be set via Docker build args from GitHub Actions
+# Set environment variables
 ARG NODE_ENV=production
 ENV NODE_ENV=$NODE_ENV
 
-# Set the environment (test or production)
 ARG ENVIRONMENT=test
 ENV ENVIRONMENT=$ENVIRONMENT
 
-# The GCP_PROJECT_ID will be set via Docker build args from GitHub Actions
-ARG GCP_PROJECT_ID
-ENV GCP_PROJECT_ID=$GCP_PROJECT_ID
-
-# Install Google Cloud SDK for cloud environments
-RUN apk add --no-cache python3 py3-pip curl bash && \
-    curl -sSL https://sdk.cloud.google.com | bash && \
-    ln -s /root/google-cloud-sdk/bin/gcloud /usr/local/bin/gcloud && \
-    pip3 install google-cloud-secret-manager
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Copy built files
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/src/lib ./src/lib
-COPY --from=builder /app/server.js ./server.js
+COPY --from=builder /app/package-lock.json ./package-lock.json
+COPY --from=builder /app/next.config.js ./next.config.js
 
 # Install only production dependencies
-RUN npm ci --only=production
+RUN npm ci --only=production --prefer-offline
 
 # Expose the port your app runs on
 EXPOSE 3000

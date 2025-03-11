@@ -25,24 +25,24 @@ async function startServer() {
         }
 
         const dev = process.env.NODE_ENV === "development";
+        const app = next({ dev });
+        const handle = app.getRequestHandler();
         const port = process.env.PORT || 3000;
-;
-        await app.prepare();        const handle = app.getRequestHandler();
-.env.PORT || 3000;
+
+        await app.prepare();
+
         createServer((req, res) => {
             const parsedUrl = parse(req.url, true);
             handle(req, res, parsedUrl);
         }).listen(port, (err) => {
-            if (err) throw err;e(req.url, true);
-            const environment = process.env.ENVIRONMENT || "development";rsedUrl);
+            if (err) throw err;
+            const environment = process.env.ENVIRONMENT || "development";
             console.log(`> Ready on http://localhost:${port} (${environment})`);
-        }); if (err) throw err;
-    } catch (err) {.log(`> Ready on http://localhost:${port}`);
+        });
+    } catch (err) {
         console.error("Error starting server:", err);
         process.exit(1);
-    }   console.error("Error starting server:", err);
-}       process.exit(1);
     }
-startServer();
+}
 
 startServer();
