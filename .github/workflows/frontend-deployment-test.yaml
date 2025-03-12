@@ -20,23 +20,46 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 2 # Needed to check for changes between commits
+
+      - name: Check for changes in next_app directory
+        id: check_changes
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Changes detected due to manual workflow dispatch"
+            echo "changes=true" >> $GITHUB_OUTPUT
+          else
+            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep "^next_app/" || echo "")
+            if [ -z "$CHANGED_FILES" ]; then
+              echo "No changes in next_app directory"
+              echo "changes=false" >> $GITHUB_OUTPUT
+            else
+              echo "Changes detected in next_app directory"
+              echo "changes=true" >> $GITHUB_OUTPUT
+            fi
+          fi
 
       - name: Set up Google Cloud SDK
+        if: steps.check_changes.outputs.changes == 'true'
         uses: google-github-actions/auth@v1
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Set up gcloud CLI
+        if: steps.check_changes.outputs.changes == 'true'
         uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
       - name: Configure Docker for Artifact Registry
+        if: steps.check_changes.outputs.changes == 'true'
         run: |
           gcloud auth configure-docker
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
       - name: Build and push Docker image
+        if: steps.check_changes.outputs.changes == 'true'
         working-directory: ./next_app
         run: |
           docker build \
@@ -47,6 +70,7 @@ jobs:
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
 
       - name: Deploy to Cloud Run (Test)
+        if: steps.check_changes.outputs.changes == 'true'
         uses: google-github-actions/deploy-cloudrun@v1
         with:
           service: ${{ env.SERVICE_NAME }}
