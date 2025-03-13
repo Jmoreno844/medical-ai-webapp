@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     # Third party apps
     "ninja",
     # Local apps
+    "apps.core.apps.CoreConfig",  # Using proper AppConfig class
     "apps.users.apps.UsersConfig",
     "apps.encuentro.apps.EncuentroConfig",
     "apps.pacientes.apps.PacientesConfig",
@@ -112,7 +113,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
+TIME_ZONE = "America/Bogota"
 USE_I18N = True
 USE_TZ = True
 
@@ -127,3 +128,5 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = "DENY"
+
+LOGIN_URL = "/admin/login/"  # Redirect to the admin login page instead

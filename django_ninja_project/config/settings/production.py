@@ -3,7 +3,7 @@ Production settings for the medical web application.
 """
 
 import os
-from .base import *  # Import only from base, not from develop or test
+from .base import *  # noqa: F403, F401
 
 # Security settings
 DEBUG = False
@@ -37,20 +37,20 @@ SECURE_HSTS_PRELOAD = True
 
 # Silk configuration (if needed in production)
 if os.environ.get("ENABLE_SILK", "False").lower() == "true":
-    INSTALLED_APPS += ["silk"]
-    MIDDLEWARE.insert(0, "silk.middleware.SilkyMiddleware")
+    INSTALLED_APPS += ["silk"]  # noqa: F405
+    MIDDLEWARE.insert(0, "silk.middleware.SilkyMiddleware")  # noqa: F405
 
 # Static files settings
-STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")  # noqa: F405
 STATIC_URL = "/static/"
 
 # Media files
-MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")  # noqa: F405
 MEDIA_URL = "/media/"
 
 # Email configuration
 EMAIL_HOST = os.environ.get("EMAIL_HOST")
-EMAIL_PORT = int(os.environ.get("EMAIL_PORT"))
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.environ.get("EMAIL_USER")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_PASSWORD")
 EMAIL_USE_TLS = True

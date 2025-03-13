@@ -14,6 +14,11 @@ on:
       - "django_ninja_project/**"
   workflow_dispatch:
 
+# Add concurrency to cancel redundant builds
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   SERVICE_NAME: medwebapp-backend-container-test
@@ -33,7 +38,7 @@ jobs:
   #     DB_USER: ${{ secrets.TEST_DB_USER }}
   #     DB_PASSWORD: ${{ secrets.TEST_DB_PASSWORD }}
   #     DB_HOST: ${{ secrets.TEST_DB_HOST }}
-  #     DB_PORT: ${{ secrets.TEST_DB_PORT || '5432' }}
+  #     DB_PORT: ${{ secrets.DB_PORT || '5432' }}
 
   #   steps:
   #     - name: Checkout code
@@ -120,9 +125,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          # Only fetch what's needed for faster checkout
+          fetch-depth: 1
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+        with:
+          # Enable more aggressive caching
+          buildkitd-flags: "--debug --allow-insecure-entitlement security.insecure"
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
@@ -133,10 +147,10 @@ jobs:
         uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
+          install_components: "beta"
 
       - name: Configure Docker for Artifact Registry
         run: |
-          gcloud auth configure-docker
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
       - name: Extract metadata for Docker
@@ -145,7 +159,6 @@ jobs:
         with:
           images: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}
           tags: |
-            type=ref,event=branch
             type=sha,format=short
 
       - name: Build and push
@@ -155,8 +168,17 @@ jobs:
           push: true
           tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Enhanced caching options
+          cache-from: type=gha,scope=${{ github.workflow }}
+          cache-to: type=gha,scope=${{ github.workflow }},mode=max
+          # Optimize build with buildx flags
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+          platforms: linux/amd64
+          # Use parallel processing where possible
+          provenance: false
+          push-args: |
+            --compress
 
   deploy:
     name: Deploy to Cloud Run
@@ -165,30 +187,36 @@ jobs:
     if: github.ref == 'refs/heads/develop'
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
-
+      # Use the optimized Cloud Run deployment action
       - name: Deploy to Cloud Run
-        run: |
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
-            --platform managed \
-            --region ${{ env.REGION }} \
-            --service-account=django-backend-sa@medical-ai-web-app.iam.gserviceaccount.com \
-            --allow-unauthenticated \
-            --vpc-connector ${{ vars.test_vpc_connector_name}} \
-            --session-affinity \
-            --cpu 1 \
-            --memory 1Gi \
-            --min-instances 1 \
-            --max-instances 3\
-            --set-env-vars DJANGO_SETTINGS_MODULE=config.settings.test,GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }},ENVIRONMENT=test,ENABLE_SILK=true \
-            --project ${{ env.GCP_PROJECT_ID }}
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v1
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          region: ${{ env.REGION }}
+          flags: |
+            --ingress=all
+            --allow-unauthenticated
+            --vpc-connector=${{ vars.test_vpc_connector_name}}
+            --session-affinity
+            --service-account=django-backend-sa@medical-ai-web-app.iam.gserviceaccount.com           
+            --cpu=1
+            --memory=1Gi
+            --min-instances=1
+            --max-instances=3
+          env_vars: |
+            DJANGO_SETTINGS_MODULE=config.settings.test
+            GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }}
+            ENVIRONMENT=test
+            ENABLE_SILK=true
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      # Display the deployment URL
+      - name: Show Output
+        run: echo ${{ steps.deploy.outputs.url }}

@@ -4,7 +4,7 @@ Development settings for the medical web application.
 
 import os
 import warnings
-from .base import *
+from .base import *  # noqa: F403, F401
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,8 +20,8 @@ DEBUG = True
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 # Add django-silk for profiling/debugging
-INSTALLED_APPS += ["silk"]
-MIDDLEWARE.insert(0, "silk.middleware.SilkyMiddleware")
+INSTALLED_APPS += ["silk"]  # noqa: F405
+MIDDLEWARE.insert(0, "silk.middleware.SilkyMiddleware")  # noqa: F405
 
 # Settings for silk
 SILKY_PYTHON_PROFILER = True
