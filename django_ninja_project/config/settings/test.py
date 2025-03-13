@@ -70,17 +70,16 @@ except Exception:
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
 # Test-specific apps
-INSTALLED_APPS += [
-    "django.contrib.staticfiles.testing",
-    "silk",  # Add django-silk for profiling/debugging in tests
-]
+INSTALLED_APPS += ["django.contrib.staticfiles.testing"]
 
-# Add silk middleware
-MIDDLEWARE.insert(0, "silk.middleware.SilkyMiddleware")
+# Add silk for profiling/debugging in tests if not already added
+if "silk" not in INSTALLED_APPS:
+    INSTALLED_APPS += ["silk"]
+    MIDDLEWARE.insert(0, "silk.middleware.SilkyMiddleware")
 
-# Settings for silk in test environment
-SILKY_PYTHON_PROFILER = True
-SILKY_INTERCEPT_PERCENT = 100  # Intercept all requests in test environment
+    # Settings for silk in test environment
+    SILKY_PYTHON_PROFILER = True
+    SILKY_INTERCEPT_PERCENT = 100  # Intercept all requests in test environment
 
 # Disable password hashers for faster tests
 PASSWORD_HASHERS = [

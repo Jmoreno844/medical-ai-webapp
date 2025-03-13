@@ -182,7 +182,8 @@ jobs:
             --image ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
             --platform managed \
             --region ${{ env.REGION }} \
+            --service-account=django-backend-sa@medical-ai-web-app.iam.gserviceaccount.com \
             --allow-unauthenticated \
             --vpc-connector ${{ vars.test_vpc_connector_name}} \
-            --set-env-vars GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }},DJANGO_SETTINGS_MODULE=config.settings.test \
+            --set-env-vars DJANGO_SETTINGS_MODULE=config.settings.test,GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }},ENVIRONMENT=test,ENABLE_SILK=true \
             --project ${{ env.GCP_PROJECT_ID }}

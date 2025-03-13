@@ -66,8 +66,10 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    DJANGO_SETTINGS_MODULE=config.settings.production
+    PYTHONUNBUFFERED=1
+
+# Don't set DJANGO_SETTINGS_MODULE here, it will be passed as an environment variable
+# This prevents hard-coding it and allows more flexibility
 
 # Run the application with Gunicorn
 ENTRYPOINT ["gunicorn"]
