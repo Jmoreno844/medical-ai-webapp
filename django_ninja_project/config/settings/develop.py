@@ -19,18 +19,16 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
-# Conditionally add django-debug-toolbar if installed
-try:
-    import debug_toolbar
+# Add django-silk for profiling/debugging
+INSTALLED_APPS += ["silk"]
+MIDDLEWARE.insert(0, "silk.middleware.SilkyMiddleware")
 
-    INSTALLED_APPS += ["debug_toolbar"]
-    MIDDLEWARE += ["debug_toolbar.middleware.DebugToolbarMiddleware"]
-    INTERNAL_IPS = ["127.0.0.1"]
-except ImportError:
-    warnings.warn(
-        "django-debug-toolbar not installed. "
-        "Install it with: pip install django-debug-toolbar"
-    )
+# Settings for silk
+SILKY_PYTHON_PROFILER = True
+SILKY_AUTHENTICATION = True  # User must login
+SILKY_AUTHORISATION = True  # User must have permissions
+SILKY_META = True
+INTERNAL_IPS = ["127.0.0.1"]
 
 # Database
 DATABASES = {

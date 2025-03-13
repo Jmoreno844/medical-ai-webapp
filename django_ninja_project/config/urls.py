@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 from ninja import NinjaAPI
 from apps.users.api import router as accounts_router
 from apps.encuentro.api import router as encuentro_router
@@ -24,4 +24,5 @@ api.add_router("/", generative_ai_router)
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", api.urls),
+    path("silk/", include("silk.urls", namespace="silk")),
 ]
