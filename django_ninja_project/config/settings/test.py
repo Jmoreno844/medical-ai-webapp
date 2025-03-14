@@ -69,6 +69,10 @@ def configure_json_logging():
         django_logger = logging.getLogger("django")
         django_logger.setLevel(logging.WARNING)
 
+        # Configure CORS debug middleware logger
+        cors_debug_logger = logging.getLogger("apps.core.middleware")
+        cors_debug_logger.setLevel(logging.INFO)  # Make sure this is at INFO level
+
         # Configure security-related loggers at appropriate levels
         security_logger = logging.getLogger("django.security")
         security_logger.setLevel(logging.INFO)
@@ -268,16 +272,16 @@ SESSION_COOKIE_SECURE = True
 
 CORS_ALLOW_CREDENTIALS = True
 
-# Update CORS settings to ensure frontend can access backend
 CORS_ALLOWED_ORIGINS = [
     "https://medwebapp-frontend-container-test-192857848105.us-east1.run.app",
 ]
 
-# Keep the regex pattern for additional flexibility
+# Corrected regex patterns that include the region
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://medwebapp-frontend-container-test-[a-z0-9\-]+\.run\.app$",
-    r"^https://medwebapp-backend-container-test-[a-z0-9\-]+\.run\.app$",
+    r"^https://medwebapp-frontend-container-test-[a-z0-9\-]+\.us-east1\.run\.app$",
+    r"^https://medwebapp-backend-container-test-[a-z0-9\-]+\.us-east1\.run\.app$",
 ]
+
 
 # Ensure all CORS features are properly enabled
 CORS_ALLOW_ALL_HEADERS = True
