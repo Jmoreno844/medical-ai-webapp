@@ -201,11 +201,11 @@ jobs:
           image: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
           region: ${{ env.REGION }}
           flags: |
-            --ingress=all
+            --ingress=internal-and-cloud-load-balancing
             --allow-unauthenticated
             --vpc-connector=${{ vars.test_vpc_connector_name}}
             --session-affinity
-            --service-account=django-backend-sa@medical-ai-web-app.iam.gserviceaccount.com           
+            --service-account=${{ vars.BACKEND_SERVICE_ACCOUNT }}           
             --cpu=1
             --memory=1Gi
             --min-instances=1

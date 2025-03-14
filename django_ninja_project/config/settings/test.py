@@ -219,6 +219,10 @@ try:
                     "PASSWORD": db_password,
                     "HOST": db_host,
                     "PORT": "5432",
+                    "OPTIONS": {
+                        "sslmode": "require",
+                        "use_iam_auth": True,  # Enable IAM auth in your database driver
+                    },
                 }
             }
             logging.info("Using database configuration from Google Secret Manager")
@@ -262,5 +266,10 @@ CSRF_TRUSTED_ORIGINS = [
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 
+CORS_ALLOW_CREDENTIALS = True  # Probably false in production
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://medwebapp-frontend-container-test-[a-z0-9\-]+\.run\.app$",
+]
 # Log successful initialization
 logging.info("Test settings loaded successfully")

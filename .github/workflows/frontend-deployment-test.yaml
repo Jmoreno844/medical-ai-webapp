@@ -78,5 +78,11 @@ jobs:
           region: ${{ env.REGION }}
           env_vars: |
             NODE_ENV=${{ env.NODE_ENV }}
-            NEXT_PUBLIC_API_URL=${{ secrets.TEST_NEXT_PUBLIC_API_URL }}
-          flags: "--allow-unauthenticated"
+            TEST_NEXT_PUBLIC_API_URL=${{ vars.TEST_NEXT_PUBLIC_API_URL }}
+          flags: |
+            --allow-unauthenticated
+            --ingress=all
+            --min-instances=0 
+            --max-instances=2 
+            --vpc-connector=${{ vars.test_vpc_connector_name}}
+            --service-account=${{ vars.FRONTEND_SERVICE_ACCOUNT }}

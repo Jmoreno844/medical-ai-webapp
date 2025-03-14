@@ -21,5 +21,7 @@ export function logEnvironment(): void {
     }
 
     // Log API URL (safe to log as it's public anyway)
-    console.log(`API URL: ${process.env.NEXT_PUBLIC_API_URL || "not set"}`);
+    console.log(
+        `API URL: ${process.env.TEST_NEXT_PUBLIC_API_URL || "not set"}`
+    );
 }
