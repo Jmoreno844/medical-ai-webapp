@@ -64,7 +64,7 @@ jobs:
         run: |
           docker build \
             --build-arg NODE_ENV=${{ env.NODE_ENV }} \
-            --build-arg NEXT_PUBLIC_API_URL=${{ secrets.TEST_NEXT_PUBLIC_API_URL }} \
+            --build-arg NEXT_PUBLIC_API_URL=${{ vars.TEST_NEXT_PUBLIC_API_URL }} \
             --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
             .
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}

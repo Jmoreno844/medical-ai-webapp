@@ -121,6 +121,8 @@ jobs:
     # needs: [test, lint]
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.test
 
     steps:
       - name: Checkout code
@@ -174,6 +176,7 @@ jobs:
           # Optimize build with buildx flags
           build-args: |
             BUILDKIT_INLINE_CACHE=1
+            DJANGO_SETTINGS_MODULE=${{ env.DJANGO_SETTINGS_MODULE }}
           platforms: linux/amd64
           # Use parallel processing where possible
           provenance: false
