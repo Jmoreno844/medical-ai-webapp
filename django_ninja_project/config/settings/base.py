@@ -5,6 +5,11 @@ Base Django settings for the medical web application.
 import os
 from pathlib import Path
 
+# At the top of config/settings/test.py
+
+print(
+    f"Loading settings with DJANGO_SETTINGS_MODULE={os.environ.get('DJANGO_SETTINGS_MODULE')}"
+)
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -33,8 +38,7 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = "users.User"
 
 # CORS Settings
-
-# CORS_ALLOW_CREDENTIALS = False # Probably false in production
+CORS_ALLOW_CREDENTIALS = True  # Enable credentials in CORS requests
 
 CORS_ALLOW_METHODS = [
     "DELETE",

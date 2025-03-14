@@ -266,10 +266,23 @@ CSRF_TRUSTED_ORIGINS = [
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 
-CORS_ALLOW_CREDENTIALS = True  # Probably false in production
+CORS_ALLOW_CREDENTIALS = True
 
+# Update CORS settings to ensure frontend can access backend
+CORS_ALLOWED_ORIGINS = [
+    "https://medwebapp-frontend-container-test-192857848105.us-east1.run.app",
+]
+
+# Keep the regex pattern for additional flexibility
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://medwebapp-frontend-container-test-[a-z0-9\-]+\.run\.app$",
+    r"^https://medwebapp-backend-container-test-[a-z0-9\-]+\.run\.app$",
 ]
+
+# Ensure all CORS features are properly enabled
+CORS_ALLOW_ALL_HEADERS = True
+CORS_EXPOSE_HEADERS = ["Content-Type", "X-CSRFToken"]
+CORS_PREFLIGHT_MAX_AGE = 86400  # 24 hours
+
 # Log successful initialization
 logging.info("Test settings loaded successfully")
