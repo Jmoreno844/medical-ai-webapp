@@ -57,27 +57,27 @@ def configure_json_logging():
 
         console_handler.setFormatter(formatter)
 
-        # Configure root logger
+        # Configure root logger to show EVERYTHING
         root_logger = logging.getLogger()
         root_logger.handlers = []  # Clear any existing handlers
         root_logger.addHandler(console_handler)
-
-        # Set appropriate log level for test environment
-        root_logger.setLevel(logging.INFO)
+        root_logger.setLevel(logging.DEBUG)  # Set to DEBUG level
 
         # Configure Django logger specifically
         django_logger = logging.getLogger("django")
-        django_logger.setLevel(logging.WARNING)
+        django_logger.setLevel(logging.INFO)  # Change to INFO to see more details
 
-        # Configure CORS debug middleware logger
+        # Configure Django CORS middleware logger to show INFO logs
+        django_cors_logger = logging.getLogger("corsheaders")
+        django_cors_logger.setLevel(logging.DEBUG)
+
+        # Configure CORS debug middleware logger - set to DEBUG
         cors_debug_logger = logging.getLogger("apps.core.middleware")
-        cors_debug_logger.setLevel(logging.INFO)  # Make sure this is at INFO level
+        cors_debug_logger.setLevel(logging.DEBUG)  # Set to DEBUG level
 
         # Configure security-related loggers at appropriate levels
         security_logger = logging.getLogger("django.security")
         security_logger.setLevel(logging.INFO)
-
-        # Quiet down noisy loggers in test environment
         logging.getLogger("silk").setLevel(logging.WARNING)
 
         # Setup log filter to prevent sensitive data leakage
@@ -108,7 +108,7 @@ def configure_json_logging():
     except Exception as e:
         # Fallback to basic logging if JSON logging fails
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.DEBUG,
             format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
             handlers=[logging.StreamHandler(sys.stderr)],
         )
@@ -165,7 +165,9 @@ FALLBACK_SECRET_KEY = os.environ.get(
 SECRET_KEY = access_secret(
     GCP_PROJECT_ID, "django_secret_key", default=FALLBACK_SECRET_KEY
 )
-DEBUG = False
+
+# Change to DEBUG mode to help diagnose issues
+DEBUG = True
 
 # In your Django settings
 ALLOWED_HOSTS = [
@@ -270,23 +272,39 @@ CSRF_TRUSTED_ORIGINS = [
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 
-CORS_ALLOW_CREDENTIALS = True
+# CORS settings - full debug mode
+# Try allowing all origins temporarily to diagnose the issue
+CORS_ALLOW_ALL_ORIGINS = True  # FOR DEBUGGING ONLY, remove in production
 
+# Keep the specific origins too
 CORS_ALLOWED_ORIGINS = [
     "https://medwebapp-frontend-container-test-192857848105.us-east1.run.app",
+    # Add localhost and other dev environments
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
 ]
 
-# Corrected regex patterns that include the region
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://medwebapp-frontend-container-test-[a-z0-9\-]+\.us-east1\.run\.app$",
-    r"^https://medwebapp-backend-container-test-[a-z0-9\-]+\.us-east1\.run\.app$",
+# Make sure credentials are allowed
+CORS_ALLOW_CREDENTIALS = True
+
+# Be explicit about allowed methods, particularly OPTIONS for preflight
+CORS_ALLOW_METHODS = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
 ]
 
-
-# Ensure all CORS features are properly enabled
+# Allow all headers for debugging
 CORS_ALLOW_ALL_HEADERS = True
-CORS_EXPOSE_HEADERS = ["Content-Type", "X-CSRFToken"]
-CORS_PREFLIGHT_MAX_AGE = 86400  # 24 hours
+
+# Expose headers that the frontend might need
+CORS_EXPOSE_HEADERS = ["Content-Type", "X-CSRFToken", "Authorization"]
+
+# Set a shorter preflight max age for testing
+CORS_PREFLIGHT_MAX_AGE = 60  # 1 minute for testing
 
 # Log successful initialization
 logging.info("Test settings loaded successfully")

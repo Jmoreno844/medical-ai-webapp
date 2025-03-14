@@ -1,7 +1,9 @@
 import axios from "axios";
 import { getCookie } from "./cookieUtils";
 
-const API_URL = process.env.TEST_NEXT_PUBLIC_API_URL || "";
+// Use NEXT_PUBLIC_ prefix for client-side environment variables
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+console.log("API URL:", API_URL); // Helps with debugging
 
 // Function to get CSRF token from cookiess
 const getCsrfToken = (): string | null => {
@@ -43,6 +45,13 @@ axiosInstance.interceptors.response.use(
         return response;
     },
     (error) => {
+        // Enhanced error handling with specific CORS error detection
+        if (error.message === "Network Error" || error.code === "ERR_NETWORK") {
+            console.error(
+                "CORS or network error detected. Check your CORS configuration."
+            );
+        }
+
         console.error("API Error:", {
             status: error.response?.status,
             data: error.response?.data,

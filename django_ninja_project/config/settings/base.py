@@ -62,11 +62,12 @@ CORS_ALLOW_HEADERS = [
 ]
 
 MIDDLEWARE = [
-    "apps.core.middleware.DebugCorsMiddleware",  # Add this before CORS middleware for debugging
+    # Make absolutely sure DebugCorsMiddleware is first
+    "apps.core.middleware.DebugCorsMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.common.CommonMiddleware",  # This should be right after CorsMiddleware
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",

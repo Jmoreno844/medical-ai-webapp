@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     reactStrictMode: true,
+    swcMinify: true,
     // Enable public runtime config only for NEXT_PUBLIC_ prefixed variables
     publicRuntimeConfig: {
         // Will be available on both server and client
