@@ -1,21 +1,42 @@
-from datetime import datetime, timedelta
-import jwt
-from django.conf import settings
 from ninja.security import HttpBearer
 from django.http import HttpRequest
-
-
-def create_token(user):
-    payload = {
-        "user_id": user.id,
-        "exp": datetime.utcnow() + timedelta(days=1),
-        "iat": datetime.utcnow(),
-    }
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+from typing import Optional, Any
 
 
 class SessionAuth(HttpBearer):
-    def authenticate(self, request: HttpRequest, token: str = None):
+    """
+    Session-based authentication for Django Ninja
+
+    This class provides authentication based on Django's session framework.
+    It can be used as a dependency for protected routes.
+
+    Example:
+        @router.get("/protected", auth=SessionAuth())
+        def protected_route(request):
+            return {"data": "This is protected"}
+    """
+
+    def __init__(self, auto_error: bool = True):
+        """
+        Initialize the SessionAuth class
+
+        Args:
+            auto_error: If True, throw 401 when authentication fails
+                        If False, return None (allows optional auth)
+        """
+        self.auto_error = auto_error
+
+    def authenticate(self, request: HttpRequest, token: str = None) -> Optional[Any]:
+        """
+        Authenticate the request based on session
+
+        Args:
+            request: The HTTP request object
+            token: Not used in session auth, kept for compatibility
+
+        Returns:
+            The authenticated user or None
+        """
         if request.user and request.user.is_authenticated:
             return request.user
         return None

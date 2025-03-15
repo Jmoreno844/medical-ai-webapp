@@ -3,12 +3,6 @@
 import { useState, useContext } from "react";
 import axiosInstance from "../utils/axiosInstance";
 import { AuthContext } from "../contexts/AuthContext";
-import { getCookie } from "../utils/cookieUtils";
-
-interface LoginCredentials {
-    email: string;
-    password: string;
-}
 
 interface SignupCredentials {
     email: string;
@@ -20,23 +14,40 @@ interface SignupCredentials {
 export const useAuth = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const authContext = useContext(AuthContext);
+    const {
+        login: contextLogin,
+        logout: contextLogout,
+        isAuthLoading,
+        userData,
+        isAuthenticated,
+    } = useContext(AuthContext);
 
-    const login = async ({ email, password }: LoginCredentials) => {
+    const login = async (email: string, password: string) => {
         setLoading(true);
         setError(null);
         try {
-            const response = await axiosInstance.post("/api/auth/login", {
-                email,
-                password,
-            });
-
-            // The CSRF token is automatically handled by axiosInstance for all requests
-            authContext.setIsAuthenticated(true);
-            return response.data;
+            // Use the login method from AuthContext
+            await contextLogin(email, password);
+            return { success: true };
         } catch (err) {
             setError(
                 err instanceof Error ? err.message : "Error al iniciar sesión"
+            );
+            throw err;
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const logout = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            await contextLogout();
+            return { success: true };
+        } catch (err) {
+            setError(
+                err instanceof Error ? err.message : "Error al cerrar sesión"
             );
             throw err;
         } finally {
@@ -95,9 +106,12 @@ export const useAuth = () => {
 
     return {
         login,
+        logout,
         forgotPassword,
         signUp,
-        loading,
+        loading: loading || isAuthLoading,
         error,
+        userData,
+        isAuthenticated,
     };
 };

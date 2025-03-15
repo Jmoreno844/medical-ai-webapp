@@ -51,18 +51,26 @@ def register_user(request, data: UserRegistrationIn):
 
 @router.post("/login", response={200: dict, 401: dict})
 def login_user(request, data: UserLoginIn):
-    """Login user using session authentication"""
+    """
+    Login user using session authentication
+
+    Creates a server-side session and sets session cookie.
+    """
     user = authenticate(request, email=data.email, password=data.password)
     if user is None:
         return 401, {"message": "Invalid credentials"}
 
     login(request, user)
-    return 200, {"message": "Successfully logged in"}
+    # Configure session settings
+    request.session.set_expiry(3600)  # 1 hour expiry
+    return 200, {"message": "Successfully logged in", "userId": user.id}
 
 
-@router.post("/logout")
+@router.post("/logout", response={200: dict})
 def logout_user(request):
-    """Logout the current user"""
+    """
+    Logout the current user by invalidating their session
+    """
     logout(request)
     return {"message": "Successfully logged out"}
 
@@ -109,7 +117,13 @@ def delete_user(request, user_id: int):
 
 @router.get("/me", response={200: bool, 401: dict})
 def me(request):
-    """Return True if session validated, else False"""
+    """
+    Verify if the user's session is valid
+
+    Returns:
+        200: True if session is valid
+        401: Error message if session is invalid or expired
+    """
     if request.user and request.user.is_authenticated:
         return 200, True
     return 401, {"message": "Session not validated"}
@@ -117,7 +131,13 @@ def me(request):
 
 @router.get("/me/data", response={200: UserProfileOut, 401: dict})
 def me_data(request):
-    """Return user profile data if session validated, else return error"""
+    """
+    Return user profile data if session is valid
+
+    Returns:
+        200: User profile data
+        401: Error message if session is invalid
+    """
     if request.user and request.user.is_authenticated:
         return 200, request.user
     return 401, {"message": "Session not validated"}
@@ -125,6 +145,10 @@ def me_data(request):
 
 @router.get("/csrf-token", response={200: dict})
 def get_csrf_token(request):
-    """Get a CSRF token for use in forms and API requests"""
+    """
+    Get a CSRF token for use in forms and API requests
+
+    This endpoint ensures CSRF protection for non-GET requests
+    """
     csrf_token = get_token(request)
     return {"csrfToken": csrf_token}
