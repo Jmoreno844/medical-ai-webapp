@@ -268,13 +268,6 @@ CORS_SKIP_TRUSTED_ORIGINS = [
     "medwebapp-frontend-container-test-192857848105.us-east1.run.app",  # Match existing allowed origins
 ]
 
-# Insert CorsSkipMiddleware right after DebugCorsMiddleware but before real CORS middleware
-if "apps.core.cors_skip_middleware.CorsSkipMiddleware" not in MIDDLEWARE:  # noqa: F405
-    cors_index = MIDDLEWARE.index("apps.core.middleware.DebugCorsMiddleware")  # noqa: F405
-    MIDDLEWARE.insert(
-        cors_index + 1, "apps.core.cors_skip_middleware.CorsSkipMiddleware"
-    )  # noqa: F405
-    logging.info("CorsSkipMiddleware added to the middleware chain")
 
 # Disable password hashers for faster tests
 PASSWORD_HASHERS = [

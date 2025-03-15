@@ -41,7 +41,7 @@ AUTH_USER_MODEL = "users.User"
 
 MIDDLEWARE = [
     "apps.core.middleware.DebugCorsMiddleware",  # Debug CORS middleware comes first
-    "corsheaders.middleware.CorsMiddleware",  # corsheaders middleware follows our debugger
+    "corsheaders.middleware.CorsMiddleware",  # CORS middleware comes second
     "django.middleware.common.CommonMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",

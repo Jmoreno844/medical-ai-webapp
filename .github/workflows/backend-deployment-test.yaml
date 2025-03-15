@@ -204,7 +204,7 @@ jobs:
           image: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
           region: ${{ env.REGION }}
           flags: |
-            --ingress=internal-and-cloud-load-balancing
+            --ingress=all
             --allow-unauthenticated
             --vpc-connector=${{ vars.test_vpc_connector_name}}
             --session-affinity
