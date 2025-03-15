@@ -37,35 +37,12 @@ INSTALLED_APPS = [
 # Custom user model
 AUTH_USER_MODEL = "users.User"
 
-# CORS Settings
-CORS_ALLOW_CREDENTIALS = True  # Enable credentials in CORS requests
-
-CORS_ALLOW_METHODS = [
-    "DELETE",
-    "GET",
-    "OPTIONS",
-    "PATCH",
-    "POST",
-    "PUT",
-]
-
-CORS_ALLOW_HEADERS = [
-    "accept",
-    "accept-encoding",
-    "authorization",
-    "content-type",
-    "dnt",
-    "origin",
-    "user-agent",
-    "x-csrftoken",
-    "x-requested-with",
-]
+# CORS Settings removed
 
 MIDDLEWARE = [
-    # Make absolutely sure DebugCorsMiddleware is first
-    "apps.core.middleware.DebugCorsMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
-    "django.middleware.common.CommonMiddleware",  # This should be right after CorsMiddleware
+    "apps.core.middleware.DebugCorsMiddleware",  # Debug CORS middleware comes first
+    "corsheaders.middleware.CorsMiddleware",  # corsheaders middleware follows our debugger
+    "django.middleware.common.CommonMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",

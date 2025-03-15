@@ -227,7 +227,6 @@ try:
                     "PORT": "5432",
                     "OPTIONS": {
                         "sslmode": "require",
-                        "use_iam_auth": True,  # Enable IAM auth in your database driver
                     },
                 }
             }
@@ -254,11 +253,28 @@ INSTALLED_APPS += ["django.contrib.staticfiles.testing"]  # noqa: F405
 # Add silk for profiling/debugging in tests if not already added
 if "silk" not in INSTALLED_APPS:  # noqa: F405
     INSTALLED_APPS += ["silk"]  # noqa: F405
-    cors_index = MIDDLEWARE.index("corsheaders.middleware.CorsMiddleware")  # noqa: F405
+    cors_index = MIDDLEWARE.index("apps.core.middleware.DebugCorsMiddleware")  # noqa: F405
     MIDDLEWARE.insert(cors_index + 2, "silk.middleware.SilkyMiddleware")  # noqa: F405
     # Settings for silk in test environment
     SILKY_PYTHON_PROFILER = True
     SILKY_INTERCEPT_PERCENT = 100  # Intercept all requests in test environment
+
+# Add CORS skip middleware configuration
+# Define trusted origins that can bypass CORS restrictions during testing
+CORS_SKIP_TRUSTED_ORIGINS = [
+    "localhost:3000",
+    "127.0.0.1:3000",
+    "run.app",  # For Cloud Run domains
+    "medwebapp-frontend-container-test-192857848105.us-east1.run.app",  # Match existing allowed origins
+]
+
+# Insert CorsSkipMiddleware right after DebugCorsMiddleware but before real CORS middleware
+if "apps.core.cors_skip_middleware.CorsSkipMiddleware" not in MIDDLEWARE:  # noqa: F405
+    cors_index = MIDDLEWARE.index("apps.core.middleware.DebugCorsMiddleware")  # noqa: F405
+    MIDDLEWARE.insert(
+        cors_index + 1, "apps.core.cors_skip_middleware.CorsSkipMiddleware"
+    )  # noqa: F405
+    logging.info("CorsSkipMiddleware added to the middleware chain")
 
 # Disable password hashers for faster tests
 PASSWORD_HASHERS = [
@@ -272,14 +288,12 @@ CSRF_TRUSTED_ORIGINS = [
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 
-# CORS settings - full debug mode
-# Try allowing all origins temporarily to diagnose the issue
-CORS_ALLOW_ALL_ORIGINS = True  # FOR DEBUGGING ONLY, remove in production
+# CORS settings – making more specific and aligned with develop.py
+CORS_ALLOW_ALL_ORIGINS = False  # More secure approach, only allow specific origins
 
-# Keep the specific origins too
+# Keep the specific origins with Cloud Run URL as the primary focus
 CORS_ALLOWED_ORIGINS = [
     "https://medwebapp-frontend-container-test-192857848105.us-east1.run.app",
-    # Add localhost and other dev environments
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
@@ -287,7 +301,7 @@ CORS_ALLOWED_ORIGINS = [
 # Make sure credentials are allowed
 CORS_ALLOW_CREDENTIALS = True
 
-# Be explicit about allowed methods, particularly OPTIONS for preflight
+# Be explicit about allowed methods
 CORS_ALLOW_METHODS = [
     "DELETE",
     "GET",
@@ -297,14 +311,36 @@ CORS_ALLOW_METHODS = [
     "PUT",
 ]
 
-# Allow all headers for debugging
-CORS_ALLOW_ALL_HEADERS = True
+# Define specific allowed headers instead of allowing all
+CORS_ALLOW_ALL_HEADERS = False
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+]
 
 # Expose headers that the frontend might need
 CORS_EXPOSE_HEADERS = ["Content-Type", "X-CSRFToken", "Authorization"]
 
-# Set a shorter preflight max age for testing
-CORS_PREFLIGHT_MAX_AGE = 60  # 1 minute for testing
+# Set a reasonable preflight max age
+CORS_PREFLIGHT_MAX_AGE = 86400  # 24 hours
+
+# Update CSRF trusted origins to explicitly include the Cloud Run URL
+CSRF_TRUSTED_ORIGINS = [
+    "https://medwebapp-frontend-container-test-192857848105.us-east1.run.app",
+    "https://*.run.app",  # Trust all Cloud Run domains
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+# Make sure logging is configured to capture CORS-related messages
+logging.getLogger("apps.core.cors_skip_middleware").setLevel(logging.DEBUG)
 
 # Log successful initialization
 logging.info("Test settings loaded successfully")
