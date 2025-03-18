@@ -1,5 +1,5 @@
 "use client";
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { DocumentoOut } from "@/types/documento";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
@@ -21,9 +21,19 @@ import { createEditorConfig } from "./utils/editorConfig";
 
 interface TextAreaProps {
     /**
-     * Document to display/edit
+     * Current document to display/edit
      */
-    document: DocumentoOut;
+    document: DocumentoOut | null;
+
+    /**
+     * All available documents
+     */
+    allDocuments: DocumentoOut[];
+
+    /**
+     * Active document ID
+     */
+    activeDocumentId: number | null;
 
     /**
      * Whether the editor is in read-only mode
@@ -58,9 +68,17 @@ interface TextAreaProps {
     isLoadingContent?: boolean;
 
     /**
-     * Whether this document has been loaded before
+     * List of document IDs that have already been loaded
      */
-    isDocumentLoaded?: boolean;
+    loadedDocumentIds?: number[];
+
+    /**
+     * Callback when document switches
+     */
+    onDocumentSwitch?: (
+        oldDocId: number | null,
+        newDocId: number | null
+    ) => void;
 }
 
 /**
@@ -69,57 +87,43 @@ interface TextAreaProps {
  */
 const TextArea: React.FC<TextAreaProps> = ({
     document,
+    allDocuments,
+    activeDocumentId,
     readOnly = true,
     onSave,
     registerSaveFunction,
     documentContentCache,
     fetchDocumentContent,
     isLoadingContent = false,
-    isDocumentLoaded = false,
+    loadedDocumentIds = [],
+    onDocumentSwitch,
 }) => {
-    // Use the document content hook to manage content loading
+    // Track the previous document to detect changes
+    const previousDocIdRef = useRef<number | null>(null);
+
+    // Check if this document has been loaded before - moved up before potential early return
+    const isDocumentLoaded = document
+        ? loadedDocumentIds?.includes(document.id) || false
+        : false;
+
+    // Initialize content state - also moved above early return
     const {
         documentContent,
         fetchError,
         isLoading: isContentLoading,
         contentLoadedSuccessfully,
     } = useDocumentContent({
-        document,
+        document: document || ({} as DocumentoOut), // Provide fallback
         fetchDocumentContent,
         documentContentCache,
-        isDocumentLoaded, // Pass the loaded state to the hook
+        isDocumentLoaded,
     });
 
-    // Check if content is from cache for debugging
-    const isFromCache = documentContentCache?.has(document.id) || false;
+    // Check if content is from cache for debugging - moved up before early return
+    const isFromCache =
+        (document && documentContentCache?.has(document.id)) || false;
 
-    // Log component lifecycle for debugging
-    useEffect(() => {
-        console.log(
-            `[TEXT_AREA] Document ${document.id}: Component initialized/updated`
-        );
-
-        return () => {
-            console.log(
-                `[TEXT_AREA] Document ${document.id}: Component unmounting`
-            );
-        };
-    }, [document.id]);
-
-    // Log cache status for debugging
-    useEffect(() => {
-        console.log(
-            `[CACHE_CHECK] Document ${document.id}: Is from cache: ${isFromCache}`
-        );
-
-        if (documentContentCache?.has(document.id)) {
-            const cachedContent = documentContentCache.get(document.id) || "";
-            console.log(
-                `[CACHE_DATA] Document ${document.id}: Cached content length: ${cachedContent.length} chars`
-            );
-        }
-    }, [document.id, documentContentCache, isFromCache]);
-
+    // Define all hooks before conditional logic
     // Custom save wrapper to prevent saving empty content for documents that had content
     const handleSave = useCallback(
         async (docId: number, content: string) => {
@@ -138,6 +142,50 @@ const TextArea: React.FC<TextAreaProps> = ({
         },
         [onSave, contentLoadedSuccessfully]
     );
+
+    // Replace the current document switching effect with an optimized version
+    useEffect(() => {
+        // Only run if we have a document
+        if (!document) return;
+
+        // Create stable function to avoid depending on onDocumentSwitch
+        function notifyDocumentSwitch() {
+            if (onDocumentSwitch && document.id !== previousDocIdRef.current) {
+                onDocumentSwitch(previousDocIdRef.current, document.id);
+                previousDocIdRef.current = document.id;
+            }
+        }
+
+        // Run once per document change
+        notifyDocumentSwitch();
+
+        // No cleanup needed, we're just tracking changes
+    }, [document?.id]); // Only depend on document.id, not the entire document object
+
+    // Log component lifecycle for debugging
+    useEffect(() => {
+        if (document) {
+            console.log(`[TEXT_AREA] Document ${document.id}: Content updated`);
+        }
+    }, [document, documentContent]);
+
+    // Log cache status for debugging
+    useEffect(() => {
+        if (document && documentContentCache?.has(document.id)) {
+            console.log(
+                `[CACHE_DATA] Document ${document.id}: Cached content available`
+            );
+        }
+    }, [document, documentContentCache]);
+
+    // Only proceed with rendering editor if we have a document
+    if (!document) {
+        return (
+            <div className="flex items-center justify-center h-full text-gray-500">
+                Seleccione un documento para visualizar
+            </div>
+        );
+    }
 
     // Error handler for Lexical
     function onError(error: Error) {
@@ -185,9 +233,12 @@ const TextArea: React.FC<TextAreaProps> = ({
                 </div>
             )}
 
-            {/* Editor container */}
+            {/* Use a persistent editor without document ID in the key */}
             <div className="border rounded-md flex-1 bg-white">
-                <LexicalComposer initialConfig={initialConfig}>
+                <LexicalComposer
+                    key="persistent-editor"
+                    initialConfig={initialConfig}
+                >
                     <div className="editor-container h-full">
                         <RichTextPlugin
                             contentEditable={

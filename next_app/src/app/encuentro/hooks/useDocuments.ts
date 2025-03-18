@@ -221,82 +221,97 @@ export const useDocuments = (encounterId: number) => {
     /**
      * Save document content to the server
      */
-    const saveDocument = useCallback(async (docId: number, content: string) => {
-        try {
-            setIsSaving(true);
-
-            console.log(
-                `[DOC_SAVE] Document ${docId}: Saving content (${content.length} chars)`
-            );
-
-            // Final content preparation - strip all HTML if it exists
-            let finalContent = content;
-
-            // If content appears to have any HTML tags, completely strip them
-            if (finalContent.includes("<") && finalContent.includes(">")) {
-                try {
-                    // Use DOM to strip all HTML
-                    const tempDiv = document.createElement("div");
-                    tempDiv.innerHTML = content;
-                    finalContent = tempDiv.textContent || "";
+    const saveDocument = useCallback(
+        async (docId: number, content: string) => {
+            try {
+                // Check if content in cache is the same (if available)
+                const cachedContent = documentContentCache.get(docId);
+                if (cachedContent && cachedContent.trim() === content.trim()) {
                     console.log(
-                        `[DOC_SAVE] Document ${docId}: Stripped HTML tags`
+                        `[DOC_SAVE] Document ${docId}: Content unchanged from cache, skipping API call`
                     );
-                } catch (e) {
-                    // Fallback: Use regex to strip HTML tags
-                    finalContent = content.replace(/<[^>]*>/g, "");
-                    console.log(
-                        `[DOC_SAVE] Document ${docId}: Stripped HTML tags (regex fallback)`
-                    );
+                    return true; // Return success without API call
                 }
-            }
 
-            console.log(
-                `[DOC_SAVE] Document ${docId}: Final content length: ${finalContent.length} chars`
-            );
-
-            // Send the update
-            const response = await axiosInstance.patch(
-                `/api/documento_by_editor/${docId}`,
-                {
-                    contenido: finalContent,
-                }
-            );
-
-            // Update local document data
-            setDocuments((docs) =>
-                docs.map((doc) =>
-                    doc.id === docId ? { ...doc, contenido: finalContent } : doc
-                )
-            );
-
-            // Update the cache
-            console.log(
-                `[CACHE_UPDATE 📝] Document ${docId}: Updating after save`
-            );
-            setDocumentContentCache((prev) => {
-                const newCache = new Map(prev);
-                newCache.set(docId, finalContent);
+                setIsSaving(true);
                 console.log(
-                    `[CACHE_STATUS] Size after save: ${newCache.size} documents`
+                    `[DOC_SAVE] Document ${docId}: Saving content (${content.length} chars)`
                 );
-                return newCache;
-            });
 
-            console.log(`[DOC_SAVE ✅] Document ${docId}: Saved successfully`);
-            return true;
-        } catch (err: any) {
-            console.error(
-                `[DOC_SAVE ❌] Document ${docId}: Error saving:`,
-                err
-            );
-            // Store failed save for retry
-            setPendingSave({ id: docId, content });
-            throw err; // Re-throw to allow handling in components
-        } finally {
-            setIsSaving(false);
-        }
-    }, []);
+                // Final content preparation - strip all HTML if it exists
+                let finalContent = content;
+
+                // If content appears to have any HTML tags, completely strip them
+                if (finalContent.includes("<") && finalContent.includes(">")) {
+                    try {
+                        // Use DOM to strip all HTML
+                        const tempDiv = document.createElement("div");
+                        tempDiv.innerHTML = content;
+                        finalContent = tempDiv.textContent || "";
+                        console.log(
+                            `[DOC_SAVE] Document ${docId}: Stripped HTML tags`
+                        );
+                    } catch (e) {
+                        // Fallback: Use regex to strip HTML tags
+                        finalContent = content.replace(/<[^>]*>/g, "");
+                        console.log(
+                            `[DOC_SAVE] Document ${docId}: Stripped HTML tags (regex fallback)`
+                        );
+                    }
+                }
+
+                console.log(
+                    `[DOC_SAVE] Document ${docId}: Final content length: ${finalContent.length} chars`
+                );
+
+                // Send the update
+                const response = await axiosInstance.patch(
+                    `/api/documento_by_editor/${docId}`,
+                    {
+                        contenido: finalContent,
+                    }
+                );
+
+                // Update local document data
+                setDocuments((docs) =>
+                    docs.map((doc) =>
+                        doc.id === docId
+                            ? { ...doc, contenido: finalContent }
+                            : doc
+                    )
+                );
+
+                // Update the cache
+                console.log(
+                    `[CACHE_UPDATE 📝] Document ${docId}: Updating after save`
+                );
+                setDocumentContentCache((prev) => {
+                    const newCache = new Map(prev);
+                    newCache.set(docId, finalContent);
+                    console.log(
+                        `[CACHE_STATUS] Size after save: ${newCache.size} documents`
+                    );
+                    return newCache;
+                });
+
+                console.log(
+                    `[DOC_SAVE ✅] Document ${docId}: Saved successfully`
+                );
+                return true;
+            } catch (err: any) {
+                console.error(
+                    `[DOC_SAVE ❌] Document ${docId}: Error saving:`,
+                    err
+                );
+                // Store failed save for retry
+                setPendingSave({ id: docId, content });
+                throw err; // Re-throw to allow handling in components
+            } finally {
+                setIsSaving(false);
+            }
+        },
+        [documentContentCache]
+    );
 
     /**
      * Create a new document for the encounter

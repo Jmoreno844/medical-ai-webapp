@@ -23,7 +23,6 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
         isSaving,
         selectDocument,
         saveDocument,
-        // Extract these additional props from useDocuments
         documentContentCache,
         fetchDocumentContent,
         isLoadingContent,
@@ -35,10 +34,8 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
         ((force?: boolean) => Promise<void>) | null
     >(null);
 
-    // Keep track of documents we've already loaded to ensure proper key changes
-    const [documentVersions, setDocumentVersions] = useState<
-        Record<number, number>
-    >({});
+    // Track when a document actually needs a force refresh
+    const needsRefreshRef = useRef<Set<number>>(new Set());
 
     // Find and emit transcription document ID when documents load
     useEffect(() => {
@@ -59,16 +56,6 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
         },
         []
     );
-
-    // Update document version when switching documents
-    useEffect(() => {
-        if (activeDocumentId) {
-            setDocumentVersions((prev) => ({
-                ...prev,
-                [activeDocumentId]: (prev[activeDocumentId] || 0) + 1,
-            }));
-        }
-    }, [activeDocumentId]);
 
     // Handle document selection with saving
     const handleSelectDocument = useCallback(
@@ -133,36 +120,37 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
             <TabBar
                 documents={documents}
                 activeDocumentId={activeDocumentId}
-                onSelectDocument={handleSelectDocument} // Use our wrapped handler
+                onSelectDocument={handleSelectDocument}
             />
 
             <div className="flex-1 overflow-auto bg-white">
-                {activeDocument ? (
+                {/* Single persistent TextArea component - key set to encounterId so it only remounts 
+                    when the encounter changes, not when documents change */}
+                {documents.length > 0 ? (
                     <TextArea
-                        // Use document version in key to ensure proper remounting
-                        key={`doc-${activeDocument.id}-v${
-                            documentVersions[activeDocument.id] || 1
-                        }`}
+                        key={`encounter-${encounterId}`}
                         document={activeDocument}
+                        allDocuments={documents}
+                        activeDocumentId={activeDocumentId}
                         readOnly={false}
                         onSave={async (docId, content) => {
-                            await saveDocument(docId, content); // Discard the boolean result
-                            // Returns void implicitly
+                            await saveDocument(docId, content);
                         }}
                         registerSaveFunction={registerSaveFunction}
-                        // Pass these additional props to TextArea
                         documentContentCache={documentContentCache}
                         fetchDocumentContent={fetchDocumentContent}
                         isLoadingContent={isLoadingContent}
-                        isDocumentLoaded={loadedDocumentIds.includes(
-                            activeDocument.id
-                        )}
+                        loadedDocumentIds={loadedDocumentIds}
+                        onDocumentSwitch={(oldDocId, newDocId) => {
+                            console.log(
+                                `[DOC_SWITCH] Changed from document ${oldDocId} to ${newDocId}`
+                            );
+                            // Optional: Add any specific logic needed on document switch
+                        }}
                     />
                 ) : (
                     <div className="flex items-center justify-center h-full text-gray-500">
-                        {documents.length > 0
-                            ? "Seleccione un documento para visualizar"
-                            : "No hay documentos disponibles para este encuentro"}
+                        No hay documentos disponibles para este encuentro
                     </div>
                 )}
             </div>
