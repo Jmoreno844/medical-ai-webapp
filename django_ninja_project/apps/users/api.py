@@ -9,6 +9,9 @@ import jwt
 import os
 from django.conf import settings
 from django.middleware.csrf import get_token
+import logging
+
+logger = logging.getLogger(__name__)
 
 from .models import User, UserRole
 from .schemas import (
@@ -56,13 +59,16 @@ def login_user(request, data: UserLoginIn):
 
     Creates a server-side session and sets session cookie.
     """
+    logger.info(f"Login attempt for email: {data.email}")
     user = authenticate(request, email=data.email, password=data.password)
     if user is None:
+        logger.warning(f"Failed login attempt for email: {data.email}")
         return 401, {"message": "Invalid credentials"}
 
     login(request, user)
     # Configure session settings
     request.session.set_expiry(3600)  # 1 hour expiry
+    logger.info(f"User logged in successfully: {user.id}")
     return 200, {"message": "Successfully logged in", "userId": user.id}
 
 
@@ -124,6 +130,11 @@ def me(request):
         200: True if session is valid
         401: Error message if session is invalid or expired
     """
+    logger.debug(
+        f"Session check: authenticated={request.user.is_authenticated if hasattr(request, 'user') else 'No user'}"
+    )
+    logger.debug(f"Session ID: {request.session.session_key}")
+
     if request.user and request.user.is_authenticated:
         return 200, True
     return 401, {"message": "Session not validated"}
@@ -138,7 +149,12 @@ def me_data(request):
         200: User profile data
         401: Error message if session is invalid
     """
+    logger.debug(
+        f"User data request: authenticated={request.user.is_authenticated if hasattr(request, 'user') else 'No user'}"
+    )
+
     if request.user and request.user.is_authenticated:
+        logger.info(f"Returning user data for ID: {request.user.id}")
         return 200, request.user
     return 401, {"message": "Session not validated"}
 

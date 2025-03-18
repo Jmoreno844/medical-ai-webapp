@@ -43,6 +43,16 @@ export const AuthContext = createContext<AuthContextType>({
     refreshUserData: async () => {},
 });
 
+// Logger utility for consistent logging
+const logAuth = (type: "info" | "error", message: string, data?: any) => {
+    const prefix = "[AuthContext]";
+    if (type === "info") {
+        console.log(`${prefix} ${message}`, data || "");
+    } else {
+        console.error(`${prefix} ${message}`, data || "");
+    }
+};
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const router = useRouter();
     const pathname = usePathname();
@@ -70,24 +80,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (!isAuthenticated) return;
 
         try {
-            const response = await axiosInstance.get("api/auth/me/data");
+            logAuth("info", "Fetching user data");
+            const response = await axiosInstance.get("/api/auth/me/data");
+            logAuth("info", "User data fetched successfully", response.data);
             setUserData(response.data);
-        } catch (error) {
-            console.error("Failed to fetch user data:", error);
+        } catch (error: any) {
+            logAuth("error", "Failed to fetch user data:", {
+                status: error.response?.status,
+                data: error.response?.data,
+            });
         }
     }, [isAuthenticated]);
 
     // Login function
     const login = useCallback(
         async (email: string, password: string) => {
+            // Add immediate synchronous log to confirm function entry
+            console.log("🔐 AUTH-CONTEXT LOGIN FUNCTION CALLED with email:", email);
             try {
-                await axiosInstance.post("api/auth/login", { email, password });
+                logAuth("info", "Attempting login with email", { email });
+                console.log("🔐 AUTH-CONTEXT: Before API call");
+                const response = await axiosInstance.post("/api/auth/login", {
+                    email,
+                    password,
+                });
+                console.log("🔐 AUTH-CONTEXT: API call completed with status:", response.status);
+                logAuth("info", "Login successful", {
+                    status: response.status,
+                });
                 setIsAuthenticated(true);
                 updateCsrfToken();
                 await refreshUserData();
-                router.push("/dashboard");
-            } catch (error) {
-                console.error("Login failed:", error);
+                logAuth("info", "Redirecting to home page");
+                router.push("/home"); // Consistent path with login form
+            } catch (error: any) {
+                console.error("🔴 AUTH-CONTEXT LOGIN ERROR:", error);
+                logAuth("error", "Login failed", {
+                    status: error.response?.status,
+                    data: error.response?.data,
+                });
                 throw error;
             }
         },
@@ -97,9 +128,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Logout function
     const logout = useCallback(async () => {
         try {
-            await axiosInstance.post("api/auth/logout");
-        } catch (error) {
-            console.error("Logout error:", error);
+            logAuth("info", "Attempting logout");
+            await axiosInstance.post("/api/auth/logout");
+            logAuth("info", "Logout successful");
+        } catch (error: any) {
+            logAuth("error", "Logout error", {
+                status: error.response?.status,
+                message: error.message,
+            });
         } finally {
             setIsAuthenticated(false);
             setUserData(null);
@@ -109,17 +145,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Initial authentication check and CSRF token setup on mount
     useEffect(() => {
+        logAuth("info", "Checking authentication status");
         updateCsrfToken();
 
+        // Check if there's a session cookie before making the request
+        const hasCookie = document.cookie
+            .split(";")
+            .some((item) => item.trim().startsWith("sessionid="));
+        logAuth("info", "Session cookie exists:", hasCookie);
+
         axiosInstance
-            .get("api/auth/me")
+            .get("/api/auth/me")
             .then((response) => {
+                logAuth("info", "User is authenticated", response.data);
                 setIsAuthenticated(true);
                 updateCsrfToken();
                 refreshUserData();
             })
             .catch((error) => {
-                console.error("Auth check failed:", error);
+                logAuth("error", "Auth check failed", {
+                    status: error.response?.status,
+                    data: error.response?.data,
+                });
                 setIsAuthenticated(false);
                 setUserData(null);
             })
@@ -134,6 +181,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             (response) => response,
             (error) => {
                 if (error.response?.status === 401) {
+                    logAuth(
+                        "info",
+                        "Unauthorized access detected, logging out user"
+                    );
                     setIsAuthenticated(false);
                     setUserData(null);
 
@@ -158,6 +209,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             !isAuthenticated &&
             !publicRoutes.includes(pathname)
         ) {
+            logAuth(
+                "info",
+                "Redirecting unauthenticated user from protected route",
+                {
+                    currentPath: pathname,
+                }
+            );
             router.push("/login");
         }
     }, [isAuthenticated, router, pathname, isAuthLoading, publicRoutes]);

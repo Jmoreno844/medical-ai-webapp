@@ -42,6 +42,7 @@ CORS_ALLOW_HEADERS = [
     "user-agent",
     "x-csrftoken",
     "x-requested-with",
+    "cookie",  # Add cookie to allowed headers
 ]
 
 CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
@@ -73,10 +74,35 @@ DATABASES = {
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # Disable security settings that might interfere with development
-CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = "None"  # Required for cross-site requests with credentials
+CSRF_USE_SESSIONS = False  # Store CSRF token in cookie instead of session
 
-SESSION_COOKIE_SECURE = False
+SESSION_COOKIE_SECURE = True  # Keep True for HTTPS, even in development
 SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
-SESSION_COOKIE_SAMESITE = "Lax"  # CSRF protection
+SESSION_COOKIE_SAMESITE = "None"  # Required for cross-site requests with credentials
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Session ends when browser closes
 SESSION_COOKIE_AGE = 3600  # 1 hour in seconds
+
+# Debug logging for authentication
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "django.request": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": True,
+        },
+        "apps.users.api": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": True,
+        },
+    },
+}

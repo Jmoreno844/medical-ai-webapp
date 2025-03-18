@@ -11,6 +11,16 @@ interface SignupCredentials {
     lastName: string;
 }
 
+// Logger utility for consistent logging
+const logAuth = (type: "info" | "error", message: string, data?: any) => {
+    const prefix = "[useAuth]";
+    if (type === "info") {
+        console.log(`${prefix} ${message}`, data || "");
+    } else {
+        console.error(`${prefix} ${message}`, data || "");
+    }
+};
+
 export const useAuth = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -26,13 +36,25 @@ export const useAuth = () => {
         setLoading(true);
         setError(null);
         try {
-            // Use the login method from AuthContext
-            await contextLogin(email, password);
-            return { success: true };
-        } catch (err) {
-            setError(
-                err instanceof Error ? err.message : "Error al iniciar sesión"
+            logAuth("info", "Delegating login to AuthContext");
+            console.log(
+                "📱 USEAUTH: About to call contextLogin with email:",
+                email
             );
+            await contextLogin(email, password);
+            console.log("📱 USEAUTH: contextLogin call completed");
+            logAuth("info", "Login completed successfully");
+            return { success: true };
+        } catch (err: any) {
+            // Extract error message from API response if available
+            const errorMessage =
+                err.response?.data?.detail ||
+                err.response?.data?.message ||
+                (err instanceof Error
+                    ? err.message
+                    : "Error al iniciar sesión");
+            logAuth("error", "Login failed", { message: errorMessage });
+            setError(errorMessage);
             throw err;
         } finally {
             setLoading(false);
@@ -43,12 +65,14 @@ export const useAuth = () => {
         setLoading(true);
         setError(null);
         try {
+            logAuth("info", "Delegating logout to AuthContext");
             await contextLogout();
             return { success: true };
         } catch (err) {
-            setError(
-                err instanceof Error ? err.message : "Error al cerrar sesión"
-            );
+            const errorMessage =
+                err instanceof Error ? err.message : "Error al cerrar sesión";
+            logAuth("error", "Logout failed", { message: errorMessage });
+            setError(errorMessage);
             throw err;
         } finally {
             setLoading(false);
@@ -59,19 +83,21 @@ export const useAuth = () => {
         setLoading(true);
         setError(null);
         try {
+            logAuth("info", "Requesting password reset for email", email);
             const response = await axiosInstance.post(
                 "/api/auth/forgot-password",
-                {
-                    email,
-                }
+                { email }
             );
             return response.data;
         } catch (err) {
-            setError(
+            const errorMessage =
                 err instanceof Error
                     ? err.message
-                    : "Error al recuperar contraseña"
-            );
+                    : "Error al recuperar contraseña";
+            logAuth("error", "Password reset failed", {
+                message: errorMessage,
+            });
+            setError(errorMessage);
             throw err;
         } finally {
             setLoading(false);
@@ -87,17 +113,22 @@ export const useAuth = () => {
         setLoading(true);
         setError(null);
         try {
-            const response = await axiosInstance.post("/api/auth/registro", {
+            logAuth("info", "Attempting signup");
+            const response = await axiosInstance.post("api/auth/registro", {
                 email,
                 name,
                 lastName,
                 password,
             });
+            logAuth("info", "Signup successful");
             return response.data;
-        } catch (err) {
-            setError(
-                err instanceof Error ? err.message : "Error en el registro"
-            );
+        } catch (err: any) {
+            const errorMessage =
+                err.response?.data?.detail ||
+                err.response?.data?.message ||
+                (err instanceof Error ? err.message : "Error en el registro");
+            logAuth("error", "Signup failed", { message: errorMessage });
+            setError(errorMessage);
             throw err;
         } finally {
             setLoading(false);

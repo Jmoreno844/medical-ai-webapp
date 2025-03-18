@@ -21,4 +21,8 @@ COPY . .
 ENV GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/service-account-key.json
 
 # Command to run the cloud function
-CMD ["functions-framework", "--target=gemini_handler", "--port=8082"]
+# Add this line to expose the port
+EXPOSE 8082
+
+# Update the command to bind to all interfaces
+CMD ["functions-framework", "--target=gemini_handler", "--port=8082", "--host=0.0.0.0"]

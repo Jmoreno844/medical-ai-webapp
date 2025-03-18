@@ -9,6 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+// Logger utility for consistent logging
+const logForm = (type: "info" | "error", message: string, data?: any) => {
+    const prefix = "[LoginForm]";
+    if (type === "info") {
+        console.log(`${prefix} ${message}`, data || "");
+    } else {
+        console.error(`${prefix} ${message}`, data || "");
+    }
+};
+
 export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -18,16 +28,19 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            console.log("Attempting login..."); // Debug log
+            logForm("info", "Submitting login form", { email });
             await login(email, password);
-            router.push("/home");
+            logForm("info", "Login successful, redirecting to dashboard");
+            // No need to redirect here - AuthContext will handle it
         } catch (err) {
-            console.error("Login error:", err); // Debug log
+            logForm("error", "Form submission error");
+            // Error already handled by useAuth
         }
     };
 
     const handleRedirect = (path: string) => (e: React.MouseEvent) => {
         e.preventDefault();
+        logForm("info", "Redirecting to", path);
         router.push(path);
     };
 

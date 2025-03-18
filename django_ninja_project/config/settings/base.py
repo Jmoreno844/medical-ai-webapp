@@ -40,7 +40,7 @@ AUTH_USER_MODEL = "users.User"
 # CORS Settings removed
 
 MIDDLEWARE = [
-    "apps.core.middleware.DebugCorsMiddleware",  # Debug CORS middleware comes first
+    # "apps.core.middleware.DebugCorsMiddleware",  # Debug CORS middleware comes first
     "corsheaders.middleware.CorsMiddleware",  # CORS middleware comes second
     "django.middleware.common.CommonMiddleware",
     "django.middleware.security.SecurityMiddleware",

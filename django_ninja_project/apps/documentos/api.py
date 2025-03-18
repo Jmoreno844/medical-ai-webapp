@@ -142,7 +142,9 @@ def authorize_transcription(request, documento_id: int):
     return {"success": True, "token": token}
 
 
-@router.patch("/documento/{documento_id}", response=SuccessResponse, auth=JWTAuth())
+@router.patch(
+    "/documento_by_function/{documento_id}", response=SuccessResponse, auth=JWTAuth()
+)
 def update_documento_content(
     request, documento_id: int, payload: DocumentoUpdateIn, auth=None
 ):
@@ -200,6 +202,41 @@ def update_documento_content(
         documento.contenido = payload.contenido
         documento.save()
         logger.info(f"Successfully updated documento {documento_id}")
+
+        # Return simple success response
+        return {
+            "success": True,
+            "message": f"Documento {documento_id} actualizado exitosamente",
+        }
+    except Http404:
+        logger.error(f"Documento {documento_id} not found")
+        raise HttpError(404, "Documento no encontrado")
+
+
+@router.patch(
+    "/documento_by_editor/{documento_id}", response=SuccessResponse, auth=django_auth
+)
+def update_documento_by_user(request, documento_id: int, payload: DocumentoUpdateIn):
+    """
+    Update the content of an existing document using Django authentication.
+    Authentication is via the Django session.
+    """
+    doctor = request.user
+
+    try:
+        # Get the document and verify it exists
+        documento = get_object_or_404(Documento, id=documento_id)
+
+        # Verify the document belongs to the authenticated doctor
+        if documento.id_medico.id != doctor.id:
+            raise HttpError(403, "No tienes permiso para modificar este documento")
+
+        # Update only the content field
+        documento.contenido = payload.contenido
+        documento.save()
+        logger.info(
+            f"Successfully updated documento {documento_id} by user {doctor.id}"
+        )
 
         # Return simple success response
         return {

@@ -283,7 +283,7 @@ CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True  # Keep this True for security
 SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to cookies
 SESSION_COOKIE_SAMESITE = "None"  # Try changing to None for cross-domain
-SESSION_COOKIE_DOMAIN = ".run.app"  # Try setting domain for Cloud Run
+SESSION_COOKIE_DOMAIN = None  # Try setting domain for Cloud Run
 SESSION_COOKIE_NAME = "medwebapp_session"
 SESSION_COOKIE_AGE = 3600  # 1 hour (matches your session.set_expiry)
 # CORS settings – making more specific and aligned with develop.py

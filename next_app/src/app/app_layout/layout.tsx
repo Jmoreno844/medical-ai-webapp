@@ -1,7 +1,6 @@
 "use client";
 import React from "react";
 import { Metadata } from "next";
-import { AuthProvider } from "@/contexts/AuthContext";
 import { SidebarProvider, useSidebar } from "@/contexts/SidebarContext";
 import Sidebar from "./components/Sidebar";
 
@@ -52,11 +51,9 @@ const BaseLayout: React.FC<BaseLayoutProps> = ({ children, metadata }) => {
     }
 
     return (
-        <AuthProvider>
-            <SidebarProvider>
-                <LayoutContent>{children}</LayoutContent>
-            </SidebarProvider>
-        </AuthProvider>
+        <SidebarProvider>
+            <LayoutContent>{children}</LayoutContent>
+        </SidebarProvider>
     );
 };
 
