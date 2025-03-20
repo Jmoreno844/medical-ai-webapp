@@ -72,21 +72,36 @@ export function DocumentContentPlugin({
             editor.update(() => {
                 const root = $getRoot();
 
-                // Always clear first - this is critical!
+                // Always clear first
                 root.clear();
 
-                // No content case
+                // Empty content case
                 if (!content || content.trim() === "") {
                     root.append($createParagraphNode());
                     return;
                 }
 
-                // Handle content with simple paragraphs
-                const lines = content.split("\n");
-                lines.forEach((line) => {
+                // Handle newlines properly without duplication
+                // Create a single text node for the content with normalized line breaks
+                const normalizedContent = content
+                    .replace(/\r\n/g, "\n") // Normalize Windows line breaks
+                    .replace(/\r/g, "\n"); // Normalize Mac line breaks
+
+                // For single-line content (without line breaks)
+                if (!normalizedContent.includes("\n")) {
                     const para = $createParagraphNode();
-                    if (line.trim()) {
-                        para.append($createTextNode(line));
+                    para.append($createTextNode(normalizedContent));
+                    root.append(para);
+                    return;
+                }
+
+                // For multi-line content, create paragraphs more carefully
+                const sections = normalizedContent.split("\n");
+                sections.forEach((section, i) => {
+                    // Create paragraph with content
+                    const para = $createParagraphNode();
+                    if (section.length > 0) {
+                        para.append($createTextNode(section));
                     }
                     root.append(para);
                 });

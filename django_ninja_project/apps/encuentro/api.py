@@ -8,9 +8,15 @@ from .schemas import (
     EncuentroUpdate,
     EncuentroOut,
     EmptyEncuentroResponse,
+    AudioUploadRequest,
+    AudioUploadResponse,
 )
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from apps.documentos.models import Documento  # Import the Documento model
+from google.cloud import storage
+from django.conf import settings
+import uuid
+from google.oauth2 import service_account
 
 router = Router(tags=["encuentros"])
 
@@ -145,3 +151,48 @@ def delete_encuentro(request, encuentro_id: int):
 
     encuentro.delete()
     return {"success": True}
+
+
+## Audio and AI
+
+
+@router.post(
+    "/generar_url_audio/{encuentro_id}", response=AudioUploadResponse, auth=django_auth
+)
+def generate_upload_url(request, encuentro_id: int, payload: AudioUploadRequest):
+    """Generate a signed URL for direct upload to Google Cloud Storage"""
+    try:
+        # Verify user has permission to this encounter
+        encuentro = get_object_or_404(Encuentro, id=encuentro_id)
+        if request.user.id != encuentro.id_medico.id:
+            return {"success": False, "error": "Not authorized"}
+
+        # Initialize GCS client with service account credentials
+        credentials = service_account.Credentials.from_service_account_file(
+            settings.GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH
+        )
+        storage_client = storage.Client(credentials=credentials)
+        bucket = storage_client.bucket(settings.GCS_BUCKET_NAME)
+
+        # Generate unique filename
+        filename = f"encounter_audio/{encuentro_id}/{uuid.uuid4()}.mp3"
+        blob = bucket.blob(filename)
+
+        # Generate signed URL valid for 10 minutes (for upload)
+        url = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(minutes=10),
+            method="PUT",
+            content_type="audio/webm;codecs=opus",
+        )
+
+        # Update the encuentro with the filename
+        encuentro.audio_file_name = filename
+        encuentro.audio_duration_seconds = payload.audio_duration_seconds
+        encuentro.save()
+
+        # Return the signed URL and filename to the frontend
+        return {"success": True, "upload_url": url, "filename": filename}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}

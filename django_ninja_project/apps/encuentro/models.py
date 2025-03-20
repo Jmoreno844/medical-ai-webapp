@@ -19,6 +19,12 @@ class Encuentro(models.Model):
     fecha = models.DateTimeField()  # Changed from DateField to DateTimeField
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # New fields for audio handling
+    audio_file_name = models.CharField(max_length=255, null=True, blank=True)
+    audio_uploaded_at = models.DateTimeField(null=True, blank=True)
+    audio_expires_at = models.DateTimeField(null=True, blank=True)
+    audio_duration_seconds = models.IntegerField(null=True, blank=True)
+
     class Meta:
         ordering = ["-created_at"]
         indexes = [
@@ -28,3 +34,24 @@ class Encuentro(models.Model):
 
     def __str__(self):
         return f"Encuentro {self.id} - {self.fecha}"
+
+    def save(self, *args, **kwargs):
+        # Set audio expiration time when uploading a new audio file
+        if self.audio_file_name and not self.audio_uploaded_at:
+            from django.utils import timezone
+            import datetime
+
+            self.audio_uploaded_at = timezone.now()
+            self.audio_expires_at = self.audio_uploaded_at + datetime.timedelta(
+                hours=24
+            )
+
+        super().save(*args, **kwargs)
+
+    def is_audio_expired(self):
+        """Check if the audio file has expired"""
+        from django.utils import timezone
+
+        if not self.audio_expires_at:
+            return False
+        return timezone.now() >= self.audio_expires_at

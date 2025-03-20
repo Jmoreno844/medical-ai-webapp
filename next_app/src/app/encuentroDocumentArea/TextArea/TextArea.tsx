@@ -16,7 +16,7 @@ import {
 } from "./plugins";
 
 // Import custom hooks and utilities
-import { useDocumentContent } from "../../../hooks/useDocumentContent";
+import { useDocumentContent } from "../../encuentro/hooks/useDocumentContent";
 import { createEditorConfig } from "./utils/editorConfig";
 
 interface TextAreaProps {

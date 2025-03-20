@@ -223,10 +223,22 @@ export const useDocuments = (encounterId: number) => {
      */
     const saveDocument = useCallback(
         async (docId: number, content: string) => {
+            // Normalize line breaks before comparing
+            const normalizeBreaks = (text: string): string => {
+                return text
+                    .replace(/\r\n/g, "\n")
+                    .replace(/\r/g, "\n")
+                    .replace(/\n\n/g, "\n")
+                    .trim();
+            };
+
             try {
                 // Check if content in cache is the same (if available)
                 const cachedContent = documentContentCache.get(docId);
-                if (cachedContent && cachedContent.trim() === content.trim()) {
+                if (
+                    cachedContent &&
+                    normalizeBreaks(cachedContent) === normalizeBreaks(content)
+                ) {
                     console.log(
                         `[DOC_SAVE] Document ${docId}: Content unchanged from cache, skipping API call`
                     );

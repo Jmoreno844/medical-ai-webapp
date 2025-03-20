@@ -1,10 +1,10 @@
 "use client";
 import React, { useState } from "react";
-import EncuentroHeader from "../components/EncuentroHeader/EncuentroHeader";
-import { DocumentArea } from "../components/DocumentArea";
+import EncuentroHeader from "../../encuentroHeader/EncuentroHeader";
+import { DocumentArea } from "../../encuentroDocumentArea";
 import { useEncuentroDetail } from "../../app_layout/hooks/Encuentros/useEncuentroDetail";
 import { useEncounter } from "../hooks/useEncounter";
-import { usePatients } from "../hooks/usePatients";
+import { usePatients } from "../../encuentroHeader/hooks/usePatients";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorDisplay from "@/components/ErrorDisplay";
 import { format } from "date-fns";

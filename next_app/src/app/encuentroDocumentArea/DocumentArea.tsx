@@ -3,7 +3,7 @@ import TabBar from "./TabBar/TabBar";
 import TextArea from "./TextArea/TextArea";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorDisplay from "@/components/ErrorDisplay";
-import { useDocuments } from "../../hooks/useDocuments";
+import { useDocuments } from "./hooks/useDocuments";
 
 interface DocumentAreaProps {
     encounterId: number;

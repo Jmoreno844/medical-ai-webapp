@@ -30,3 +30,14 @@ class EncuentroUpdate(Schema):
 
 class EmptyEncuentroResponse(Schema):
     id: int
+
+
+class AudioUploadRequest(Schema):
+    audio_duration_seconds: int = 0
+
+
+class AudioUploadResponse(Schema):
+    success: bool
+    upload_url: Optional[str] = None
+    filename: Optional[str] = None
+    error: Optional[str] = None

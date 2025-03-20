@@ -32,10 +32,12 @@ export function AutoSavePlugin({
 
         editor.getEditorState().read(() => {
             const root = $getRoot();
+            // Get raw content with Lexical's natural paragraph breaks
             content = root.getTextContent();
         });
 
-        return content;
+        // Normalize line breaks to ensure consistent comparison
+        return content.replace(/\n\n/g, "\n").trim();
     };
 
     const handleSave = async (force: boolean = false) => {
@@ -44,7 +46,10 @@ export function AutoSavePlugin({
         const lastSaved = lastSavedContentRef.current;
 
         // Skip if content hasn't changed and not forced
-        if (!force && currentContent.trim() === lastSaved.trim()) {
+        if (
+            savingRef.current ||
+            (!force && currentContent.trim() === lastSaved.trim())
+        ) {
             console.log(
                 `[AUTO_SAVE] Document ${documentId}: Content unchanged, skipping save`
             );

@@ -62,7 +62,7 @@ def update_document_content(
         return {"success": False, "error": error_msg}
 
     base_url = get_api_base_url()
-    api_url = f"{base_url}/documento/{document_id}"
+    api_url = f"{base_url}/documento_by_function/{document_id}"
 
     # More detailed debugging for auth token
     if auth_token:

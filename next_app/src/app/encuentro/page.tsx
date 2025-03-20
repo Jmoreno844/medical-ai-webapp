@@ -1,11 +1,11 @@
 "use client";
 import React from "react";
-import TopBar from "./components/EncuentroHeader/EncuentroHeader";
+import EncuentroHeader from "../encuentroHeader/EncuentroHeader";
 
 export default function SessionPage() {
-  return (
-    <>
-      <TopBar />
-    </>
-  );
+    return (
+        <>
+            <EncuentroHeader />
+        </>
+    );
 }
