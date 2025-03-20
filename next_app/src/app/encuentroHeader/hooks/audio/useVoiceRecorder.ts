@@ -2,7 +2,37 @@ import { useState, useEffect, useRef } from "react";
 import { UseVoiceRecorderReturn } from "./types";
 import { getBestSupportedAudioType } from "./utils";
 import { uploadAudioToCloud, generateAudioUploadUrl } from "./uploadService";
+import axiosInstance from "@/utils/axiosInstance";
+/**
+ * Checks if audio exists for an encounter
+ *
+ * @param encounterId - ID of the encounter to check
+ * @returns Object containing exists flag and duration if exists
+ */
+const checkAudioExists = async (encounterId: number) => {
+    try {
+        const response = await axiosInstance.get(
+            `/api/encuentros/audio_exists/${encounterId}`
+        );
 
+        // With axiosInstance, the data is already parsed as JSON
+        const data = response.data;
+
+        return {
+            exists:
+                data === true ||
+                (typeof data === "object" && data.exists === true),
+            duration:
+                typeof data === "object" && data.duration ? data.duration : 0,
+        };
+    } catch (error) {
+        console.error(
+            "[VOICE_RECORDER] Error checking audio existence:",
+            error
+        );
+        return { exists: false, duration: 0 };
+    }
+};
 /**
  * Custom hook to manage voice recording functionality
  *
@@ -20,6 +50,8 @@ export const useVoiceRecorder = (
     const [isPaused, setIsPaused] = useState(false);
     const [duration, setDuration] = useState(0);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+    const [audioExists, setAudioExists] = useState(false);
+    const [isCheckingAudio, setIsCheckingAudio] = useState(false);
 
     // Refs for managing media recorder and timer
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -35,6 +67,32 @@ export const useVoiceRecorder = (
     useEffect(() => {
         transcriptionDocIdRef.current = transcriptionDocId;
     }, [transcriptionDocId]);
+
+    // Check if audio exists for this encounter when component mounts
+    useEffect(() => {
+        const checkExistingAudio = async () => {
+            // Extract encounter ID from URL path
+            const urlParts =
+                typeof window !== "undefined"
+                    ? window.location.pathname.split("/")
+                    : [];
+            const encounterIdFromUrl =
+                parseInt(urlParts[urlParts.length - 1]) || 0;
+
+            if (encounterIdFromUrl) {
+                setIsCheckingAudio(true);
+                const { exists, duration: existingDuration } =
+                    await checkAudioExists(encounterIdFromUrl);
+                setAudioExists(exists);
+                if (exists) {
+                    setDuration(existingDuration);
+                }
+                setIsCheckingAudio(false);
+            }
+        };
+
+        checkExistingAudio();
+    }, []);
 
     /**
      * Start recording audio
@@ -86,13 +144,18 @@ export const useVoiceRecorder = (
                 );
 
                 setAudioBlob(audioBlob);
+                setAudioExists(true);
                 stream.getTracks().forEach((track) => track.stop());
             };
+
+            // Reset duration if we're starting a new recording
+            if (audioExists) {
+                setDuration(0);
+            }
 
             mediaRecorder.start(100); // Collect chunks every 100ms for smoother pausing
             setIsRecording(true);
             setIsPaused(false);
-            setDuration(0);
             timerRef.current = setInterval(() => {
                 setDuration((prev) => prev + 1);
             }, 1000);
@@ -242,8 +305,9 @@ export const useVoiceRecorder = (
      * Delete the current recording
      *
      * Resets all recording state and stops any active recording
+     * Also deletes the audio file from the server if it exists
      */
-    const deleteRecording = () => {
+    const deleteRecording = async () => {
         if (mediaRecorderRef.current?.state !== "inactive") {
             try {
                 mediaRecorderRef.current?.stop();
@@ -255,11 +319,48 @@ export const useVoiceRecorder = (
             }
         }
 
+        // Delete from server if audio exists
+        if (audioExists) {
+            try {
+                // Extract encounter ID from URL path
+                const urlParts =
+                    typeof window !== "undefined"
+                        ? window.location.pathname.split("/")
+                        : [];
+                const encounterIdFromUrl =
+                    parseInt(urlParts[urlParts.length - 1]) || 0;
+
+                if (encounterIdFromUrl) {
+                    const response = await axiosInstance.delete(
+                        `/api/encuentros/delete_audio/${encounterIdFromUrl}`
+                    );
+
+                    const success = response.data?.success;
+
+                    if (!success) {
+                        console.error(
+                            "[VOICE_RECORDER] Failed to delete audio from server"
+                        );
+                    } else {
+                        console.log(
+                            "[VOICE_RECORDER] Audio deleted successfully from server"
+                        );
+                    }
+                }
+            } catch (error) {
+                console.error(
+                    "[VOICE_RECORDER] Error deleting audio from server:",
+                    error
+                );
+            }
+        }
+
         // Reset all states
         setAudioBlob(null);
         setDuration(0);
         setIsRecording(false);
         setIsPaused(false);
+        setAudioExists(false);
         chunksRef.current = [];
 
         // Clear timer
@@ -289,6 +390,8 @@ export const useVoiceRecorder = (
         duration,
         audioBlob,
         transcriptionDocId: transcriptionDocIdRef.current,
+        audioExists,
+        isCheckingAudio,
         startRecording,
         stopRecording,
         pauseResumeRecording,

@@ -33,6 +33,8 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         isPaused,
         duration,
         audioBlob,
+        audioExists,
+        isCheckingAudio,
         startRecording,
         stopRecording,
         pauseResumeRecording,
@@ -52,12 +54,17 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         setShowPauseButton(isRecording);
 
         // Hide start/stop button only when we have a completed recording
-        if (!isRecording && audioBlob) {
+        if (!isRecording && (audioBlob || audioExists)) {
             setShowStartStopButton(false);
         } else {
             setShowStartStopButton(true);
         }
-    }, [isRecording, audioBlob]);
+
+        // If audio exists, we should show the delete button
+        if (audioExists && !isCheckingAudio) {
+            setHasRecordingActivity(true);
+        }
+    }, [isRecording, audioBlob, audioExists, isCheckingAudio]);
 
     /**
      * Handle recording start/stop
@@ -103,6 +110,17 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         });
     };
 
+    // Show loading state while checking audio existence
+    if (isCheckingAudio) {
+        return (
+            <div className="flex items-center space-x-4">
+                <span className="text-gray-500">
+                    Checking for existing audio...
+                </span>
+            </div>
+        );
+    }
+
     return (
         <div className="flex items-center space-x-4">
             {/* Transcribe button - new addition */}
@@ -110,6 +128,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
                 transcriptionDocId={transcriptionDocId}
                 audioBlob={audioBlob}
                 isRecording={isRecording}
+                audioExists={audioExists}
             />
 
             <TimerDisplay duration={duration} />
@@ -125,15 +144,18 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
             )}
 
             {/* Always ensure start button visibility */}
-            {(showStartStopButton || !hasRecordingActivity) && (
+            {(showStartStopButton ||
+                (!hasRecordingActivity && !audioExists)) && (
                 <StartStopButton
                     isRecording={isRecording}
                     onClick={handleStartStop}
                 />
             )}
 
-            {/* Show delete button when recording has started or completed */}
-            {hasRecordingActivity && <DeleteButton onClick={handleDelete} />}
+            {/* Show delete button when recording has started or completed or audio exists */}
+            {(hasRecordingActivity || audioExists) && (
+                <DeleteButton onClick={handleDelete} />
+            )}
 
             <SettingsIcon />
         </div>

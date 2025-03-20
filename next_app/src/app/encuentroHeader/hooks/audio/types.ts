@@ -7,6 +7,8 @@ export interface UseVoiceRecorderReturn {
     duration: number;
     audioBlob: Blob | null;
     transcriptionDocId?: number;
+    audioExists: boolean;
+    isCheckingAudio: boolean;
     startRecording: () => Promise<void>;
     stopRecording: () => void;
     pauseResumeRecording: () => void;

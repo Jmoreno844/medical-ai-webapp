@@ -10,6 +10,7 @@ from .schemas import (
     EmptyEncuentroResponse,
     AudioUploadRequest,
     AudioUploadResponse,
+    AudioExistsResponse,
 )
 from datetime import date, datetime, timedelta
 from apps.documentos.models import Documento  # Import the Documento model
@@ -193,6 +194,67 @@ def generate_upload_url(request, encuentro_id: int, payload: AudioUploadRequest)
 
         # Return the signed URL and filename to the frontend
         return {"success": True, "upload_url": url, "filename": filename}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@router.get(
+    "encuentros/audio_exists/{encuentro_id}",
+    response=AudioExistsResponse,
+    auth=django_auth,
+)
+def check_audio_exists(request, encuentro_id: int):
+    """Check if the encounter has an assigned audio file"""
+    # Get the encounter or return 404
+    encuentro = get_object_or_404(Encuentro, id=encuentro_id)
+
+    # Verify the doctor owns this encounter
+    if encuentro.id_medico_id != request.user.id:
+        raise PermissionError("No puede acceder a encuentros de otro médico")
+
+    # Check if audio file exists (not null or empty)
+    has_audio = bool(encuentro.audio_file_name and encuentro.audio_file_name.strip())
+
+    # Return response with exists flag and duration
+    return {"exists": has_audio, "duration": encuentro.audio_duration_seconds or 0}
+
+
+@router.delete(
+    "/encuentros/delete_audio/{encuentro_id}", response=dict, auth=django_auth
+)
+def delete_audio(request, encuentro_id: int):
+    """Delete audio data for an encounter from database and cloud storage"""
+    try:
+        # Get the encounter or return 404
+        encuentro = get_object_or_404(Encuentro, id=encuentro_id)
+
+        # Verify the doctor owns this encounter
+        if encuentro.id_medico_id != request.user.id:
+            raise PermissionError("No puede modificar encuentros de otro médico")
+
+        # Check if there's an audio file to delete
+        if encuentro.audio_file_name:
+            # Initialize GCS client with service account credentials
+            credentials = service_account.Credentials.from_service_account_file(
+                settings.GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH
+            )
+            storage_client = storage.Client(credentials=credentials)
+            bucket = storage_client.bucket(settings.GCS_BUCKET_NAME)
+
+            # Delete the blob from cloud storage
+            blob = bucket.blob(encuentro.audio_file_name)
+            if blob.exists():
+                blob.delete()
+
+        # Clear audio fields in the database
+        encuentro.audio_file_name = None
+        encuentro.audio_uploaded_at = None
+        encuentro.audio_expires_at = None
+        encuentro.audio_duration_seconds = None
+        encuentro.save()
+
+        return {"success": True}
 
     except Exception as e:
         return {"success": False, "error": str(e)}

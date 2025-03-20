@@ -41,3 +41,8 @@ class AudioUploadResponse(Schema):
     upload_url: Optional[str] = None
     filename: Optional[str] = None
     error: Optional[str] = None
+
+
+class AudioExistsResponse(Schema):
+    exists: bool
+    duration: int = 0
