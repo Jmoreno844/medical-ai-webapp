@@ -6,10 +6,9 @@ WORKDIR /app
 # Copy the requirements file
 COPY requirements.txt .
 
-# Update pip and install dependencies with verbose output for debugging
+# Update pip and install dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt -v && \
-    pip list  # List installed packages for verification
+    pip install --no-cache-dir -r requirements.txt
 
 # Create directory for service account credentials
 RUN mkdir -p /app/credentials
@@ -20,9 +19,8 @@ COPY . .
 # Environment variable for service account (will be overridden at runtime)
 ENV GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/service-account-key.json
 
-# Command to run the cloud function
-# Add this line to expose the port
-EXPOSE 8082
+# The target function will be specified via environment variable
+ENV PORT=8082
 
-# Update the command to bind to all interfaces
-CMD ["functions-framework", "--target=gemini_handler", "--port=8082", "--host=0.0.0.0"]
+# Use environment variable for target function
+CMD functions-framework --target=${FUNCTION_TARGET} --port=${PORT} --host=0.0.0.0

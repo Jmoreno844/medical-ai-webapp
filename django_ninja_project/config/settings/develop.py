@@ -14,9 +14,14 @@ SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY", "django-insecure-development-key-change-this"
 )
 JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "not-loaded")
+
+
 GCS_BUCKET_NAME = os.environ.get("GCS_BUCKET_NAME", "not-loaded")
 GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH = os.environ.get(
     "GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH", "not-loaded"
+)
+TRANSCRIPTION_CLOUD_FUNCTION_URL = os.environ.get(
+    "TRANSCRIPTION_CLOUD_FUNCTION_URL", "not-loaded"
 )
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True

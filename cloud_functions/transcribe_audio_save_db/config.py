@@ -21,9 +21,15 @@ GENERATION_CONFIG = {
 
 # Define a single, fixed prompt that instructs the model to summarize text
 SUMMARY_PROMPT = """
-Summarize the following text in a clear, comprehensive manner. Focus on extracting key medical information, diagnoses, symptoms, treatments, and follow-up recommendations. Structure the summary with appropriate headings and bullet points where relevant:
+You are a professional medical assistant. Please create a concise and professional summary of the following medical text:
 
 {text}
+
+Focus on key medical findings, diagnoses, and recommendations.
+"""
+
+TRANSCRIPTION_PROMPT = """
+You are a professional medical transcriber. Please transcribe the following audio accurately, focusing on medical terminology and maintaining clarity.
 """
 
 # Define Django API connection defaults (will be overridden by environment variables)
@@ -31,6 +37,13 @@ DJANGO_API_DEFAULTS = {
     "base_url": "http://localhost:8000/api",  # Default for local development
     "timeout": 30,  # Default timeout in seconds
 }
+
+# Gemini API Configuration
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-pro")
+TEMPERATURE = float(os.environ.get("TEMPERATURE", "0.2"))
+TOP_P = float(os.environ.get("TOP_P", "0.95"))
+MAX_OUTPUT_TOKENS = int(os.environ.get("MAX_OUTPUT_TOKENS", "1024"))
 
 
 def get_environment():

@@ -7,6 +7,7 @@ from django.http import Http404
 from ninja.security import django_auth
 from utils.auth import JWTAuth
 import jwt
+
 from django.conf import settings
 from datetime import datetime, timedelta
 
@@ -23,7 +24,6 @@ from apps.encuentro.models import Encuentro
 import logging
 
 logger = logging.getLogger(__name__)
-
 router = Router()
 
 
@@ -116,30 +116,6 @@ def get_documentos_by_encuentro(request, encuentro_id: int):
         return result
     except Http404:
         raise HttpError(404, "Encuentro no encontrado")
-
-
-# This endpoint uses Django auth
-@router.post("/autorizar-documento/{documento_id}", auth=django_auth)
-def authorize_transcription(request, documento_id: int):
-    """Endpoint that requires Django auth and generates a JWT token"""
-    # Check if user is authenticated (Django auth)
-    if not request.user.is_authenticated:
-        return {"success": False, "error": "Authentication required"}
-
-    # Your ownership verification logic
-    # ...
-
-    # Generate JWT token
-    payload = {
-        "user_id": request.user.id,
-        "document_id": documento_id,
-        "exp": datetime.utcnow() + timedelta(minutes=15),
-        "purpose": "transcription",
-    }
-
-    token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
-
-    return {"success": True, "token": token}
 
 
 @router.patch(

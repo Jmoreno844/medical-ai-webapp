@@ -9,7 +9,7 @@ import google.auth
 import time
 
 import vertexai
-from vertexai.generative_models import GenerationConfig, GenerativeModel
+from vertexai.generative_models import GenerationConfig, GenerativeModel, Part
 
 from config import is_production, GENERATION_CONFIG
 
@@ -104,13 +104,18 @@ def create_generation_config():
     return GenerationConfig(**GENERATION_CONFIG)
 
 
-def generate_content(prompt: str, model_name: Optional[str] = None) -> Dict[str, Any]:
+def generate_content(
+    prompt: str,
+    model_name: Optional[str] = None,
+    additional_params: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
-    Generate content using Gemini model.
+    Generate content using Gemini model, with support for audio and other content types.
 
     Args:
         prompt: Text prompt for content generation
         model_name: The Gemini model to use
+        additional_params: Additional parameters like audio_uri
 
     Returns:
         Dictionary containing generated text and metadata
@@ -125,8 +130,32 @@ def generate_content(prompt: str, model_name: Optional[str] = None) -> Dict[str,
         logger.info("Sending request to Gemini API - starting to wait for response")
         start_time = time.time()
 
-        # Generate content - this is a synchronous call that will wait for the response
-        response = model.generate_content(prompt, generation_config=config)
+        # Prepare contents list for the model
+        contents = []
+
+        # Handle audio if provided - properly handle gs:// URI format
+        if additional_params and "audio_uri" in additional_params:
+            audio_uri = additional_params.get("audio_uri")
+            mime_type = additional_params.get("mime_type", "audio/mpeg")
+
+            # Ensure audio URI is in gs:// format if it's not already
+            if not audio_uri.startswith("gs://") and "/" in audio_uri:
+                from services.transcription import extract_gs_uri
+
+                audio_uri = extract_gs_uri(audio_uri)
+
+            logger.info(f"Adding audio from URI: {audio_uri}")
+            audio_part = Part.from_uri(uri=audio_uri, mime_type=mime_type)
+            contents.append(audio_part)
+
+        # Add the text prompt
+        contents.append(prompt)
+
+        # Generate content with the model
+        response = model.generate_content(
+            contents,
+            generation_config=config,
+        )
 
         end_time = time.time()
         logger.info(

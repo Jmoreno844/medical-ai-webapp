@@ -1,18 +1,18 @@
-import React, { useState } from "react";
-import axiosInstance from "@/utils/axiosInstance";
+import React from "react";
 import Tooltip from "@/components/Tooltip";
+import useTranscription from "../hooks/useTranscription";
 
 interface TranscribeButtonProps {
     transcriptionDocId?: number;
     audioBlob: Blob | null;
     isRecording: boolean;
-    audioExists?: boolean; // Add new prop to track if audio exists on server
+    audioExists?: boolean;
 }
 
 /**
  * Button to trigger audio transcription
  *
- * Makes API call to transcribe recorded audio
+ * Uses a custom hook to make API call to transcribe audio
  */
 const TranscribeButton: React.FC<TranscribeButtonProps> = ({
     transcriptionDocId,
@@ -20,19 +20,11 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
     isRecording,
     audioExists = false,
 }) => {
-    const [isLoading, setIsLoading] = useState(false);
-    const [transcriptionStatus, setTranscriptionStatus] = useState<
-        "idle" | "success" | "error"
-    >("idle");
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const { transcribeAudio, isLoading, transcriptionStatus, errorMessage } =
+        useTranscription();
 
-    // Update the disabled logic to consider both local audioBlob and remote audioExists
-    // The button should be enabled if:
-    // 1. We have a transcription doc ID, AND
-    // 2. We're not currently recording, AND
-    // 3. We're not currently loading, AND
-    // 4. Either we have an audio blob locally OR audio exists on the server (but not both)
-    const hasAudioToTranscribe = audioBlob || (audioExists && !audioBlob);
+    // Determine if we have audio to transcribe
+    const hasAudioToTranscribe = audioBlob || audioExists;
     const isDisabled =
         !transcriptionDocId ||
         isRecording ||
@@ -42,73 +34,27 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
     const handleTranscribe = async () => {
         if (isDisabled) return;
 
-        setIsLoading(true);
-        setTranscriptionStatus("idle");
-        setErrorMessage(null);
-
         try {
-            if (audioBlob) {
-                // Local audio transcription flow - use existing logic
-                // Prepare form data with audio blob
-                const formData = new FormData();
-                formData.append("audio", audioBlob as Blob, "recording.webm");
+            // Extract encounter ID from URL path
+            const urlParts =
+                typeof window !== "undefined"
+                    ? window.location.pathname.split("/")
+                    : [];
+            const encounterIdFromUrl =
+                parseInt(urlParts[urlParts.length - 1]) || 0;
 
-                // Make API call to transcribe endpoint
-                const response = await axiosInstance.post(
-                    `api/transcribir/${transcriptionDocId}`,
-                    formData,
-                    {
-                        headers: {
-                            "Content-Type": "multipart/form-data",
-                        },
-                        timeout: 60000, // 60 seconds timeout for long transcription
-                    }
-                );
-
-                setTranscriptionStatus("success");
-                console.log("Transcription successful:", response.data);
-            } else if (audioExists) {
-                // Server-side audio transcription flow - just pass the encounter ID
-                // Extract encounter ID from URL path
-                const urlParts =
-                    typeof window !== "undefined"
-                        ? window.location.pathname.split("/")
-                        : [];
-                const encounterIdFromUrl =
-                    parseInt(urlParts[urlParts.length - 1]) || 0;
-
-                if (!encounterIdFromUrl) {
-                    throw new Error("Could not determine encounter ID");
-                }
-
-                // Make API call to transcribe endpoint for existing server audio
-                const response = await axiosInstance.post(
-                    `api/transcribir_existente/${encounterIdFromUrl}`,
-                    { transcription_doc_id: transcriptionDocId },
-                    { timeout: 60000 } // 60 seconds timeout for long transcription
-                );
-
-                setTranscriptionStatus("success");
-                console.log(
-                    "Transcription of existing audio successful:",
-                    response.data
-                );
+            if (!encounterIdFromUrl) {
+                throw new Error("Could not determine encounter ID");
             }
 
-            // Optional: Show a brief success message then reset
-            setTimeout(() => {
-                setTranscriptionStatus("idle");
-            }, 3000);
-        } catch (error: any) {
-            console.error("Transcription error:", error);
-            setTranscriptionStatus("error");
-            setErrorMessage(
-                error.response?.data?.message ||
-                    error.message ||
-                    "Error al transcribir el audio"
-            );
-        } finally {
-            setIsLoading(false);
+            if (!transcriptionDocId) {
+                throw new Error("Missing transcription document ID");
+            }
+
+            // Call the transcribeAudio function from the hook
+            await transcribeAudio(transcriptionDocId, encounterIdFromUrl);
+        } catch (error) {
+            console.error("Error in transcribe handler:", error);
         }
     };
 
