@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import EncuentroHeader from "../../encuentroHeader/EncuentroHeader";
-import { DocumentArea } from "../../encuentroDocumentArea";
+import { DocumentArea } from "../../encuentroTextArea";
 import { useEncuentroDetail } from "../../app_layout/hooks/Encuentros/useEncuentroDetail";
 import { useEncounter } from "../hooks/useEncounter";
 import { usePatients } from "../../encuentroHeader/hooks/usePatients";

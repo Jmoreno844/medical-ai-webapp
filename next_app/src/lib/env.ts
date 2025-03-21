@@ -1,5 +1,5 @@
 export const env = {
-    NEXT_PUBLIC_API_URL: process.env.TEST_NEXT_PUBLIC_API_URL!,
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL!,
     NODE_ENV: process.env.NODE_ENV || "development",
 } as const;
 

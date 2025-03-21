@@ -132,7 +132,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
                         document={activeDocument}
                         allDocuments={documents}
                         activeDocumentId={activeDocumentId}
-                        readOnly={false}
+                        readOnly={activeDocument?.tipo === "transcripcion"}
                         onSave={async (docId, content) => {
                             await saveDocument(docId, content);
                         }}

@@ -1,6 +1,7 @@
 from typing import Optional, List
 from ninja import Schema
 from datetime import date
+from pydantic import BaseModel
 
 
 class DocumentoIn(Schema):
@@ -37,3 +38,17 @@ class SuccessResponse(Schema):
 
     success: bool
     message: str
+
+
+class TranscriptionNotificationIn(BaseModel):
+    documento_id: int
+    status: str = "complete"
+    message: str = None
+
+
+class SSETokenResponse(Schema):
+    """Response for SSE token generation"""
+
+    success: bool
+    token: Optional[str] = None
+    error: Optional[str] = None

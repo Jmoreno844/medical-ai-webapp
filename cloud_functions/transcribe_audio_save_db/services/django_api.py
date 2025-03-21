@@ -33,6 +33,66 @@ def get_api_auth_token():
     return token
 
 
+def notify_transcription_complete(
+    document_id: int, auth_token: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Notify Django that transcription is complete.
+
+    Args:
+        document_id: The ID of the document that was transcribed
+        auth_token: Authentication token for the Django API
+
+    Returns:
+        Dictionary containing the API response or error information
+    """
+    base_url = get_api_base_url()
+    api_url = f"{base_url}/notify/transcription-complete"
+
+    # Get auth token from parameter or environment
+    if not auth_token:
+        auth_token = get_api_auth_token()
+
+    # Prepare headers with token
+    headers = {
+        "Content-Type": "application/json",
+    }
+
+    if auth_token:
+        if (
+            "." in auth_token
+            and len(auth_token.split(".")) == 3
+            and not auth_token.startswith("Bearer ")
+        ):
+            headers["Authorization"] = f"Bearer {auth_token}"
+        else:
+            headers["Authorization"] = auth_token
+
+    # Prepare payload
+    payload = {
+        "documento_id": document_id,
+        "status": "complete",
+    }
+
+    logger.info(f"Notifying transcription completion for document {document_id}")
+
+    try:
+        response = requests.post(api_url, json=payload, headers=headers, timeout=15)
+        response.raise_for_status()
+
+        logger.info(
+            f"Successfully notified about document {document_id} transcription completion"
+        )
+        return {
+            "success": True,
+            "status_code": response.status_code,
+            "response": response.json() if response.text else {},
+        }
+    except Exception as e:
+        logger.error(f"Error notifying transcription completion: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
 def update_document_content(
     document_id: int, content: str, auth_token: Optional[str] = None
 ) -> Dict[str, Any]:
@@ -142,6 +202,14 @@ def update_document_content(
             response_data = {"raw_response": response.text}
 
         logger.info(f"Document {document_id} updated successfully")
+
+        # After successful update, notify transcription completion
+        notify_result = notify_transcription_complete(document_id, auth_token)
+        if not notify_result["success"]:
+            logger.warning(
+                f"Failed to send completion notification: {notify_result.get('error')}"
+            )
+
         return {
             "success": True,
             "status_code": response.status_code,
