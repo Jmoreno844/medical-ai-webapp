@@ -4,15 +4,20 @@ import TextArea from "./TextArea/TextArea";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ErrorDisplay from "@/components/ErrorDisplay";
 import { useDocuments } from "./hooks/useDocuments";
+import { useDocumentGeneration } from "./hooks/useDocumentGeneration";
+import DocumentGenerationModal from "./DocumentGenerationModal";
 
+// Update the interface to include the new prop
 interface DocumentAreaProps {
     encounterId: number;
     onTranscriptionDocumentFound?: (documentId: number) => void;
+    registerGenerateDocumentationHandler?: (handler: () => void) => void;
 }
 
 const DocumentArea: React.FC<DocumentAreaProps> = ({
     encounterId,
     onTranscriptionDocumentFound,
+    registerGenerateDocumentationHandler,
 }) => {
     const {
         documents,
@@ -27,7 +32,38 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
         fetchDocumentContent,
         isLoadingContent,
         loadedDocumentIds,
+        addDocument, // Assuming this function exists in useDocuments hook
     } = useDocuments(encounterId);
+
+    // Handler for when a new document is created
+    const handleDocumentCreated = useCallback(
+        (newDocument) => {
+            // Add the new document to the list
+            addDocument(newDocument);
+
+            // Select the new document
+            selectDocument(newDocument.id);
+
+            console.log(
+                `📄 Nuevo documento creado y seleccionado: ${newDocument.id}`
+            );
+        },
+        [addDocument, selectDocument]
+    );
+
+    // Update document generation hook to include encounterId and document creation handler
+    const {
+        isModalOpen,
+        isGenerating,
+        error: generationError,
+        openGenerationModal,
+        closeGenerationModal,
+        generateDocumentation,
+    } = useDocumentGeneration({
+        documents,
+        encounterId,
+        onDocumentCreated: handleDocumentCreated,
+    });
 
     // Reference to track the current editor's save function
     const currentEditorSaveRef = useRef<
@@ -86,6 +122,18 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
         [activeDocumentId, selectDocument]
     );
 
+    // Create a handler function for generate documentation that we can pass to header
+    const handleGenerateDocumentation = useCallback(() => {
+        openGenerationModal();
+    }, [openGenerationModal]);
+
+    // Register the handler so it can be called from outside
+    useEffect(() => {
+        if (registerGenerateDocumentationHandler) {
+            registerGenerateDocumentationHandler(handleGenerateDocumentation);
+        }
+    }, [registerGenerateDocumentationHandler, handleGenerateDocumentation]);
+
     if (loading) {
         return (
             <div className="flex flex-col h-full">
@@ -121,6 +169,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
                 documents={documents}
                 activeDocumentId={activeDocumentId}
                 onSelectDocument={handleSelectDocument}
+                onGenerateDocumentation={handleGenerateDocumentation}
             />
 
             <div className="flex-1 overflow-auto bg-white">
@@ -161,6 +210,15 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
                     Guardando cambios...
                 </div>
             )}
+
+            {/* Document Generation Modal */}
+            <DocumentGenerationModal
+                isOpen={isModalOpen}
+                onClose={closeGenerationModal}
+                onGenerate={generateDocumentation}
+                isGenerating={isGenerating}
+                error={generationError}
+            />
         </div>
     );
 };

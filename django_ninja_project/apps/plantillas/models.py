@@ -79,3 +79,28 @@ class PlantillaDoctor(models.Model):
         if self.contenido_base and self.id_plantilla_base:
             return self.id_plantilla_base.contenido
         return self.contenido
+
+
+class UsoPlantilla(models.Model):
+    """
+    Tracks usage statistics for doctor templates.
+    """
+
+    id_plantilla = models.ForeignKey(
+        PlantillaDoctor, on_delete=models.CASCADE, related_name="usos"
+    )
+    veces_usada = models.PositiveIntegerField(default=0)
+    ultimo_uso = models.DateTimeField(null=True, blank=True)
+    id_medico = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="usos_plantillas"
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["id_plantilla"]),
+            models.Index(fields=["id_medico"]),
+        ]
+        unique_together = ["id_plantilla", "id_medico"]
+
+    def __str__(self):
+        return f"Uso de {self.id_plantilla.nombre} por {self.id_medico}"

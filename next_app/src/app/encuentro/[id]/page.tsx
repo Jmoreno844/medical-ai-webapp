@@ -1,13 +1,22 @@
 import React from "react";
 import { EncounterDetailClient } from "./EncounterDetailClient";
 
-// Define the proper type for Params in Next.js 15+
-type Params = Promise<{ id: string }>;
+// Define the proper type for Params in Next.js
+type Params = {
+    id: string;
+};
 
-export default async function EncounterDetailPage(props: { params: Params }) {
-    // Await the params Promise to get the id
-    const params = await props.params;
-    const id = params.id;
+// Make the page component async to handle Next.js dynamic params
+export default async function EncounterDetailPage({
+    params,
+}: {
+    params: Params | Promise<Params>;
+}) {
+    // Await the params if it's a promise
+    const resolvedParams = await Promise.resolve(params);
+
+    // Now we can safely access the id
+    const id = resolvedParams.id;
 
     // Pass the ID to the client component
     return <EncounterDetailClient id={id} />;

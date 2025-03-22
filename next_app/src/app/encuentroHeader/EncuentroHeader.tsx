@@ -4,6 +4,7 @@ import VoiceRecorder from "./subcomponents/VoiceRecorder";
 import PatientEditModal from "./PatientEditModal";
 import Modal from "../../components/Modal";
 import { useEncuentroHeader } from "./hooks/useEncuentroHeader";
+import GenerateDocumentationButton from "./subcomponents/GenerateDocumentationButton";
 
 /**
  * Props for the EncuentroHeader component
@@ -31,6 +32,8 @@ interface EncuentroHeaderProps {
     patientName?: string;
     /** ID of the transcription document if available */
     transcriptionDocId?: number;
+    /** Function to handle document generation request */
+    onGenerateDocumentation?: () => void;
 }
 
 /**
@@ -52,6 +55,7 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
     patientId = null,
     patientName = "",
     transcriptionDocId,
+    onGenerateDocumentation,
 }) => {
     // Get the current URL to extract the encounter ID
     const urlParts =
@@ -115,7 +119,20 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
                             <div className="ml-3 inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-purple-500"></div>
                         )}
                     </div>
-                    <VoiceRecorder transcriptionDocId={transcriptionDocId} />
+
+                    <div className="flex items-center">
+                        {/* Add Generate Documentation Button */}
+                        {onGenerateDocumentation && (
+                            <div className="mr-4">
+                                <GenerateDocumentationButton
+                                    onClick={onGenerateDocumentation}
+                                />
+                            </div>
+                        )}
+                        <VoiceRecorder
+                            transcriptionDocId={transcriptionDocId}
+                        />
+                    </div>
                 </div>
             </nav>
 

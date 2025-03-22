@@ -2,7 +2,8 @@ from ninja import Router
 from typing import List
 from django.shortcuts import get_object_or_404
 from ninja.security import django_auth
-from .models import PlantillaBase, PlantillaDoctor
+from django.db.models import F
+from .models import PlantillaBase, PlantillaDoctor, UsoPlantilla
 from .schemas import (
     PlantillaDoctorCreate,
     PlantillaDoctorResponse,
@@ -54,11 +55,13 @@ def create_plantilla_doctor(request, data: PlantillaDoctorCreate):
         if plantilla_doctor.id_plantilla_base
         else None,
         "fecha_creacion": plantilla_doctor.fecha_creacion.isoformat(),
+        "veces_usada": 0,  # New template has not been used yet
+        "ultimo_uso": None,
     }
 
 
 @router.get(
-    "/plantilla_doctor", response=List[PlantillaDoctorListItem], auth=django_auth
+    "/plantillas_short", response=List[PlantillaDoctorListItem], auth=django_auth
 )
 def list_plantillas_doctor(request):
     """
@@ -79,12 +82,69 @@ def list_plantillas_doctor(request):
     # Transform to response format with only the requested fields
     result = []
     for plantilla in plantillas:
+        # Try to get usage statistics, or default to zeros
+        try:
+            uso = UsoPlantilla.objects.get(id_plantilla=plantilla, id_medico=user)
+            veces_usada = uso.veces_usada
+            ultimo_uso = uso.ultimo_uso.isoformat() if uso.ultimo_uso else None
+        except UsoPlantilla.DoesNotExist:
+            veces_usada = 0
+            ultimo_uso = None
+
         result.append(
             {
                 "id": plantilla.id,
                 "nombre": plantilla.nombre,
                 "tipo_documento": plantilla.tipo_documento,
+                "fecha_creacion": plantilla.fecha_creacion.isoformat(),
+                "es_base": plantilla.contenido_base,
+                "veces_usada": veces_usada,
+                "ultimo_uso": ultimo_uso,
             }
         )
 
     return result
+
+
+@router.get(
+    "/plantilla_doctor/{id}", response=PlantillaDoctorResponse, auth=django_auth
+)
+def get_plantilla_doctor(request, id: int):
+    """
+    Get details for a specific doctor's template including usage statistics.
+
+    Args:
+        id: The template ID to retrieve
+
+    Returns:
+        Complete template details including usage information
+    """
+    # Get the authenticated user
+    user = request.user
+
+    # Get the template
+    plantilla = get_object_or_404(PlantillaDoctor, id=id, id_medico=user)
+
+    # Try to get usage statistics, or default to zeros
+    try:
+        uso = UsoPlantilla.objects.get(id_plantilla=plantilla, id_medico=user)
+        veces_usada = uso.veces_usada
+        ultimo_uso = uso.ultimo_uso.isoformat() if uso.ultimo_uso else None
+    except UsoPlantilla.DoesNotExist:
+        veces_usada = 0
+        ultimo_uso = None
+
+    # Return the template with usage information
+    return {
+        "id": plantilla.id,
+        "nombre": plantilla.nombre,
+        "tipo_documento": plantilla.tipo_documento,
+        "contenido": plantilla.contenido,
+        "contenido_base": plantilla.contenido_base,
+        "id_plantilla_base": plantilla.id_plantilla_base.id
+        if plantilla.id_plantilla_base
+        else None,
+        "fecha_creacion": plantilla.fecha_creacion.isoformat(),
+        "veces_usada": veces_usada,
+        "ultimo_uso": ultimo_uso,
+    }

@@ -9,6 +9,7 @@ class Documento(models.Model):
         ("contexto", "Contexto"),
         ("transcripcion", "Transcripción"),
         ("plantilla", "Plantilla"),
+        ("nota", "Nota"),
     ]
 
     id_encuentro = models.ForeignKey(

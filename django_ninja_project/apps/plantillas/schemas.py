@@ -21,6 +21,8 @@ class PlantillaDoctorResponse(Schema):
     contenido_base: bool
     id_plantilla_base: Optional[int]
     fecha_creacion: str
+    veces_usada: Optional[int] = 0
+    ultimo_uso: Optional[str] = None
 
 
 class PlantillaDoctorListItem(Schema):
@@ -29,3 +31,6 @@ class PlantillaDoctorListItem(Schema):
     id: int
     nombre: str
     tipo_documento: str
+    veces_usada: Optional[int] = 0
+    ultimo_uso: Optional[str] = None
+    es_base: bool

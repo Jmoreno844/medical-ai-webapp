@@ -421,6 +421,11 @@ export const useDocuments = (encounterId: number) => {
         [activeDocumentId, documents]
     );
 
+    // Add a function to add a new document to the documents list
+    const addDocument = useCallback((newDocument: DocumentoOut) => {
+        setDocuments((prev) => [...prev, newDocument]);
+    }, []);
+
     // Track if this is the initial mount of the component
     const isInitialMount = useRef(true);
 
@@ -487,6 +492,7 @@ export const useDocuments = (encounterId: number) => {
 
         // Actions
         fetchDocuments,
+        addDocument,
         selectDocument,
         saveDocument,
         createDocument,

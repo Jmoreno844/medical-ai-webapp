@@ -8,7 +8,7 @@ class DocumentoIn(Schema):
     id_encuentro: int
     tipo: str
     id_plantilla_doctor: Optional[int] = None
-    contenido: str
+    contenido: Optional[str] = ""  # Make contenido optional with empty string default
 
 
 class DocumentoOut(Schema):
