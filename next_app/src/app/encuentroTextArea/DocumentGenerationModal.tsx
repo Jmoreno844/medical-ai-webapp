@@ -1,5 +1,6 @@
 import React from "react";
 import Modal from "@/components/Modal";
+import { DocumentGenerationProgress } from "./components/DocumentGenerationProgress";
 
 interface Plantilla {
     id: number;
@@ -14,7 +15,7 @@ interface Plantilla {
 interface DocumentGenerationModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onGenerate: () => Promise<string | null>;
+    onGenerate: () => Promise<any>; // Changed type to return Promise
     isGenerating: boolean;
     error: string | null;
     plantillas: Plantilla[];
@@ -24,6 +25,12 @@ interface DocumentGenerationModalProps {
     setSelectedPlantillaId: (id: number) => void;
     searchQuery: string;
     setSearchQuery: (query: string) => void;
+    generationStatus?: {
+        inProgress: boolean;
+        content: string;
+        isComplete: boolean;
+        error: string | null;
+    };
 }
 
 const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
@@ -39,6 +46,7 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
     setSelectedPlantillaId,
     searchQuery,
     setSearchQuery,
+    generationStatus,
 }) => {
     return (
         <Modal
@@ -169,10 +177,20 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
                     </div>
                 )}
 
-                {error && (
+                {error && !generationStatus?.error && (
                     <div className="bg-red-50 p-3 rounded-md border border-red-200">
                         <p className="text-red-700 text-sm">{error}</p>
                     </div>
+                )}
+
+                {/* Show generation progress if available */}
+                {generationStatus && (
+                    <DocumentGenerationProgress
+                        isGenerating={generationStatus.inProgress}
+                        content={generationStatus.content}
+                        isComplete={generationStatus.isComplete}
+                        error={generationStatus.error}
+                    />
                 )}
             </div>
         </Modal>

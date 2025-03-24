@@ -6,6 +6,7 @@ import ErrorDisplay from "@/components/ErrorDisplay";
 import { useDocuments } from "./hooks/useDocuments";
 import { useDocumentGeneration } from "./hooks/useDocumentGeneration";
 import DocumentGenerationModal from "./DocumentGenerationModal";
+import { DocumentGenerationProgress } from "./components/DocumentGenerationProgress";
 
 // Update the interface to include the new prop
 interface DocumentAreaProps {
@@ -35,6 +36,9 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
         addDocument, // Assuming this function exists in useDocuments hook
     } = useDocuments(encounterId);
 
+    // Add state to track content updates and trigger refreshes
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+
     // Handler for when a new document is created
     const handleDocumentCreated = useCallback(
         (newDocument) => {
@@ -49,6 +53,34 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
             );
         },
         [addDocument, selectDocument]
+    );
+
+    // Document content update handler for SSE generation
+    const handleContentUpdate = useCallback(
+        async (documentId: number, content: string) => {
+            console.log(
+                `[DOC_UPDATE] Saving streamed content to document ${documentId} (${content.length} chars)`
+            );
+
+            try {
+                // Save the content to the document
+                await saveDocument(documentId, content);
+
+                // If this is the active document, trigger a refresh to update the TextArea
+                if (activeDocumentId === documentId) {
+                    console.log(
+                        "[DOC_UPDATE] Active document updated, triggering refresh"
+                    );
+                    setRefreshTrigger((prev) => prev + 1);
+                }
+            } catch (err) {
+                console.error(
+                    "[DOC_UPDATE] Error saving streamed content:",
+                    err
+                );
+            }
+        },
+        [saveDocument, activeDocumentId]
     );
 
     // Update document generation hook to include encounterId and document creation handler
@@ -66,10 +98,12 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
         setSelectedPlantillaId,
         searchQuery,
         setSearchQuery,
+        generationStatus,
     } = useDocumentGeneration({
         documents,
         encounterId,
         onDocumentCreated: handleDocumentCreated,
+        onContentUpdate: handleContentUpdate,
     });
 
     // Reference to track the current editor's save function
@@ -130,9 +164,27 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
     );
 
     // Create a handler function for generate documentation that we can pass to header
+    // This should only open the modal, not generate the document yet
     const handleGenerateDocumentation = useCallback(() => {
         openGenerationModal();
     }, [openGenerationModal]);
+
+    // New function to handle generation after plantilla selection
+    const handleExecuteGeneration = useCallback(async () => {
+        try {
+            const newDocument = await generateDocumentation();
+
+            // If generation was successful and returned a document,
+            // select it immediately to show it in the editor
+            if (newDocument && newDocument.id) {
+                handleSelectDocument(newDocument.id);
+            }
+            return newDocument;
+        } catch (error) {
+            console.error("Error generating documentation:", error);
+            return null;
+        }
+    }, [generateDocumentation, handleSelectDocument]);
 
     // Register the handler so it can be called from outside
     useEffect(() => {
@@ -201,8 +253,9 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
                             console.log(
                                 `[DOC_SWITCH] Changed from document ${oldDocId} to ${newDocId}`
                             );
-                            // Optional: Add any specific logic needed on document switch
                         }}
+                        refreshTrigger={refreshTrigger}
+                        generationStatus={generationStatus} // Pass generation status to TextArea
                     />
                 ) : (
                     <div className="flex items-center justify-center h-full text-gray-500">
@@ -210,6 +263,29 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* Display real-time generation progress when active outside the modal 
+                Only show when we're not already viewing the document being generated */}
+            {!isModalOpen &&
+                generationStatus?.inProgress &&
+                activeDocumentId !== generationStatus.documentId && (
+                    <div className="p-4 bg-white border-t">
+                        <DocumentGenerationProgress
+                            isGenerating={generationStatus.inProgress}
+                            content={generationStatus.content}
+                            isComplete={generationStatus.isComplete}
+                            error={generationStatus.error}
+                            onViewDocument={
+                                generationStatus.documentId
+                                    ? () =>
+                                          handleSelectDocument(
+                                              generationStatus.documentId!
+                                          )
+                                    : undefined
+                            }
+                        />
+                    </div>
+                )}
 
             {/* Saving indicator */}
             {isSaving && (
@@ -222,7 +298,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
             <DocumentGenerationModal
                 isOpen={isModalOpen}
                 onClose={closeGenerationModal}
-                onGenerate={generateDocumentation}
+                onGenerate={handleExecuteGeneration} // Use the execution handler here
                 isGenerating={isGenerating}
                 error={generationError}
                 plantillas={plantillas}
@@ -232,6 +308,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
                 setSelectedPlantillaId={setSelectedPlantillaId}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
+                generationStatus={generationStatus}
             />
         </div>
     );

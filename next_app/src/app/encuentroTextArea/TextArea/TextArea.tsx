@@ -79,6 +79,19 @@ interface TextAreaProps {
         oldDocId: number | null,
         newDocId: number | null
     ) => void;
+
+    /**
+     * Force refresh trigger - increment to force the editor to reload content
+     */
+    refreshTrigger?: number;
+
+    generationStatus?: {
+        inProgress: boolean;
+        documentId: number | null;
+        content: string;
+        error: string | null;
+        isComplete: boolean;
+    };
 }
 
 /**
@@ -97,9 +110,14 @@ const TextArea: React.FC<TextAreaProps> = ({
     isLoadingContent = false,
     loadedDocumentIds = [],
     onDocumentSwitch,
+    refreshTrigger = 0,
+    generationStatus,
 }) => {
     // Track the previous document to detect changes
     const previousDocIdRef = useRef<number | null>(null);
+
+    // Track the refresh trigger to detect external content updates
+    const previousRefreshTriggerRef = useRef(refreshTrigger);
 
     // Check if this document has been loaded before - moved up before potential early return
     const isDocumentLoaded = document
@@ -112,6 +130,7 @@ const TextArea: React.FC<TextAreaProps> = ({
         fetchError,
         isLoading: isContentLoading,
         contentLoadedSuccessfully,
+        reloadContent, // Add this method to useDocumentContent hook or implement inline
     } = useDocumentContent({
         document: document || ({} as DocumentoOut), // Provide fallback
         fetchDocumentContent,
@@ -119,9 +138,26 @@ const TextArea: React.FC<TextAreaProps> = ({
         isDocumentLoaded,
     });
 
-    // Check if content is from cache for debugging - moved up before early return
-    const isFromCache =
-        (document && documentContentCache?.has(document.id)) || false;
+    // Detect external content updates via refreshTrigger
+    useEffect(() => {
+        if (
+            document &&
+            refreshTrigger !== previousRefreshTriggerRef.current &&
+            documentContentCache?.has(document.id)
+        ) {
+            console.log(
+                `[TEXT_AREA] Refresh trigger changed (${previousRefreshTriggerRef.current} -> ${refreshTrigger}). Reloading content for document ${document.id}`
+            );
+
+            // Get the fresh content from cache
+            previousRefreshTriggerRef.current = refreshTrigger;
+
+            // If you have a reloadContent method in useDocumentContent, use it
+            if (typeof reloadContent === "function") {
+                reloadContent();
+            }
+        }
+    }, [refreshTrigger, document, documentContentCache, reloadContent]);
 
     // Define all hooks before conditional logic
     // Custom save wrapper to prevent saving empty content for documents that had content
@@ -198,12 +234,33 @@ const TextArea: React.FC<TextAreaProps> = ({
     // Determine if we should show the loading indicator
     const showLoading = isLoadingContent || isContentLoading;
 
+    // Check if content is from cache for debugging
+    const isFromCache =
+        (document && documentContentCache?.has(document.id)) || false;
+
+    // Extract streaming content when this is the active generated document
+    const streamingContent =
+        document &&
+        generationStatus?.documentId === document.id &&
+        generationStatus.inProgress
+            ? generationStatus.content
+            : undefined;
+
     return (
         <div className="flex flex-col h-full">
             {/* Loading indicator */}
             {showLoading && (
                 <div className="bg-gray-100 p-2 text-center text-gray-600 text-sm">
                     Cargando contenido...
+                </div>
+            )}
+
+            {/* Add streaming indicator when content is being streamed */}
+            {streamingContent !== undefined && (
+                <div className="bg-purple-100 p-1 text-center text-purple-600 text-xs flex justify-center items-center">
+                    <span className="mr-1">📝</span>
+                    Contenido generándose en tiempo real (
+                    {streamingContent.length} caracteres)
                 </div>
             )}
 
@@ -236,7 +293,7 @@ const TextArea: React.FC<TextAreaProps> = ({
             {/* Use a persistent editor without document ID in the key */}
             <div className="border rounded-md flex-1 bg-white">
                 <LexicalComposer
-                    key="persistent-editor"
+                    key={`persistent-editor-${refreshTrigger}`} // Add refreshTrigger to key to force remount when needed
                     initialConfig={initialConfig}
                 >
                     <div className="editor-container h-full">
@@ -258,6 +315,9 @@ const TextArea: React.FC<TextAreaProps> = ({
                             documentId={document.id}
                             content={documentContent}
                             isLoading={showLoading}
+                            refreshTrigger={refreshTrigger} // Pass refresh trigger to plugin
+                            forceRefresh={false} // Remove the force refresh, use streaming instead
+                            streamingContent={streamingContent} // Pass streaming content here
                         />
                         <ReadOnlyPlugin isReadOnly={readOnly} />
 

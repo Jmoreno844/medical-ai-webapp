@@ -1,6 +1,17 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { DocumentoOut } from "@/types/documento";
 import axiosInstance from "@/utils/axiosInstance";
+import { env } from "@/lib/env";
+
+// Add types for generation status tracking
+interface GenerationStatus {
+    inProgress: boolean;
+    processingId: string | null;
+    documentId: number | null;
+    content: string;
+    error: string | null;
+    isComplete: boolean;
+}
 
 interface Plantilla {
     id: number;
@@ -16,12 +27,14 @@ interface UseDocumentGenerationProps {
     documents: DocumentoOut[];
     encounterId: number;
     onDocumentCreated?: (newDocument: DocumentoOut) => void;
+    onContentUpdate?: (documentId: number, content: string) => Promise<void>;
 }
 
 export function useDocumentGeneration({
     documents,
     encounterId,
     onDocumentCreated,
+    onContentUpdate,
 }: UseDocumentGenerationProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -35,6 +48,28 @@ export function useDocumentGeneration({
         number | null
     >(null);
     const [searchQuery, setSearchQuery] = useState("");
+
+    // New state for generation status
+    const [generationStatus, setGenerationStatus] = useState<GenerationStatus>({
+        inProgress: false,
+        processingId: null,
+        documentId: null,
+        content: "",
+        error: null,
+        isComplete: false,
+    });
+
+    // SSE connection reference
+    const eventSourceRef = useRef<EventSource | null>(null);
+
+    // Cleanup SSE connection when component unmounts
+    useEffect(() => {
+        return () => {
+            if (eventSourceRef.current) {
+                eventSourceRef.current.close();
+            }
+        };
+    }, []);
 
     // Fetch plantillas when modal opens
     useEffect(() => {
@@ -95,6 +130,121 @@ export function useDocumentGeneration({
         }
     }, [encounterId, onDocumentCreated]);
 
+    // Connect to SSE with token
+    const connectToSSE = useCallback(
+        (documentId: number, sseToken: string) => {
+            // Close any existing connection
+            if (eventSourceRef.current) {
+                eventSourceRef.current.close();
+            }
+
+            // Create full URL to the SSE endpoint with secure token using API URL from env
+            const apiBaseUrl = env.NEXT_PUBLIC_API_URL.endsWith("/")
+                ? env.NEXT_PUBLIC_API_URL.slice(0, -1)
+                : env.NEXT_PUBLIC_API_URL;
+            const sseUrl = `${apiBaseUrl}/api/sse/documento/${documentId}/${sseToken}`;
+            // Create a new SSE connection
+            const eventSource = new EventSource(sseUrl);
+            eventSourceRef.current = eventSource;
+
+            eventSource.onopen = () => {
+                console.log("✅ SSE connection established");
+            };
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log("📡 SSE event received:", data);
+
+                    switch (data.event) {
+                        case "connected":
+                            console.log(
+                                "✅ Connected to SSE for document",
+                                data.id_documento
+                            );
+                            break;
+
+                        case "generation_chunk":
+                            const newChunk = data.chunk || "";
+
+                            setGenerationStatus((prev) => {
+                                const updatedContent = prev.content + newChunk;
+
+                                // Save content to document
+                                if (onContentUpdate && documentId && newChunk) {
+                                    // Use the full accumulated content for saving
+                                    onContentUpdate(
+                                        documentId,
+                                        updatedContent
+                                    ).catch((err) =>
+                                        console.error(
+                                            "Error saving document content:",
+                                            err
+                                        )
+                                    );
+                                }
+
+                                return {
+                                    ...prev,
+                                    content: updatedContent,
+                                    error: null,
+                                };
+                            });
+                            break;
+
+                        case "generation_complete":
+                            const finalContent =
+                                data.chunk || generationStatus.content;
+
+                            // Save the final content to the document
+                            if (onContentUpdate && documentId) {
+                                onContentUpdate(documentId, finalContent).catch(
+                                    (err) =>
+                                        console.error(
+                                            "Error saving final document content:",
+                                            err
+                                        )
+                                );
+                            }
+
+                            setGenerationStatus((prev) => ({
+                                ...prev,
+                                content: finalContent,
+                                isComplete: true,
+                                inProgress: false,
+                            }));
+                            setIsGenerating(false);
+                            break;
+
+                        case "generation_error":
+                            setGenerationStatus((prev) => ({
+                                ...prev,
+                                error: data.error || "Error desconocido",
+                                inProgress: false,
+                            }));
+                            setIsGenerating(false);
+                            setError(data.error || "Error en la generación");
+                            break;
+                    }
+                } catch (err) {
+                    console.error("❌ Error processing SSE message:", err);
+                }
+            };
+
+            eventSource.onerror = (err) => {
+                console.error("❌ SSE connection error:", err);
+                setError("Error en la conexión con el servidor");
+
+                // Close and cleanup on error
+                eventSource.close();
+                eventSourceRef.current = null;
+            };
+
+            return eventSource;
+        },
+        [onContentUpdate, generationStatus.content]
+    );
+
     const generateDocumentation = useCallback(async () => {
         try {
             if (!selectedPlantillaId) {
@@ -103,6 +253,14 @@ export function useDocumentGeneration({
 
             setIsGenerating(true);
             setError(null);
+            setGenerationStatus({
+                inProgress: true,
+                processingId: null,
+                documentId: null,
+                content: "",
+                error: null,
+                isComplete: false,
+            });
 
             // Find transcription and context documents
             const transcriptionDoc = documents.find(
@@ -123,34 +281,57 @@ export function useDocumentGeneration({
                 contexto: contextDoc.id,
             });
 
-            // Here you would make the API call with just the document IDs
-            console.log("🚀 Generando documentación con IDs:", {
-                idTranscripcion: transcriptionDoc.id,
-                idContexto: contextDoc.id,
-                idPlantilla: selectedPlantillaId,
-            });
-
-            // Mock API call for now
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-
-            // Success!
-            console.log("✅ Documentación generada con éxito");
-
-            // Create new document after successful generation
+            // Create new document for the generated content
             const newDocument = await createNewDocument();
 
+            if (!newDocument || !newDocument.id) {
+                throw new Error("Error al crear nuevo documento");
+            }
+
+            // Request document generation workflow
+            const response = await axiosInstance.post(
+                "/api/generate-document",
+                {
+                    id_documento_contexto: contextDoc.id,
+                    id_documento_transcripcion: transcriptionDoc.id,
+                    id_plantilla_doctor: selectedPlantillaId,
+                    id_documento_nuevo: newDocument.id,
+                }
+            );
+
+            if (!response.data.success) {
+                throw new Error(
+                    response.data.error || "Error al iniciar generación"
+                );
+            }
+
+            // Update generation status with info from response
+            setGenerationStatus((prev) => ({
+                ...prev,
+                processingId: response.data.id_proceso,
+                documentId: newDocument.id, // Use the document ID from newDocument
+            }));
+
+            // Connect to SSE for real-time updates
+            connectToSSE(newDocument.id, response.data.sse_token);
+
+            // Close the modal as generation has started
             setIsModalOpen(false);
 
-            // Return the newly created document
+            // Return the new document so it can be selected
             return newDocument;
         } catch (err) {
             setError(err instanceof Error ? err.message : "Error desconocido");
+            setIsGenerating(false);
+            setGenerationStatus((prev) => ({
+                ...prev,
+                inProgress: false,
+                error: err instanceof Error ? err.message : "Error desconocido",
+            }));
             console.error("❌ Error generando documentación:", err);
             return null;
-        } finally {
-            setIsGenerating(false);
         }
-    }, [documents, createNewDocument, selectedPlantillaId]);
+    }, [documents, createNewDocument, selectedPlantillaId, connectToSSE]);
 
     // Filter plantillas based on search query
     const filteredPlantillas = searchQuery
@@ -173,5 +354,7 @@ export function useDocumentGeneration({
         setSelectedPlantillaId,
         searchQuery,
         setSearchQuery,
+        // New fields
+        generationStatus,
     };
 }
