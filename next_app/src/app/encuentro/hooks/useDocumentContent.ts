@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { DocumentoOut } from "@/types/documento";
 
 interface UseDocumentContentProps {
@@ -122,10 +122,47 @@ export const useDocumentContent = ({
         document?.contenido,
     ]);
 
+    const reloadContent = useCallback(async () => {
+        console.log(
+            `[USE_DOC_CONTENT] Reloading content for document ${document.id}`
+        );
+
+        // Clear from cache if it exists
+        if (documentContentCache) {
+            console.log(
+                `[USE_DOC_CONTENT] Removing document ${document.id} from cache`
+            );
+            documentContentCache.delete(document.id);
+        }
+
+        // Force refetch from API
+        if (fetchDocumentContent) {
+            console.log(
+                `[USE_DOC_CONTENT] Fetching fresh content for document ${document.id} from API`
+            );
+            const freshContent = await fetchDocumentContent(document.id);
+            console.log(
+                `[USE_DOC_CONTENT] Fresh content received: ${freshContent?.substring(
+                    0,
+                    20
+                )}...`
+            );
+            if (freshContent) {
+                setDocumentContent(freshContent);
+                if (documentContentCache) {
+                    documentContentCache.set(document.id, freshContent);
+                }
+                setContentHasBeenSet(true);
+                contentLoadedSuccessfully.current = true;
+            }
+        }
+    }, [document?.id, fetchDocumentContent, documentContentCache]);
+
     return {
         documentContent: memoizedDocumentContent,
         fetchError,
         isLoading,
         contentLoadedSuccessfully: contentLoadedSuccessfully.current,
+        reloadContent,
     };
 };

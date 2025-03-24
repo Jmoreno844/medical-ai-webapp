@@ -14,6 +14,7 @@ import TranscribeButton from "./TranscribeButton";
 interface VoiceRecorderProps {
     /** ID of the transcription document if available */
     transcriptionDocId?: number;
+    onTranscriptionComplete?: () => void; // Add this prop
 }
 
 /**
@@ -26,7 +27,12 @@ interface VoiceRecorderProps {
  */
 const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     transcriptionDocId,
+    onTranscriptionComplete,
 }) => {
+    console.log(
+        "[VOICE_RECORDER] Rendering VoiceRecorder with transcriptionDocId:",
+        transcriptionDocId
+    );
     // Use our cleaned up voice recorder hook
     const {
         isRecording,
@@ -129,6 +135,12 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
                 audioBlob={audioBlob}
                 isRecording={isRecording}
                 audioExists={audioExists}
+                onTranscriptionComplete={() => {
+                    console.log(
+                        "[VOICE_RECORDER] onTranscriptionComplete callback from TranscribeButton fired"
+                    );
+                    if (onTranscriptionComplete) onTranscriptionComplete();
+                }}
             />
 
             <TimerDisplay duration={duration} />

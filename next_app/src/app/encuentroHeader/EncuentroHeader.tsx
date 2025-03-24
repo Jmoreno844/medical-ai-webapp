@@ -32,6 +32,7 @@ interface EncuentroHeaderProps {
     patientName?: string;
     /** ID of the transcription document if available */
     transcriptionDocId?: number;
+    onTranscriptionComplete?: () => void; // Add this prop
     /** Function to handle document generation request */
     onGenerateDocumentation?: () => void;
 }
@@ -55,6 +56,7 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
     patientId = null,
     patientName = "",
     transcriptionDocId,
+    onTranscriptionComplete,
     onGenerateDocumentation,
 }) => {
     // Get the current URL to extract the encounter ID
@@ -131,6 +133,7 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
                         )}
                         <VoiceRecorder
                             transcriptionDocId={transcriptionDocId}
+                            onTranscriptionComplete={onTranscriptionComplete}
                         />
                     </div>
                 </div>

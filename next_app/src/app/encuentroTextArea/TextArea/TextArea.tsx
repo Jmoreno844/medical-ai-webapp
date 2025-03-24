@@ -160,20 +160,15 @@ const TextArea: React.FC<TextAreaProps> = ({
 
     // Detect external content updates via refreshTrigger
     useEffect(() => {
-        if (
-            document &&
-            refreshTrigger !== previousRefreshTriggerRef.current &&
-            documentContentCache?.has(document.id)
-        ) {
+        if (document && refreshTrigger !== previousRefreshTriggerRef.current) {
             console.log(
-                `[TEXT_AREA] Refresh trigger changed (${previousRefreshTriggerRef.current} -> ${refreshTrigger}). Reloading content for document ${document.id}`
+                `[TEXT_AREA] Refresh trigger changed from ${previousRefreshTriggerRef.current} to ${refreshTrigger} for document ${document.id}`
             );
-
-            // Get the fresh content from cache
             previousRefreshTriggerRef.current = refreshTrigger;
-
-            // If you have a reloadContent method in useDocumentContent, use it
             if (typeof reloadContent === "function") {
+                console.log(
+                    `[TEXT_AREA] Calling reloadContent for document ${document.id}`
+                );
                 reloadContent();
             }
         }
@@ -357,7 +352,7 @@ const TextArea: React.FC<TextAreaProps> = ({
                             >
                                 <path
                                     fillRule="evenodd"
-                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a 1 1 0 01-1.414 0l-4-4a 1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
                                     clipRule="evenodd"
                                 />
                             </svg>
@@ -422,6 +417,7 @@ const TextArea: React.FC<TextAreaProps> = ({
                             refreshTrigger={refreshTrigger} // Pass refresh trigger to plugin
                             forceRefresh={false} // Remove the force refresh, use streaming instead
                             streamingContent={streamingContent} // Pass streaming content here
+                            documentType={document.tipo} // Pass document type
                         />
                         <ReadOnlyPlugin isReadOnly={readOnly} />
 

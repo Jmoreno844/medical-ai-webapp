@@ -29,6 +29,18 @@ export const EncounterDetailClient: React.FC<EncounterDetailClientProps> = ({
     // Reference to store the document generation function
     const generateDocumentationRef = useRef<(() => void) | null>(null);
 
+    // Add state to track transcription completion events
+    const [transcriptionCompleteTimestamp, setTranscriptionCompleteTimestamp] =
+        useState<number | null>(null);
+
+    // Handler for transcription completion
+    const handleTranscriptionComplete = useCallback(() => {
+        console.log(
+            `[ENCOUNTER] Transcription complete callback triggered. Current transcriptionDocId: ${transcriptionDocId}`
+        );
+        setTranscriptionCompleteTimestamp(Date.now());
+    }, [transcriptionDocId]);
+
     // Handle document generation button click
     const handleGenerateDocumentation = useCallback(() => {
         if (generateDocumentationRef.current) {
@@ -105,6 +117,7 @@ export const EncounterDetailClient: React.FC<EncounterDetailClientProps> = ({
                 patientName={patientName}
                 transcriptionDocId={transcriptionDocId}
                 onGenerateDocumentation={handleGenerateDocumentation}
+                onTranscriptionComplete={handleTranscriptionComplete}
             />
             <div className="flex-1 overflow-hidden">
                 <DocumentArea
@@ -115,6 +128,10 @@ export const EncounterDetailClient: React.FC<EncounterDetailClientProps> = ({
                     registerGenerateDocumentationHandler={
                         registerGenerateDocumentationHandler
                     }
+                    transcriptionCompleteTimestamp={
+                        transcriptionCompleteTimestamp
+                    }
+                    transcriptionDocId={transcriptionDocId}
                 />
             </div>
         </div>

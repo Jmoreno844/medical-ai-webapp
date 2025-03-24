@@ -9,6 +9,7 @@ interface DocumentContentPluginProps {
     refreshTrigger?: number;
     forceRefresh?: boolean;
     streamingContent?: string;
+    documentType?: string; // Add document type to determine refresh behavior
 }
 
 export function DocumentContentPlugin({
@@ -18,10 +19,12 @@ export function DocumentContentPlugin({
     refreshTrigger,
     forceRefresh = false,
     streamingContent,
+    documentType, // Read document type
 }: DocumentContentPluginProps): React.ReactElement | null {
     const [editor] = useLexicalComposerContext();
     const lastUpdatedContentRef = useRef<string>("");
     const lastStreamContentRef = useRef<string>("");
+    const isTranscription = documentType === "transcripcion"; // Check if this is a transcription document
 
     // Effect to update editor content when document changes or refresh triggers
     useEffect(() => {
@@ -74,6 +77,45 @@ export function DocumentContentPlugin({
 
             // Important: Save the streaming content as the last updated content
             lastUpdatedContentRef.current = streamingContent;
+            return;
+        }
+        // ENHANCED: Better detection of content truncation after streaming ends
+        else if (
+            lastStreamContentRef.current &&
+            (!content ||
+                content.length < lastStreamContentRef.current.length * 0.9) // If content is less than 90% of streamed content
+        ) {
+            console.log(
+                `⚠️ Document ${documentId}: Content truncation detected (${
+                    content ? content.length : 0
+                } chars vs ${
+                    lastStreamContentRef.current.length
+                } chars streamed). Preserving full content.`
+            );
+
+            // Use the last streaming content we had
+            const savedStreamContent = lastStreamContentRef.current;
+
+            // Update the global cache to ensure consistency
+            if (window.documentContentCache) {
+                window.documentContentCache.set(documentId, savedStreamContent);
+                console.log(
+                    `🛡️ Cache updated with preserved content (${savedStreamContent.length} chars)`
+                );
+            }
+
+            editor.update(() => {
+                const root = $getRoot();
+                root.clear();
+
+                const lines = savedStreamContent.split("\n");
+                lines.forEach((line) => {
+                    const paragraph = $createParagraphNode();
+                    paragraph.append($createTextNode(line));
+                    root.append(paragraph);
+                });
+            });
+
             return;
         }
         // Handle the transition when streaming completes
@@ -158,6 +200,7 @@ export function DocumentContentPlugin({
         forceRefresh,
         editor,
         streamingContent,
+        documentType, // Add documentType to dependencies
     ]);
 
     return null;

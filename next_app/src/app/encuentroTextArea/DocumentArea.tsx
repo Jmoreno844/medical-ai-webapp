@@ -13,12 +13,16 @@ interface DocumentAreaProps {
     encounterId: number;
     onTranscriptionDocumentFound?: (documentId: number) => void;
     registerGenerateDocumentationHandler?: (handler: () => void) => void;
+    transcriptionCompleteTimestamp?: number | null;
+    transcriptionDocId?: number;
 }
 
 const DocumentArea: React.FC<DocumentAreaProps> = ({
     encounterId,
     onTranscriptionDocumentFound,
     registerGenerateDocumentationHandler,
+    transcriptionCompleteTimestamp,
+    transcriptionDocId,
 }) => {
     const {
         documents,
@@ -66,10 +70,16 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
                 // Save the content to the document
                 await saveDocument(documentId, content);
 
-                // If this is the active document, trigger a refresh to update the TextArea
-                if (activeDocumentId === documentId) {
+                // Find the document to determine its type
+                const updatedDoc = documents.find(
+                    (doc) => doc.id === documentId
+                );
+                const isTranscription = updatedDoc?.tipo === "transcripcion";
+
+                // If this is the active document AND it's a transcription, trigger a refresh
+                if (activeDocumentId === documentId && isTranscription) {
                     console.log(
-                        "[DOC_UPDATE] Active document updated, triggering refresh"
+                        "[DOC_UPDATE] Active transcription document updated, triggering refresh"
                     );
                     setRefreshTrigger((prev) => prev + 1);
                 }
@@ -80,7 +90,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
                 );
             }
         },
-        [saveDocument, activeDocumentId]
+        [saveDocument, activeDocumentId, documents]
     );
 
     // Update document generation hook to include encounterId and document creation handler
@@ -193,6 +203,190 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
         }
     }, [registerGenerateDocumentationHandler, handleGenerateDocumentation]);
 
+    // Add these refs to track polling state and document content
+    const processedTimestampsRef = useRef(new Set<number>());
+    const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const contentLengthRef = useRef<number>(0);
+    const lastAttemptTimeRef = useRef<number>(0);
+
+    // React to transcription complete events with smarter polling
+    useEffect(() => {
+        console.log("[DOC_AREA] Effect triggered with", {
+            transcriptionCompleteTimestamp,
+            transcriptionDocId,
+            activeDocumentId,
+            cacheExists: documentContentCache
+                ? documentContentCache.has(transcriptionDocId as number)
+                : false,
+        });
+
+        // Skip if we've already processed this timestamp
+        if (
+            transcriptionCompleteTimestamp &&
+            processedTimestampsRef.current.has(transcriptionCompleteTimestamp)
+        ) {
+            console.log(
+                `[DOC_AREA] Already processed timestamp ${transcriptionCompleteTimestamp}, skipping`
+            );
+            return;
+        }
+
+        // Clear any existing polling timer
+        if (pollingTimerRef.current) {
+            clearTimeout(pollingTimerRef.current);
+            pollingTimerRef.current = null;
+        }
+
+        if (
+            transcriptionCompleteTimestamp &&
+            transcriptionDocId &&
+            activeDocumentId === transcriptionDocId
+        ) {
+            console.log(
+                "[DOC_AREA] Detected transcription complete while viewing transcription document"
+            );
+
+            // Mark this timestamp as processed
+            if (transcriptionCompleteTimestamp) {
+                processedTimestampsRef.current.add(
+                    transcriptionCompleteTimestamp
+                );
+            }
+
+            // Check if document already has content of significant length
+            const checkContentLength = async () => {
+                if (documentContentCache && transcriptionDocId) {
+                    const cachedContent =
+                        documentContentCache.get(transcriptionDocId);
+                    if (cachedContent && cachedContent.length > 20) {
+                        console.log(
+                            `[DOC_AREA] Document ${transcriptionDocId} already has content of length ${cachedContent.length}, no polling needed`
+                        );
+                        return true;
+                    }
+                }
+
+                // If fetchDocumentContent exists, try getting current content length
+                if (fetchDocumentContent && transcriptionDocId) {
+                    try {
+                        const content = await fetchDocumentContent(
+                            transcriptionDocId
+                        );
+                        if (content && content.length > 20) {
+                            console.log(
+                                `[DOC_AREA] Fresh content already available with length ${content.length}, no polling needed`
+                            );
+                            return true;
+                        }
+                    } catch (err) {
+                        console.log(
+                            "[DOC_AREA] Error checking current content:",
+                            err
+                        );
+                    }
+                }
+
+                return false;
+            };
+
+            // Function to poll for content with early termination
+            const attemptContentRefresh = async (
+                attempt: number = 1,
+                maxAttempts: number = 8
+            ) => {
+                // Stop if more than 100ms hasn't passed since last attempt (prevents double triggers)
+                const now = Date.now();
+                if (now - lastAttemptTimeRef.current < 100 && attempt > 1) {
+                    console.log(
+                        `[DOC_AREA] Skipping attempt ${attempt} - too close to previous attempt`
+                    );
+                    return;
+                }
+                lastAttemptTimeRef.current = now;
+
+                console.log(
+                    `[DOC_AREA] Polling attempt ${attempt}/${maxAttempts} for document ${transcriptionDocId}`
+                );
+
+                // First check if content already exists
+                const hasContent = await checkContentLength();
+                if (hasContent) {
+                    console.log(
+                        `[DOC_AREA] Content already available, stopping polling`
+                    );
+                    return;
+                }
+
+                // Clear document from cache to force a fresh load
+                if (documentContentCache && transcriptionDocId) {
+                    console.log(
+                        `[DOC_AREA] Clearing cached content for document ${transcriptionDocId}`
+                    );
+                    documentContentCache.delete(transcriptionDocId);
+                }
+
+                // Trigger the content refresh
+                setRefreshTrigger((prev) => {
+                    const newTrigger = prev + 1;
+                    console.log(
+                        `[DOC_AREA] Refresh trigger updated to ${newTrigger} (attempt ${attempt})`
+                    );
+                    return newTrigger;
+                });
+
+                // Wait a bit to let the content load before checking
+                await new Promise((resolve) => setTimeout(resolve, 250));
+
+                // Check if content was loaded after refresh
+                const contentLoaded = await checkContentLength();
+                if (contentLoaded) {
+                    console.log(
+                        `[DOC_AREA] Content loaded successfully after attempt ${attempt}, stopping polling`
+                    );
+                    return;
+                }
+
+                // If we haven't reached max attempts and no content yet, schedule another try
+                if (attempt < maxAttempts) {
+                    // Calculate next delay with exponential backoff (500ms, 1000ms, etc.)
+                    const nextDelay = Math.min(
+                        500 * Math.pow(1.5, attempt - 1),
+                        1000
+                    );
+
+                    console.log(
+                        `[DOC_AREA] Content not loaded yet. Scheduling next polling attempt in ${nextDelay}ms`
+                    );
+                    pollingTimerRef.current = setTimeout(() => {
+                        attemptContentRefresh(attempt + 1, maxAttempts);
+                    }, nextDelay);
+                } else {
+                    console.log(
+                        `[DOC_AREA] Reached maximum polling attempts (${maxAttempts})`
+                    );
+                }
+            };
+
+            // Start polling immediately (but asynchronously)
+            setTimeout(() => {
+                attemptContentRefresh();
+            }, 0);
+        }
+
+        // Cleanup function to clear any polling timers when component unmounts or dependencies change
+        return () => {
+            if (pollingTimerRef.current) {
+                clearTimeout(pollingTimerRef.current);
+                pollingTimerRef.current = null;
+            }
+        };
+    }, [
+        transcriptionCompleteTimestamp,
+        activeDocumentId,
+        transcriptionDocId,
+        fetchDocumentContent,
+    ]);
+
     if (loading) {
         return (
             <div className="flex flex-col h-full">
@@ -232,7 +426,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
             />
 
             <div className="flex-1 overflow-auto bg-white">
-                {/* Single persistent TextArea component - key set to encounterId so it only remounts 
+                {/* Single persistent TextArea component - key set to encounterId so it only remounts
                     when the encounter changes, not when documents change */}
                 {documents.length > 0 ? (
                     <TextArea
@@ -264,7 +458,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
                 )}
             </div>
 
-            {/* Display real-time generation progress when active outside the modal 
+            {/* Display real-time generation progress when active outside the modal
                 Only show when we're not already viewing the document being generated */}
             {!isModalOpen &&
                 generationStatus?.inProgress &&

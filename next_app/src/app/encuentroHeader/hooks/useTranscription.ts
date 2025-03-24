@@ -4,7 +4,7 @@ import { env } from "@/lib/env";
 
 type TranscriptionStatus = "idle" | "pending" | "success" | "error";
 
-export const useTranscription = () => {
+export const useTranscription = (onTranscriptionComplete?: () => void) => {
     const [isLoading, setIsLoading] = useState(false);
     const [transcriptionStatus, setTranscriptionStatus] =
         useState<TranscriptionStatus>("idle");
@@ -28,18 +28,30 @@ export const useTranscription = () => {
     const getSSEToken = async (
         id_documento: number
     ): Promise<string | null> => {
+        console.log(
+            `[USE_TRANSCRIPTION] Requesting SSE token for document ${id_documento}`
+        );
         try {
             const response = await axiosInstance.post(
                 `/api/generate-sse-token/${id_documento}`
             );
             if (response.data.success && response.data.token) {
+                console.log(
+                    `[USE_TRANSCRIPTION] Received SSE token for document ${id_documento}`
+                );
                 return response.data.token;
             } else {
-                console.error("Failed to get SSE token:", response.data.error);
+                console.error(
+                    "[USE_TRANSCRIPTION] Failed to get SSE token:",
+                    response.data.error
+                );
                 return null;
             }
         } catch (error) {
-            console.error("Error getting SSE token:", error);
+            console.error(
+                "[USE_TRANSCRIPTION] Error getting SSE token:",
+                error
+            );
             return null;
         }
     };
@@ -48,8 +60,12 @@ export const useTranscription = () => {
     const subscribeToTranscriptionUpdates = async (
         id_documento: number
     ): Promise<boolean> => {
+        console.log(
+            `[USE_TRANSCRIPTION] Subscribing to transcription updates for document ${id_documento}`
+        );
         // First close any existing connections
         if (eventSourceRef.current) {
+            console.log("[USE_TRANSCRIPTION] Closing existing SSE connection");
             eventSourceRef.current.close();
             eventSourceRef.current = null;
         }
@@ -67,6 +83,9 @@ export const useTranscription = () => {
                 ? env.NEXT_PUBLIC_API_URL.slice(0, -1)
                 : env.NEXT_PUBLIC_API_URL;
             const sseUrl = `${apiBaseUrl}/api/sse/documento/${id_documento}/${token}`;
+            console.log(
+                `[USE_TRANSCRIPTION] Connecting to SSE endpoint: ${sseUrl}`
+            );
 
             // Create a new EventSource connection
             const eventSource = new EventSource(sseUrl);
@@ -75,36 +94,52 @@ export const useTranscription = () => {
             // Connection opened
             eventSource.onopen = () => {
                 console.log(
-                    "SSE connection established for document",
-                    id_documento
+                    `[USE_TRANSCRIPTION] SSE connection established for document ${id_documento}`
                 );
             };
 
             // Message received
             eventSource.onmessage = (event) => {
+                console.log(
+                    "[USE_TRANSCRIPTION] SSE message received",
+                    event.data
+                );
                 try {
                     const data = JSON.parse(event.data);
-                    console.log("SSE event received:", data);
+                    console.log("[USE_TRANSCRIPTION] Parsed SSE data:", data);
 
                     if (data.event === "transcription_complete") {
                         console.log(
-                            "Transcription completed for document",
-                            id_documento
+                            `[USE_TRANSCRIPTION] Transcription completed for document ${id_documento}`
                         );
                         setTranscriptionStatus("success");
+
+                        // Call the callback when transcription completes
+                        if (onTranscriptionComplete) {
+                            console.log(
+                                "[USE_TRANSCRIPTION] Calling onTranscriptionComplete callback"
+                            );
+                            onTranscriptionComplete();
+                        }
 
                         // Close the connection since we no longer need updates
                         eventSource.close();
                         eventSourceRef.current = null;
                     }
                 } catch (error) {
-                    console.error("Error parsing SSE message:", error);
+                    console.error(
+                        "[USE_TRANSCRIPTION] Error parsing SSE message:",
+                        error
+                    );
                 }
             };
 
             // Error handling
             eventSource.onerror = (error) => {
-                console.error("SSE connection error:", error);
+                console.error(
+                    "[USE_TRANSCRIPTION] SSE connection error:",
+                    error
+                );
                 setErrorMessage("Error in real-time updates connection");
 
                 // Close the connection on error
@@ -114,7 +149,10 @@ export const useTranscription = () => {
 
             return true;
         } catch (error) {
-            console.error("Error creating SSE connection:", error);
+            console.error(
+                "[USE_TRANSCRIPTION] Error creating SSE connection:",
+                error
+            );
             setErrorMessage("Failed to establish real-time updates");
             return false;
         }

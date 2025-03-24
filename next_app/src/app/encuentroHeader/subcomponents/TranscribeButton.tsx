@@ -7,6 +7,7 @@ interface TranscribeButtonProps {
     audioBlob: Blob | null;
     isRecording: boolean;
     audioExists?: boolean;
+    onTranscriptionComplete?: () => void; // Add this prop
 }
 
 /**
@@ -19,9 +20,10 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
     audioBlob,
     isRecording,
     audioExists = false,
+    onTranscriptionComplete,
 }) => {
     const { transcribeAudio, isLoading, transcriptionStatus, errorMessage } =
-        useTranscription();
+        useTranscription(onTranscriptionComplete);
 
     // Determine if we have audio to transcribe
     const hasAudioToTranscribe = audioBlob || audioExists;
@@ -32,7 +34,13 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
         !hasAudioToTranscribe;
 
     const handleTranscribe = async () => {
-        if (isDisabled) return;
+        console.log("[TRANSCRIBE_BUTTON] Transcribe button clicked");
+        if (isDisabled) {
+            console.log(
+                "[TRANSCRIBE_BUTTON] Button is disabled. Aborting transcription"
+            );
+            return;
+        }
 
         try {
             // Extract encounter ID from URL path
@@ -51,10 +59,17 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
                 throw new Error("Missing transcription document ID");
             }
 
+            console.log(
+                `[TRANSCRIBE_BUTTON] Initiating transcription for document ${transcriptionDocId} and encounter ${encounterIdFromUrl}`
+            );
+
             // Call the transcribeAudio function from the hook
             await transcribeAudio(transcriptionDocId, encounterIdFromUrl);
         } catch (error) {
-            console.error("Error in transcribe handler:", error);
+            console.error(
+                "[TRANSCRIBE_BUTTON] Error in transcribe handler:",
+                error
+            );
         }
     };
 
