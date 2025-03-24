@@ -8,7 +8,7 @@ interface DocumentContentPluginProps {
     isLoading: boolean;
     refreshTrigger?: number;
     forceRefresh?: boolean;
-    streamingContent?: string; // Add this new prop for streaming content
+    streamingContent?: string;
 }
 
 export function DocumentContentPlugin({
@@ -17,23 +17,38 @@ export function DocumentContentPlugin({
     isLoading,
     refreshTrigger,
     forceRefresh = false,
-    streamingContent, // Support for streaming content
+    streamingContent,
 }: DocumentContentPluginProps): React.ReactElement | null {
     const [editor] = useLexicalComposerContext();
-    const lastUpdatedContentRef = useRef<string>(""); // Track last content to avoid duplicate updates
+    const lastUpdatedContentRef = useRef<string>("");
+    const lastStreamContentRef = useRef<string>("");
 
     // Effect to update editor content when document changes or refresh triggers
     useEffect(() => {
-        // Handle streaming content updates if provided and different from last update
-        if (
-            streamingContent !== undefined &&
-            streamingContent !== lastUpdatedContentRef.current
-        ) {
+        // Debug logging to track content transitions
+        if (streamingContent) {
             console.log(
-                `[EDITOR_PLUGIN] Updating editor with streaming content for document ${documentId} (${streamingContent.length} chars)`
+                `🔄 Document ${documentId}: Using streaming content (${streamingContent.length} chars)`
+            );
+            lastStreamContentRef.current = streamingContent;
+        } else if (content) {
+            console.log(
+                `📄 Document ${documentId}: Using regular content (${content.length} chars)`
+            );
+        } else if (lastStreamContentRef.current) {
+            console.log(
+                `🔍 Document ${documentId}: Fallback to last stream content (${lastStreamContentRef.current.length} chars)`
+            );
+        }
+
+        // Handle streaming content updates if provided
+        if (streamingContent && streamingContent.length > 5) {
+            // Only use if substantial content
+            console.log(
+                `🔄 Document ${documentId}: Using streaming content (${streamingContent.length} chars)`
             );
 
-            lastUpdatedContentRef.current = streamingContent;
+            lastStreamContentRef.current = streamingContent;
 
             editor.update(() => {
                 // Clear editor
@@ -57,20 +72,58 @@ export function DocumentContentPlugin({
                 });
             });
 
-            return; // Skip the normal content update when streaming
+            // Important: Save the streaming content as the last updated content
+            lastUpdatedContentRef.current = streamingContent;
+            return;
+        }
+        // Handle the transition when streaming completes
+        else if (
+            lastStreamContentRef.current &&
+            (!content || content.length <= 1)
+        ) {
+            console.log(
+                `⚠️ Document ${documentId}: Content appears empty/truncated. Using last stream content (${lastStreamContentRef.current.length} chars).`
+            );
+
+            // Use the last streaming content we had
+            const savedStreamContent = lastStreamContentRef.current;
+
+            editor.update(() => {
+                const root = $getRoot();
+                root.clear();
+
+                const lines = savedStreamContent.split("\n");
+                lines.forEach((line) => {
+                    const paragraph = $createParagraphNode();
+                    paragraph.append($createTextNode(line));
+                    root.append(paragraph);
+                });
+            });
+
+            return;
         }
 
         // Regular document content updates (non-streaming)
         if ((content && !isLoading) || forceRefresh) {
+            // Skip if content is suspiciously short and we have better content
+            if (
+                content.length <= 5 &&
+                lastStreamContentRef.current &&
+                lastStreamContentRef.current.length > 100
+            ) {
+                console.log(
+                    `⚠️ Rejecting suspicious short content update (${content.length} chars vs ${lastStreamContentRef.current.length} chars stored)`
+                );
+                return;
+            }
+
             // Skip if content is the same as last updated content
             if (content === lastUpdatedContentRef.current && !forceRefresh) {
                 return;
             }
 
             console.log(
-                `[EDITOR_PLUGIN] Updating editor content for document ${documentId}${
-                    forceRefresh ? " (forced)" : ""
-                }`
+                `📄 Document ${documentId}: Using regular content (${content.length} chars)`
             );
 
             lastUpdatedContentRef.current = content;

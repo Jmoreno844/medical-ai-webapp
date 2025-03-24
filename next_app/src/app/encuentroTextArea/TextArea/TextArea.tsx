@@ -19,6 +19,13 @@ import {
 import { useDocumentContent } from "../../encuentro/hooks/useDocumentContent";
 import { createEditorConfig } from "./utils/editorConfig";
 
+// Create a global cache reference for direct access
+declare global {
+    interface Window {
+        documentContentCache: Map<number, string> | undefined;
+    }
+}
+
 interface TextAreaProps {
     /**
      * Current document to display/edit
@@ -124,6 +131,19 @@ const TextArea: React.FC<TextAreaProps> = ({
         ? loadedDocumentIds?.includes(document.id) || false
         : false;
 
+    // Make the cache globally available for direct updates
+    useEffect(() => {
+        // Make the cache globally available for direct updates
+        if (documentContentCache) {
+            window.documentContentCache = documentContentCache;
+        }
+
+        return () => {
+            // Clean up on unmount
+            delete window.documentContentCache;
+        };
+    }, [documentContentCache]);
+
     // Initialize content state - also moved above early return
     const {
         documentContent,
@@ -197,6 +217,34 @@ const TextArea: React.FC<TextAreaProps> = ({
 
         // No cleanup needed, we're just tracking changes
     }, [document?.id]); // Only depend on document.id, not the entire document object
+
+    // Monitor generationStatus and manually update the cache
+    useEffect(() => {
+        if (!generationStatus || !documentContentCache) return;
+
+        // When streaming content changes, update our cache to ensure it's always current
+        if (
+            generationStatus.inProgress &&
+            generationStatus.documentId &&
+            generationStatus.content
+        ) {
+            const docId = generationStatus.documentId;
+            const content = generationStatus.content;
+
+            // Keep the cache updated with streaming content
+            if (content.length > 5) {
+                // Only update if we have meaningful content
+                console.log(
+                    `🔄 Syncing streaming content to cache (${content.length} chars)`
+                );
+                documentContentCache.set(docId, content);
+            }
+        }
+    }, [
+        generationStatus?.content,
+        generationStatus?.documentId,
+        documentContentCache,
+    ]);
 
     // Log component lifecycle for debugging
     useEffect(() => {

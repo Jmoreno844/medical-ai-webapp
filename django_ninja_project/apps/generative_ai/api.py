@@ -155,8 +155,8 @@ def iniciar_transcripcion(request, payload: TranscriptionRequest):
 
         # Generate JWT token
         token_payload = {
-            "user_id": request.user.id,
-            "document_id": documento_id,
+            "id_usuario": request.user.id,
+            "id_documento": documento_id,
             "exp": datetime.utcnow() + timedelta(minutes=15),
             "purpose": "transcription",
         }

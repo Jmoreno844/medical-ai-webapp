@@ -177,7 +177,7 @@ def update_document_content(
 
     logger.info(f"Making API call to update document {id_documento}")
     logger.info(f"API URL: {api_url}")
-
+    logger.info(f"Payload: {payload}")
     try:
         # Measure API call time
         start_time = time.time()

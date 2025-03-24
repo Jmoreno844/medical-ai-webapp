@@ -153,7 +153,7 @@ def receive_generation_chunk(request, payload: GenerationChunkIn, auth=None):
     "/documento_by_function/{documento_id}", response=SuccessResponse, auth=JWTAuth()
 )
 def update_documento_content(
-    request, documento_id: int, payload: DocumentoUpdateIn, auth
+    request, documento_id: int, payload: DocumentoUpdateIn, auth=None
 ):
     """
     Update the content of an existing document.

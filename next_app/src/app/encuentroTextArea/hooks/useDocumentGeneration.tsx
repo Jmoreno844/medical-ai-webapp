@@ -136,6 +136,7 @@ export function useDocumentGeneration({
             // Close any existing connection
             if (eventSourceRef.current) {
                 eventSourceRef.current.close();
+                eventSourceRef.current = null;
             }
 
             // Create full URL to the SSE endpoint with secure token using API URL from env
@@ -143,104 +144,144 @@ export function useDocumentGeneration({
                 ? env.NEXT_PUBLIC_API_URL.slice(0, -1)
                 : env.NEXT_PUBLIC_API_URL;
             const sseUrl = `${apiBaseUrl}/api/sse/documento/${documentId}/${sseToken}`;
-            // Create a new SSE connection
-            const eventSource = new EventSource(sseUrl);
-            eventSourceRef.current = eventSource;
 
-            eventSource.onopen = () => {
-                console.log("✅ SSE connection established");
-            };
+            console.log(`🔌 Connecting to SSE endpoint: ${sseUrl}`);
 
-            eventSource.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    console.log("📡 SSE event received:", data);
+            try {
+                const eventSource = new EventSource(sseUrl);
+                eventSourceRef.current = eventSource;
 
-                    switch (data.event) {
-                        case "connected":
-                            console.log(
-                                "✅ Connected to SSE for document",
-                                data.id_documento
-                            );
-                            break;
+                eventSource.onopen = () => {
+                    console.log(
+                        `✅ SSE connection established for document ${documentId}`
+                    );
+                };
 
-                        case "generation_chunk":
-                            const newChunk = data.chunk || "";
+                eventSource.onmessage = async (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log(`📩 SSE message received: ${data.event}`);
 
-                            setGenerationStatus((prev) => {
-                                const updatedContent = prev.content + newChunk;
+                        switch (data.event) {
+                            case "connected":
+                                console.log(
+                                    "✅ Connected to SSE for document",
+                                    data.id_documento
+                                );
+                                break;
 
-                                // Save content to document
-                                if (onContentUpdate && documentId && newChunk) {
-                                    // Use the full accumulated content for saving
-                                    onContentUpdate(
+                            case "generation_chunk":
+                                const newChunk = data.chunk || "";
+
+                                setGenerationStatus((prev) => {
+                                    const updatedContent =
+                                        prev.content + newChunk;
+
+                                    // Save content to document
+                                    if (
+                                        onContentUpdate &&
+                                        documentId &&
+                                        newChunk
+                                    ) {
+                                        // Use the full accumulated content for saving
+                                        onContentUpdate(
+                                            documentId,
+                                            updatedContent
+                                        ).catch((err) =>
+                                            console.error(
+                                                "Error saving document content:",
+                                                err
+                                            )
+                                        );
+                                    }
+
+                                    return {
+                                        ...prev,
+                                        content: updatedContent,
+                                        error: null,
+                                    };
+                                });
+                                break;
+
+                            case "generation_complete":
+                                const finalContent =
+                                    data.chunk || generationStatus.content;
+
+                                console.log(
+                                    `✅ Generation complete - Final content length: ${finalContent.length} chars`
+                                );
+
+                                // CRITICAL: Update the document content cache directly to prevent race condition
+                                if (window.documentContentCache && documentId) {
+                                    window.documentContentCache.set(
                                         documentId,
-                                        updatedContent
-                                    ).catch((err) =>
-                                        console.error(
-                                            "Error saving document content:",
-                                            err
-                                        )
+                                        finalContent
+                                    );
+                                    console.log(
+                                        `💾 Manually updated cache for document ${documentId} with ${finalContent.length} chars`
                                     );
                                 }
 
-                                return {
-                                    ...prev,
-                                    content: updatedContent,
-                                    error: null,
-                                };
-                            });
-                            break;
-
-                        case "generation_complete":
-                            const finalContent =
-                                data.chunk || generationStatus.content;
-
-                            // Save the final content to the document
-                            if (onContentUpdate && documentId) {
-                                onContentUpdate(documentId, finalContent).catch(
-                                    (err) =>
+                                // Save final content to database
+                                if (onContentUpdate && documentId) {
+                                    try {
+                                        await onContentUpdate(
+                                            documentId,
+                                            finalContent
+                                        );
+                                        console.log(
+                                            `📝 Final content saved to database (${finalContent.length} chars)`
+                                        );
+                                    } catch (err) {
                                         console.error(
-                                            "Error saving final document content:",
+                                            "❌ Error saving final content:",
                                             err
-                                        )
+                                        );
+                                    }
+                                }
+
+                                // Only after saving content, update the state
+                                setGenerationStatus((prev) => ({
+                                    ...prev,
+                                    content: finalContent,
+                                    isComplete: true,
+                                    inProgress: false,
+                                }));
+
+                                setIsGenerating(false);
+                                break;
+
+                            case "generation_error":
+                                setGenerationStatus((prev) => ({
+                                    ...prev,
+                                    error: data.error || "Error desconocido",
+                                    inProgress: false,
+                                }));
+                                setIsGenerating(false);
+                                setError(
+                                    data.error || "Error en la generación"
                                 );
-                            }
-
-                            setGenerationStatus((prev) => ({
-                                ...prev,
-                                content: finalContent,
-                                isComplete: true,
-                                inProgress: false,
-                            }));
-                            setIsGenerating(false);
-                            break;
-
-                        case "generation_error":
-                            setGenerationStatus((prev) => ({
-                                ...prev,
-                                error: data.error || "Error desconocido",
-                                inProgress: false,
-                            }));
-                            setIsGenerating(false);
-                            setError(data.error || "Error en la generación");
-                            break;
+                                break;
+                        }
+                    } catch (err) {
+                        console.error("❌ Error processing SSE message:", err);
                     }
-                } catch (err) {
-                    console.error("❌ Error processing SSE message:", err);
-                }
-            };
+                };
 
-            eventSource.onerror = (err) => {
-                console.error("❌ SSE connection error:", err);
-                setError("Error en la conexión con el servidor");
+                eventSource.onerror = (err) => {
+                    console.error("❌ SSE connection error:", err);
+                    setError("Error en la conexión con el servidor");
 
-                // Close and cleanup on error
-                eventSource.close();
-                eventSourceRef.current = null;
-            };
+                    // Close and cleanup on error
+                    eventSource.close();
+                    eventSourceRef.current = null;
+                };
 
-            return eventSource;
+                return eventSource;
+            } catch (error) {
+                console.error("Error creating SSE connection:", error);
+                return null;
+            }
         },
         [onContentUpdate, generationStatus.content]
     );
