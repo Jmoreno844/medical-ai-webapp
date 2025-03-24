@@ -216,9 +216,10 @@ def document_streaming_generation(request) -> tuple:
                 content=content,
                 generation_type=generation_type,
                 custom_prompt=prompt,
-                document_id=document_id,
-                processing_id=processing_id,
-                auth_token=auth_token,
+                id_documento=document_id,  # FIXED: Changed from document_id
+                id_proceso=processing_id,  # FIXED: Changed from processing_id
+                token_auth=auth_token,  # FIXED: Parameter name now matches django_api.py
+                model_name=None,
             )
 
             if not result.get("success", False):
@@ -233,7 +234,7 @@ def document_streaming_generation(request) -> tuple:
                     is_complete=False,
                     is_error=True,
                     error=error_msg,
-                    token_auth=auth_token,
+                    token_auth=auth_token,  # This was already correct
                 )
 
                 return (
@@ -267,7 +268,7 @@ def document_streaming_generation(request) -> tuple:
                 is_complete=False,
                 is_error=True,
                 error=f"Error en la generación: {str(e)}",
-                token_auth=auth_token,
+                token_auth=auth_token,  # This was already correct
             )
 
             return (

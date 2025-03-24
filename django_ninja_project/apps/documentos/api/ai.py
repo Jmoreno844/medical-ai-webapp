@@ -62,17 +62,31 @@ def receive_generation_chunk(request, payload: GenerationChunkIn, auth=None):
     Receive a chunk of generated content from the cloud function.
     Broadcast to connected clients and update document.
     """
+
+    # Failsafe: If auth is None but there's an Authorization header, try manual token extraction and decoding
+    if not auth and "Authorization" in request.headers:
+        try:
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                token = auth_header.split(" ")[1]
+                logger.info(f"Attempting manual token decode: {token[:10]}...")
+
+                auth = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
+                logger.info(f"Manual token decode successful: {auth}")
+        except Exception as e:
+            logger.error(f"Manual token decode failed: {str(e)}")
+
     if not auth:
         logger.error("Authentication required but not provided")
         raise HttpError(401, "Authentication required")
 
-    id_documento = payload.id_documento  # Changed from document_id
-    id_proceso = payload.id_proceso  # Changed from processing_id
+    id_documento = payload.id_documento
+    id_proceso = payload.id_proceso
 
     try:
         # Verify authentication and permissions
-        id_documento_from_token = auth.get("document_id")
-        id_proceso_from_token = auth.get("processing_id")
+        id_documento_from_token = auth.get("id_documento")
+        id_proceso_from_token = auth.get("id_proceso")
 
         if int(id_documento_from_token) != id_documento:
             logger.warning(
@@ -139,7 +153,7 @@ def receive_generation_chunk(request, payload: GenerationChunkIn, auth=None):
     "/documento_by_function/{documento_id}", response=SuccessResponse, auth=JWTAuth()
 )
 def update_documento_content(
-    request, documento_id: int, payload: DocumentoUpdateIn, auth=None
+    request, documento_id: int, payload: DocumentoUpdateIn, auth
 ):
     """
     Update the content of an existing document.
@@ -166,10 +180,8 @@ def update_documento_content(
         logger.error("Authentication required but not provided")
         raise HttpError(401, "Authentication required")
 
-    id_documento_from_token = auth.get(
-        "document_id"
-    )  # Keeping this as is for compatibility
-    id_medico_from_token = auth.get("user_id")  # Keeping this as is for compatibility
+    id_documento_from_token = auth.get("id_documento")  # CHANGED: from document_id
+    id_medico_from_token = auth.get("id_usuario")  # CHANGED: from user_id
 
     logger.info(
         f"Token contains: doc_id={id_documento_from_token}, user_id={id_medico_from_token}"
@@ -228,8 +240,8 @@ def transcription_complete_notification(
         documento = get_object_or_404(Documento, id=id_documento)
 
         # Verify the auth token's permissions
-        document_id_from_token = auth.get("document_id")
-        doctor_id_from_token = auth.get("user_id")
+        document_id_from_token = auth.get("id_documento")  # CHANGED: from document_id
+        doctor_id_from_token = auth.get("id_usuario")  # CHANGED: from user_id
 
         if int(document_id_from_token) != id_documento:
             logger.warning(
@@ -385,7 +397,7 @@ def generate_document_workflow(request, data: DocumentGenerationWorkflowRequest)
 
         try:
             # Make a validation-only request to check if the cloud function accepts our inputs
-            logger.info(f"Making validation request to cloud function")
+            logger.info("Making validation request to cloud function")
             respuesta_validacion = requests.post(
                 url_cloud_function,
                 json=datos_peticion,

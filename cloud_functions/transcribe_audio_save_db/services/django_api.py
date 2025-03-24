@@ -271,6 +271,7 @@ def send_generation_chunk(
     is_error: bool = False,
     error: Optional[str] = None,
     token_auth: Optional[str] = None,
+    max_retries: int = 1,  # Allow one retry (total of 2 attempts)
 ) -> Dict[str, Any]:
     """
     Send a chunk of generated content to the Django API.
@@ -283,6 +284,7 @@ def send_generation_chunk(
         is_error: Whether an error occurred
         error: Error message (if is_error is True)
         token_auth: Authentication token for the Django API
+        max_retries: Maximum number of retries on 401 error
 
     Returns:
         Dictionary containing the API response or error information
@@ -296,49 +298,129 @@ def send_generation_chunk(
         if not token_auth:
             return {"success": False, "error": "No authentication token available"}
 
-    # Prepare headers with token
+    # Prepare headers with token - keep improved token handling
     headers = {"Content-Type": "application/json"}
 
-    # Set Authorization header
+    # Set Authorization header - Always ensure proper JWT format
     if token_auth:
-        if (
-            "." in token_auth
-            and len(token_auth.split(".")) == 3
-            and not token_auth.startswith("Bearer ")
-        ):
+        # Always use Bearer format, and ensure it's only added once
+        if not token_auth.startswith("Bearer "):
             headers["Authorization"] = f"Bearer {token_auth}"
         else:
             headers["Authorization"] = token_auth
 
-    # Prepare payload
+    # Modified payload creation - ensure all fields are present and have correct types
     payload = {
-        "id_documento": id_documento,  # Changed from document_id
-        "id_proceso": id_proceso,  # Changed from processing_id
-        "chunk": chunk,
-        "is_complete": is_complete,
-        "is_error": is_error,
+        "id_documento": int(id_documento),  # Ensure integer
+        "id_proceso": str(id_proceso),  # Ensure string
+        "is_complete": bool(is_complete),  # Ensure boolean
+        "is_error": bool(is_error),  # Ensure boolean
     }
 
+    # Add chunk field (could be None in schema but Django Ninja might require it)
+    payload["chunk"] = chunk if chunk is not None else ""
+
+    # Add error field only if applicable
     if is_error and error:
-        payload["error"] = error
+        payload["error"] = str(error)
+    else:
+        payload["error"] = None  # Explicitly include with None value
 
-    logger.debug(
-        f"Sending generation chunk for document {id_documento}, job {id_proceso}"
-    )
+    # Debug logging to see what's being sent
+    logger.info(f"Sending payload to Django: {payload}")
 
-    try:
-        response = requests.post(api_url, json=payload, headers=headers, timeout=10)
-        response.raise_for_status()
+    # Track retry attempts
+    attempts = 0
+    max_attempts = max_retries + 1  # Initial attempt + retries
 
-        logger.debug(f"Successfully sent chunk for document {id_documento}")
-        return {
-            "success": True,
-            "status_code": response.status_code,
-            "response": response.json() if response.text else {},
-        }
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error sending generation chunk: {str(e)}")
-        return {"success": False, "error": str(e)}
-    except Exception as e:
-        logger.error(f"Unexpected error sending chunk: {str(e)}")
-        return {"success": False, "error": str(e)}
+    while attempts < max_attempts:
+        attempts += 1
+        try:
+            logger.info(f"API request attempt {attempts}/{max_attempts}")
+
+            # Make the API request
+            response = requests.post(api_url, json=payload, headers=headers, timeout=10)
+
+            # Log detailed information about the response
+            logger.info(f"API response status code: {response.status_code}")
+
+            # Enhanced error logging
+            if response.status_code >= 400:
+                logger.error(f"API error response: {response.status_code}")
+                logger.error(f"API response headers: {dict(response.headers)}")
+
+                try:
+                    logger.error(f"API response body: {response.text[:500]}")
+                except:
+                    logger.error("Could not log response body")
+
+                # Special handling for 422 validation errors
+                if response.status_code == 422:
+                    logger.error(f"Validation error (422): {response.text}")
+                    # Try to parse the error message for more details
+                    try:
+                        error_details = response.json()
+                        logger.error(f"Validation error details: {error_details}")
+                    except:
+                        logger.error(f"Raw validation error: {response.text}")
+
+            # Handle 401 errors specifically
+            if response.status_code == 401:
+                logger.error(f"Authentication failed (401 Unauthorized)")
+
+                if attempts < max_attempts:
+                    logger.info(
+                        f"Retrying after 401 error ({attempts}/{max_attempts})..."
+                    )
+                    continue  # Retry
+                else:
+                    logger.error("Max retry attempts reached. Giving up.")
+                    return {
+                        "success": False,
+                        "error": "Authentication failed after max retries",
+                        "status_code": 401,
+                    }
+
+            # For any other status, proceed as normal
+            response.raise_for_status()
+
+            logger.info(f"Successfully sent chunk for document {id_documento}")
+            return {
+                "success": True,
+                "status_code": response.status_code,
+                "response": response.json() if response.text else {},
+            }
+
+        except requests.exceptions.RequestException as e:
+            status_code = getattr(getattr(e, "response", None), "status_code", None)
+            logger.error(f"Request error: {str(e)} (status code: {status_code})")
+
+            # Only retry on 401 errors
+            if status_code == 401 and attempts < max_attempts:
+                logger.info(
+                    f"Will retry after 401 error ({attempts}/{max_attempts})..."
+                )
+                continue
+
+            # Extract more helpful error details when available
+            response_text = None
+            if hasattr(e, "response") and hasattr(e.response, "text"):
+                try:
+                    response_text = e.response.text
+                    logger.error(f"Error response body: {response_text}")
+                except:
+                    pass
+
+            return {
+                "success": False,
+                "error": str(e),
+                "status_code": status_code,
+                "response_text": response_text,
+            }
+
+        except Exception as e:
+            logger.error(f"Unexpected error sending chunk: {str(e)}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    # Should never reach here but just in case
+    return {"success": False, "error": "Failed after max retries"}

@@ -95,26 +95,84 @@ SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
 SESSION_COOKIE_SAMESITE = "None"  # Required for cross-site requests with credentials
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Session ends when browser closes
 SESSION_COOKIE_AGE = 3600  # 1 hour in seconds
+# Replace the existing LOGGING dictionary with this more comprehensive one:
 
-# Debug logging for authentication
+"""
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[{asctime}] {levelname} {module} {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "{levelname} {message}",
+            "style": "{",
+        },
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+        "file": {
+            "level": "DEBUG",
+            "class": "logging.FileHandler",
+            "filename": os.path.join(BASE_DIR, "logs/django-debug.log"),
+            "formatter": "verbose",
         },
     },
     "loggers": {
+        # Root logger
+        "": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": True,
+        },
+        # Django's loggers
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
         "django.request": {
             "handlers": ["console"],
             "level": "DEBUG",
-            "propagate": True,
+            "propagate": False,
         },
-        "apps.users.api": {
+        "django.security": {
             "handlers": ["console"],
             "level": "DEBUG",
-            "propagate": True,
+            "propagate": False,
         },
-    },
+        "django.contrib.auth": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        # Your app loggers - add all relevant modules
+        "apps.documentos.api.ai": {
+            "handlers": ["console", "file"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "apps.documentos.api.sse": {
+            "handlers": ["console", "file"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "utils.auth": {
+            "handlers": ["console", "file"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "apps.users.api": {
+            "handlers": ["console", "file"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+    },info 
 }
+
+"""

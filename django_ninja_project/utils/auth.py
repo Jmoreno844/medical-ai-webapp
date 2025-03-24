@@ -29,8 +29,24 @@ class JWTAuth(HttpBearer):
 
         try:
             # Decode and verify the token
+            logger.info(
+                f"Attempting to decode token with SECRET_KEY: {settings.JWT_SECRET_KEY[:3]}..."
+            )
             payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
-            logger.info(f"Token decoded successfully: {payload}")
+
+            # Log detailed info about the decoded token
+            logger.info(
+                f"Token decoded successfully with payload keys: {list(payload.keys())}"
+            )
+
+            # Check for expected fields in token payload
+            expected_fields = ["id_documento", "id_usuario", "id_proceso"]
+            missing_fields = [
+                field for field in expected_fields if field not in payload
+            ]
+            if missing_fields:
+                logger.warning(f"Token missing expected fields: {missing_fields}")
+
             return payload
         except jwt.ExpiredSignatureError:
             logger.error("Authentication failed: Token has expired")
