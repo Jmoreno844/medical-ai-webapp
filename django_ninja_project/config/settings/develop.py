@@ -23,6 +23,9 @@ GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH = os.environ.get(
 TRANSCRIPTION_CLOUD_FUNCTION_URL = os.environ.get(
     "TRANSCRIPTION_CLOUD_FUNCTION_URL", "not-loaded"
 )
+GENERATE_DOCUMENT_CLOUD_FUNCTION_BASE_URL = os.environ.get(
+    "GENERATE_DOCUMENT_CLOUD_FUNCTION_BASE_URL", "not-loaded"
+)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 

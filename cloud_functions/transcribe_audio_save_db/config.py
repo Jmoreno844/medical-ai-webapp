@@ -21,11 +21,55 @@ GENERATION_CONFIG = {
 
 # Define a single, fixed prompt that instructs the model to summarize text
 SUMMARY_PROMPT = """
-You are a professional medical assistant. Please create a concise and professional summary of the following medical text:
+Por favor, resume el siguiente texto médico de manera profesional, manteniendo la 
+información clínica importante y organizándola de manera clara:
 
 {text}
 
-Focus on key medical findings, diagnoses, and recommendations.
+Resumen:
+"""
+
+EXPAND_PROMPT = """
+Por favor, desarrolla y expande el siguiente texto médico con más detalles profesionales, 
+manteniendo un tono clínico apropiado:
+
+{text}
+
+Versión expandida:
+"""
+
+TRANSLATE_PROMPT = """
+Por favor, traduce el siguiente texto médico del español al inglés, manteniendo toda la 
+terminología clínica relevante:
+
+{text}
+
+English translation:
+"""
+
+DOCUMENT_GENERATION_PROMPT = """
+Tu tarea es generar un documento médico basado en los siguientes componentes:
+
+1. PLANTILLA: 
+{template}
+
+2. CONTEXTO DEL PACIENTE:
+{context}
+
+3. TRANSCRIPCIÓN DE LA CONVERSACIÓN:
+{transcription}
+
+Instrucciones:
+- Utiliza la estructura proporcionada en la PLANTILLA.
+- Completa cada sección con información relevante del CONTEXTO y la TRANSCRIPCIÓN.
+- Mantén un tono profesional y médico en todo momento.
+- Si hay secciones en la plantilla que no pueden ser completadas con la información disponible, 
+  indícalo con "Información no disponible" o proporciona una observación genérica apropiada.
+- Asegúrate de que el documento final sea coherente y siga las convenciones médicas.
+- Incluye fechas, horas y cualquier dato específico mencionado en la transcripción.
+- No inventes información que no esté presente en los datos proporcionados.
+
+Genera el documento completo:
 """
 
 TRANSCRIPTION_PROMPT = """

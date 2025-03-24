@@ -25,10 +25,12 @@ export const useTranscription = () => {
     }, []);
 
     // Function to get a secure SSE token
-    const getSSEToken = async (documentId: number): Promise<string | null> => {
+    const getSSEToken = async (
+        id_documento: number
+    ): Promise<string | null> => {
         try {
             const response = await axiosInstance.post(
-                `/api/generate-sse-token/${documentId}`
+                `/api/generate-sse-token/${id_documento}`
             );
             if (response.data.success && response.data.token) {
                 return response.data.token;
@@ -44,7 +46,7 @@ export const useTranscription = () => {
 
     // Function to subscribe to real-time transcription updates
     const subscribeToTranscriptionUpdates = async (
-        documentId: number
+        id_documento: number
     ): Promise<boolean> => {
         // First close any existing connections
         if (eventSourceRef.current) {
@@ -54,7 +56,7 @@ export const useTranscription = () => {
 
         try {
             // Get secure token for SSE connection
-            const token = await getSSEToken(documentId);
+            const token = await getSSEToken(id_documento);
             if (!token) {
                 setErrorMessage("Failed to authenticate for real-time updates");
                 return false;
@@ -64,7 +66,7 @@ export const useTranscription = () => {
             const apiBaseUrl = env.NEXT_PUBLIC_API_URL.endsWith("/")
                 ? env.NEXT_PUBLIC_API_URL.slice(0, -1)
                 : env.NEXT_PUBLIC_API_URL;
-            const sseUrl = `${apiBaseUrl}/api/sse/documento/${documentId}/${token}`;
+            const sseUrl = `${apiBaseUrl}/api/sse/documento/${id_documento}/${token}`;
 
             // Create a new EventSource connection
             const eventSource = new EventSource(sseUrl);
@@ -74,7 +76,7 @@ export const useTranscription = () => {
             eventSource.onopen = () => {
                 console.log(
                     "SSE connection established for document",
-                    documentId
+                    id_documento
                 );
             };
 
@@ -87,7 +89,7 @@ export const useTranscription = () => {
                     if (data.event === "transcription_complete") {
                         console.log(
                             "Transcription completed for document",
-                            documentId
+                            id_documento
                         );
                         setTranscriptionStatus("success");
 
@@ -119,10 +121,10 @@ export const useTranscription = () => {
     };
 
     const transcribeAudio = async (
-        transcriptionDocId: number,
-        encounterId: number
+        id_documento_transcripcion: number,
+        id_encuentro: number
     ) => {
-        if (!transcriptionDocId || !encounterId) {
+        if (!id_documento_transcripcion || !id_encuentro) {
             setErrorMessage(
                 "Missing transcription document ID or encounter ID"
             );
@@ -136,14 +138,14 @@ export const useTranscription = () => {
 
         try {
             // Subscribe to real-time updates for this document with secure authentication
-            await subscribeToTranscriptionUpdates(transcriptionDocId);
+            await subscribeToTranscriptionUpdates(id_documento_transcripcion);
 
             // Make API call to the simplified transcription endpoint
             const response = await axiosInstance.post(
                 `api/iniciar_transcripcion`,
                 {
-                    documento_id: transcriptionDocId,
-                    encuentro_id: encounterId,
+                    id_documento: id_documento_transcripcion,
+                    id_encuentro: id_encuentro,
                 },
                 { timeout: 60000 } // 60 seconds timeout for long transcription
             );

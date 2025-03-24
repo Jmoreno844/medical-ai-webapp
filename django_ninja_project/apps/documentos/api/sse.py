@@ -26,23 +26,65 @@ connections_lock = threading.Lock()
 event_queues = {}
 
 
-def notify_document_updated(documento_id, event_type):
+def get_processing_id(documento_id):
+    """Generate a predictable processing ID without storing state"""
+    return f"gen_{documento_id}_{int(datetime.now().timestamp())}"
+
+
+def notify_document_updated(id_documento, event_type, content=None):
     """Send an event to any clients subscribed to this document"""
-    doc_id_str = str(documento_id)
+    doc_id_str = str(id_documento)
 
     with connections_lock:
         if doc_id_str in event_queues:
             event_data = {
                 "event": event_type,
-                "documento_id": documento_id,
+                "id_documento": id_documento,  # Changed from documento_id
                 "timestamp": datetime.now().isoformat(),
             }
+
+            # Add content to event data if provided
+            if content:
+                event_data["content"] = content
 
             for queue in event_queues[doc_id_str]:
                 queue.put(json.dumps(event_data))
 
             logger.info(
-                f"Sent {event_type} event to {len(event_queues[doc_id_str])} clients for document {documento_id}"
+                f"Sent {event_type} event to {len(event_queues[doc_id_str])} clients for document {id_documento}"
+            )
+
+
+def notify_generation_progress(
+    id_documento, id_proceso, chunk=None, is_complete=False, error=None
+):
+    """Send a generation progress event to clients"""
+    doc_id_str = str(id_documento)
+
+    with connections_lock:
+        if doc_id_str in event_queues:
+            event_type = "generation_complete" if is_complete else "generation_chunk"
+            if error:
+                event_type = "generation_error"
+
+            event_data = {
+                "event": event_type,
+                "id_documento": id_documento,  # Changed from documento_id
+                "id_proceso": id_proceso,  # Changed from processing_id
+                "timestamp": datetime.now().isoformat(),
+            }
+
+            if chunk:
+                event_data["chunk"] = chunk
+
+            if error:
+                event_data["error"] = error
+
+            for queue in event_queues[doc_id_str]:
+                queue.put(json.dumps(event_data))
+
+            logger.info(
+                f"Sent {event_type} event for processing job {id_proceso} to {len(event_queues[doc_id_str])} clients"
             )
 
 
@@ -65,8 +107,8 @@ def generate_sse_token(request, documento_id: int):
         # Generate a short-lived token (5 minutes)
         token = jwt.encode(
             {
-                "documento_id": documento_id,
-                "user_id": doctor.id,
+                "id_documento": documento_id,  # Changed from documento_id
+                "id_usuario": doctor.id,  # Changed from user_id
                 "exp": datetime.utcnow() + timedelta(minutes=5),
                 "purpose": "sse_connection",
             },
@@ -99,12 +141,12 @@ def validate_sse_token(token: str, documento_id: int):
             return False, None, "Invalid token purpose"
 
         # Check document ID
-        token_doc_id = payload.get("documento_id")
+        token_doc_id = payload.get("id_documento")  # Changed from documento_id
         if token_doc_id is None or int(token_doc_id) != documento_id:
             return False, None, "Token doesn't match requested document"
 
         # Get user ID
-        user_id = payload.get("user_id")
+        user_id = payload.get("id_usuario")  # Changed from user_id
         if not user_id:
             return False, None, "Missing user ID in token"
 

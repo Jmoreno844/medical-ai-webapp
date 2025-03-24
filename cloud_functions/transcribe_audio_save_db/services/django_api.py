@@ -34,14 +34,14 @@ def get_api_auth_token():
 
 
 def notify_transcription_complete(
-    document_id: int, auth_token: Optional[str] = None
+    id_documento: int, token_auth: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Notify Django that transcription is complete.
 
     Args:
-        document_id: The ID of the document that was transcribed
-        auth_token: Authentication token for the Django API
+        id_documento: The ID of the document that was transcribed
+        token_auth: Authentication token for the Django API
 
     Returns:
         Dictionary containing the API response or error information
@@ -50,38 +50,38 @@ def notify_transcription_complete(
     api_url = f"{base_url}/notify/transcription-complete"
 
     # Get auth token from parameter or environment
-    if not auth_token:
-        auth_token = get_api_auth_token()
+    if not token_auth:
+        token_auth = get_api_auth_token()
 
     # Prepare headers with token
     headers = {
         "Content-Type": "application/json",
     }
 
-    if auth_token:
+    if token_auth:
         if (
-            "." in auth_token
-            and len(auth_token.split(".")) == 3
-            and not auth_token.startswith("Bearer ")
+            "." in token_auth
+            and len(token_auth.split(".")) == 3
+            and not token_auth.startswith("Bearer ")
         ):
-            headers["Authorization"] = f"Bearer {auth_token}"
+            headers["Authorization"] = f"Bearer {token_auth}"
         else:
-            headers["Authorization"] = auth_token
+            headers["Authorization"] = token_auth
 
     # Prepare payload
     payload = {
-        "documento_id": document_id,
+        "id_documento": id_documento,  # Changed from documento_id
         "status": "complete",
     }
 
-    logger.info(f"Notifying transcription completion for document {document_id}")
+    logger.info(f"Notifying transcription completion for document {id_documento}")
 
     try:
         response = requests.post(api_url, json=payload, headers=headers, timeout=15)
         response.raise_for_status()
 
         logger.info(
-            f"Successfully notified about document {document_id} transcription completion"
+            f"Successfully notified about document {id_documento} transcription completion"
         )
         return {
             "success": True,
@@ -94,43 +94,43 @@ def notify_transcription_complete(
 
 
 def update_document_content(
-    document_id: int, content: str, auth_token: Optional[str] = None
+    id_documento: int, content: str, token_auth: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Update a document's content in the Django API.
 
     Args:
-        document_id: The ID of the document to update
+        id_documento: The ID of the document to update
         content: The new content (summary) to save
-        auth_token: Authentication token for the Django API (overrides env var if provided)
+        token_auth: Authentication token for the Django API (overrides env var if provided)
 
     Returns:
         Dictionary containing the API response or error information
     """
-    # Validate document_id
+    # Validate id_documento
     try:
-        document_id = int(document_id)
-        if document_id <= 0:
+        id_documento = int(id_documento)
+        if id_documento <= 0:
             error_msg = (
-                f"Invalid document_id: {document_id}. Must be a positive integer."
+                f"Invalid id_documento: {id_documento}. Must be a positive integer."
             )
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
     except (TypeError, ValueError) as e:
-        error_msg = f"Invalid document_id format: {document_id}. Error: {str(e)}"
+        error_msg = f"Invalid id_documento format: {id_documento}. Error: {str(e)}"
         logger.error(error_msg)
         return {"success": False, "error": error_msg}
 
     base_url = get_api_base_url()
-    api_url = f"{base_url}/documento_by_function/{document_id}"
+    api_url = f"{base_url}/documento_by_function/{id_documento}"
 
     # More detailed debugging for auth token
-    if auth_token:
+    if token_auth:
         logger.info(
-            f"Received auth token in update_document_content (length: {len(auth_token)})"
+            f"Received auth token in update_document_content (length: {len(token_auth)})"
         )
         # Check if token looks like JWT (format: xxx.yyy.zzz)
-        if "." in auth_token and len(auth_token.split(".")) == 3:
+        if "." in token_auth and len(token_auth.split(".")) == 3:
             logger.info("Token appears to be in JWT format")
         else:
             logger.warning(
@@ -138,8 +138,8 @@ def update_document_content(
             )
     else:
         logger.warning("No auth token provided to update_document_content function")
-        auth_token = get_api_auth_token()
-        if auth_token:
+        token_auth = get_api_auth_token()
+        if token_auth:
             logger.info("Using fallback token from environment")
         else:
             logger.error(
@@ -152,18 +152,18 @@ def update_document_content(
     }
 
     # Improved token handling logic
-    if auth_token:
+    if token_auth:
         # For JWT tokens, always use Bearer format
-        if "." in auth_token and len(auth_token.split(".")) == 3:
-            if not auth_token.startswith("Bearer "):
-                headers["Authorization"] = f"Bearer {auth_token}"
+        if "." in token_auth and len(token_auth.split(".")) == 3:
+            if not token_auth.startswith("Bearer "):
+                headers["Authorization"] = f"Bearer {token_auth}"
                 logger.info("Added 'Bearer' prefix to JWT token")
             else:
-                headers["Authorization"] = auth_token
+                headers["Authorization"] = token_auth
                 logger.info("Using JWT token with existing Bearer prefix")
         else:
             # For non-JWT tokens, use as-is
-            headers["Authorization"] = auth_token
+            headers["Authorization"] = token_auth
             logger.info("Using non-JWT token as-is")
 
         logger.info(
@@ -175,7 +175,7 @@ def update_document_content(
     # Prepare payload
     payload = {"contenido": content}
 
-    logger.info(f"Making API call to update document {document_id}")
+    logger.info(f"Making API call to update document {id_documento}")
     logger.info(f"API URL: {api_url}")
 
     try:
@@ -201,10 +201,10 @@ def update_document_content(
         except json.JSONDecodeError:
             response_data = {"raw_response": response.text}
 
-        logger.info(f"Document {document_id} updated successfully")
+        logger.info(f"Document {id_documento} updated successfully")
 
         # After successful update, notify transcription completion
-        notify_result = notify_transcription_complete(document_id, auth_token)
+        notify_result = notify_transcription_complete(id_documento, token_auth)
         if not notify_result["success"]:
             logger.warning(
                 f"Failed to send completion notification: {notify_result.get('error')}"
@@ -218,14 +218,14 @@ def update_document_content(
         }
 
     except requests.exceptions.ConnectionError as e:
-        error_msg = f"Connection error while updating document {document_id}: {str(e)}"
+        error_msg = f"Connection error while updating document {id_documento}: {str(e)}"
         logger.error(
             f"{error_msg}. Check if Django server is running and accessible at {api_url}"
         )
         return {"success": False, "error": error_msg}
 
     except requests.exceptions.RequestException as e:
-        error_msg = f"Error updating document {document_id}: {str(e)}"
+        error_msg = f"Error updating document {id_documento}: {str(e)}"
         logger.error(error_msg)
 
         # Try to get status code and response details
@@ -243,8 +243,8 @@ def update_document_content(
             logger.error(
                 "🔐 Authentication failed (401 Unauthorized) - Check your token!"
             )
-            if auth_token:
-                logger.error(f"Token used (first 10 chars): {auth_token[:10]}...")
+            if token_auth:
+                logger.error(f"Token used (first 10 chars): {token_auth[:10]}...")
             if response_text:
                 logger.error(f"Response from server: {response_text}")
 
@@ -258,6 +258,87 @@ def update_document_content(
         return {"success": False, "error": error_msg, "status_code": status_code}
 
     except Exception as e:
-        error_msg = f"Unexpected error updating document {document_id}: {str(e)}"
+        error_msg = f"Unexpected error updating document {id_documento}: {str(e)}"
         logger.error(error_msg, exc_info=True)
         return {"success": False, "error": error_msg}
+
+
+def send_generation_chunk(
+    id_documento: int,
+    id_proceso: str,
+    chunk: Optional[str] = None,
+    is_complete: bool = False,
+    is_error: bool = False,
+    error: Optional[str] = None,
+    token_auth: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Send a chunk of generated content to the Django API.
+
+    Args:
+        id_documento: The ID of the document being processed
+        id_proceso: The ID of the processing job
+        chunk: The content chunk to send
+        is_complete: Whether this is the final chunk
+        is_error: Whether an error occurred
+        error: Error message (if is_error is True)
+        token_auth: Authentication token for the Django API
+
+    Returns:
+        Dictionary containing the API response or error information
+    """
+    base_url = get_api_base_url()
+    api_url = f"{base_url}/document/generation-chunk"
+
+    # Get auth token from parameter or environment
+    if not token_auth:
+        token_auth = get_api_auth_token()
+        if not token_auth:
+            return {"success": False, "error": "No authentication token available"}
+
+    # Prepare headers with token
+    headers = {"Content-Type": "application/json"}
+
+    # Set Authorization header
+    if token_auth:
+        if (
+            "." in token_auth
+            and len(token_auth.split(".")) == 3
+            and not token_auth.startswith("Bearer ")
+        ):
+            headers["Authorization"] = f"Bearer {token_auth}"
+        else:
+            headers["Authorization"] = token_auth
+
+    # Prepare payload
+    payload = {
+        "id_documento": id_documento,  # Changed from document_id
+        "id_proceso": id_proceso,  # Changed from processing_id
+        "chunk": chunk,
+        "is_complete": is_complete,
+        "is_error": is_error,
+    }
+
+    if is_error and error:
+        payload["error"] = error
+
+    logger.debug(
+        f"Sending generation chunk for document {id_documento}, job {id_proceso}"
+    )
+
+    try:
+        response = requests.post(api_url, json=payload, headers=headers, timeout=10)
+        response.raise_for_status()
+
+        logger.debug(f"Successfully sent chunk for document {id_documento}")
+        return {
+            "success": True,
+            "status_code": response.status_code,
+            "response": response.json() if response.text else {},
+        }
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error sending generation chunk: {str(e)}")
+        return {"success": False, "error": str(e)}
+    except Exception as e:
+        logger.error(f"Unexpected error sending chunk: {str(e)}")
+        return {"success": False, "error": str(e)}

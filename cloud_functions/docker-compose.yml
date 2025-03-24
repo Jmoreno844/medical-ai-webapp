@@ -26,7 +26,10 @@ services:
       - "8083:8083"
     environment:
       - ENVIRONMENT=local
-      - FUNCTION_TARGET=document_generation_endpoint
+      - GEMINI_MODEL=gemini-2.0-flash # Added missing GEMINI_MODEL
+      - GCP_PROJECT=medical-ai-web-app # Added GCP project ID
+      - GCP_REGION=us-east1 # Added GCP region
+      - FUNCTION_TARGET=generate_document_workflow
       - PORT=8083 # Different port here
     env_file:
       - ./transcribe_audio_save_db/.env.local

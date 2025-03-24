@@ -59,6 +59,13 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
         openGenerationModal,
         closeGenerationModal,
         generateDocumentation,
+        plantillas,
+        isLoadingPlantillas,
+        plantillasError,
+        selectedPlantillaId,
+        setSelectedPlantillaId,
+        searchQuery,
+        setSearchQuery,
     } = useDocumentGeneration({
         documents,
         encounterId,
@@ -218,6 +225,13 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
                 onGenerate={generateDocumentation}
                 isGenerating={isGenerating}
                 error={generationError}
+                plantillas={plantillas}
+                isLoadingPlantillas={isLoadingPlantillas}
+                plantillasError={plantillasError}
+                selectedPlantillaId={selectedPlantillaId}
+                setSelectedPlantillaId={setSelectedPlantillaId}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
             />
         </div>
     );

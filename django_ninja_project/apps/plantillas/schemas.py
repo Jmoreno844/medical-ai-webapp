@@ -20,9 +20,6 @@ class PlantillaDoctorResponse(Schema):
     contenido: Optional[str]
     contenido_base: bool
     id_plantilla_base: Optional[int]
-    fecha_creacion: str
-    veces_usada: Optional[int] = 0
-    ultimo_uso: Optional[str] = None
 
 
 class PlantillaDoctorListItem(Schema):
@@ -34,3 +31,11 @@ class PlantillaDoctorListItem(Schema):
     veces_usada: Optional[int] = 0
     ultimo_uso: Optional[str] = None
     es_base: bool
+
+
+class PlantillaDoctorUpdate(Schema):
+    """Schema for updating a doctor's template"""
+
+    nombre: str
+    tipo_documento: str
+    contenido: str

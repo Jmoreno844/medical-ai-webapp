@@ -13,6 +13,18 @@ export interface Plantilla {
 export interface NewPlantilla {
     nombre: string;
     tipo_documento: string;
+    contenido?: string;
+    contenido_base?: boolean;
+    id_plantilla_base?: number | null;
+}
+
+export interface PlantillaDetalle {
+    id: number;
+    nombre: string;
+    tipo_documento: string;
+    contenido: string | null;
+    contenido_base: boolean;
+    id_plantilla_base: number | null;
 }
 
 export function usePlantillas() {
@@ -31,6 +43,15 @@ export function usePlantillas() {
     const [currentPlantilla, setCurrentPlantilla] = useState<Plantilla | null>(
         null
     );
+
+    // Plantilla details states
+    const [currentPlantillaDetails, setCurrentPlantillaDetails] =
+        useState<PlantillaDetalle | null>(null);
+    const [loadingPlantillaDetails, setLoadingPlantillaDetails] =
+        useState(false);
+    const [plantillaDetailsError, setPlantillaDetailsError] = useState<
+        string | null
+    >(null);
 
     const fetchPlantillas = useCallback(async () => {
         setLoading(true);
@@ -72,8 +93,31 @@ export function usePlantillas() {
         setIsCreateModalOpen(true);
     };
 
-    const openEditModal = (plantilla: Plantilla) => {
+    const fetchPlantillaDetails = useCallback(async (id_plantilla: number) => {
+        setLoadingPlantillaDetails(true);
+        setPlantillaDetailsError(null);
+
+        try {
+            const response = await axiosInstance.get(
+                `/api/plantilla_doctor/${id_plantilla}`
+            );
+            setCurrentPlantillaDetails(response.data);
+            return response.data;
+        } catch (error) {
+            console.error("Error fetching plantilla details:", error);
+            setPlantillaDetailsError(
+                "No se pudo cargar el contenido de la plantilla"
+            );
+            return null;
+        } finally {
+            setLoadingPlantillaDetails(false);
+        }
+    }, []);
+
+    const openEditModal = async (plantilla: Plantilla) => {
         setCurrentPlantilla(plantilla);
+        // Fetch details when opening edit modal
+        await fetchPlantillaDetails(plantilla.id);
         setIsEditModalOpen(true);
     };
 
@@ -87,11 +131,13 @@ export function usePlantillas() {
         setIsEditModalOpen(false);
         setIsDeleteModalOpen(false);
         setCurrentPlantilla(null);
+        setCurrentPlantillaDetails(null);
     };
 
     const createPlantilla = async (newPlantilla: NewPlantilla) => {
         try {
-            await axiosInstance.post("/api/plantillas", newPlantilla);
+            // This endpoint should accept all the fields we're sending
+            await axiosInstance.post("/api/plantilla_doctor", newPlantilla);
             await fetchPlantillas();
             closeModals();
             return true;
@@ -102,11 +148,14 @@ export function usePlantillas() {
     };
 
     const updatePlantilla = async (
-        id: number,
+        id_plantilla: number,
         updatedData: Partial<NewPlantilla>
     ) => {
         try {
-            await axiosInstance.put(`/api/plantillas/${id}`, updatedData);
+            await axiosInstance.patch(
+                `/api/plantilla_doctor/${id_plantilla}`,
+                updatedData
+            );
             await fetchPlantillas();
             closeModals();
             return true;
@@ -116,9 +165,9 @@ export function usePlantillas() {
         }
     };
 
-    const deletePlantilla = async (id: number) => {
+    const deletePlantilla = async (id_plantilla: number) => {
         try {
-            await axiosInstance.delete(`/api/plantillas/${id}`);
+            await axiosInstance.delete(`/api/plantillas/${id_plantilla}`);
             await fetchPlantillas();
             closeModals();
             return true;
@@ -138,6 +187,9 @@ export function usePlantillas() {
         isEditModalOpen,
         isDeleteModalOpen,
         currentPlantilla,
+        currentPlantillaDetails,
+        loadingPlantillaDetails,
+        plantillaDetailsError,
         openCreateModal,
         openEditModal,
         openDeleteModal,
@@ -145,5 +197,6 @@ export function usePlantillas() {
         createPlantilla,
         updatePlantilla,
         deletePlantilla,
+        fetchPlantillaDetails,
     };
 }

@@ -1,6 +1,16 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { DocumentoOut } from "@/types/documento";
 import axiosInstance from "@/utils/axiosInstance";
+
+interface Plantilla {
+    id: number;
+    nombre: string;
+    tipo_documento: string;
+    fecha_creacion: string;
+    es_base: boolean;
+    veces_usada: number;
+    ultimo_uso: string | null;
+}
 
 interface UseDocumentGenerationProps {
     documents: DocumentoOut[];
@@ -17,6 +27,42 @@ export function useDocumentGeneration({
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Template related state
+    const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
+    const [isLoadingPlantillas, setIsLoadingPlantillas] = useState(false);
+    const [plantillasError, setPlantillasError] = useState<string | null>(null);
+    const [selectedPlantillaId, setSelectedPlantillaId] = useState<
+        number | null
+    >(null);
+    const [searchQuery, setSearchQuery] = useState("");
+
+    // Fetch plantillas when modal opens
+    useEffect(() => {
+        if (isModalOpen) {
+            fetchPlantillas();
+        }
+    }, [isModalOpen]);
+
+    const fetchPlantillas = useCallback(async () => {
+        try {
+            setIsLoadingPlantillas(true);
+            setPlantillasError(null);
+
+            const response = await axiosInstance.get("/api/plantillas_short");
+            setPlantillas(response.data || []);
+
+            // Select first template by default if available
+            if (response.data && response.data.length > 0) {
+                setSelectedPlantillaId(response.data[0].id);
+            }
+        } catch (err) {
+            console.error("❌ Error al cargar plantillas:", err);
+            setPlantillasError("No se pudieron cargar las plantillas");
+        } finally {
+            setIsLoadingPlantillas(false);
+        }
+    }, []);
+
     const openGenerationModal = useCallback(() => {
         setIsModalOpen(true);
         setError(null);
@@ -24,6 +70,7 @@ export function useDocumentGeneration({
 
     const closeGenerationModal = useCallback(() => {
         setIsModalOpen(false);
+        setSearchQuery("");
     }, []);
 
     const createNewDocument = useCallback(async () => {
@@ -50,6 +97,10 @@ export function useDocumentGeneration({
 
     const generateDocumentation = useCallback(async () => {
         try {
+            if (!selectedPlantillaId) {
+                throw new Error("Por favor seleccione una plantilla");
+            }
+
             setIsGenerating(true);
             setError(null);
 
@@ -76,6 +127,7 @@ export function useDocumentGeneration({
             console.log("🚀 Generando documentación con IDs:", {
                 idTranscripcion: transcriptionDoc.id,
                 idContexto: contextDoc.id,
+                idPlantilla: selectedPlantillaId,
             });
 
             // Mock API call for now
@@ -98,7 +150,14 @@ export function useDocumentGeneration({
         } finally {
             setIsGenerating(false);
         }
-    }, [documents, createNewDocument]);
+    }, [documents, createNewDocument, selectedPlantillaId]);
+
+    // Filter plantillas based on search query
+    const filteredPlantillas = searchQuery
+        ? plantillas.filter((p) =>
+              p.nombre.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+        : plantillas;
 
     return {
         isModalOpen,
@@ -107,5 +166,12 @@ export function useDocumentGeneration({
         openGenerationModal,
         closeGenerationModal,
         generateDocumentation,
+        plantillas: filteredPlantillas,
+        isLoadingPlantillas,
+        plantillasError,
+        selectedPlantillaId,
+        setSelectedPlantillaId,
+        searchQuery,
+        setSearchQuery,
     };
 }

@@ -6,13 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-} from "@/components/ui/dialog";
-import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -28,6 +21,7 @@ import {
     Trash2,
     Loader2,
 } from "lucide-react";
+import { PlantillaModal } from "./subcomponents/PlantillaModal";
 
 export default function PlantillasPage() {
     const {
@@ -40,6 +34,9 @@ export default function PlantillasPage() {
         isEditModalOpen,
         isDeleteModalOpen,
         currentPlantilla,
+        currentPlantillaDetails,
+        loadingPlantillaDetails,
+        plantillaDetailsError,
         openCreateModal,
         openEditModal,
         openDeleteModal,
@@ -49,51 +46,46 @@ export default function PlantillasPage() {
         deletePlantilla,
     } = usePlantillas();
 
-    const [newPlantilla, setNewPlantilla] = useState<NewPlantilla>({
-        nombre: "",
-        tipo_documento: "documento",
-    });
-
-    const [editingPlantilla, setEditingPlantilla] = useState<
-        Partial<NewPlantilla>
-    >({
-        nombre: "",
-        tipo_documento: "",
-    });
-
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleCreateSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleCreateSubmit = async (data: NewPlantilla) => {
         setIsSubmitting(true);
-        await createPlantilla(newPlantilla);
-        setNewPlantilla({ nombre: "", tipo_documento: "documento" });
+        await createPlantilla(data);
         setIsSubmitting(false);
     };
 
-    const handleEditSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleEditSubmit = async (
+        data: Partial<NewPlantilla>,
+        isBaseCopy: boolean = false
+    ) => {
         if (!currentPlantilla) return;
 
         setIsSubmitting(true);
-        await updatePlantilla(currentPlantilla.id, editingPlantilla);
+
+        if (isBaseCopy) {
+            // Create a copy of the base template
+            const newTemplateData: NewPlantilla = {
+                nombre: data.nombre || "", // Ensure it's not undefined
+                tipo_documento: data.tipo_documento || "documento", // Ensure it's not undefined
+                contenido: data.contenido,
+                contenido_base: false,
+                id_plantilla_base: currentPlantilla.id,
+            };
+
+            await createPlantilla(newTemplateData);
+        } else {
+            // Normal update for non-base templates
+            await updatePlantilla(currentPlantilla.id, data);
+        }
+
         setIsSubmitting(false);
     };
 
     const handleDeleteConfirm = async () => {
         if (!currentPlantilla) return;
-
-        setIsSubmitting(true);
+        setIsSubmitting(true); // Fixed missing opening parenthesis
         await deletePlantilla(currentPlantilla.id);
         setIsSubmitting(false);
-    };
-
-    const handleOpenEditModal = (plantilla: Plantilla) => {
-        setEditingPlantilla({
-            nombre: plantilla.nombre,
-            tipo_documento: plantilla.tipo_documento,
-        });
-        openEditModal(plantilla);
     };
 
     const formatDate = (dateString: string | null) => {
@@ -183,9 +175,7 @@ export default function PlantillasPage() {
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuItem
                                                 onClick={() =>
-                                                    handleOpenEditModal(
-                                                        plantilla
-                                                    )
+                                                    openEditModal(plantilla)
                                                 }
                                                 className="flex items-center gap-2 cursor-pointer"
                                             >
@@ -211,188 +201,43 @@ export default function PlantillasPage() {
             )}
 
             {/* Create Modal */}
-            <Dialog
-                open={isCreateModalOpen}
-                onOpenChange={(open) => !open && closeModals()}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Crear nueva plantilla</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateSubmit}>
-                        <div className="space-y-4 py-4">
-                            <div>
-                                <label
-                                    htmlFor="nombre"
-                                    className="block text-sm font-medium mb-1"
-                                >
-                                    Nombre
-                                </label>
-                                <Input
-                                    id="nombre"
-                                    value={newPlantilla.nombre}
-                                    onChange={(e) =>
-                                        setNewPlantilla({
-                                            ...newPlantilla,
-                                            nombre: e.target.value,
-                                        })
-                                    }
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label
-                                    htmlFor="tipo"
-                                    className="block text-sm font-medium mb-1"
-                                >
-                                    Tipo de documento
-                                </label>
-                                <select
-                                    id="tipo"
-                                    value={newPlantilla.tipo_documento}
-                                    onChange={(e) =>
-                                        setNewPlantilla({
-                                            ...newPlantilla,
-                                            tipo_documento: e.target.value,
-                                        })
-                                    }
-                                    className="w-full border border-gray-300 rounded-md p-2"
-                                    required
-                                >
-                                    <option value="documento">Documento</option>
-                                    <option value="receta">Receta</option>
-                                    <option value="informe">Informe</option>
-                                </select>
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button
-                                variant="outline"
-                                type="button"
-                                onClick={closeModals}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting && (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                )}
-                                Crear
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            <PlantillaModal
+                isOpen={isCreateModalOpen}
+                onClose={closeModals}
+                modalType="create"
+                currentPlantilla={null}
+                currentPlantillaDetails={null}
+                loadingPlantillaDetails={false}
+                plantillaDetailsError={null}
+                onSubmit={handleCreateSubmit}
+                isSubmitting={isSubmitting}
+            />
 
             {/* Edit Modal */}
-            <Dialog
-                open={isEditModalOpen}
-                onOpenChange={(open) => !open && closeModals()}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Editar plantilla</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleEditSubmit}>
-                        <div className="space-y-4 py-4">
-                            <div>
-                                <label
-                                    htmlFor="edit-nombre"
-                                    className="block text-sm font-medium mb-1"
-                                >
-                                    Nombre
-                                </label>
-                                <Input
-                                    id="edit-nombre"
-                                    value={editingPlantilla.nombre}
-                                    onChange={(e) =>
-                                        setEditingPlantilla({
-                                            ...editingPlantilla,
-                                            nombre: e.target.value,
-                                        })
-                                    }
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label
-                                    htmlFor="edit-tipo"
-                                    className="block text-sm font-medium mb-1"
-                                >
-                                    Tipo de documento
-                                </label>
-                                <select
-                                    id="edit-tipo"
-                                    value={editingPlantilla.tipo_documento}
-                                    onChange={(e) =>
-                                        setEditingPlantilla({
-                                            ...editingPlantilla,
-                                            tipo_documento: e.target.value,
-                                        })
-                                    }
-                                    className="w-full border border-gray-300 rounded-md p-2"
-                                    required
-                                >
-                                    <option value="documento">Documento</option>
-                                    <option value="receta">Receta</option>
-                                    <option value="informe">Informe</option>
-                                </select>
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button
-                                variant="outline"
-                                type="button"
-                                onClick={closeModals}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting && (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                )}
-                                Guardar cambios
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            <PlantillaModal
+                isOpen={isEditModalOpen}
+                onClose={closeModals}
+                modalType="edit"
+                currentPlantilla={currentPlantilla}
+                currentPlantillaDetails={currentPlantillaDetails}
+                loadingPlantillaDetails={loadingPlantillaDetails}
+                plantillaDetailsError={plantillaDetailsError}
+                onSubmit={handleEditSubmit}
+                isSubmitting={isSubmitting}
+            />
 
             {/* Delete Modal */}
-            <Dialog
-                open={isDeleteModalOpen}
-                onOpenChange={(open) => !open && closeModals()}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Eliminar plantilla</DialogTitle>
-                    </DialogHeader>
-                    <div className="py-4">
-                        <p>
-                            ¿Estás seguro de que quieres eliminar la plantilla "
-                            {currentPlantilla?.nombre}"?
-                        </p>
-                        <p className="text-sm text-gray-500 mt-2">
-                            Esta acción no se puede deshacer.
-                        </p>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={closeModals}>
-                            Cancelar
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={handleDeleteConfirm}
-                            disabled={isSubmitting}
-                        >
-                            {isSubmitting && (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            )}
-                            Eliminar
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <PlantillaModal
+                isOpen={isDeleteModalOpen}
+                onClose={closeModals}
+                modalType="delete"
+                currentPlantilla={currentPlantilla}
+                currentPlantillaDetails={null}
+                loadingPlantillaDetails={false}
+                plantillaDetailsError={null}
+                onSubmit={handleDeleteConfirm}
+                isSubmitting={isSubmitting}
+            />
         </div>
     );
 }
