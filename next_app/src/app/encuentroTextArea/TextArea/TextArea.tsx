@@ -255,14 +255,70 @@ const TextArea: React.FC<TextAreaProps> = ({
                 </div>
             )}
 
-            {/* Add streaming indicator when content is being streamed */}
+            {/* Enhanced streaming indicator when content is being streamed */}
             {streamingContent !== undefined && (
-                <div className="bg-purple-100 p-1 text-center text-purple-600 text-xs flex justify-center items-center">
-                    <span className="mr-1">📝</span>
-                    Contenido generándose en tiempo real (
-                    {streamingContent.length} caracteres)
+                <div className="bg-purple-100 p-2 border-b border-purple-200">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                            <div className="animate-pulse h-3 w-3 rounded-full bg-purple-500 mr-2"></div>
+                            <span className="text-purple-800 font-medium">
+                                Generando documento...
+                            </span>
+                        </div>
+                        <div className="text-purple-600 text-sm">
+                            {streamingContent.length} caracteres
+                        </div>
+                    </div>
+
+                    {generationStatus?.error && (
+                        <div className="mt-2 p-2 bg-red-100 text-red-700 rounded text-sm">
+                            <strong>Error:</strong> {generationStatus.error}
+                        </div>
+                    )}
                 </div>
             )}
+
+            {/* Add a progress bar for better visual feedback */}
+            {streamingContent !== undefined && (
+                <div className="h-1 w-full bg-purple-200">
+                    <div
+                        className="h-1 bg-purple-600 transition-all duration-300"
+                        style={{
+                            width: `${Math.min(
+                                Math.max(
+                                    (streamingContent.length / 500) * 100,
+                                    10
+                                ),
+                                95
+                            )}%`,
+                        }}
+                    />
+                </div>
+            )}
+
+            {/* Add completion indicator when generation is complete */}
+            {!streamingContent &&
+                generationStatus?.isComplete &&
+                generationStatus?.documentId === document.id && (
+                    <div className="bg-green-100 p-2 border-b border-green-200 text-green-800">
+                        <div className="flex items-center">
+                            <svg
+                                className="h-4 w-4 mr-2"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                            >
+                                <path
+                                    fillRule="evenodd"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    clipRule="evenodd"
+                                />
+                            </svg>
+                            <span className="font-medium">
+                                Documento generado exitosamente
+                            </span>
+                        </div>
+                    </div>
+                )}
 
             {/* Cache status indicator (for debugging) */}
             {!showLoading && isFromCache && (

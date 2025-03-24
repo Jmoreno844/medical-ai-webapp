@@ -10,6 +10,8 @@ services:
     environment:
       - ENVIRONMENT=local
       - GEMINI_MODEL=gemini-2.0-flash
+      - GCP_PROJECT=medical-ai-web-app # Added GCP project ID
+      - GCP_REGION=us-east1 # Added GCP region
       - FUNCTION_TARGET=transcription_endpoint
       - PORT=8082 # Explicitly set port
     env_file:

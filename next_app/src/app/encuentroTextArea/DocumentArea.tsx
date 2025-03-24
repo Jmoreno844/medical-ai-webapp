@@ -294,7 +294,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
                 </div>
             )}
 
-            {/* Document Generation Modal */}
+            {/* Document Generation Modal - now with updated props */}
             <DocumentGenerationModal
                 isOpen={isModalOpen}
                 onClose={closeGenerationModal}

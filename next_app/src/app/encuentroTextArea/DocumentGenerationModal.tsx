@@ -1,6 +1,5 @@
 import React from "react";
 import Modal from "@/components/Modal";
-import { DocumentGenerationProgress } from "./components/DocumentGenerationProgress";
 
 interface Plantilla {
     id: number;
@@ -46,7 +45,6 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
     setSelectedPlantillaId,
     searchQuery,
     setSearchQuery,
-    generationStatus,
 }) => {
     return (
         <Modal
@@ -167,31 +165,6 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
                         )}
                     </div>
                 </div>
-
-                {isGenerating && (
-                    <div className="flex items-center justify-center space-x-2">
-                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-600"></div>
-                        <span className="text-blue-600 font-medium">
-                            Generando documentación...
-                        </span>
-                    </div>
-                )}
-
-                {error && !generationStatus?.error && (
-                    <div className="bg-red-50 p-3 rounded-md border border-red-200">
-                        <p className="text-red-700 text-sm">{error}</p>
-                    </div>
-                )}
-
-                {/* Show generation progress if available */}
-                {generationStatus && (
-                    <DocumentGenerationProgress
-                        isGenerating={generationStatus.inProgress}
-                        content={generationStatus.content}
-                        isComplete={generationStatus.isComplete}
-                        error={generationStatus.error}
-                    />
-                )}
             </div>
         </Modal>
     );

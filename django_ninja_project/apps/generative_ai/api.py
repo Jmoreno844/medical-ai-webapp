@@ -2,7 +2,7 @@ from ninja import Router, File, UploadedFile, Body
 from ninja.security import django_auth
 from ninja.errors import HttpError
 from ninja.responses import Response
-from .schemas import AudioDownloadResponse
+from .schemas import AudioDownloadResponse, TranscriptionRequest, TranscriptionResponse
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.http import Http404
@@ -102,41 +102,40 @@ def authorize_transcription(request, documento_id: int):
         return {"success": False, "error": "Documento no encontrado"}
 
 
-@router.post("/iniciar_transcripcion", auth=django_auth)
-def iniciar_transcripcion(request, payload: Dict[str, Any] = Body(...)):
+@router.post("/iniciar_transcripcion", response=TranscriptionResponse, auth=django_auth)
+def iniciar_transcripcion(request, payload: TranscriptionRequest):
     """
-    Combined endpoint that processes audio and document authorization
-    and calls the cloud function for transcription
-    """
-    # Extract the IDs from the payload
-    encuentro_id = payload.get("encuentro_id")
-    documento_id = payload.get("documento_id")
+    Initiate transcription of an audio file for a document
 
-    if not encuentro_id or not documento_id:
-        return {
-            "success": False,
-            "error": "Both encuentro_id and documento_id are required",
-        }
+    1. Validates user permissions for both encounter and document
+    2. Gets audio file URI from the encounter
+    3. Generates authorization token
+    4. Calls the cloud function for transcription
+    """
+    # Extract the IDs from the payload using proper schema
+    encuentro_id = payload.id_encuentro
+    documento_id = payload.id_documento
 
     try:
         # Verify encounter permissions and get audio URI
         encuentro = get_object_or_404(Encuentro, id=encuentro_id)
         if request.user.id != encuentro.id_medico.id:
             logger.warning(f"Not authorized for encounter {encuentro_id}")
-            return {"success": False, "error": "Not authorized for this encounter"}
+            return TranscriptionResponse(
+                success=False, error="Not authorized for this encounter"
+            )
 
         # Check if audio exists
         if not encuentro.audio_file_name:
             logger.warning(f"No audio file for encounter {encuentro_id}")
-            return {
-                "success": False,
-                "error": "No audio file associated with this encounter",
-            }
+            return TranscriptionResponse(
+                success=False, error="No audio file associated with this encounter"
+            )
 
         # Check if audio has expired
         if encuentro.is_audio_expired():
             logger.warning(f"Audio file expired for encounter {encuentro_id}")
-            return {"success": False, "error": "Audio file has expired"}
+            return TranscriptionResponse(success=False, error="Audio file has expired")
 
         # Generate GCS URI
         bucket_name = settings.GCS_BUCKET_NAME
@@ -150,24 +149,25 @@ def iniciar_transcripcion(request, payload: Dict[str, Any] = Body(...)):
             logger.warning(
                 f"Permission denied: documento doctor {documento.id_medico.id} != requesting doctor {request.user.id}"
             )
-            return {
-                "success": False,
-                "error": "No tienes permiso para acceder a este documento",
-            }
+            return TranscriptionResponse(
+                success=False, error="No tienes permiso para acceder a este documento"
+            )
 
         # Generate JWT token
-        payload = {
+        token_payload = {
             "user_id": request.user.id,
             "document_id": documento_id,
             "exp": datetime.utcnow() + timedelta(minutes=15),
             "purpose": "transcription",
         }
 
-        auth_token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
+        auth_token = jwt.encode(
+            token_payload, settings.JWT_SECRET_KEY, algorithm="HS256"
+        )
 
         # Prepare cloud function request payload
         cloud_function_payload = {
-            "document_id": documento_id,
+            "id_documento": documento_id,
             "audio_uri": audio_uri,
             "auth_token": auth_token,
         }
@@ -180,17 +180,18 @@ def iniciar_transcripcion(request, payload: Dict[str, Any] = Body(...)):
             logger.info(
                 f"Transcription initiated for document {documento_id} with encounter {encuentro_id}"
             )
-            return {"success": True, "message": "Transcription initiated successfully"}
+            return TranscriptionResponse(
+                success=True, message="Transcription initiated successfully"
+            )
         except requests.RequestException as e:
             logger.error(f"Error calling transcription cloud function: {str(e)}")
-            return {
-                "success": False,
-                "error": f"Failed to initiate transcription: {str(e)}",
-            }
+            return TranscriptionResponse(
+                success=False, error=f"Failed to initiate transcription: {str(e)}"
+            )
 
     except Http404 as e:
         logger.error(f"Resource not found: {str(e)}")
-        return {"success": False, "error": "Resource not found"}
+        return TranscriptionResponse(success=False, error="Resource not found")
     except Exception as e:
         logger.error(f"Error in iniciar_transcripcion: {str(e)}")
-        return {"success": False, "error": str(e)}
+        return TranscriptionResponse(success=False, error=str(e))
