@@ -184,3 +184,34 @@ def get_documento_content(request, documento_id: int):
         return {"contenido": documento.contenido}
     except Http404:
         raise HttpError(404, "Documento no encontrado")
+
+
+@router.delete("/documento/{documento_id}", response=SuccessResponse, auth=django_auth)
+def delete_documento(request, documento_id: int):
+    """
+    Delete a document by ID.
+    """
+    doctor = request.user
+
+    try:
+        # Get the document and verify it exists
+        documento = get_object_or_404(Documento, id=documento_id)
+
+        # Verify the document belongs to the authenticated doctor
+        if documento.id_medico.id != doctor.id:
+            raise HttpError(403, "No tienes permiso para acceder a este documento")
+
+        # Delete the document
+        documento.delete()
+        logger.info(
+            f"Successfully deleted documento {documento_id} by user {doctor.id}"
+        )
+
+        # Return simple success response
+        return {
+            "success": True,
+            "message": f"Documento {documento_id} eliminado exitosamente",
+        }
+    except Http404:
+        logger.error(f"Documento {documento_id} not found")
+        raise HttpError(404, "Documento no encontrado")

@@ -10,10 +10,10 @@ import GenerateDocumentationButton from "./subcomponents/GenerateDocumentationBu
  * Props for the EncuentroHeader component
  */
 interface EncuentroHeaderProps {
-    /** Name of the encounter to display */
-    encounterName?: string;
     /** Formatted date of the encounter */
     encounterDate?: string;
+    /** Name of the encounter */
+    encounterName?: string;
     /** Function to update patient information */
     onUpdatePatient?: (patientId: number, patientName: string) => void;
     /** Function to update both patient and encounter information */
@@ -47,14 +47,14 @@ interface EncuentroHeaderProps {
  * @returns React component
  */
 const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
-    encounterName = "Consulta médica",
     encounterDate = "Sin fecha",
     onUpdatePatient = () => {},
     onUpdatePatientAndEncounter = () => {},
     isUpdating = false,
-    isPatientConnected = false,
-    patientId = null,
-    patientName = "",
+    // We'll ignore these props and use values from the hook instead
+    // isPatientConnected = false,
+    // patientId = null,
+    // patientName = "",
     transcriptionDocId,
     onTranscriptionComplete,
     onGenerateDocumentation,
@@ -76,6 +76,7 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
         deleteSuccess,
         redirectInfo,
         progressPercentage,
+        encounterName,
 
         // Modal actions
         setIsModalOpen,
@@ -94,6 +95,11 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
 
         // Status
         isEncounterUpdating,
+
+        // Get these values from the hook
+        isPatientConnected,
+        patientId,
+        patientName,
     } = useEncuentroHeader(
         encounterIdFromUrl,
         onUpdatePatient,

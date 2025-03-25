@@ -80,7 +80,7 @@ const Sidebar = () => {
 
                 {/* Main navigation section */}
                 <nav className="mt-2 flex-grow">
-                    <ul className="space-y-1">
+                    <ul className="space-y-3 mt-4">
                         {navigationItems.map((item, index) => (
                             <li
                                 key={index}
@@ -90,10 +90,17 @@ const Sidebar = () => {
                                         item.action();
                                     }
                                 }}
-                                className={`flex items-center cursor-pointer h-8 md:h-10 w-10/12 mx-auto ${
-                                    isActivePath(item.path, item.pattern)
-                                        ? "bg-blue-600"
-                                        : "hover:bg-gray-100"
+                                className={`flex items-center cursor-pointer h-8 md:h-10 w-10/12 mx-auto rounded-lg ${
+                                    // Apply teal background to Crear Encuentro button
+                                    item.label === "Crear Encuentro" ||
+                                    item.label === "Creando..."
+                                        ? "bg-purple-600 hover:bg-purple-700" // Fixed color to purple as requested
+                                        : isActivePath(item.path, item.pattern)
+                                        ? "hover:bg-gray-100" // Removed blue background, kept hover effect
+                                        : /* To restore blue background, replace the line above with:
+                                           ? "bg-blue-600" 
+                                        */
+                                          "hover:bg-gray-100"
                                 }`}
                             >
                                 {!item.isToggle ? (
@@ -111,9 +118,17 @@ const Sidebar = () => {
                                                 <Icon
                                                     src={item.icon}
                                                     className={`h-8 w-4 md:h-5 md:w-5 ${
-                                                        isActivePath(item.path)
-                                                            ? "filter invert brightness-0 saturate-100"
+                                                        item.label ===
+                                                            "Crear Encuentro" ||
+                                                        item.label ===
+                                                            "Creando..."
+                                                            ? "filter invert brightness-0 saturate-100" // Keep white icon for purple button
                                                             : "text-black"
+                                                        /* To restore white icon for selected items, use:
+                                                               isActivePath(item.path)
+                                                               ? "filter invert brightness-0 saturate-100"
+                                                               : "text-black"
+                                                            */
                                                     }`}
                                                     alt={item.label}
                                                 />
@@ -121,9 +136,17 @@ const Sidebar = () => {
                                             {isExpanded && (
                                                 <span
                                                     className={`pr-4 text-xs md:text-sm whitespace-nowrap ${
-                                                        isActivePath(item.path)
-                                                            ? "text-white font-medium"
+                                                        item.label ===
+                                                            "Crear Encuentro" ||
+                                                        item.label ===
+                                                            "Creando..."
+                                                            ? "text-white font-medium" // Keep white text for teal button
                                                             : "text-black"
+                                                        /* To restore white text for selected items, use:
+                                                               isActivePath(item.path)
+                                                               ? "text-white font-medium"
+                                                               : "text-black"
+                                                            */
                                                     }`}
                                                 >
                                                     {item.label}
@@ -140,9 +163,12 @@ const Sidebar = () => {
                                                 <Icon
                                                     src={item.icon}
                                                     className={`h-8 w-4 md:h-5 md:w-5 ${
-                                                        isActivePath(item.path)
-                                                            ? "filter invert brightness-0 saturate-100"
-                                                            : "text-black"
+                                                        "text-black"
+                                                        /* To restore white icon for selected items, use:
+                                                           isActivePath(item.path)
+                                                           ? "filter invert brightness-0 saturate-100"
+                                                           : "text-black"
+                                                        */
                                                     }`}
                                                     alt={item.label}
                                                 />
@@ -150,9 +176,12 @@ const Sidebar = () => {
                                             {isExpanded && (
                                                 <span
                                                     className={`pr-4 text-xs md:text-sm whitespace-nowrap ${
-                                                        isActivePath(item.path)
-                                                            ? "text-white font-medium"
-                                                            : "text-black"
+                                                        "text-black"
+                                                        /* To restore white text for selected items, use:
+                                                           isActivePath(item.path)
+                                                           ? "text-white font-medium"
+                                                           : "text-black"
+                                                        */
                                                     }`}
                                                 >
                                                     {item.label}
@@ -167,9 +196,12 @@ const Sidebar = () => {
                                                 <Icon
                                                     src={item.icon}
                                                     className={`h-8 w-4 md:h-5 md:w-5 ${
-                                                        showRightSidebar
-                                                            ? "filter invert brightness-0 saturate-100"
-                                                            : "text-black"
+                                                        "text-black"
+                                                        /* To restore white icon for toggled items, use:
+                                                           showRightSidebar
+                                                           ? "filter invert brightness-0 saturate-100"
+                                                           : "text-black"
+                                                        */
                                                     }`}
                                                     alt={item.label}
                                                 />
@@ -178,24 +210,24 @@ const Sidebar = () => {
                                                 <div className="flex flex-col leading-none">
                                                     <span
                                                         className={`text-xs md:text-sm ${
-                                                            isActivePath(
-                                                                undefined,
-                                                                item.pattern
-                                                            )
-                                                                ? "text-white font-medium"
-                                                                : "text-black"
+                                                            "text-black"
+                                                            /* To restore white text for active pattern, use:
+                                                               isActivePath(undefined, item.pattern)
+                                                               ? "text-white font-medium"
+                                                               : "text-black"
+                                                            */
                                                         }`}
                                                     >
                                                         Últimos
                                                     </span>
                                                     <span
                                                         className={`text-xs md:text-sm ${
-                                                            isActivePath(
-                                                                undefined,
-                                                                item.pattern
-                                                            )
-                                                                ? "text-white font-medium"
-                                                                : "text-black"
+                                                            "text-black"
+                                                            /* To restore white text for active pattern, use:
+                                                               isActivePath(undefined, item.pattern)
+                                                               ? "text-white font-medium"
+                                                               : "text-black"
+                                                            */
                                                         }`}
                                                     >
                                                         Encuentros
@@ -209,9 +241,12 @@ const Sidebar = () => {
                                                     src={item.pointerIcon}
                                                     alt="Pointer icon"
                                                     className={`w-3 h-3 md:w-4 md:h-4 ${
-                                                        showRightSidebar
-                                                            ? "filter invert brightness-0 saturate-100"
-                                                            : "text-black"
+                                                        "text-black"
+                                                        /* To restore white icon for active right sidebar, use:
+                                                           showRightSidebar
+                                                           ? "filter invert brightness-0 saturate-100"
+                                                           : "text-black"
+                                                        */
                                                     }`}
                                                 />
                                             </div>

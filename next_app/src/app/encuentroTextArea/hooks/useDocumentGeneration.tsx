@@ -346,6 +346,23 @@ export function useDocumentGeneration({
                 );
             }
 
+            // Track template usage after successful generation request
+            try {
+                const usageResponse = await axiosInstance.post(
+                    `/api/plantilla_doctor/uso/${selectedPlantillaId}`
+                );
+                console.log(
+                    "📊 Uso de plantilla registrado:",
+                    usageResponse.data
+                );
+            } catch (usageErr) {
+                // Log error but don't interrupt the main flow
+                console.error(
+                    "❌ Error al registrar uso de plantilla:",
+                    usageErr
+                );
+            }
+
             // Update generation status with info from response
             setGenerationStatus((prev) => ({
                 ...prev,

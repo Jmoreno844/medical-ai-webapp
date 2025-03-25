@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404
 from ninja.security import django_auth
 from django.db.models import F
 from ninja.errors import HttpError
+from django.utils import timezone
 from .models import PlantillaBase, PlantillaDoctor, UsoPlantilla
 from .schemas import (
     PlantillaDoctorCreate,
@@ -199,3 +200,39 @@ def update_plantilla_doctor(request, id_plantilla: int, data: PlantillaDoctorUpd
         if plantilla.id_plantilla_base
         else None,
     }
+
+
+@router.post("/plantilla_doctor/uso/{id_plantilla}", auth=django_auth)
+def track_plantilla_usage(request, id_plantilla: int):
+    """
+    Track the usage of a doctor's template
+
+    Args:
+        request: The HTTP request
+        id_plantilla: The ID of the template to track
+
+    Returns:
+        A simple success response
+
+    Raises:
+        HttpError: If the user is not authorized or the template is not found
+    """
+    # Get the template or return 404
+    plantilla = get_object_or_404(PlantillaDoctor, id=id_plantilla)
+
+    # Check authorization - make sure the requesting user is the template owner
+    if request.user.id != plantilla.id_medico.id:
+        raise HttpError(
+            403, "You don't have permission to track usage for this template"
+        )
+
+    # Update the usage tracking entry
+    uso_plantilla = UsoPlantilla.objects.get(
+        id_plantilla=plantilla, id_medico=request.user
+    )
+    uso_plantilla.veces_usada = F("veces_usada") + 1
+    uso_plantilla.ultimo_uso = timezone.now()
+    uso_plantilla.save()
+
+    # Return a simple success response
+    return {"success": True, "message": "Template usage tracked successfully"}

@@ -45,7 +45,7 @@ export const useNavigationItems = (
                 ? "/pointer_left.svg"
                 : "/pointer_right.svg",
         },
-        { icon: "/document.svg", label: "Plantillas", path: "/plantillas" },
+        { icon: "/template.svg", label: "Plantillas", path: "/plantillas" },
     ];
 
     return navigationItems;

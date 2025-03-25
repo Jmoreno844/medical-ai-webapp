@@ -1,8 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useVoiceRecorder } from "./audio/useVoiceRecorder";
 import { useEncounter } from "../../encuentro/hooks/useEncounter";
 import { useRouter } from "next/navigation";
 import useEncuentroList from "../../app_layout/hooks/Encuentros/useEncuentroList";
+// Import useEncuentroDetail
+import { useEncuentroDetail } from "../../app_layout/hooks/Encuentros/useEncuentroDetail";
 
 /**
  * Interface for the return value of useEncuentroHeader hook
@@ -17,6 +19,15 @@ interface UseEncuentroHeaderReturn {
     redirectInfo: { path: string; name: string } | null;
     redirectCountdown: number;
     progressPercentage: number;
+
+    // Encounter data
+    encounterIdFromUrl: number;
+    encounterName: string;
+
+    // Add these properties related to patient connection
+    isPatientConnected: boolean;
+    patientId: number | null;
+    patientName: string;
 
     // Actions
     setIsModalOpen: (isOpen: boolean) => void;
@@ -40,9 +51,6 @@ interface UseEncuentroHeaderReturn {
 
     // Encounter update status
     isEncounterUpdating: boolean;
-
-    // Current encounter ID
-    encounterIdFromUrl: number;
 }
 
 /**
@@ -84,12 +92,46 @@ export function useEncuentroHeader(
     const [redirectCountdown, setRedirectCountdown] = useState(0.5);
     const [progressPercentage, setProgressPercentage] = useState(0);
 
+    // Add state for encounter name
+    const [encounterName, setEncounterName] = useState("Consulta médica");
+
+    // Add state for patient data
+    const [isPatientConnected, setIsPatientConnected] = useState(false);
+    const [patientId, setPatientId] = useState<number | null>(null);
+    const [patientName, setPatientName] = useState("");
+
     // Hook for encounter operations
     const {
         updateEncounter,
         deleteEncounter,
         isLoading: isEncounterUpdating,
     } = useEncounter(encounterIdFromUrl);
+
+    // Use the useEncuentroDetail hook instead of direct fetch
+    const { encuentro, loading: encounterDataLoading } =
+        useEncuentroDetail(encounterIdFromUrl);
+
+    // Update encounter name when data is available
+    useEffect(() => {
+        if (encuentro) {
+            // Set encounter name
+            if (encuentro.nombre_encuentro) {
+                setEncounterName(encuentro.nombre_encuentro);
+            }
+
+            // Set patient connection state
+            setIsPatientConnected(!!encuentro.paciente_conectado);
+
+            // Set patient data if connected
+            if (encuentro.paciente_conectado) {
+                setPatientId(encuentro.id_paciente || null);
+                setPatientName(encuentro.nombre_paciente || "");
+            } else {
+                setPatientId(null);
+                setPatientName("");
+            }
+        }
+    }, [encuentro]);
 
     // Hook for encounter list to get encounters for redirection
     const { encuentros } = useEncuentroList();
@@ -147,9 +189,29 @@ export function useEncuentroHeader(
     /**
      * Handle patient selection from modal
      */
-    const handleSelectPatient = (patientId: number, patientName: string) => {
+    const handleSelectPatient = async (
+        patientId: number,
+        patientName: string
+    ) => {
         console.log(`Selected patient: ID=${patientId}, Name=${patientName}`);
-        onUpdatePatient(patientId, patientName);
+
+        // Use updateEncounter to update the patient connection in the database
+        // Also set the encounter name to match the patient name
+        const success = await updateEncounter(encounterIdFromUrl, {
+            id_paciente: patientId,
+            paciente_conectado: true,
+            nombre_encuentro: patientName, // Add this line to update encounter name
+        });
+
+        if (success) {
+            // Update local state to reflect the new encounter name
+            setEncounterName(patientName);
+
+            // Call the callback function to update UI state
+            onUpdatePatient(patientId, patientName);
+        } else {
+            console.error("Failed to update patient connection");
+        }
     };
 
     /**
@@ -163,7 +225,7 @@ export function useEncuentroHeader(
     /**
      * Handle updating both patient and encounter names
      */
-    const handleUpdatePatientAndEncounter = (
+    const handleUpdatePatientAndEncounter = async (
         patientId: number,
         patientName: string,
         encounterName: string
@@ -171,7 +233,22 @@ export function useEncuentroHeader(
         console.log(
             `Updating both patient and encounter: PatientID=${patientId}, PatientName=${patientName}, EncounterName=${encounterName}`
         );
-        onUpdatePatientAndEncounter(patientId, patientName, encounterName);
+
+        // Use updateEncounter to update both the patient and encounter name in the database
+        const success = await updateEncounter(encounterIdFromUrl, {
+            id_paciente: patientId,
+            paciente_conectado: true,
+            nombre_encuentro: encounterName,
+        });
+
+        if (success) {
+            // Update local encounter name state
+            setEncounterName(encounterName);
+            // Call the callback function to update UI state
+            onUpdatePatientAndEncounter(patientId, patientName, encounterName);
+        } else {
+            console.error("Failed to update patient and encounter information");
+        }
     };
 
     /**
@@ -285,7 +362,13 @@ export function useEncuentroHeader(
         // Status
         isEncounterUpdating,
 
-        // Current encounter ID
+        // Current encounter data
         encounterIdFromUrl,
+        encounterName, // Use state variable instead of encounter?.nombre_encuentro
+
+        // Add these properties to the return object
+        isPatientConnected,
+        patientId,
+        patientName,
     };
 }

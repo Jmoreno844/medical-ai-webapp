@@ -38,6 +38,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
         isLoadingContent,
         loadedDocumentIds,
         addDocument, // Assuming this function exists in useDocuments hook
+        deleteDocument, // Add deleteDocument from the hook
     } = useDocuments(encounterId);
 
     // Add state to track content updates and trigger refreshes
@@ -423,6 +424,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
                 activeDocumentId={activeDocumentId}
                 onSelectDocument={handleSelectDocument}
                 onGenerateDocumentation={handleGenerateDocumentation}
+                onDeleteDocument={deleteDocument} // Pass the delete function
             />
 
             <div className="flex-1 overflow-auto bg-white">

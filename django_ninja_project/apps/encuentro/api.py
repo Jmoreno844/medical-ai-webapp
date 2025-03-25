@@ -94,7 +94,7 @@ def create_empty_encuentro(request):
     return {"id": encuentro.id}
 
 
-@router.put("/encuentros/{encuentro_id}", response=EncuentroOut, auth=django_auth)
+@router.patch("/encuentros/{encuentro_id}", response=EncuentroOut, auth=django_auth)
 def update_encuentro(request, encuentro_id: int, payload: EncuentroUpdate):
     encuentro = get_object_or_404(Encuentro, id=encuentro_id)
 
