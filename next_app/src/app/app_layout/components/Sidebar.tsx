@@ -53,15 +53,14 @@ const Sidebar = () => {
                             : "w-10 md:w-12 lg:w-14"
                     }`}
             >
-                {/* Logo / top area */}
-                <div className="relative flex items-center h-8 md:h-10">
-                    <div className="flex-grow flex justify-center">
-                        <Icon
-                            src="/brand_logo.svg"
-                            className="h-6 w-6 md:h-7 md:w-7 text-gray-800"
-                            alt="Brand Logo"
-                            size={30}
-                        />
+                {/* User info / top area - Replaced logo with SidebarUser */}
+                <div className="relative flex items-center h-10 md:h-12">
+                    <div
+                        className={`flex-grow overflow-hidden ${
+                            isExpanded ? "pr-8" : ""
+                        }`}
+                    >
+                        <SidebarUser />
                     </div>
                     {isExpanded && (
                         <div className="absolute right-0 pr-2">
@@ -224,7 +223,7 @@ const Sidebar = () => {
                     </ul>
                 </nav>
 
-                {/* Bottom section with settings, logout and user info */}
+                {/* Bottom section with settings and logout */}
                 <div className="mt-auto border-t border-gray-200">
                     {/* Settings button */}
                     <div className="w-10/12 mx-auto my-1">
@@ -248,7 +247,7 @@ const Sidebar = () => {
                     </div>
 
                     {/* Logout button - FIXED */}
-                    <div className="w-10/12 mx-auto my-1">
+                    <div className="w-10/12 mx-auto my-1 mb-2">
                         <button
                             onClick={handleLogout}
                             className="flex items-center w-full py-2 hover:bg-gray-100"
@@ -268,10 +267,7 @@ const Sidebar = () => {
                         </button>
                     </div>
 
-                    {/* User information */}
-                    <div className="w-10/12 mx-auto my-1 mb-2">
-                        <SidebarUser />
-                    </div>
+                    {/* Removed SidebarUser from here as it's now at the top */}
                 </div>
             </div>
 

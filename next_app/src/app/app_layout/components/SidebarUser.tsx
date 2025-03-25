@@ -17,7 +17,7 @@ const SidebarUser = () => {
     return (
         <div
             className={`flex items-center ${
-                isExpanded ? "justify-start px-2" : "justify-center"
+                isExpanded ? "justify-start px-2" : "justify-center w-full"
             } py-2`}
         >
             <div className="flex-shrink-0">
@@ -27,7 +27,7 @@ const SidebarUser = () => {
             </div>
 
             {isExpanded && userData && (
-                <div className="ml-2 overflow-hidden">
+                <div className="ml-2 max-w-[calc(100%-40px)]">
                     <p className="text-sm font-medium truncate">
                         {userData.name} {userData.lastName}
                     </p>
