@@ -17,7 +17,6 @@ const checkAudioExists = async (encounterId: number) => {
 
     // With axiosInstance, the data is already parsed as JSON
     const data = response.data;
-    console.log("has_been_transcribed", data.has_been_transcribed);
     return {
       exists:
         data === true || (typeof data === "object" && data.exists === true),

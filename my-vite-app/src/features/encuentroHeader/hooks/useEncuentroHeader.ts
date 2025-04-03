@@ -5,6 +5,26 @@ import { useNavigate } from "react-router-dom"; // Replace Next.js router with R
 import useEncuentroList from "../../app_layout/hooks/Encuentros/useEncuentroList";
 // Import useEncuentroDetail
 import { useEncuentroDetail } from "../../app_layout/hooks/Encuentros/useEncuentroDetail";
+import axiosInstance from "@/commons/utils/axiosInstance";
+
+// Add this date formatting helper function at the top of the file
+const formatDate = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+
+    // Format for Spanish locale - example: "3 de abril de 2025, 15:29"
+    return new Intl.DateTimeFormat("es", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  } catch (error) {
+    console.error("Error formatting date:", error);
+    return "Sin fecha";
+  }
+};
 
 /**
  * Interface for the return value of useEncuentroHeader hook
@@ -23,6 +43,8 @@ interface UseEncuentroHeaderReturn {
   // Encounter data
   encounterIdFromUrl: number;
   encounterName: string;
+  encounterDate: string;
+  originalEncounterDateString: string | null;
 
   // Add these properties related to patient connection
   isPatientConnected: boolean;
@@ -45,12 +67,14 @@ interface UseEncuentroHeaderReturn {
   handleUnlinkConfirm: () => Promise<void>;
   handleDeleteClick: () => void;
   handleDeleteConfirm: () => Promise<void>;
+  updateEncounterDate: (date: Date) => Promise<boolean>;
 
   // Voice recorder integration
   voiceRecorder: ReturnType<typeof useVoiceRecorder>;
 
   // Encounter update status
   isEncounterUpdating: boolean;
+  isDateUpdating: boolean;
 }
 
 /**
@@ -92,10 +116,20 @@ export function useEncuentroHeader(
   // Add state for encounter name
   const [encounterName, setEncounterName] = useState("Consulta médica");
 
+  // Add state for encounter date
+  const [encounterDate, setEncounterDate] = useState("Sin fecha");
+
+  // Add state for original encounter date string
+  const [originalEncounterDateString, setOriginalEncounterDateString] =
+    useState<string | null>(null);
+
   // Add state for patient data
   const [isPatientConnected, setIsPatientConnected] = useState(false);
   const [patientId, setPatientId] = useState<number | null>(null);
   const [patientName, setPatientName] = useState("");
+
+  // State for date updating
+  const [isDateUpdating, setIsDateUpdating] = useState(false);
 
   // Hook for encounter operations
   const {
@@ -108,12 +142,18 @@ export function useEncuentroHeader(
   const { encuentro, loading: encounterDataLoading } =
     useEncuentroDetail(encounterIdFromUrl);
 
-  // Update encounter name when data is available
+  // Update encounter info when data is available
   useEffect(() => {
     if (encuentro) {
       // Set encounter name
       if (encuentro.nombre_encuentro) {
         setEncounterName(encuentro.nombre_encuentro);
+      }
+
+      // Set encounter date with formatting
+      if (encuentro.fecha) {
+        setEncounterDate(formatDate(encuentro.fecha));
+        setOriginalEncounterDateString(encuentro.fecha);
       }
 
       // Set patient connection state
@@ -147,17 +187,30 @@ export function useEncuentroHeader(
     let progressTimer: NodeJS.Timeout;
 
     if (deleteSuccess && redirectInfo) {
-      // Handle the countdown (0.5 second)
       if (redirectCountdown > 0) {
         countdownTimer = setTimeout(() => {
           setRedirectCountdown(0);
         }, 500);
       } else {
-        // Replace router.push with navigate
-        navigate(redirectInfo.path);
+        console.log(`Attempting navigation to: ${redirectInfo.path}`);
+        try {
+          navigate(redirectInfo.path, { replace: true });
+          setTimeout(() => {
+            if (
+              window.location.pathname.includes(
+                `/encuentro/${encounterIdFromUrl}`
+              )
+            ) {
+              console.log(`Using fallback navigation to: ${redirectInfo.path}`);
+              window.location.href = redirectInfo.path;
+            }
+          }, 200);
+        } catch (err) {
+          console.error("Navigation error:", err);
+          window.location.href = redirectInfo.path;
+        }
       }
 
-      // Handle the progress bar animation
       if (progressPercentage < 100) {
         progressTimer = setTimeout(() => {
           setProgressPercentage((prev) => Math.min(prev + 20, 100));
@@ -174,7 +227,8 @@ export function useEncuentroHeader(
     redirectInfo,
     redirectCountdown,
     progressPercentage,
-    navigate, // Replace router with navigate
+    navigate,
+    encounterIdFromUrl, // Added dependency
   ]);
 
   /**
@@ -182,6 +236,43 @@ export function useEncuentroHeader(
    */
   const handleEditClick = () => {
     setIsModalOpen(true);
+  };
+
+  /**
+   * Update encounter date in the database
+   */
+  const updateEncounterDate = async (newDate: Date) => {
+    try {
+      setIsDateUpdating(true);
+
+      // Format date for the API
+      const isoDate = newDate.toISOString();
+
+      console.log(`Updating encounter date to: ${isoDate}`);
+
+      const response = await axiosInstance.patch(
+        `/api/encuentros/${encounterIdFromUrl}`,
+        {
+          fecha: isoDate,
+        }
+      );
+
+      if (response.status === 200) {
+        // Update local state with formatted date
+        setEncounterDate(formatDate(isoDate));
+        setOriginalEncounterDateString(isoDate);
+        console.log("Encounter date updated successfully");
+        return true;
+      } else {
+        console.error("Failed to update encounter date:", response);
+        return false;
+      }
+    } catch (error) {
+      console.error("Error updating encounter date:", error);
+      return false;
+    } finally {
+      setIsDateUpdating(false);
+    }
   };
 
   /**
@@ -295,7 +386,7 @@ export function useEncuentroHeader(
       setDeleteSuccess(true);
       setProgressPercentage(0); // Reset progress percentage
 
-      // Determine where to redirect
+      // Determine where to redirectQ
       if (encuentros.length > 0) {
         // Find the first encounter that is not the current one
         const nextEncounter = encuentros.find(
@@ -309,13 +400,13 @@ export function useEncuentroHeader(
           });
         } else {
           setRedirectInfo({
-            path: "/dashboard",
+            path: "/home",
             name: "Panel Principal",
           });
         }
       } else {
         setRedirectInfo({
-          path: "/dashboard",
+          path: "/home",
           name: "Panel Principal",
         });
       }
@@ -353,16 +444,20 @@ export function useEncuentroHeader(
     handleUnlinkConfirm,
     handleDeleteClick,
     handleDeleteConfirm,
+    updateEncounterDate,
 
     // Voice recorder integration
     voiceRecorder,
 
     // Status
     isEncounterUpdating,
+    isDateUpdating,
 
     // Current encounter data
     encounterIdFromUrl,
-    encounterName, // Use state variable instead of encounter?.nombre_encuentro
+    encounterName,
+    encounterDate,
+    originalEncounterDateString,
 
     // Add these properties to the return object
     isPatientConnected,

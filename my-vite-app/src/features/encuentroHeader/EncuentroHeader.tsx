@@ -47,14 +47,10 @@ interface EncuentroHeaderProps {
  * @returns React component
  */
 const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
-  encounterDate = "Sin fecha",
+  encounterDate = "Sin fecha", // Keep default for type safety
   onUpdatePatient = () => {},
   onUpdatePatientAndEncounter = () => {},
   isUpdating = false,
-  // We'll ignore these props and use values from the hook instead
-  // isPatientConnected = false,
-  // patientId = null,
-  // patientName = "",
   transcriptionDocId,
   onTranscriptionComplete,
   onGenerateDocumentation,
@@ -75,6 +71,7 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
     redirectInfo,
     progressPercentage,
     encounterName,
+    encounterDate: encounterDateFromHook, // Extract date from hook
 
     // Modal actions
     setIsModalOpen,
@@ -90,9 +87,12 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
     handleUnlinkConfirm,
     handleDeleteClick,
     handleDeleteConfirm,
+    updateEncounterDate,
+    originalEncounterDateString,
 
     // Status
     isEncounterUpdating,
+    isDateUpdating,
 
     // Get these values from the hook
     isPatientConnected,
@@ -115,13 +115,16 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
           <div className="flex items-center">
             <PatientInfo
               encounterName={encounterName}
-              encounterDate={encounterDate}
+              encounterDate={encounterDateFromHook} // Use the date from hook instead
               onEdit={handleEditClick}
+              onUpdateDate={updateEncounterDate} // Replace onEditDate with onUpdateDate
               isPatientConnected={isPatientConnected}
               onUnlink={handleUnlinkClick}
               onDelete={handleDeleteClick}
+              originalDateString={originalEncounterDateString}
+              isDateUpdating={isDateUpdating}
             />
-            {isUpdating && (
+            {isEncounterUpdating && (
               <div className="ml-3 inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-purple-500"></div>
             )}
           </div>

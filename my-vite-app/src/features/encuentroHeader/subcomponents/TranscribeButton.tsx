@@ -97,10 +97,10 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
       isDisabled
         ? "bg-gray-200 text-gray-400 cursor-not-allowed"
         : transcriptionStatus === "success"
-        ? "bg-green-500 text-white hover:bg-green-600"
+        ? "bg-teal-500 text-white hover:bg-teal-600"
         : transcriptionStatus === "error"
         ? "bg-red-500 text-white hover:bg-red-600"
-        : "bg-blue-500 text-white hover:bg-blue-600"
+        : "bg-purple-500 text-white hover:bg-purple-600"
     }
     transition-colors duration-200
   `;

@@ -19,13 +19,14 @@ class EncuentroOut(Schema):
 
 
 class EncuentroUpdate(Schema):
-    id_paciente: Optional[int]
-    paciente_conectado: Optional[bool]
-    nombre_encuentro: Optional[str]
+    id_paciente: Optional[int] = None
+    paciente_conectado: Optional[bool] = None
+    nombre_encuentro: Optional[str] = None
     fecha: Optional[datetime] = None
 
     class Config:
         exclude_unset = True
+        arbitrary_types_allowed = True
 
 
 class EmptyEncuentroResponse(Schema):
