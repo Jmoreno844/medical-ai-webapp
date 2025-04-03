@@ -3,7 +3,7 @@ version: "3.8"
 services:
   transcription_service: # Renamed service
     build:
-      context: ./transcribe_audio_save_db
+      context: ./functions
       dockerfile: Dockerfile
     ports:
       - "8082:8082"
@@ -15,14 +15,14 @@ services:
       - FUNCTION_TARGET=transcription_endpoint
       - PORT=8082 # Explicitly set port
     env_file:
-      - ./transcribe_audio_save_db/.env.local
+      - ./functions/.env.local
     volumes:
       - ./credentials:/app/credentials:ro
     network_mode: "host"
 
   documentation_generation_service: # Renamed service
     build:
-      context: ./transcribe_audio_save_db
+      context: ./functions
       dockerfile: Dockerfile
     ports:
       - "8083:8083"
@@ -34,7 +34,7 @@ services:
       - FUNCTION_TARGET=generate_document_workflow
       - PORT=8083 # Different port here
     env_file:
-      - ./transcribe_audio_save_db/.env.local
+      - ./functions/.env.local
     volumes:
       - ./credentials:/app/credentials:ro
     network_mode: "host"

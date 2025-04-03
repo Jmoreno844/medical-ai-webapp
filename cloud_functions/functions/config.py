@@ -152,7 +152,9 @@ def initialize_environment():
 
     if is_production():
         # In production, use Secret Manager (Cloud Run function context)
-        from services.secret_manager import load_environment_from_secret_manager
+        from cloud_functions.functions.utils.secret_manager import (
+            load_environment_from_secret_manager,
+        )
 
         load_environment_from_secret_manager()
     elif is_test():

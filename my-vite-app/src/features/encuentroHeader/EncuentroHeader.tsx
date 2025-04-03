@@ -2,7 +2,7 @@ import React from "react";
 import PatientInfo from "./subcomponents/PatientInfo";
 import VoiceRecorder from "./subcomponents/VoiceRecorder";
 import PatientEditModal from "./PatientEditModal";
-import Modal from "../../../../next_app/src/components/Modal";
+import Modal from "@/commons/components/Modal";
 import { useEncuentroHeader } from "./hooks/useEncuentroHeader";
 import GenerateDocumentationButton from "./subcomponents/GenerateDocumentationButton";
 
@@ -136,6 +136,7 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
               </div>
             )}
             <VoiceRecorder
+              key={`recorder-${transcriptionDocId || encounterIdFromUrl}`}
               transcriptionDocId={transcriptionDocId}
               onTranscriptionComplete={onTranscriptionComplete}
             />
