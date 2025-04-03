@@ -180,6 +180,10 @@ def iniciar_transcripcion(request, payload: TranscriptionRequest):
             logger.info(
                 f"Transcription initiated for document {documento_id} with encounter {encuentro_id}"
             )
+
+            # Update the encounter with transcription status
+            encuentro.has_been_transcribed = True
+            encuentro.save()
             return TranscriptionResponse(
                 success=True, message="Transcription initiated successfully"
             )

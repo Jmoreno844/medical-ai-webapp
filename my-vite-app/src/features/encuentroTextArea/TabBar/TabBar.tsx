@@ -168,15 +168,6 @@ const TabBar: React.FC<TabBarProps> = ({
             </button>
           )}
         </div>
-
-        {/* Display the document title in the tab bar */}
-        {activeDocumentId && (
-          <div className="px-4 text-sm font-medium text-gray-600">
-            {getDocumentTitle(
-              documents.find((doc) => doc.id === activeDocumentId)
-            )}
-          </div>
-        )}
       </div>
 
       {/* Hidden dropdown trigger */}
@@ -241,6 +232,7 @@ const TabBar: React.FC<TabBarProps> = ({
               variant="destructive"
               onClick={handleDeleteDocument}
               disabled={isDeleting}
+              className="bg-red-600 text-white hover:bg-red-700 border border-red-600" // Force proper colors
             >
               {isDeleting ? "Eliminando..." : "Eliminar"}
             </Button>

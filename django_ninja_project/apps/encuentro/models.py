@@ -24,6 +24,7 @@ class Encuentro(models.Model):
     audio_uploaded_at = models.DateTimeField(null=True, blank=True)
     audio_expires_at = models.DateTimeField(null=True, blank=True)
     audio_duration_seconds = models.IntegerField(null=True, blank=True)
+    has_been_transcribed = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["-created_at"]

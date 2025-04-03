@@ -197,12 +197,20 @@ export const useTranscription = (onTranscriptionComplete?: () => void) => {
     }
   };
 
+  // Add a function to reset the transcription state
+  const resetTranscriptionState = () => {
+    setTranscriptionStatus("idle");
+    setErrorMessage(null);
+    setIsLoading(false);
+  };
+
   return {
     transcribeAudio,
     isLoading,
     transcriptionStatus,
     errorMessage,
     setTranscriptionStatus,
+    resetTranscriptionState, // Add this new function to the returned object
   };
 };
 

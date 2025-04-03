@@ -217,7 +217,11 @@ def check_audio_exists(request, encuentro_id: int):
     has_audio = bool(encuentro.audio_file_name and encuentro.audio_file_name.strip())
 
     # Return response with exists flag and duration
-    return {"exists": has_audio, "duration": encuentro.audio_duration_seconds or 0}
+    return {
+        "exists": has_audio,
+        "duration": encuentro.audio_duration_seconds or 0,
+        "has_been_transcribed": encuentro.has_been_transcribed,
+    }
 
 
 @router.delete(
@@ -252,6 +256,7 @@ def delete_audio(request, encuentro_id: int):
         encuentro.audio_uploaded_at = None
         encuentro.audio_expires_at = None
         encuentro.audio_duration_seconds = None
+        encuentro.has_been_transcribed = False
         encuentro.save()
 
         return {"success": True}

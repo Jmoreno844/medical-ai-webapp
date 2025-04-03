@@ -17,15 +17,17 @@ const checkAudioExists = async (encounterId: number) => {
 
     // With axiosInstance, the data is already parsed as JSON
     const data = response.data;
-
+    console.log("has_been_transcribed", data.has_been_transcribed);
     return {
       exists:
         data === true || (typeof data === "object" && data.exists === true),
       duration: typeof data === "object" && data.duration ? data.duration : 0,
+      has_been_transcribed:
+        typeof data === "object" && data.has_been_transcribed === true,
     };
   } catch (error) {
     console.error("[VOICE_RECORDER] Error checking audio existence:", error);
-    return { exists: false, duration: 0 };
+    return { exists: false, duration: 0, has_been_transcribed: false };
   }
 };
 /**
@@ -47,6 +49,8 @@ export const useVoiceRecorder = (
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioExists, setAudioExists] = useState(false);
   const [isCheckingAudio, setIsCheckingAudio] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [hasBeenTranscribed, setHasBeenTranscribed] = useState(false); // Add this line
 
   // Refs for managing media recorder and timer
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -73,12 +77,16 @@ export const useVoiceRecorder = (
 
       if (encounterIdFromUrl) {
         setIsCheckingAudio(true);
-        const { exists, duration: existingDuration } = await checkAudioExists(
-          encounterIdFromUrl
-        );
+        const {
+          exists,
+          duration: existingDuration,
+          has_been_transcribed,
+        } = await checkAudioExists(encounterIdFromUrl);
+
         setAudioExists(exists);
         if (exists) {
           setDuration(existingDuration);
+          setHasBeenTranscribed(has_been_transcribed); // Set transcription status
         }
         setIsCheckingAudio(false);
       }
@@ -293,6 +301,8 @@ export const useVoiceRecorder = (
    * Also deletes the audio file from the server if it exists
    */
   const deleteRecording = async () => {
+    setIsDeleting(true); // Set deleting state to true
+
     if (mediaRecorderRef.current?.state !== "inactive") {
       try {
         mediaRecorderRef.current?.stop();
@@ -342,6 +352,7 @@ export const useVoiceRecorder = (
     setIsRecording(false);
     setIsPaused(false);
     setAudioExists(false);
+    setHasBeenTranscribed(false); // Reset this too
     chunksRef.current = [];
 
     // Clear timer
@@ -349,6 +360,8 @@ export const useVoiceRecorder = (
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+
+    setIsDeleting(false); // Reset deleting state
   };
 
   /**
@@ -373,6 +386,8 @@ export const useVoiceRecorder = (
     transcriptionDocId: transcriptionDocIdRef.current,
     audioExists,
     isCheckingAudio,
+    isDeleting,
+    hasBeenTranscribed, // Add this
     startRecording,
     stopRecording,
     pauseResumeRecording,

@@ -46,3 +46,4 @@ class AudioUploadResponse(Schema):
 class AudioExistsResponse(Schema):
     exists: bool
     duration: int = 0
+    has_been_transcribed: bool

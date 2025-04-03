@@ -251,6 +251,24 @@ const TextArea: React.FC<TextAreaProps> = ({
     }
   }, [document, documentContentCache]);
 
+  // State for temporary display of generation success indicator
+  const [showGenerationSuccess, setShowGenerationSuccess] = useState(false);
+
+  // When generation completes, show the indicator for 2 seconds
+  useEffect(() => {
+    if (
+      generationStatus?.isComplete &&
+      document &&
+      generationStatus.documentId === document.id
+    ) {
+      setShowGenerationSuccess(true);
+      const timer = setTimeout(() => {
+        setShowGenerationSuccess(false);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [generationStatus, document]);
+
   // Only proceed with rendering editor if we have a document
   if (!document) {
     return (
@@ -330,31 +348,28 @@ const TextArea: React.FC<TextAreaProps> = ({
         </div>
       )}
 
-      {/* Add completion indicator when generation is complete */}
-      {!streamingContent &&
-        generationStatus?.isComplete &&
-        generationStatus?.documentId === document.id && (
-          <div className="bg-green-100 p-2 border-b border-green-200 text-green-800">
-            <div className="flex items-center">
-              <svg
-                className="h-4 w-4 mr-2"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a 1 1 0 01-1.414 0l-4-4a 1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <span className="font-medium">
-                Documento generado exitosamente
-              </span>
-            </div>
+      {/* Display generation success indicator for 2 seconds */}
+      {showGenerationSuccess && (
+        <div className="bg-green-100 p-2 border-b border-green-200 text-green-800">
+          <div className="flex items-center">
+            <svg
+              className="h-4 w-4 mr-2"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                fillRule="evenodd"
+                d="M16.707 5.293a1 1 0 010 1.414l-8 8a 1 1 0 01-1.414 0l-4-4a 1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span className="font-medium">Documento generado exitosamente</span>
           </div>
-        )}
+        </div>
+      )}
 
       {/* Cache status indicator (for debugging) */}
+      {/*
       {!showLoading && isFromCache && (
         <div className="bg-green-100 p-1 text-center text-green-600 text-xs flex justify-center items-center">
           <span className="mr-1">🔄</span>
@@ -362,8 +377,10 @@ const TextArea: React.FC<TextAreaProps> = ({
           {documentContentCache?.get(document.id)?.length || 0} caracteres)
         </div>
       )}
-
+ */}
       {/* Source indicator when content is from API/database */}
+      {/*
+
       {!showLoading && !isFromCache && documentContent && (
         <div className="bg-blue-100 p-1 text-center text-blue-600 text-xs flex justify-center items-center">
           <span className="mr-1">🔍</span>
@@ -371,7 +388,7 @@ const TextArea: React.FC<TextAreaProps> = ({
           caracteres)
         </div>
       )}
-
+ */}
       {/* Error display */}
       {fetchError && (
         <div className="bg-red-100 p-2 text-center text-red-600 text-sm">

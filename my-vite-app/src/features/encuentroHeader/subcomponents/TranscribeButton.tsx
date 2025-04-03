@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import Tooltip from "@/commons/components/Tooltip";
 import useTranscription from "../hooks/useTranscription";
 
@@ -7,7 +7,9 @@ interface TranscribeButtonProps {
   audioBlob: Blob | null;
   isRecording: boolean;
   audioExists?: boolean;
-  onTranscriptionComplete?: () => void; // Add this prop
+  hasBeenTranscribed?: boolean; // Add this prop
+  onTranscriptionComplete?: () => void;
+  resetKey?: number; // Add this to trigger resets when audio is deleted
 }
 
 /**
@@ -20,10 +22,32 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
   audioBlob,
   isRecording,
   audioExists = false,
+  hasBeenTranscribed = false, // Default to false
   onTranscriptionComplete,
+  resetKey = 0, // Default value
 }) => {
-  const { transcribeAudio, isLoading, transcriptionStatus, errorMessage } =
-    useTranscription(onTranscriptionComplete);
+  const {
+    transcribeAudio,
+    isLoading,
+    transcriptionStatus,
+    errorMessage,
+    resetTranscriptionState,
+    setTranscriptionStatus, // Make sure to extract this
+  } = useTranscription(onTranscriptionComplete);
+
+  // Set initial transcription status based on hasBeenTranscribed
+  useEffect(() => {
+    if (hasBeenTranscribed) {
+      setTranscriptionStatus("success");
+    }
+  }, [hasBeenTranscribed, setTranscriptionStatus]);
+
+  // Reset transcription state when resetKey changes or audio is deleted
+  useEffect(() => {
+    if (!audioExists && !audioBlob) {
+      resetTranscriptionState();
+    }
+  }, [resetKey, audioExists, audioBlob, resetTranscriptionState]);
 
   // Determine if we have audio to transcribe
   const hasAudioToTranscribe = audioBlob || audioExists;
