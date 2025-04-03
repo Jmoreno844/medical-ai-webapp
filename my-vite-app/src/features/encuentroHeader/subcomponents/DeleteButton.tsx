@@ -18,7 +18,7 @@ const DeleteButton: React.FC<DeleteButtonProps> = ({
     className={`px-4 py-2 rounded-md font-medium transition-colors ${
       isDeleting
         ? "bg-red-100 text-red-500"
-        : "bg-gray-200 text-black hover:bg-gray-300"
+        : "bg-red-700 text-white hover:bg-red-500"
     }`}
   >
     {isDeleting ? (

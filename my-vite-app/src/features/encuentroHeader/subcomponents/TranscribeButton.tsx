@@ -170,7 +170,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
             clipRule="evenodd"
           ></path>
         </svg>
-        <span>Transcribir</span>
+        <span className="text-base font-medium">Transcribir</span>
       </>
     );
   };
