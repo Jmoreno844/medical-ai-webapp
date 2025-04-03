@@ -1,0 +1,15 @@
+[
+    {
+        "origin": [
+            "http://localhost:5173",
+            "https://your-production-domain.com"
+        ],
+        "method": ["PUT", "GET", "HEAD"],
+        "responseHeader": [
+            "Content-Type",
+            "Content-MD5",
+            "Content-Disposition"
+        ],
+        "maxAgeSeconds": 3600
+    }
+]

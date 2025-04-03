@@ -30,9 +30,13 @@ GENERATE_DOCUMENT_CLOUD_FUNCTION_BASE_URL = os.environ.get(
 DEBUG = True
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
-CORS_ALLOWED_ORIGINS = [
+CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",  # Add Vite development server
+    "http://127.0.0.1:5173",  # Also add the IP version
 ]
+
 
 # Additional CORS settings to ensure proper functioning
 CORS_ALLOW_CREDENTIALS = True
@@ -57,8 +61,12 @@ CORS_ALLOW_HEADERS = [
     "cookie",  # Add cookie to allowed headers
 ]
 
-CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
-
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 # Add django-silk for profiling/debugging
 INSTALLED_APPS += ["silk"]  # noqa: F405
 MIDDLEWARE.insert(0, "silk.middleware.SilkyMiddleware")  # noqa: F405
