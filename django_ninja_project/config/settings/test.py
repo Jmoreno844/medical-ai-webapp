@@ -170,12 +170,7 @@ SECRET_KEY = access_secret(
 DEBUG = True
 
 # In your Django settings
-ALLOWED_HOSTS = [
-    ".run.app",  # Allows Cloud Run URLs
-    "http://34.8.20.32",  # If you use an internal load balancer
-    "34.8.20.32" "localhost",
-    "127.0.0.1",  # For local development
-]
+ALLOWED_HOSTS = ["*"]
 
 # Database settings - Use PostgreSQL for tests
 # First try to get credentials from environment variables (for CI/CD)
@@ -268,9 +263,6 @@ PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
 
-CSRF_TRUSTED_ORIGINS = [
-    "https://*.run.app",  # Trust all Cloud Run domains
-]
 # Security settings
 CSRF_COOKIE_SECURE = True
 
@@ -285,12 +277,9 @@ CORS_ALLOW_ALL_ORIGINS = False  # More secure approach, only allow specific orig
 
 # Keep the specific origins with Cloud Run URL as the primary focus
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    "https://34.8.20.32",
     "http://34.8.20.32",
-    "34.8.20.32",
 ]
-
 # Make sure credentials are allowed
 CORS_ALLOW_CREDENTIALS = True
 
@@ -326,12 +315,9 @@ CORS_PREFLIGHT_MAX_AGE = 86400  # 24 hours
 
 # Update CSRF trusted origins to explicitly include the Cloud Run URL
 CSRF_TRUSTED_ORIGINS = [
-    "https://medwebapp-frontend-container-test-192857848105.us-east1.run.app",
-    "https://*.run.app",  # Trust all Cloud Run domains
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    "https://34.8.20.32",
     "http://34.8.20.32",
-    "34.8.20.32",
+    "https://*.run.app",
 ]
 
 # Make sure logging is configured to capture CORS-related messages

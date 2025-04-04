@@ -60,7 +60,7 @@ RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
 
 # Copy project files and set permissions in one layer
 COPY --chown=appuser:appuser . .
-RUN chmod +x /app/scripts/run-migrations.sh
+RUN chmod +x /app/scripts/migrate.sh
 
 # Switch to non-root user
 USER appuser
@@ -79,7 +79,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PORT=8080
 
 # Use our script as entrypoint
-ENTRYPOINT ["/app/scripts/run-migrations.sh"]
+ENTRYPOINT ["/app/scripts/migrate.sh"]
 
 # Command
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "4", "--timeout", "120", "--log-level", "debug", "--capture-output", "--access-logfile", "-", "--error-logfile", "-", "--enable-stdio-inheritance", "config.wsgi:application"]
