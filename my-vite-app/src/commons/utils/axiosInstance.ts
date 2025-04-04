@@ -23,9 +23,21 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   (config) => {
     const csrfToken = getCsrfToken();
+
+    // Add logging for CSRF token and request details
+    console.log(`🔒 Request: ${config.method?.toUpperCase()} ${config.url}`);
+    console.log(`🔑 CSRF Token: ${csrfToken || "NOT SET"}`);
+    console.log(`🍪 All Cookies: ${document.cookie}`);
+
     if (csrfToken) {
       config.headers["X-CSRFToken"] = csrfToken;
+      console.log(
+        `✅ Added X-CSRFToken header: ${csrfToken.substring(0, 10)}...`
+      );
+    } else {
+      console.warn(`⚠️ No CSRF token available for request to ${config.url}`);
     }
+
     return config;
   },
   (error) => {

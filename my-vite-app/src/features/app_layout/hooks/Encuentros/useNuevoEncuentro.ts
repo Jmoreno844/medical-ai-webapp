@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { AxiosError } from "axios";
-import { getCookie } from "@/commons/utils/cookieUtils"; // Import the same utility
 
 /**
  * Hook to handle the creation of a new medical encounter
@@ -24,12 +23,6 @@ export const useNuevoEncuentro = () => {
       setLoading(true);
       console.log("Creating new encounter: Initiating API call");
 
-      const allCookies = document.cookie;
-      console.log("All cookies:", allCookies);
-
-      // Log the CSRF token specifically
-      const csrfToken = getCookie("csrftoken");
-      console.log("CSRF Token before request:", csrfToken || "NOT SET");
       const response = await axiosInstance.post("/api/encuentros");
       const data = response.data;
 
