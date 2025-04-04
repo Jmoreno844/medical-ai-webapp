@@ -1,22 +1,28 @@
+# Enable BuildKit features
+# syntax=docker/dockerfile:1.4
+
 FROM python:3.10-slim AS builder
 
 WORKDIR /app
 
 # Install system dependencies - combine RUN commands to reduce layers
-RUN apt-get update && apt-get install -y \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install poetry
-RUN pip install poetry==1.7.1
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    pip install poetry==1.7.1
 
 # Copy only dependency files first to leverage Docker layer caching
 COPY pyproject.toml poetry.lock* ./
 
-# Generate requirements.txt and explicitly add gunicorn to requirements
-RUN poetry config virtualenvs.create false \
+# Generate requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pypoetry,sharing=locked \
+    poetry config virtualenvs.create false \
     && poetry remove psycopg2 --quiet || true \
     && poetry add psycopg2-binary \
     && poetry add gunicorn \
@@ -33,7 +39,8 @@ LABEL maintainer="Medical AI Team" \
       version="1.0"
 
 # Install system dependencies - combine into one layer
-RUN apt-get update && apt-get install -y \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
     libpq-dev \
@@ -46,8 +53,9 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements from builder stage
 COPY --from=builder /app/requirements.txt .
 
-# Install dependencies - don't install gunicorn separately
-RUN pip install --upgrade pip && \
+# Install dependencies with pip cache
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy project files and set permissions in one layer
@@ -60,7 +68,7 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
-# Health check - reduced frequency for faster startup
+# Health check
 HEALTHCHECK --interval=60s --timeout=30s --start-period=10s --retries=2 \
     CMD curl -f http://localhost:8000/api/health/ || exit 1
 
