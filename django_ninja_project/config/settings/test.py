@@ -265,11 +265,13 @@ PASSWORD_HASHERS = [
 
 # Security settings
 CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = "None"  # Required for cross-site requests
+CSRF_USE_SESSIONS = False  # Use cookies, not sessions
 
 SESSION_COOKIE_SECURE = True  # Keep this True for security
 SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to cookies
 SESSION_COOKIE_SAMESITE = "None"  # Try changing to None for cross-domain
-SESSION_COOKIE_DOMAIN = None  # Try setting domain for Cloud Run
+# SESSION_COOKIE_DOMAIN = None  # Commented out as requested
 SESSION_COOKIE_NAME = "medwebapp_session"
 SESSION_COOKIE_AGE = 3600  # 1 hour (matches your session.set_expiry)
 # CORS settings – making more specific and aligned with develop.py
@@ -305,6 +307,7 @@ CORS_ALLOW_HEADERS = [
     "user-agent",
     "x-csrftoken",
     "x-requested-with",
+    "cookie",  # Added this!
 ]
 
 # Expose headers that the frontend might need
