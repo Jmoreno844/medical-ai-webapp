@@ -21,19 +21,36 @@ log "Using PORT: ${PORT:-8080}"
 # Try to get values from Secret Manager, fall back to env vars
 if command -v gcloud &> /dev/null; then
   log "Using Google Cloud Secret Manager to retrieve database connection details"
+  
+  # Get database credentials from Secret Manager
+  # Note: Using the secret names as they appear in your Secret Manager
   POSTGRES_HOST=${POSTGRES_HOST:-$(gcloud secrets versions access latest --secret="db_host" 2>/dev/null || echo "localhost")}
   POSTGRES_PORT=${POSTGRES_PORT:-$(gcloud secrets versions access latest --secret="POSTGRES_PORT" 2>/dev/null || echo "5432")}
+  POSTGRES_DB=${POSTGRES_DB:-$(gcloud secrets versions access latest --secret="db_name" 2>/dev/null || echo "postgres")}
+  POSTGRES_USER=${POSTGRES_USER:-$(gcloud secrets versions access latest --secret="db_user" 2>/dev/null || echo "postgres")}
+  POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-$(gcloud secrets versions access latest --secret="db_password" 2>/dev/null || echo "")}
+  
+  # Export these variables so Django can use them
+  export POSTGRES_HOST
+  export POSTGRES_PORT
+  export POSTGRES_DB
+  export POSTGRES_USER
+  export POSTGRES_PASSWORD
 else
   log "Using environment variables for database connection details"
+  # Ensure all required variables have defaults
   POSTGRES_HOST=${POSTGRES_HOST:-localhost}
   POSTGRES_PORT=${POSTGRES_PORT:-5432}
+  POSTGRES_DB=${POSTGRES_DB:-postgres}
+  POSTGRES_USER=${POSTGRES_USER:-postgres}
+  POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-""}
 fi
 
-# Log connection details (but don't show actual IP in production logs)
+# Log connection details (but don't show sensitive information in production logs)
 if [ "$DJANGO_SETTINGS_MODULE" = "config.settings.production" ]; then
-  log "Connecting to PostgreSQL database on port $POSTGRES_PORT (host address masked for security)"
+  log "Connecting to PostgreSQL database $POSTGRES_DB on port $POSTGRES_PORT (host and credentials masked for security)"
 else
-  log "Connecting to PostgreSQL database at $POSTGRES_HOST:$POSTGRES_PORT"
+  log "Connecting to PostgreSQL database $POSTGRES_DB at $POSTGRES_HOST:$POSTGRES_PORT with user $POSTGRES_USER"
 fi
 
 # Check if netcat is available
