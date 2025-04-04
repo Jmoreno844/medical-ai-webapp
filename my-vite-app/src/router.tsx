@@ -1,4 +1,8 @@
-import { createBrowserRouter, RouteObject } from "react-router-dom";
+import {
+  createBrowserRouter,
+  createHashRouter,
+  RouteObject,
+} from "react-router-dom";
 import App from "./App";
 import HomePage from "./features/home/HomePage";
 import AboutPage from "./pages/AboutPage";
@@ -15,6 +19,10 @@ const routes: RouteObject[] = [
     path: "/",
     element: <App />,
     children: [
+      {
+        index: true, // Add index route that redirects to login
+        element: <LoginPage />,
+      },
       {
         path: "about",
         element: <AboutPage />,
@@ -69,6 +77,7 @@ const routes: RouteObject[] = [
   },
 ];
 
-const router = createBrowserRouter(routes);
+// Replace createBrowserRouter with createHashRouter for static hosting
+const router = createHashRouter(routes);
 
 export default router;

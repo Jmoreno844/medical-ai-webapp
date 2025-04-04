@@ -172,8 +172,8 @@ DEBUG = True
 # In your Django settings
 ALLOWED_HOSTS = [
     ".run.app",  # Allows Cloud Run URLs
-    "your-internal-lb.com",  # If you use an internal load balancer
-    "localhost",
+    "http://34.8.20.32",  # If you use an internal load balancer
+    "34.8.20.32" "localhost",
     "127.0.0.1",  # For local development
 ]
 
@@ -261,12 +261,6 @@ if "silk" not in INSTALLED_APPS:  # noqa: F405
 
 # Add CORS skip middleware configuration
 # Define trusted origins that can bypass CORS restrictions during testing
-CORS_SKIP_TRUSTED_ORIGINS = [
-    "localhost:3000",
-    "127.0.0.1:3000",
-    "run.app",  # For Cloud Run domains
-    "medwebapp-frontend-container-test-192857848105.us-east1.run.app",  # Match existing allowed origins
-]
 
 
 # Disable password hashers for faster tests
@@ -291,9 +285,10 @@ CORS_ALLOW_ALL_ORIGINS = False  # More secure approach, only allow specific orig
 
 # Keep the specific origins with Cloud Run URL as the primary focus
 CORS_ALLOWED_ORIGINS = [
-    "https://medwebapp-frontend-container-test-192857848105.us-east1.run.app",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://34.8.20.32",
+    "34.8.20.32",
 ]
 
 # Make sure credentials are allowed
@@ -335,6 +330,8 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.run.app",  # Trust all Cloud Run domains
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://34.8.20.32",
+    "34.8.20.32",
 ]
 
 # Make sure logging is configured to capture CORS-related messages

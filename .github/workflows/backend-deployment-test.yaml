@@ -3,13 +3,13 @@ name: Backend Test and Deployment
 on:
   push:
     branches:
-      - develop
+      - main
     paths:
       - "django_ninja_project/**"
       - ".github/workflows/backend-deployment-test.yaml"
   pull_request:
     branches:
-      - develop
+      - main
     paths:
       - "django_ninja_project/**"
   workflow_dispatch:
@@ -187,7 +187,7 @@ jobs:
     name: Deploy to Cloud Run
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
+    if: github.ref == 'refs/heads/main'
 
     steps:
       - name: Authenticate to Google Cloud
