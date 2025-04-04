@@ -29,6 +29,10 @@ class EncuentroUpdate(Schema):
         arbitrary_types_allowed = True
 
 
+class EmptyPayload(Schema):
+    pass
+
+
 class EmptyEncuentroResponse(Schema):
     id: int
 

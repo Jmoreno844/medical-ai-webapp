@@ -11,6 +11,7 @@ from .schemas import (
     AudioUploadRequest,
     AudioUploadResponse,
     AudioExistsResponse,
+    EmptyPayload,
 )
 from datetime import date, datetime, timedelta
 from apps.documentos.models import Documento  # Import the Documento model
@@ -66,7 +67,7 @@ def get_encuentro(request, encuentro_id: int):
 
 
 @router.post("/encuentros", response=EmptyEncuentroResponse, auth=django_auth)
-def create_empty_encuentro(request):
+def create_empty_encuentro(request, payload: EmptyPayload = None):
     # Create the encounter
     encuentro = Encuentro.objects.create(
         id_medico_id=request.user.id,
