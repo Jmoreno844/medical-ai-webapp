@@ -11,7 +11,7 @@ import TranscribeButton from "./TranscribeButton";
 // Declare the global cache typing
 declare global {
   interface Window {
-    documentContentCache?: Map<number, any>;
+    documentContentCache?: Map<number, string>;
   }
 }
 
@@ -22,6 +22,7 @@ interface VoiceRecorderProps {
   /** ID of the transcription document if available */
   transcriptionDocId?: number;
   onTranscriptionComplete?: () => void; // Add this prop
+  onHasBeenTranscribed?: (value: boolean) => void; // Add this prop
 }
 
 /**
@@ -35,6 +36,7 @@ interface VoiceRecorderProps {
 const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   transcriptionDocId,
   onTranscriptionComplete,
+  onHasBeenTranscribed,
 }) => {
   // Use our cleaned up voice recorder hook
   const {
@@ -61,7 +63,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   const [resetCounter, setResetCounter] = useState(0);
 
   // Add a tracking state for new transcriptions
-  const [hasNewTranscription, setHasNewTranscription] = useState(false);
+  const [_hasNewTranscription, setHasNewTranscription] = useState(false);
 
   /**
    * Update UI based on recording state
@@ -100,6 +102,11 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     // Set flag to indicate we have a new transcription
     setHasNewTranscription(true);
 
+    // Notify parent of transcription status
+    if (onHasBeenTranscribed) {
+      onHasBeenTranscribed(true);
+    }
+
     // Call the parent's completion handler
     if (onTranscriptionComplete) {
       onTranscriptionComplete();
@@ -109,7 +116,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     setTimeout(() => {
       setHasNewTranscription(false);
     }, 1000);
-  }, [transcriptionDocId, onTranscriptionComplete]);
+  }, [transcriptionDocId, onTranscriptionComplete, onHasBeenTranscribed]);
 
   /**
    * Handle recording start/stop
@@ -136,13 +143,17 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
    */
   const handleDelete = () => {
     // First capture was recording/paused state before deletion
-    const wasRecording = isRecording;
 
     // Call the hook's delete function
     deleteRecording();
 
     // Reset the new transcription flag
     setHasNewTranscription(false);
+
+    // Notify parent when audio is deleted
+    if (onHasBeenTranscribed) {
+      onHasBeenTranscribed(false);
+    }
 
     // Always force reset UI state
     setHasRecordingActivity(false);

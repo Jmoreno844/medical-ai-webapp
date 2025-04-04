@@ -14,15 +14,15 @@ const Tooltip: React.FC<TooltipProps> = ({
   delay = 200,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [timeoutId, setTimeoutId] = useState<number | null>(null);
 
   const handleMouseEnter = () => {
-    const id = setTimeout(() => setIsVisible(true), delay);
+    const id = window.setTimeout(() => setIsVisible(true), delay);
     setTimeoutId(id);
   };
 
   const handleMouseLeave = () => {
-    if (timeoutId) clearTimeout(timeoutId);
+    if (timeoutId !== null) window.clearTimeout(timeoutId);
     setIsVisible(false);
   };
 

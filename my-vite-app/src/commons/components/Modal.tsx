@@ -17,6 +17,7 @@ interface ModalProps {
   secondaryButtonText?: string;
   /** Whether the primary button should be destructive (red) */
   isPrimaryDestructive?: boolean;
+  isPrimaryDisabled?: boolean;
 }
 
 /**

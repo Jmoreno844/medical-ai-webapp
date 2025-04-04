@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import PatientInfo from "./subcomponents/PatientInfo";
 import VoiceRecorder from "./subcomponents/VoiceRecorder";
 import PatientEditModal from "./PatientEditModal";
@@ -47,14 +47,16 @@ interface EncuentroHeaderProps {
  * @returns React component
  */
 const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
-  encounterDate = "Sin fecha", // Keep default for type safety
   onUpdatePatient = () => {},
   onUpdatePatientAndEncounter = () => {},
-  isUpdating = false,
+  //isUpdating = false,
   transcriptionDocId,
   onTranscriptionComplete,
   onGenerateDocumentation,
 }) => {
+  // Add state for tracking transcription status
+  const [hasBeenTranscribed, setHasBeenTranscribed] = useState(false);
+
   // Get the current URL to extract the encounter ID
   const urlParts =
     typeof window !== "undefined" ? window.location.pathname.split("/") : [];
@@ -135,6 +137,7 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
               <div className="mr-4">
                 <GenerateDocumentationButton
                   onClick={onGenerateDocumentation}
+                  hasBeenTranscribed={hasBeenTranscribed}
                 />
               </div>
             )}
@@ -142,6 +145,7 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
               key={`recorder-${transcriptionDocId || encounterIdFromUrl}`}
               transcriptionDocId={transcriptionDocId}
               onTranscriptionComplete={onTranscriptionComplete}
+              onHasBeenTranscribed={(value) => setHasBeenTranscribed(value)}
             />
           </div>
         </div>

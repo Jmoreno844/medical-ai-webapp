@@ -53,7 +53,7 @@ export const useVoiceRecorder = (
 
   // Refs for managing media recorder and timer
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<number | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
   // Store the transcription document ID

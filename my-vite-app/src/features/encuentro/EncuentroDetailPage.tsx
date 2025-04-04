@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import EncuentroHeader from "../encuentroHeader/EncuentroHeader";
 import DocumentArea from "../encuentroTextArea/DocumentArea";
@@ -9,14 +9,14 @@ export default function EncuentroDetailPage() {
 
   // All hooks must be at the top level, before any conditionals
   const [encounterName, setEncounterName] = useState("Consulta médica");
-  const [encounterDate, setEncounterDate] = useState("Sin fecha");
+  const [encounterDate] = useState("Sin fecha");
   const [isPatientConnected, setIsPatientConnected] = useState(false);
   const [patientId, setPatientId] = useState<number | null>(null);
   const [patientName, setPatientName] = useState("");
   const [transcriptionDocId, setTranscriptionDocId] = useState<
     number | undefined
   >(undefined);
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [isUpdating] = useState(false);
   const generateDocumentationRef = useRef<(() => void) | null>(null);
   const [transcriptionCompleteTimestamp, setTranscriptionCompleteTimestamp] =
     useState<number | null>(null);

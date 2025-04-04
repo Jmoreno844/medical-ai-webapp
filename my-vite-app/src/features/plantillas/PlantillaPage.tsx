@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { usePlantillas, NewPlantilla, Plantilla } from "./hooks/usePlantillas";
+import { useState } from "react";
+import { usePlantillas, NewPlantilla } from "./hooks/usePlantillas";
 import { Button } from "@/commons/components/ui/button";
 import { Input } from "@/commons/components/ui/input";
 import { Card, CardContent } from "@/commons/components/ui/card";

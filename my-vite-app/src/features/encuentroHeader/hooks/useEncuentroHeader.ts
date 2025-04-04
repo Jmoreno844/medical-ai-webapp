@@ -139,7 +139,7 @@ export function useEncuentroHeader(
   } = useEncounter(encounterIdFromUrl);
 
   // Use the useEncuentroDetail hook instead of direct fetch
-  const { encuentro, loading: encounterDataLoading } =
+  const { encuentro, loading: _encounterDataLoading } =
     useEncuentroDetail(encounterIdFromUrl);
 
   // Update encounter info when data is available
@@ -183,8 +183,8 @@ export function useEncuentroHeader(
    * Effect for countdown and redirect after successful deletion
    */
   useEffect(() => {
-    let countdownTimer: NodeJS.Timeout;
-    let progressTimer: NodeJS.Timeout;
+    let countdownTimer: number;
+    let progressTimer: number;
 
     if (deleteSuccess && redirectInfo) {
       if (redirectCountdown > 0) {

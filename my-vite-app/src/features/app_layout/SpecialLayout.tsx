@@ -18,7 +18,7 @@ const LayoutContent: React.FC<SpecialLayoutProps> = ({ children }) => {
         <Sidebar />
       </aside>
       <main
-        className={`flex-1 transition-all duration-300 ${
+        className={`flex-1 transition-all duration-300 overflow-y-auto ${
           isExpanded ? "ml-[200px] lg:ml-[224px]" : "ml-12 lg:ml-14"
         }`}
       >

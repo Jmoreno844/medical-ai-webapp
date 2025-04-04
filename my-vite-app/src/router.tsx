@@ -40,7 +40,7 @@ const routes: RouteObject[] = [
         path: "encuentro",
         element: (
           <SpecialLayout>
-            <EncuentroPage />,
+            <EncuentroPage />
           </SpecialLayout>
         ),
       },

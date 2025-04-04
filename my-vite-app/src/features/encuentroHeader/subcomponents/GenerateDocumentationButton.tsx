@@ -3,6 +3,7 @@ import React from "react";
 interface GenerateDocumentationButtonProps {
   onClick: () => void;
   disabled?: boolean;
+  hasBeenTranscribed: boolean;
 }
 
 const GenerateDocumentationButton: React.FC<
@@ -16,7 +17,7 @@ const GenerateDocumentationButton: React.FC<
                 ${
                   disabled
                     ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                    : "bg-purple-500 text-white hover:bg-teal-200 rounded-md"
+                    : "bg-purple-500 text-white hover:bg-purple-700 rounded-md"
                 }`}
       title="Generar documentación médica"
     >

@@ -1,17 +1,15 @@
-name: Deploy to Test Environment
+name: Deploy Vite.js Static Site to GCS
 
 on:
   push:
     branches:
-      - develop
+      - main
   workflow_dispatch:
 
 env:
   GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  SERVICE_NAME: medwebapp-frontend-container-test
-  REGION: us-east1
+  BUCKET_NAME: test_medwebai_vite_cdn_bucket
   NODE_ENV: test
-  REPOSITORY: medaiwebapp-test-containers
 
 jobs:
   build-and-deploy:
@@ -23,22 +21,42 @@ jobs:
         with:
           fetch-depth: 2 # Needed to check for changes between commits
 
-      - name: Check for changes in next_app directory
+      - name: Check for changes in my-vite-app directory
         id: check_changes
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "Changes detected due to manual workflow dispatch"
             echo "changes=true" >> $GITHUB_OUTPUT
           else
-            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep "^next_app/" || echo "")
+            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep "^my-vite-app/" || echo "")
             if [ -z "$CHANGED_FILES" ]; then
-              echo "No changes in next_app directory"
+              echo "No changes in my-vite-app directory"
               echo "changes=false" >> $GITHUB_OUTPUT
             else
-              echo "Changes detected in next_app directory"
+              echo "Changes detected in my-vite-app directory"
               echo "changes=true" >> $GITHUB_OUTPUT
             fi
           fi
+
+      - name: Set up Node.js
+        if: steps.check_changes.outputs.changes == 'true'
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: my-vite-app/package-lock.json
+
+      - name: Install dependencies
+        if: steps.check_changes.outputs.changes == 'true'
+        working-directory: ./my-vite-app
+        run: npm ci
+
+      - name: Build Vite.js static site
+        if: steps.check_changes.outputs.changes == 'true'
+        working-directory: ./my-vite-app
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: npm run build:skip-ts
 
       - name: Set up Google Cloud SDK
         if: steps.check_changes.outputs.changes == 'true'
@@ -52,37 +70,15 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
-      - name: Configure Docker for Artifact Registry
+      - name: Deploy to GCS bucket
         if: steps.check_changes.outputs.changes == 'true'
+        working-directory: ./my-vite-app
         run: |
-          gcloud auth configure-docker
-          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+          echo "Syncing the dist directory to GCS bucket gs://${{ env.BUCKET_NAME }}"
+          gsutil -m rsync -r -d dist/ gs://${{ env.BUCKET_NAME }}/
 
-      - name: Build and push Docker image
-        if: steps.check_changes.outputs.changes == 'true'
-        working-directory: ./next_app
-        run: |
-          docker build \
-            --build-arg NODE_ENV=${{ env.NODE_ENV }} \
-            --build-arg NEXT_PUBLIC_API_URL=${{ vars.TEST_NEXT_PUBLIC_API_URL }} \
-            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
-            .
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          # Set long cache control for static assets
+          gsutil -m setmeta -h "Cache-Control:public, max-age=31536000" gs://${{ env.BUCKET_NAME }}/assets/**
 
-      - name: Deploy to Cloud Run (Test)
-        if: steps.check_changes.outputs.changes == 'true'
-        uses: google-github-actions/deploy-cloudrun@v1
-        with:
-          service: ${{ env.SERVICE_NAME }}
-          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
-          region: ${{ env.REGION }}
-          env_vars: |
-            NODE_ENV=${{ env.NODE_ENV }}
-            TEST_NEXT_PUBLIC_API_URL=${{ vars.TEST_NEXT_PUBLIC_API_URL }}
-          flags: |
-            --allow-unauthenticated
-            --ingress=all
-            --min-instances=0 
-            --max-instances=2 
-            --vpc-connector=${{ vars.test_vpc_connector_name}}
-            --service-account=${{ vars.FRONTEND_SERVICE_ACCOUNT }}
+          # Set shorter cache control for HTML files
+          gsutil -m setmeta -h "Cache-Control:public, max-age=0, must-revalidate" gs://${{ env.BUCKET_NAME }}/*.html

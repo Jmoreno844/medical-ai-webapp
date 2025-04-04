@@ -18,17 +18,11 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
     e.preventDefault();
     try {
       await signUp({ email, name, lastName, password });
-      navigate("/login?success=true"); // redirect with success flag
-      // On successful signup, redirect as needed
+      navigate("/home"); // redirect to home page after successful registration
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
       // Handle error (optional)
     }
-  };
-
-  const handleRedirect = (path: string) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    navigate(path);
   };
 
   return (

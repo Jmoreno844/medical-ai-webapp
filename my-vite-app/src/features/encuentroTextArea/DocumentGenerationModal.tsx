@@ -37,7 +37,7 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
   onClose,
   onGenerate,
   isGenerating,
-  error,
+  //error,
   plantillas,
   isLoadingPlantillas,
   plantillasError,

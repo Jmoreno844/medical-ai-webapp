@@ -1,7 +1,6 @@
 import Icon from "@/commons/components/Icon";
 import IconButton from "@/commons/components/IconButton";
 import { useSidebar } from "@/commons/contexts/SidebarContext";
-import { useActivePath } from "../hooks/useActivePath";
 import { useEncountersSidebar } from "../hooks/Encuentros/useEncountersSidebar";
 import { useNavigationItems } from "../hooks/useNavigationItems";
 import { EncountersSidebar } from "./EncountersSidebar";
@@ -17,7 +16,6 @@ import { useAuth } from "@/commons/hooks/useAuth";
  */
 const Sidebar = () => {
   const { isExpanded, setIsExpanded } = useSidebar();
-  const { isActivePath } = useActivePath();
   const { showRightSidebar, toggleSidebar, closeSidebar } =
     useEncountersSidebar();
   const navigationItems = useNavigationItems(toggleSidebar, showRightSidebar);
@@ -91,7 +89,7 @@ const Sidebar = () => {
                   item.label === "Crear Encuentro" ||
                   item.label === "Creando..."
                     ? "bg-purple-600 hover:!bg-purple-700"
-                    : "hover:bg-gray-100"
+                    : "hover:bg-gray-100 "
                 }`}
               >
                 {!item.isToggle ? (

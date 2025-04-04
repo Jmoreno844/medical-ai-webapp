@@ -157,13 +157,7 @@ export function DateTimePicker({
     "h-9 w-9 p-0 font-normal text-sm rounded-md flex items-center justify-center m-1";
 
   return (
-    <Popover
-      open={isOpen}
-      onOpenChange={setIsOpen}
-      align="start"
-      sideOffset={0}
-      alignOffset={0}
-    >
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"

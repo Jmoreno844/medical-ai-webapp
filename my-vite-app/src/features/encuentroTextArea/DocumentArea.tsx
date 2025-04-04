@@ -7,6 +7,7 @@ import { useDocuments } from "./hooks/useDocuments";
 import { useDocumentGeneration } from "./hooks/useDocumentGeneration";
 import DocumentGenerationModal from "./DocumentGenerationModal";
 import { DocumentGenerationProgress } from "./components/DocumentGenerationProgress";
+import { DocumentoOut } from "@/types/documento";
 
 // Update the interface to include the new prop
 interface DocumentAreaProps {
@@ -46,7 +47,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
 
   // Handler for when a new document is created
   const handleDocumentCreated = useCallback(
-    (newDocument) => {
+    (newDocument: DocumentoOut) => {
       // Add the new document to the list
       addDocument(newDocument);
 
@@ -118,7 +119,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
   >(null);
 
   // Track when a document actually needs a force refresh
-  const needsRefreshRef = useRef<Set<number>>(new Set());
+  //const needsRefreshRef = useRef<Set<number>>(new Set()); Dont know
 
   // Find and emit transcription document ID when documents load
   useEffect(() => {
@@ -201,8 +202,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
 
   // Add these refs to track polling state and document content
   const processedTimestampsRef = useRef(new Set<number>());
-  const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const contentLengthRef = useRef<number>(0);
+  const pollingTimerRef = useRef<number | null>(null);
   const lastAttemptTimeRef = useRef<number>(0);
 
   // React to transcription complete events with smarter polling

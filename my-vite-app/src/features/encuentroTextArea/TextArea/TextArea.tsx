@@ -21,7 +21,7 @@ import { createEditorConfig } from "./utils/editorConfig";
 // Create a global cache reference for direct access
 declare global {
   interface Window {
-    documentContentCache: Map<number, string> | undefined;
+    documentContentCache?: Map<number, string>;
   }
 }
 

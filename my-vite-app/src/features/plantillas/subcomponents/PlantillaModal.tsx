@@ -11,11 +11,7 @@ import {
 } from "@/commons/components/ui/dialog";
 import { Textarea } from "@/commons/components/ui/textarea";
 import { Loader2, AlertTriangle } from "lucide-react";
-import {
-  Plantilla,
-  NewPlantilla,
-  PlantillaDetalle,
-} from "../hooks/usePlantillas";
+import { Plantilla, PlantillaDetalle } from "../hooks/usePlantillas";
 import { Alert, AlertDescription } from "@/commons/components/ui/alert";
 
 interface PlantillaModalProps {
@@ -185,7 +181,7 @@ export function PlantillaModal({
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={isSubmitting} variant="primary">
+                <Button type="submit" disabled={isSubmitting} variant="default">
                   {isSubmitting && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
@@ -301,7 +297,7 @@ export function PlantillaModal({
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    variant={isBaseTemplate ? "secondary" : "primary"}
+                    variant={isBaseTemplate ? "secondary" : "default"}
                   >
                     {isSubmitting && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

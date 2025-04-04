@@ -1,4 +1,4 @@
-import axiosInstance from "@/utils/axiosInstance";
+import axiosInstance from "@/commons/utils/axiosInstance";
 import { Encuentro } from "@/types/encuentroList";
 
 /**
