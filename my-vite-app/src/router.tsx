@@ -1,8 +1,4 @@
-import {
-  createBrowserRouter,
-  createHashRouter,
-  RouteObject,
-} from "react-router-dom";
+import { createBrowserRouter, RouteObject, Navigate } from "react-router-dom";
 import App from "./App";
 import HomePage from "./features/home/HomePage";
 import AboutPage from "./pages/AboutPage";
@@ -20,8 +16,8 @@ const routes: RouteObject[] = [
     element: <App />,
     children: [
       {
-        index: true, // Add index route that redirects to login
-        element: <LoginPage />,
+        index: true, // This handles the root path
+        element: <Navigate to="/home" replace />, // Redirect root to home page
       },
       {
         path: "about",
@@ -77,7 +73,6 @@ const routes: RouteObject[] = [
   },
 ];
 
-// Replace createBrowserRouter with createHashRouter for static hosting
-const router = createHashRouter(routes);
+const router = createBrowserRouter(routes);
 
 export default router;

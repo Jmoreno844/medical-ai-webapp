@@ -20,7 +20,6 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const { login, error, loading } = useAuth();
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,17 +27,10 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
       logForm("info", "Submitting login form", { email });
       await login(email, password);
       logForm("info", "Login successful, redirecting to dashboard");
-      // No need to redirect here - AuthContext will handle it
     } catch (err) {
       logForm("error", "Form submission error");
       // Error already handled by useAuth
     }
-  };
-
-  const handleRedirect = (path: string) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    logForm("info", "Redirecting to", path);
-    navigate(path);
   };
 
   return (
