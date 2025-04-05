@@ -1,5 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.http import HttpResponse
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from ninja import NinjaAPI
 from apps.users.api import router as accounts_router
 from apps.encuentro.api import router as encuentro_router
@@ -17,6 +19,14 @@ from apps.generative_ai.api import router as generative_ai_router
 api = NinjaAPI(
     title="Medical API", version="1.0.0", urls_namespace="medical_api", csrf=True
 )
+
+
+@api.get("/csrf")
+@ensure_csrf_cookie
+@csrf_exempt
+def get_csrf_token(request):
+    return HttpResponse()
+
 
 # Replace the single router with the three separate routers
 api.add_router("/", documentos_base_router)

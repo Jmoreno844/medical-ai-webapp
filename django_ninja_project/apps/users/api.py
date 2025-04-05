@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 import jwt
 import os
 from django.conf import settings
-from django.middleware.csrf import get_token
 import logging
 from apps.plantillas.models import PlantillaBase, PlantillaDoctor, UsoPlantilla
 from .models import User, UserRole
@@ -179,14 +178,3 @@ def me_data(request):
         logger.info(f"Returning user data for ID: {request.user.id}")
         return 200, request.user
     return 401, {"message": "Session not validated"}
-
-
-@router.get("/csrf-token", response={200: dict})
-def get_csrf_token(request):
-    """
-    Get a CSRF token for use in forms and API requests
-
-    This endpoint ensures CSRF protection for non-GET requests
-    """
-    csrf_token = get_token(request)
-    return {"csrfToken": csrf_token}

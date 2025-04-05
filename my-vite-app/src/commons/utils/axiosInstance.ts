@@ -21,8 +21,26 @@ const axiosInstance = axios.create({
 
 // Add request interceptor to include CSRF token in every request
 axiosInstance.interceptors.request.use(
-  (config) => {
-    const csrfToken = getCsrfToken();
+  async (config) => {
+    // Check if CSRF token already exists in cookies
+    let csrfToken = getCsrfToken();
+
+    // Only fetch CSRF token if not already available
+    if (!csrfToken) {
+      try {
+        console.log("🔄 No CSRF token found. Fetching from /api/csrf...");
+        const csrfResponse = await axios.get(`${API_URL}/api/csrf`, {
+          withCredentials: true,
+        });
+        console.log("📥 CSRF Response:", csrfResponse.data);
+        // Get the token after the API call
+        csrfToken = getCsrfToken();
+      } catch (error) {
+        console.error("❌ Error fetching CSRF token:", error);
+      }
+    } else {
+      console.log("✅ Using existing CSRF token from cookies");
+    }
 
     // Add logging for CSRF token and request details
     console.log(`🔒 Request: ${config.method?.toUpperCase()} ${config.url}`);
