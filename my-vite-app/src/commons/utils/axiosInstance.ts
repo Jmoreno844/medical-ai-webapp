@@ -7,7 +7,7 @@ console.log("API URL:", API_URL); // Helps with debugging
 
 // Function to get CSRF token from cookiess
 const getCsrfToken = (): string | null => {
-  return getCookie("csrftoken");
+  return getCookie("_xsrf") || getCookie("csrftoken");
 };
 
 const axiosInstance = axios.create({

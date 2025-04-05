@@ -94,13 +94,13 @@ DATABASES = {
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # Disable security settings that might interfere with development
-CSRF_COOKIE_SECURE = True
-CSRF_COOKIE_SAMESITE = "None"  # Required for cross-site requests with credentials
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_SAMESITE = "Lax"  # Required for cross-site requests with credentials
 CSRF_USE_SESSIONS = False  # Store CSRF token in cookie instead of session
 
-SESSION_COOKIE_SECURE = True  # Keep True for HTTPS, even in development
+SESSION_COOKIE_SECURE = False  # Keep True for HTTPS, even in development
 SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
-SESSION_COOKIE_SAMESITE = "None"  # Required for cross-site requests with credentials
+SESSION_COOKIE_SAMESITE = "Lax"  # Required for cross-site requests with credentials
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # Session ends when browser closes
 SESSION_COOKIE_AGE = 3600  # 1 hour in seconds
 # Replace the existing LOGGING dictionary with this more comprehensive one:

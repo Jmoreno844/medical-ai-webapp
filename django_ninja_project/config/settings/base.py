@@ -109,3 +109,4 @@ SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = "DENY"
 
 LOGIN_URL = "/admin/login/"  # Redirect to the admin login page instead
+CSRF_COOKIE_NAME = "_xsrf"

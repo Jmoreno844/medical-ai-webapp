@@ -15,9 +15,7 @@ from apps.documentos.api import (
 from apps.generative_ai.api import router as generative_ai_router
 
 api = NinjaAPI(
-    title="Medical API",
-    version="1.0.0",
-    urls_namespace="medical_api",
+    title="Medical API", version="1.0.0", urls_namespace="medical_api", csrf=True
 )
 
 # Replace the single router with the three separate routers
