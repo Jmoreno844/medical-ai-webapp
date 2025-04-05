@@ -278,10 +278,7 @@ SESSION_COOKIE_AGE = 3600  # 1 hour (matches your session.set_expiry)
 CORS_ALLOW_ALL_ORIGINS = False  # More secure approach, only allow specific origins
 
 # Keep the specific origins with Cloud Run URL as the primary focus
-CORS_ALLOWED_ORIGINS = [
-    "https://34.8.20.32",
-    "http://34.8.20.32",
-]
+CORS_ALLOWED_ORIGINS = ["https://medapp.sebastianmoreno.lat"]
 # Make sure credentials are allowed
 CORS_ALLOW_CREDENTIALS = True
 
@@ -317,11 +314,7 @@ CORS_EXPOSE_HEADERS = ["Content-Type", "X-CSRFToken", "Authorization"]
 CORS_PREFLIGHT_MAX_AGE = 86400  # 24 hours
 
 # Update CSRF trusted origins to explicitly include the Cloud Run URL
-CSRF_TRUSTED_ORIGINS = [
-    "https://34.8.20.32",
-    "http://34.8.20.32",
-    "https://*.run.app",
-]
+CSRF_TRUSTED_ORIGINS = ["https://medapp.sebastianmoreno.lat"]
 
 # Make sure logging is configured to capture CORS-related messages
 logging.getLogger("apps.core.cors_skip_middleware").setLevel(logging.DEBUG)
