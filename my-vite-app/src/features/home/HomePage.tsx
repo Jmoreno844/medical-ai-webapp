@@ -5,7 +5,7 @@ import { useEncountersSidebar } from "../app_layout/hooks/Encuentros/useEncounte
 import { useNavigationItems } from "../app_layout/hooks/useNavigationItems";
 import { Link } from "react-router-dom";
 
-// Mock data for recent transcript
+// Mock data for recent transcript s
 export default function HomePage() {
   const { userData } = useContext(AuthContext);
   const lastNmae = userData?.lastName || "";

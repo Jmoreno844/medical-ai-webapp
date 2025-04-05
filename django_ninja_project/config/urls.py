@@ -33,5 +33,5 @@ api.add_router("/", generative_ai_router)
 urlpatterns = [
     path("api/admin/", admin.site.urls),
     path("api/", api.urls),
-    path("silk/", include("silk.urls", namespace="silk")),
+    path("api/silk/", include("silk.urls", namespace="silk")),
 ]
