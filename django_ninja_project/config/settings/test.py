@@ -170,9 +170,14 @@ SECRET_KEY = access_secret(
     GCP_PROJECT_ID, "django_secret_key", default=FALLBACK_SECRET_KEY
 )
 JWT_SECRET_KEY = access_secret(GCP_PROJECT_ID, "JWT_SECRET_KEY", default="not-loaded")
-
 SERVICE_ACCOUNT_JSON = access_secret(GCP_PROJECT_ID, "serviceaccountkey", default="{}")
 
+TRANSCRIPTION_CLOUD_FUNCTION_URL = os.environ.get(
+    "TRANSCRIPTION_CLOUD_FUNCTION_URL", "not-loaded"
+)
+GENERATE_DOCUMENT_CLOUD_FUNCTION_URL = os.environ.get(
+    "GENERATE_DOCUMENT_CLOUD_FUNCTION_URL", "not-loaded"
+)
 # Change to DEBUG mode to help diagnose issues
 DEBUG = True
 

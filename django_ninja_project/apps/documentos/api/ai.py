@@ -39,22 +39,16 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
-def get_cloud_function_url(function_name):
+def get_generate_document_cloud_function_url():
     """Get the URL for a cloud function from settings or environment"""
-    base_url = getattr(settings, "GENERATE_DOCUMENT_CLOUD_FUNCTION_BASE_URL", None)
+    base_url = getattr(settings, "GENERATE_DOCUMENT_CLOUD_FUNCTION_URL", None)
 
     if not base_url:
-        base_url = os.environ.get(
-            "GENERATE_DOCUMENT_CLOUD_FUNCTION_CLOUD_FUNCTION_BASE_URL"
-        )
+        error_msg = "GENERATE_DOCUMENT_CLOUD_FUNCTION_URL setting is not configured"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
-    if not base_url:
-        logger.warning(
-            "GENERATE_DOCUMENT_CLOUD_FUNCTION_BASE_URL not set, using localhost:8080"
-        )
-        base_url = "http://localhost:8080"
-
-    return f"{base_url}/{function_name}"
+    return f"{base_url}"
 
 
 @router.post("/document/generation-chunk", auth=JWTAuth())
@@ -398,7 +392,7 @@ def generate_document_workflow(request, data: DocumentGenerationWorkflowRequest)
         }
 
         # Call cloud function synchronously first to validate inputs
-        url_cloud_function = get_cloud_function_url("generate_document_workflow")
+        url_cloud_function = get_generate_document_cloud_function_url()
 
         try:
             # Make a validation-only request to check if the cloud function accepts our inputs

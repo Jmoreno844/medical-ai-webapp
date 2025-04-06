@@ -216,6 +216,8 @@ jobs:
             GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }}
             ENVIRONMENT=test
             ENABLE_SILK=true
+            GENERATE_DOCUMENT_CLOUD_FUNCTION_URL=${{ vars.GENERATE_DOCUMENT_CLOUD_FUNCTION_URL }}
+            TRANSCRIPTION_CLOUD_FUNCTION_URL=${{ vars.TRANSCRIPTION_CLOUD_FUNCTION_URL }}
           project_id: ${{ env.GCP_PROJECT_ID }}
 
       # Display the deployment URL
