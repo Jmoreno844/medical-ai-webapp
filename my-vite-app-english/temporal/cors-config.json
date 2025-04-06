@@ -1,0 +1,13 @@
+[
+  {
+    "origin": ["http://localhost:5173", "https://medapp.sebastianmoreno.lat/"],
+    "method": ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
+    "responseHeader": [
+      "Content-Type",
+      "Access-Control-Allow-Origin",
+      "Content-Length",
+      "Authorization"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

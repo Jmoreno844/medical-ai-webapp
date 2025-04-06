@@ -56,7 +56,7 @@ export function PlantillaModal({
 
       // For base templates, add "(modificada)" to the name
       if (currentPlantillaDetails.contenido_base) {
-        nombre = `${nombre} (modificada)`;
+        nombre = `${nombre} (modified)`;
       }
 
       setPlantillaData({
@@ -87,13 +87,13 @@ export function PlantillaModal({
   const getDialogDescription = () => {
     switch (modalType) {
       case "create":
-        return "Crear una nueva plantilla para usar en documentos clínicos.";
+        return "Create a new template to use in clinical documents.";
       case "edit":
         return isBaseTemplate
-          ? "Crear una copia modificada de la plantilla base."
-          : "Editar los detalles y el contenido de la plantilla existente.";
+          ? "Create a modified copy of the base template."
+          : "Edit the details and content of the existing template.";
       case "delete":
-        return "Confirmar la eliminación de la plantilla seleccionada.";
+        return "Confirm deletion of the selected template.";
     }
   };
 
@@ -103,9 +103,7 @@ export function PlantillaModal({
         return (
           <>
             <DialogHeader className="pb-2 border-b border-gray-100">
-              <DialogTitle className="text-xl">
-                Crear nueva plantilla
-              </DialogTitle>
+              <DialogTitle className="text-xl">Create new template</DialogTitle>
               <DialogDescription>{getDialogDescription()}</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="flex flex-col h-full">
@@ -115,7 +113,7 @@ export function PlantillaModal({
                     htmlFor="nombre"
                     className="block text-sm font-medium mb-1"
                   >
-                    Nombre
+                    Name
                   </label>
                   <Input
                     id="nombre"
@@ -135,7 +133,7 @@ export function PlantillaModal({
                     htmlFor="contenido"
                     className="block text-sm font-medium mb-1"
                   >
-                    Contenido
+                    Content
                   </label>
                   <Textarea
                     id="contenido"
@@ -146,7 +144,7 @@ export function PlantillaModal({
                         contenido: e.target.value,
                       })
                     }
-                    placeholder="Escribe el contenido de la plantilla aquí..."
+                    placeholder="Write your template content here..."
                     className="min-h-[240px] resize-none border-gray-200"
                   />
                 </div>
@@ -154,7 +152,7 @@ export function PlantillaModal({
               <DialogFooter className="flex items-center border-t border-gray-100 pt-4 gap-2">
                 <div className="mr-auto">
                   <label htmlFor="tipo" className="text-sm font-medium mr-2">
-                    Tipo:
+                    Type:
                   </label>
                   <select
                     id="tipo"
@@ -168,9 +166,9 @@ export function PlantillaModal({
                     className="border border-gray-200 rounded-md p-1 text-sm"
                     required
                   >
-                    <option value="documento">Documento</option>
-                    <option value="receta">Receta</option>
-                    <option value="informe">Informe</option>
+                    <option value="documento">Document</option>
+                    <option value="receta">Prescription</option>
+                    <option value="informe">Report</option>
                   </select>
                 </div>
                 <Button
@@ -179,7 +177,7 @@ export function PlantillaModal({
                   onClick={onClose}
                   className="border-gray-200"
                 >
-                  Cancelar
+                  Cancel
                 </Button>
                 <Button
                   type="submit"
@@ -190,7 +188,7 @@ export function PlantillaModal({
                   {isSubmitting && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  Crear
+                  Create
                 </Button>
               </DialogFooter>
             </form>
@@ -201,7 +199,7 @@ export function PlantillaModal({
           <>
             <DialogHeader className="pb-2 border-b border-gray-100">
               <DialogTitle className="text-xl">
-                {isBaseTemplate ? "Copiar plantilla base" : "Editar plantilla"}
+                {isBaseTemplate ? "Copy base template" : "Edit template"}
               </DialogTitle>
               <DialogDescription>{getDialogDescription()}</DialogDescription>
             </DialogHeader>
@@ -219,8 +217,8 @@ export function PlantillaModal({
                   <Alert className="my-2 bg-amber-50 border-amber-200 text-amber-800">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
-                      Las plantillas base no se pueden modificar directamente.
-                      Se creará una copia personalizada.
+                      Base templates cannot be modified directly. A custom copy
+                      will be created.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -230,7 +228,7 @@ export function PlantillaModal({
                       htmlFor="edit-nombre"
                       className="block text-sm font-medium mb-1"
                     >
-                      Nombre
+                      Name
                     </label>
                     <Input
                       id="edit-nombre"
@@ -250,7 +248,7 @@ export function PlantillaModal({
                       htmlFor="edit-contenido"
                       className="block text-sm font-medium mb-1"
                     >
-                      Contenido
+                      Content
                     </label>
                     <Textarea
                       id="edit-contenido"
@@ -261,7 +259,7 @@ export function PlantillaModal({
                           contenido: e.target.value,
                         })
                       }
-                      placeholder="Escribe el contenido de la plantilla aquí..."
+                      placeholder="Write your template content here..."
                       className="min-h-[240px] resize-none border-gray-200"
                     />
                   </div>
@@ -272,7 +270,7 @@ export function PlantillaModal({
                       htmlFor="edit-tipo"
                       className="text-sm font-medium mr-2"
                     >
-                      Tipo:
+                      Type:
                     </label>
                     <select
                       id="edit-tipo"
@@ -286,9 +284,9 @@ export function PlantillaModal({
                       className="border border-gray-200 rounded-md p-1 text-sm"
                       required
                     >
-                      <option value="documento">Documento</option>
-                      <option value="receta">Receta</option>
-                      <option value="informe">Informe</option>
+                      <option value="documento">Document</option>
+                      <option value="receta">Prescription</option>
+                      <option value="informe">Report</option>
                     </select>
                   </div>
                   <Button
@@ -297,7 +295,7 @@ export function PlantillaModal({
                     onClick={onClose}
                     className="border-gray-300 hover:border-gray-500"
                   >
-                    Cancelar
+                    Cancel
                   </Button>
                   <Button
                     type="submit"
@@ -308,7 +306,7 @@ export function PlantillaModal({
                     {isSubmitting && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
-                    {isBaseTemplate ? "Crear copia" : "Guardar cambios"}
+                    {isBaseTemplate ? "Create copy" : "Save changes"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -319,16 +317,16 @@ export function PlantillaModal({
         return (
           <>
             <DialogHeader>
-              <DialogTitle>Eliminar plantilla</DialogTitle>
+              <DialogTitle>Delete template</DialogTitle>
               <DialogDescription>{getDialogDescription()}</DialogDescription>
             </DialogHeader>
             <div className="py-4">
               <p>
-                ¿Estás seguro de que quieres eliminar la plantilla "
+                Are you sure you want to delete the template "
                 {currentPlantilla?.nombre}"?
               </p>
               <p className="text-sm text-gray-500 mt-2">
-                Esta acción no se puede deshacer.
+                This action cannot be undone.
               </p>
             </div>
             <DialogFooter>
@@ -337,7 +335,7 @@ export function PlantillaModal({
                 onClick={onClose}
                 className="border-gray-300 hover:border-gray-500"
               >
-                Cancelar
+                Cancel
               </Button>
               <Button
                 variant="destructive"
@@ -348,7 +346,7 @@ export function PlantillaModal({
                 {isSubmitting && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                Eliminar
+                Delete
               </Button>
             </DialogFooter>
           </>

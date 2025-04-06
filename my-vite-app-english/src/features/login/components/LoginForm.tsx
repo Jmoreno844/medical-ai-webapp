@@ -6,23 +6,30 @@ import { Button } from "@/commons/components/ui/button";
 import { Input } from "@/commons/components/ui/input";
 import { Label } from "@/commons/components/ui/label";
 
-export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
+// Logger utility for consistent logging
+const logForm = (type: "info" | "error", message: string, data?: any) => {
+  const prefix = "[LoginForm]";
+  if (type === "info") {
+    console.log(`${prefix} ${message}`, data || "");
+  } else {
+    console.error(`${prefix} ${message}`, data || "");
+  }
+};
+
+export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
   const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const { signUp } = useAuth();
-  const navigate = useNavigate();
+  const { login, error, loading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await signUp({ email, name, lastName, password });
-      navigate("/home"); // redirect to home page after successful registration
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Error al registrarse");
+      logForm("info", "Submitting login form", { email });
+      await login(email, password);
+      logForm("info", "Login successful, redirecting to dashboard");
+    } catch (err) {
+      logForm("error", "Form submission error");
+      // Error already handled by useAuth
     }
   };
 
@@ -32,9 +39,9 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
       onSubmit={handleSubmit}
       {...props}
     >
-      {/* Brand logo - smaller size */}
+      {/* Brand logo - with less top margin */}
       <div className="flex justify-center w-full mt-0">
-        <div className="relative w-full max-w-[200px] aspect-square">
+        <div className="relative w-full max-w-[280px] aspect-square">
           <img
             src="/brand_logo_no_text.png"
             alt="Brand Logo"
@@ -42,18 +49,20 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
           />
         </div>
       </div>
-
-      {/* Header Title */}
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-2xl font-bold text-main font-fun tracking-tight">
-          Registro
+          Welcome
         </h1>
         <p className="text-balance text-sm text-neutral-600 dark:text-neutral-300">
-          Crea tu cuenta para acceder a nuestros servicios médicos
+          Enter your credentials to access our services
         </p>
       </div>
-
       <div className="grid gap-7">
+        {error && (
+          <div className="p-4 text-sm font-medium text-red-500 bg-red-50 border border-red-100 rounded-md dark:bg-red-900/20 dark:border-red-900/30">
+            {error}
+          </div>
+        )}
         <div className="grid gap-2.5">
           <Label
             htmlFor="email"
@@ -71,78 +80,45 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
             className="py-2.5"
           />
         </div>
-
         <div className="grid gap-2.5">
-          <Label
-            htmlFor="name"
-            className="font-medium text-neutral-700 dark:text-neutral-200"
-          >
-            Nombre
-          </Label>
-          <Input
-            id="name"
-            type="text"
-            placeholder="Tu nombre"
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="py-2.5"
-          />
-        </div>
-
-        <div className="grid gap-2.5">
-          <Label
-            htmlFor="lastName"
-            className="font-medium text-neutral-700 dark:text-neutral-200"
-          >
-            Apellido
-          </Label>
-          <Input
-            id="lastName"
-            type="text"
-            placeholder="Tu apellido"
-            required
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            className="py-2.5"
-          />
-        </div>
-
-        <div className="grid gap-2.5">
-          <Label
-            htmlFor="password"
-            className="font-medium text-neutral-700 dark:text-neutral-200"
-          >
-            Contraseña
-          </Label>
+          <div className="flex items-center">
+            <Label
+              htmlFor="password"
+              className="font-medium text-neutral-700 dark:text-neutral-200"
+            >
+              Password
+            </Label>
+            <Link
+              to="/forgot-password"
+              className="ml-auto text-sm text-main hover:text-main_dark underline-offset-4 hover:underline transition-colors"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <Input
             id="password"
             type="password"
-            placeholder="Tu contraseña"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="py-2.5"
           />
         </div>
-
-        {error && <div className="text-red-500 text-sm">{error}</div>}
-
         <Button
           type="submit"
-          className="w-full bg-main hover:bg-main_dark text-white font-medium py-6 mt-2 transition-colors"
+          className="w-full bg-blue-500 hover:bg-main_dark text-white font-medium py-6 mt-2 transition-colors"
+          disabled={loading}
         >
-          Registrarse
+          {loading ? "Signing in..." : "Sign In"}
         </Button>
       </div>
-
       <div className="text-center text-sm mt-2">
-        ¿Ya tienes una cuenta?{" "}
+        Don't have an account?{" "}
         <Link
-          to="/login"
+          to="/registro"
           className="font-medium text-main hover:text-main_dark underline underline-offset-4 transition-colors"
         >
-          Iniciar sesión
+          Register
         </Link>
       </div>
     </form>

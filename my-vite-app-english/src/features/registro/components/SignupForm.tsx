@@ -22,7 +22,7 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
       navigate("/home"); // redirect to home page after successful registration
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Error al registrarse");
+      setError(err?.response?.data?.message || "Registration error");
     }
   };
 
@@ -46,10 +46,10 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
       {/* Header Title */}
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-2xl font-bold text-main font-fun tracking-tight">
-          Registro
+          Register
         </h1>
         <p className="text-balance text-sm text-neutral-600 dark:text-neutral-300">
-          Crea tu cuenta para acceder a nuestros servicios médicos
+          Create your account to access our services
         </p>
       </div>
 
@@ -77,12 +77,12 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
             htmlFor="name"
             className="font-medium text-neutral-700 dark:text-neutral-200"
           >
-            Nombre
+            Name
           </Label>
           <Input
             id="name"
             type="text"
-            placeholder="Tu nombre"
+            placeholder="Your name"
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -95,12 +95,12 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
             htmlFor="lastName"
             className="font-medium text-neutral-700 dark:text-neutral-200"
           >
-            Apellido
+            Last Name
           </Label>
           <Input
             id="lastName"
             type="text"
-            placeholder="Tu apellido"
+            placeholder="Your last name"
             required
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
@@ -113,12 +113,12 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
             htmlFor="password"
             className="font-medium text-neutral-700 dark:text-neutral-200"
           >
-            Contraseña
+            Password
           </Label>
           <Input
             id="password"
             type="password"
-            placeholder="Tu contraseña"
+            placeholder="Your password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -132,17 +132,17 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
           type="submit"
           className="w-full bg-main hover:bg-main_dark text-white font-medium py-6 mt-2 transition-colors"
         >
-          Registrarse
+          Register
         </Button>
       </div>
 
       <div className="text-center text-sm mt-2">
-        ¿Ya tienes una cuenta?{" "}
+        Already have an account?{" "}
         <Link
           to="/login"
           className="font-medium text-main hover:text-main_dark underline underline-offset-4 transition-colors"
         >
-          Iniciar sesión
+          Sign in
         </Link>
       </div>
     </form>

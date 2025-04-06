@@ -21,26 +21,17 @@ GENERATION_CONFIG = {
 
 # Define a single, fixed prompt that instructs the model to summarize text
 SUMMARY_PROMPT = """
-Por favor, resume el siguiente texto médico de manera profesional, manteniendo la 
-información clínica importante y organizándola de manera clara:
+Please summarize the following medical text professionally, maintaining the
+important clinical information and organizing it clearly:
 
 {text}
 
-Resumen:
-"""
-
-EXPAND_PROMPT = """
-Por favor, desarrolla y expande el siguiente texto médico con más detalles profesionales, 
-manteniendo un tono clínico apropiado:
-
-{text}
-
-Versión expandida:
+Summary:
 """
 
 TRANSLATE_PROMPT = """
-Por favor, traduce el siguiente texto médico del español al inglés, manteniendo toda la 
-terminología clínica relevante:
+Please translate the following medical text from Spanish to English, preserving all
+relevant clinical terminology:
 
 {text}
 
@@ -48,28 +39,28 @@ English translation:
 """
 
 DOCUMENT_GENERATION_PROMPT = """
-Tu tarea es generar un documento médico basado en los siguientes componentes:
+Your task is to generate a medical document based on the following components:
 
-1. PLANTILLA: 
+1. TEMPLATE: 
 {template}
 
-2. CONTEXTO DEL PACIENTE:
+2. PATIENT CONTEXT:
 {context}
 
-3. TRANSCRIPCIÓN DE LA CONVERSACIÓN:
+3. CONVERSATION TRANSCRIPT:
 {transcription}
 
-Instrucciones:
-- Utiliza la estructura proporcionada en la PLANTILLA.
-- Completa cada sección con información relevante del CONTEXTO y la TRANSCRIPCIÓN.
-- Mantén un tono profesional y médico en todo momento.
-- Si hay secciones en la plantilla que no pueden ser completadas con la información disponible, 
-  indícalo con "Información no disponible" o proporciona una observación genérica apropiada.
-- Asegúrate de que el documento final sea coherente y siga las convenciones médicas.
-- Incluye fechas, horas y cualquier dato específico mencionado en la transcripción.
-- No inventes información que no esté presente en los datos proporcionados.
+Instructions:
+- Use the structure provided in the TEMPLATE.
+- Complete each section with relevant information from the CONTEXT and TRANSCRIPT.
+- Maintain a professional and medical tone throughout.
+- If there are sections in the template that cannot be completed with the available information,
+  indicate it with "Information not available" or provide an appropriate generic observation.
+- Ensure the final document is coherent and follows medical conventions.
+- Include dates, times, and any specific data mentioned in the transcript.
+- Do not invent information that is not present in the provided data.
 
-Genera el documento completo:
+Generate the complete document:
 """
 
 TRANSCRIPTION_PROMPT = """

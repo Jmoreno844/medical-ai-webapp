@@ -21,19 +21,19 @@ jobs:
         with:
           fetch-depth: 2 # Needed to check for changes between commits
 
-      - name: Check for changes in my-vite-app directory
+      - name: Check for changes in my-vite-app-english directory
         id: check_changes
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "Changes detected due to manual workflow dispatch"
             echo "changes=true" >> $GITHUB_OUTPUT
           else
-            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep "^my-vite-app/" || echo "")
+            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep "^my-vite-app-english/" || echo "")
             if [ -z "$CHANGED_FILES" ]; then
-              echo "No changes in my-vite-app directory"
+              echo "No changes in my-vite-app-english directory"
               echo "changes=false" >> $GITHUB_OUTPUT
             else
-              echo "Changes detected in my-vite-app directory"
+              echo "Changes detected in my-vite-app-english directory"
               echo "changes=true" >> $GITHUB_OUTPUT
             fi
           fi
@@ -44,16 +44,16 @@ jobs:
         with:
           node-version: "18"
           cache: "npm"
-          cache-dependency-path: my-vite-app/package-lock.json
+          cache-dependency-path: my-vite-app-english/package-lock.json
 
       - name: Install dependencies
         if: steps.check_changes.outputs.changes == 'true'
-        working-directory: ./my-vite-app
+        working-directory: ./my-vite-app-english
         run: npm ci
 
       - name: Build Vite.js static site
         if: steps.check_changes.outputs.changes == 'true'
-        working-directory: ./my-vite-app
+        working-directory: ./my-vite-app-english
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
         run: npm run build:skip-ts
@@ -72,7 +72,7 @@ jobs:
 
       - name: Deploy to GCS bucket
         if: steps.check_changes.outputs.changes == 'true'
-        working-directory: ./my-vite-app
+        working-directory: ./my-vite-app-english
         run: |
           echo "Syncing the dist directory to GCS bucket gs://${{ env.BUCKET_NAME }}"
           gsutil -m rsync -r -d dist/ gs://${{ env.BUCKET_NAME }}/

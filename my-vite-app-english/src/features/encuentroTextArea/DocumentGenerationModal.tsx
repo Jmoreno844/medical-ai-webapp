@@ -1,0 +1,176 @@
+import React from "react";
+import Modal from "@/commons/components/Modal";
+
+interface Plantilla {
+  id: number;
+  nombre: string;
+  tipo_documento: string;
+  fecha_creacion: string;
+  es_base: boolean;
+  veces_usada: number;
+  ultimo_uso: string | null;
+}
+
+interface DocumentGenerationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onGenerate: () => Promise<any>; // Changed type to return Promise
+  isGenerating: boolean;
+  error: string | null;
+  plantillas: Plantilla[];
+  isLoadingPlantillas: boolean;
+  plantillasError: string | null;
+  selectedPlantillaId: number | null;
+  setSelectedPlantillaId: (id: number) => void;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  generationStatus?: {
+    inProgress: boolean;
+    content: string;
+    isComplete: boolean;
+    error: string | null;
+  };
+}
+
+const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
+  isOpen,
+  onClose,
+  onGenerate,
+  isGenerating,
+  error, // Uncomment this to use the error prop
+  plantillas,
+  isLoadingPlantillas,
+  plantillasError,
+  selectedPlantillaId,
+  setSelectedPlantillaId,
+  searchQuery,
+  setSearchQuery,
+}) => {
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Generate Medical Documentation"
+      primaryButtonText="Generate"
+      onPrimaryAction={onGenerate}
+      isPrimaryDisabled={isGenerating || !selectedPlantillaId}
+      primaryButtonVariant="purple"
+    >
+      <div className="space-y-4">
+        {/* Error message box */}
+        {error && (
+          <div
+            className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+            role="alert"
+          >
+            <strong className="font-bold">Error: </strong>
+            <span className="block sm:inline">{error}</span>
+          </div>
+        )}
+
+        {/* Search bar for plantillas */}
+        <div>
+          <label
+            htmlFor="search-plantillas"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Search Templates
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+              <svg
+                className="w-4 h-4 text-gray-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
+            <input
+              id="search-plantillas"
+              type="search"
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              placeholder="Search by name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Plantillas selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Select a Template
+          </label>
+          <div className="border border-gray-300 rounded-md overflow-hidden max-h-64 overflow-y-auto">
+            {isLoadingPlantillas ? (
+              <div className="flex items-center justify-center p-4">
+                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-600 mr-2"></div>
+                <span className="text-sm text-gray-600">
+                  Loading templates...
+                </span>
+              </div>
+            ) : plantillasError ? (
+              <div className="p-4 bg-red-50 text-red-700 text-sm">
+                {plantillasError}
+              </div>
+            ) : plantillas.length === 0 ? (
+              <div className="p-4 text-sm text-gray-500 text-center">
+                {searchQuery
+                  ? "No templates found with that name"
+                  : "No templates available"}
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-200">
+                {plantillas.map((plantilla) => {
+                  const isSelected = selectedPlantillaId === plantilla.id;
+                  return (
+                    <div
+                      key={plantilla.id}
+                      className={`p-3 cursor-pointer transition-colors duration-150 ${
+                        isSelected
+                          ? "bg-blue-100 border-l-4 border-blue-500"
+                          : "hover:bg-gray-50 border-l-4 border-transparent"
+                      }`}
+                      onClick={() => setSelectedPlantillaId(plantilla.id)}
+                      role="option"
+                      aria-selected={isSelected}
+                      tabIndex={0}
+                    >
+                      <div className="flex items-center">
+                        <span
+                          className={`block text-sm font-medium ${
+                            isSelected ? "text-blue-700" : "text-gray-700"
+                          }`}
+                        >
+                          {plantilla.nombre}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        <span className="mr-3">{plantilla.tipo_documento}</span>
+                        <span>
+                          {plantilla.es_base
+                            ? "Base Template"
+                            : `Used ${plantilla.veces_usada} times`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+export default DocumentGenerationModal;
