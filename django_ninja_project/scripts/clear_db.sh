@@ -2,7 +2,7 @@
 set -e
 
 # Load environment variables from .env file
-source /home/juan/Desktop/Proyecto_AI_Medico/github_medical_web_app/django_ninja_project/.env
+source /home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/django_ninja_project/.env
 
 echo "Using database credentials from .env file"
 echo "Database: $DB_NAME, User: $DB_USER"

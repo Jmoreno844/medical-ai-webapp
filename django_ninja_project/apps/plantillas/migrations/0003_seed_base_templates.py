@@ -13,40 +13,39 @@ def create_base_templates(apps, schema_editor):
         nombre="Medical History",
         tipo_documento="documento",
         contenido="""
-# Medical History
 
-## Patient Data
-- Name: [Patient's name] (skip if not in context)
-- Age: [Patient's age] (skip if not in context)
-- Sex: [Patient's sex] (skip if not in context)
-- Date of Birth: [Date of birth] (skip if not in context)
-- Medical Record Number: [Medical record number] (skip if not in context)
+**Patient Data**
+Name: [Patient's name] (skip if not in context)
+Age: [Patient's age] (skip if not in context)
+Sex: [Patient's sex] (skip if not in context)
+Date of Birth: [Date of birth] (skip if not in context)
+Medical Record Number: [Medical record number] (skip if not in context)
 
-## Reason for Visit
-- [Description of the reason for visit] (skip if not in context)
+**Reason for Visit**
+[Description of the reason for visit] (skip if not in context)
 
-## Medical History
-- Previous Illnesses: [List of previous illnesses] (skip if not in context)
-- Surgeries: [List of surgeries] (skip if not in context)
-- Allergies: [List of allergies] (skip if not in context)
-- Current Medications: [List of current medications] (skip if not in context)
+**Medical History**
+Previous Illnesses: [List of previous illnesses] (skip if not in context)
+Surgeries: [List of surgeries] (skip if not in context)
+Allergies: [List of allergies] (skip if not in context)
+Current Medications: [List of current  (drugs or similar)] (skip if not in context)
 
-## Physical Examination
-- Vital Signs: [Vital signs] (skip if not in context)
-- Examination Description: [Detailed description of physical examination] (skip if not in context)
+**Physical Examination**
+Vital Signs: [Vital signs] (skip if not in context)
+Examination Description: [Detailed description of physical examination] (skip if not in context)
 
-## Diagnosis
-- Primary Diagnosis: [Primary diagnosis] (skip if not in context)
-- Secondary Diagnoses: [List of secondary diagnoses] (skip if not in context)
+**Diagnosis**
+Primary Diagnosis: [Primary diagnosis] (skip if not in context)
+Secondary Diagnoses: [List of secondary diagnoses] (skip if not in context)
 
-## Treatment
-- Prescribed Medications: [List of prescribed medications] (skip if not in context)
-- Procedures: [List of procedures performed or recommended] (skip if not in context)
-- Patient Instructions: [Detailed instructions for the patient] (skip if not in context)
+**Treatment**
+Prescribed Medications: [List of prescribed medications] (skip if not in context)
+Procedures: [List of procedures performed or recommended] (skip if not in context)
+Patient Instructions: [Detailed instructions for the patient] (skip if not in context)
 
-## Follow-up Plan
-- Next Appointment: [Date and time of next appointment] (skip if not in context)
-- Requested Studies: [List of requested studies] (skip if not in context)
+**Follow-up Plan**
+Next Appointment: [Date and time of next appointment] (skip if not in context)
+Requested Studies: [List of requested studies] (skip if not in context)
     """,
         created_at=timezone.now(),
     )
@@ -56,37 +55,37 @@ def create_base_templates(apps, schema_editor):
         nombre="Discharge Report",
         tipo_documento="documento",
         contenido="""
-# Discharge Report
+**Discharge Report**
 
-## Patient Data
-- Name: [Patient's name] (skip if not in context)
-- Age: [Patient's age] (skip if not in context)
-- Sex: [Patient's sex] (skip if not in context)
-- Admission Date: [Admission date] (skip if not in context)
-- Discharge Date: [Discharge date] (skip if not in context)
+**Patient Data**
+Name: [Patient's name] (skip if not in context)
+Age: [Patient's age] (skip if not in context)
+Sex: [Patient's sex] (skip if not in context)
+Admission Date: [Admission date] (skip if not in context)
+Discharge Date: [Discharge date] (skip if not in context)
 
-## Admission Diagnosis
-- [Diagnosis at the time of admission] (skip if not in context)
+**Admission Diagnosis**
+[Diagnosis at the time of admission] (skip if not in context)
 
-## Stay Summary
-- Procedures Performed: [List of procedures performed] (skip if not in context)
-- Complications: [Description of complications, if any] (skip if not in context)
-- Treatment Administered: [Description of treatment administered] (skip if not in context)
+**Stay Summary**
+Procedures Performed: [List of procedures performed] (skip if not in context)
+Complications: [Description of complications, if any] (skip if not in context)
+Treatment Administered: [Description of treatment administered] (skip if not in context)
 
-## Discharge Diagnosis
-- Primary Diagnosis: [Primary diagnosis at discharge] (skip if not in context)
-- Secondary Diagnoses: [List of secondary diagnoses at discharge] (skip if not in context)
+**Discharge Diagnosis**
+Primary Diagnosis: [Primary diagnosis at discharge] (skip if not in context)
+Secondary Diagnoses: [List of secondary diagnoses at discharge] (skip if not in context)
 
-## Condition at Discharge
-- Patient Status: [Description of patient status at discharge] (skip if not in context)
-- Vital Signs: [Vital signs at discharge] (skip if not in context)
+**Condition at Discharge**
+Patient Status: [Description of patient status at discharge] (skip if not in context)
+Vital Signs: [Vital signs at discharge] (skip if not in context)
 
-## Follow-up Instructions
-- Prescribed Medications: [List of medications prescribed to continue at home] (skip if not in context)
-- Special Care: [Instructions on special care] (skip if not in context)
-- Diet: [Dietary recommendations] (skip if not in context)
-- Physical Activity: [Recommendations on physical activity] (skip if not in context)
-- Next Appointment: [Date and time of next appointment] (skip if not in context)
+**Follow-up Instructions**
+Prescribed Medications: [List of medications prescribed to continue at home] (skip if not in context)
+Special Care: [Instructions on special care] (skip if not in context)
+Diet: [Dietary recommendations] (skip if not in context)
+Physical Activity: [Recommendations on physical activity] (skip if not in context)
+Next Appointment: [Date and time of next appointment] (skip if not in context)
     """,
         created_at=timezone.now(),
     )

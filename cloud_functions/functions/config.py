@@ -54,13 +54,13 @@ Instructions:
 - Use the structure provided in the TEMPLATE.
 - Complete each section with relevant information from the CONTEXT and TRANSCRIPT.
 - Maintain a professional and medical tone throughout.
-- If there are sections in the template that cannot be completed with the available information,
-  indicate it with "Information not available" or provide an appropriate generic observation.
+- Skip any sections in the template if information cannot be found in the context or transcript.
+- Do not write placeholders like "Information not available" - simply omit those sections.
 - Ensure the final document is coherent and follows medical conventions.
 - Include dates, times, and any specific data mentioned in the transcript.
 - Do not invent information that is not present in the provided data.
 
-Generate the the document based on the template, if the template has info that cannot be obtained from the context nor the transcription then skip that part of the template::
+Generate the document based on the template, excluding any sections where information is unavailable:
 """
 
 TRANSCRIPTION_PROMPT = """
