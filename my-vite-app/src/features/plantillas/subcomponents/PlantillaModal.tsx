@@ -290,14 +290,15 @@ export function PlantillaModal({
                     variant="outline"
                     type="button"
                     onClick={onClose}
-                    className="border-gray-200"
+                    className="border-gray-300 hover:border-gray-500"
                   >
                     Cancelar
                   </Button>
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    variant={isBaseTemplate ? "secondary" : "default"}
+                    variant={"destructive"}
+                    className="bg-purple-500 hover:bg-purple-600"
                   >
                     {isSubmitting && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -329,7 +330,7 @@ export function PlantillaModal({
               <Button
                 variant="outline"
                 onClick={onClose}
-                className="border-gray-200"
+                className="border-gray-300 hover:border-gray-500"
               >
                 Cancelar
               </Button>
@@ -337,6 +338,7 @@ export function PlantillaModal({
                 variant="destructive"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
+                className="bg-red-600 hover:bg-red-700"
               >
                 {isSubmitting && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

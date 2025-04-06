@@ -236,3 +236,46 @@ def track_plantilla_usage(request, id_plantilla: int):
 
     # Return a simple success response
     return {"success": True, "message": "Template usage tracked successfully"}
+
+
+@router.delete("/plantillas/{id_plantilla}", auth=django_auth)
+def delete_plantilla_doctor(request, id_plantilla: int):
+    """
+    Delete a doctor's template.
+
+    This endpoint allows authenticated doctors to delete their own templates.
+    First deletes all usage records associated with the template,
+    then deletes the template itself.
+
+    Cannot delete templates where contenido_base is True.
+
+    Args:
+        request: The HTTP request
+        id_plantilla: The ID of the template to delete
+
+    Returns:
+        A success message
+
+    Raises:
+        HttpError: If the user is not authorized, the template is not found,
+                  or if attempting to delete a base template
+    """
+    # Get the template or return 404
+    plantilla = get_object_or_404(PlantillaDoctor, id=id_plantilla)
+
+    # Check authorization - make sure the requesting user is the template owner
+    if request.user.id != plantilla.id_medico.id:
+        raise HttpError(403, "You don't have permission to delete this template")
+
+    # Check if this is a base template - if so, don't allow deletion
+    if plantilla.contenido_base:
+        raise HttpError(400, "Base templates cannot be deleted")
+
+    # Delete all usage records for this template
+    UsoPlantilla.objects.filter(id_plantilla=plantilla).delete()
+
+    # Now delete the template itself
+    plantilla.delete()
+
+    # Return a success message
+    return {"success": True, "message": "Template deleted successfully"}

@@ -32,6 +32,7 @@ const Modal: React.FC<ModalProps> = ({
   onPrimaryAction,
   secondaryButtonText = "Cancel",
   isPrimaryDestructive = false,
+  isPrimaryDisabled = false,
 }) => {
   if (!isOpen) return null;
 
@@ -40,7 +41,7 @@ const Modal: React.FC<ModalProps> = ({
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
       data-testid="modal-overlay"
     >
-      <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+      <div className="bg-card text-card-foreground rounded-lg shadow-xl p-6 w-full max-w-md">
         {/* Modal header */}
         <h2 className="text-xl font-semibold mb-4">{title}</h2>
 
@@ -50,19 +51,20 @@ const Modal: React.FC<ModalProps> = ({
         {/* Modal actions */}
         <div className="flex justify-end space-x-3">
           <button
-            className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+            className="px-4 py-2 bg-secondary text-secondary-foreground rounded hover:bg-secondary/80"
             onClick={onClose}
           >
             {secondaryButtonText}
           </button>
           {onPrimaryAction && (
             <button
-              className={`px-4 py-2 rounded text-white ${
+              className={`px-4 py-2 rounded ${
                 isPrimaryDestructive
-                  ? "bg-red-500 hover:bg-red-600"
-                  : "bg-purple-500 hover:bg-purple-600"
+                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90"
               }`}
               onClick={onPrimaryAction}
+              disabled={isPrimaryDisabled}
             >
               {primaryButtonText}
             </button>
