@@ -293,8 +293,14 @@ export function useEncuentroHeader(
     });
 
     if (success) {
-      // Update local state to reflect the new encounter name
+      // Update ALL relevant local state variables immediately
       setEncounterName(patientName);
+      setIsPatientConnected(true); // Add this line to fix the unlink button
+      setPatientId(patientId); // Add this to ensure patient ID is updated
+      setPatientName(patientName); // Add this to ensure patient name is updated
+
+      // Close the modal
+      setIsModalOpen(false);
 
       // Call the callback function to update UI state
       onUpdatePatient(patientId, patientName);
@@ -331,8 +337,14 @@ export function useEncuentroHeader(
     });
 
     if (success) {
-      // Update local encounter name state
+      // Update ALL local state variables
       setEncounterName(encounterName);
+      setIsPatientConnected(true); // Add this line
+      setPatientId(patientId); // Add this line
+      setPatientName(patientName); // Add this line
+
+      // Close the modal
+
       // Call the callback function to update UI state
       onUpdatePatientAndEncounter(patientId, patientName, encounterName);
     } else {
