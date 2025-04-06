@@ -45,8 +45,22 @@ export const useDocumentContent = ({
     // Skip if no document
     if (!document?.id) return;
 
-    // Skip if content is already loaded for this exact document
-    if (documentIdRef.current === document.id && contentHasBeenSet) {
+    // If this is the same document but we detect different content length, allow reload
+    if (
+      documentIdRef.current === document.id &&
+      contentHasBeenSet &&
+      document?.contenido &&
+      document?.contenido.length !== (documentContent?.length || 0)
+    ) {
+      console.log(
+        `[DOC_CONTENT] Detected different content length for document ${
+          document.id
+        } (${document?.contenido.length} vs ${
+          documentContent?.length || 0
+        }), forcing reload`
+      );
+      // No return here to allow reload
+    } else if (documentIdRef.current === document.id && contentHasBeenSet) {
       console.log(
         `[DOC_CONTENT] Document ${document.id}: Already loaded same document, skipping reload`
       );

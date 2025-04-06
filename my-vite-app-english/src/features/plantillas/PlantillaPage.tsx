@@ -87,14 +87,14 @@ export default function PlantillasPage() {
   };
 
   const formatDate = (dateString: string | null) => {
-    if (!dateString) return "Nunca";
+    if (!dateString) return "Never";
 
     try {
       return format(new Date(dateString), "dd/MM/yyyy HH:mm", {
         locale: es,
       });
     } catch (e) {
-      return "Fecha inválida";
+      return "Date format error";
     }
   };
 
@@ -105,7 +105,8 @@ export default function PlantillasPage() {
         <Button
           onClick={openCreateModal}
           variant="outline"
-          className="flex items-center gap-2 bg-white"
+          className="flex items-center gap-2 bg-purple-600 text-white font-medium 
+          text-base hover:bg-purple-500 transition-colors hover:text-white"
         >
           <PlusCircle className="h-4 w-4" />
           Create Template

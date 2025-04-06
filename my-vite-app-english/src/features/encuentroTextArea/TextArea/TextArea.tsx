@@ -93,6 +93,9 @@ interface TextAreaProps {
     error: string | null;
     isComplete: boolean;
   };
+
+  transcriptionCompleteTimestamp?: number | null;
+  registerReloadFunction?: (reloadFunc: () => Promise<void>) => void; // New prop for registering reload function
 }
 
 /**
@@ -113,6 +116,8 @@ const TextArea: React.FC<TextAreaProps> = ({
   onDocumentSwitch,
   refreshTrigger = 0,
   generationStatus,
+  transcriptionCompleteTimestamp,
+  registerReloadFunction,
 }) => {
   // Track the previous document to detect changes
   const previousDocIdRef = useRef<number | null>(null);
@@ -268,6 +273,20 @@ const TextArea: React.FC<TextAreaProps> = ({
       return () => clearTimeout(timer);
     }
   }, [generationStatus, document]);
+
+  // Register the reload content function with parent component
+  useEffect(() => {
+    if (
+      registerReloadFunction &&
+      document &&
+      typeof reloadContent === "function"
+    ) {
+      console.log(
+        `[TEXT_AREA] Registering reload function for document ${document.id}`
+      );
+      registerReloadFunction(reloadContent);
+    }
+  }, [document?.id, reloadContent, registerReloadFunction]);
 
   // Only proceed with rendering editor if we have a document
   if (!document) {

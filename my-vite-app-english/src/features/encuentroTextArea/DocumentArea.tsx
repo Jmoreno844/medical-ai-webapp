@@ -205,6 +205,18 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
   const pollingTimerRef = useRef<number | null>(null);
   const lastAttemptTimeRef = useRef<number>(0);
 
+  // Add a ref to store the reload function
+  const reloadContentRef = useRef<(() => Promise<void>) | null>(null);
+
+  // Add a function to register the reload content function
+  const registerReloadFunction = useCallback(
+    (reloadFunc: () => Promise<void>) => {
+      console.log("[DOC_AREA] Reload function registered");
+      reloadContentRef.current = reloadFunc;
+    },
+    []
+  );
+
   // React to transcription complete events with smarter polling
   useEffect(() => {
     console.log("[DOC_AREA] Effect triggered with", {
@@ -214,6 +226,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
       cacheExists: documentContentCache
         ? documentContentCache.has(transcriptionDocId as number)
         : false,
+      hasReloadFunction: !!reloadContentRef.current,
     });
 
     // Skip if we've already processed this timestamp
@@ -245,6 +258,24 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
       // Mark this timestamp as processed
       if (transcriptionCompleteTimestamp) {
         processedTimestampsRef.current.add(transcriptionCompleteTimestamp);
+      }
+
+      // IMPORTANT: Directly trigger reload via the ref if available
+      if (reloadContentRef.current) {
+        console.log(
+          "[DOC_AREA] Triggering direct reload via registered function"
+        );
+        reloadContentRef
+          .current()
+          .then(() => {
+            console.log("[DOC_AREA] Content reloaded successfully");
+          })
+          .catch((err) => {
+            console.error("[DOC_AREA] Error reloading content:", err);
+          });
+        // Still refresh the component to ensure UI updates
+        setRefreshTrigger((prev) => prev + 1);
+        return; // Skip the normal polling process
       }
 
       // Check if document already has content of significant length
@@ -368,6 +399,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
     activeDocumentId,
     transcriptionDocId,
     fetchDocumentContent,
+    documentContentCache, // Add cache to dependencies
   ]);
 
   if (loading) {
@@ -423,6 +455,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
               await saveDocument(docId, content);
             }}
             registerSaveFunction={registerSaveFunction}
+            registerReloadFunction={registerReloadFunction} // Add this prop
             documentContentCache={documentContentCache}
             fetchDocumentContent={fetchDocumentContent}
             isLoadingContent={isLoadingContent}
@@ -434,6 +467,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
             }}
             refreshTrigger={refreshTrigger}
             generationStatus={generationStatus} // Pass generation status to TextArea
+            transcriptionCompleteTimestamp={transcriptionCompleteTimestamp} // Pass this through
           />
         ) : (
           <div className="flex items-center justify-center h-full text-gray-500">

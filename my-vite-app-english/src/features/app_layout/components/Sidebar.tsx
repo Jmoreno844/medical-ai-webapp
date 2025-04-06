@@ -194,23 +194,6 @@ const Sidebar = () => {
         {/* Bottom section with settings and logout */}
         <div className="mt-auto border-t border-gray-200">
           {/* Settings button */}
-          <div className="w-10/12 mx-auto my-1">
-            <Link
-              to="/configuracion"
-              className="flex items-center w-full py-2 hover:bg-gray-100"
-            >
-              <div className="w-10 md:w-12 lg:w-14 flex items-center justify-center">
-                <Icon
-                  src="/settings.svg"
-                  className="h-4 w-4 md:h-5 md:w-5 text-black"
-                  alt="Configuración"
-                />
-              </div>
-              {isExpanded && (
-                <span className="text-xs md:text-sm">Configuración</span>
-              )}
-            </Link>
-          </div>
 
           {/* Logout button - FIXED */}
           <div className="w-10/12 mx-auto my-1 mb-2">

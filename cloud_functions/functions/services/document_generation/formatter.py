@@ -3,58 +3,22 @@ Formatting utilities for document generation.
 """
 
 import logging
+from config import (
+    SUMMARY_PROMPT,
+    TRANSLATE_PROMPT,
+    DOCUMENT_GENERATION_PROMPT,
+)
 
 # Initialize logger
 logger = logging.getLogger(__name__)
 
-# Document generation prompts
-SUMMARY_PROMPT = """
-Proporciona un resumen breve y claro del siguiente texto, resaltando los puntos principales:
-
-{text}
-
-Resumen:
-"""
-
+# Define expand prompt (not available in config.py)
 EXPAND_PROMPT = """
 Expande y proporciona más detalles sobre el siguiente texto:
 
 {text}
 
 Versión expandida:
-"""
-
-TRANSLATE_PROMPT = """
-Traduce el siguiente texto del español al inglés, manteniendo el tono y estilo:
-
-{text}
-
-Traducción:
-"""
-
-DOCUMENT_GENERATION_PROMPT = """
-Tu tarea es generar un documento médico basado en los siguientes componentes:
-
-1. PLANTILLA: 
-{template}
-
-2. CONTEXTO DEL PACIENTE:
-{context}
-
-3. TRANSCRIPCIÓN DE LA CONVERSACIÓN:
-{transcription}
-
-Instrucciones:
-- Utiliza la estructura proporcionada en la PLANTILLA.
-- Completa cada sección con información relevante del CONTEXTO y la TRANSCRIPCIÓN.
-- Mantén un tono profesional y médico en todo momento.
-- Si hay secciones en la plantilla que no pueden ser completadas con la información disponible, 
-  indícalo con "Información no disponible" o proporciona una observación genérica apropiada.
-- Asegúrate de que el documento final sea coherente y siga las convenciones médicas.
-- Incluye fechas, horas y cualquier dato específico mencionado en la transcripción.
-- No inventes información que no esté presente en los datos proporcionados.
-
-Genera el documento completo:
 """
 
 

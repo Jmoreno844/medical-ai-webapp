@@ -11,10 +11,8 @@ from models.gemini_client import (
     generate_content_streaming as gemini_generate_content_streaming,
 )
 from services.django_api import send_generation_chunk
-from services.document_generation.formatter import (
-    get_prompt_for_type,
-    DOCUMENT_GENERATION_PROMPT,
-)
+from services.document_generation.formatter import get_prompt_for_type
+from config import DOCUMENT_GENERATION_PROMPT
 
 # Initialize logger
 logger = logging.getLogger(__name__)

@@ -224,7 +224,11 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
               </p>
               <p className="mb-4">
                 Redirecting to{" "}
-                <span className="font-medium">{redirectInfo.name}</span>
+                <span className="font-medium">
+                  {redirectInfo.name === "Encuentro Nuevo"
+                    ? "New Encounter"
+                    : redirectInfo.name}
+                </span>
                 ...
               </p>
               <div className="bg-gray-200 h-1 rounded-full max-w-xs mx-auto">

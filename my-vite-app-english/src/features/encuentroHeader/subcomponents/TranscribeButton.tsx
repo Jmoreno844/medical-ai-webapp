@@ -92,7 +92,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
 
   // Determine button appearance based on state
   const buttonClasses = `
-    flex items-center justify-center px-2 py-1 rounded-md
+    flex items-center justify-center px-2 py-1 rounded-md py-1.5
     ${
       isDisabled
         ? "bg-gray-200 text-gray-400 cursor-not-allowed"
