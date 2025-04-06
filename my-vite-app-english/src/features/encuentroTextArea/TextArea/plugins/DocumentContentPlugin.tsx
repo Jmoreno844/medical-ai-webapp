@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $getRoot, $createParagraphNode, $createTextNode } from "lexical";
+import { $convertFromMarkdownString, TRANSFORMERS } from "@lexical/markdown";
 
 interface DocumentContentPluginProps {
   documentId: number;
@@ -46,7 +47,11 @@ export function DocumentContentPlugin({
 
     // Handle streaming content updates if provided
     if (streamingContent && streamingContent.length > 5) {
-      // Only use if substantial content
+      // Skip if unchanged
+      if (streamingContent === lastStreamContentRef.current) {
+        return;
+      }
+
       console.log(
         `🔄 Document ${documentId}: Using streaming content (${streamingContent.length} chars)`
       );
@@ -65,6 +70,7 @@ export function DocumentContentPlugin({
           return;
         }
 
+        // For streaming content, we should not parse markdown
         // Simple content parsing: split by new lines
         const lines = streamingContent.split("\n");
 
@@ -203,14 +209,8 @@ export function DocumentContentPlugin({
           return;
         }
 
-        // Simple content parsing: split by new lines
-        const lines = content.split("\n");
-
-        lines.forEach((line) => {
-          const paragraph = $createParagraphNode();
-          paragraph.append($createTextNode(line));
-          root.append(paragraph);
-        });
+        // Convert markdown to rich text (this correctly handles **bold** syntax)
+        $convertFromMarkdownString(content, TRANSFORMERS);
       });
     }
   }, [

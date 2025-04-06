@@ -5,6 +5,13 @@ import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
+// Fix the import name - change LexicalMarkdownShortcutPlugin to MarkdownShortcutPlugin
+import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
+import {
+  $convertFromMarkdownString,
+  $convertToMarkdownString,
+  TRANSFORMERS,
+} from "@lexical/markdown";
 
 // Import custom plugins
 import {
@@ -333,14 +340,17 @@ const TextArea: React.FC<TextAreaProps> = ({
       {streamingContent !== undefined && (
         <div className="bg-purple-100 p-2 border-b border-purple-200">
           <div className="flex items-center justify-between">
+            <div className="w-24 invisible">
+              {/* Empty space for balance */}
+            </div>
             <div className="flex items-center">
               <div className="animate-pulse h-3 w-3 rounded-full bg-purple-500 mr-2"></div>
               <span className="text-purple-800 font-medium">
-                Generando documento...
+                Generating document...
               </span>
             </div>
-            <div className="text-purple-600 text-sm">
-              {streamingContent.length} caracteres
+            <div className="text-purple-600 text-sm w-24 text-right">
+              {streamingContent.length} characters
             </div>
           </div>
 
@@ -370,7 +380,7 @@ const TextArea: React.FC<TextAreaProps> = ({
       {/* Display generation success indicator for 2 seconds */}
       {showGenerationSuccess && (
         <div className="bg-green-100 p-2 border-b border-green-200 text-green-800">
-          <div className="flex items-center">
+          <div className="flex items-center justify-center">
             <svg
               className="h-4 w-4 mr-2"
               fill="currentColor"
@@ -378,11 +388,11 @@ const TextArea: React.FC<TextAreaProps> = ({
             >
               <path
                 fillRule="evenodd"
-                d="M16.707 5.293a1 1 0 010 1.414l-8 8a 1 1 0 01-1.414 0l-4-4a 1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
                 clipRule="evenodd"
               />
             </svg>
-            <span className="font-medium">Documento generado exitosamente</span>
+            <span className="font-medium">Document generated successfully</span>
           </div>
         </div>
       )}
@@ -436,6 +446,8 @@ const TextArea: React.FC<TextAreaProps> = ({
 
             {/* Core plugins */}
             <HistoryPlugin />
+            {/* Fixed component name from LexicalMarkdownShortcutPlugin to MarkdownShortcutPlugin */}
+            <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
             <DocumentContentPlugin
               documentId={document.id}
               content={documentContent}
