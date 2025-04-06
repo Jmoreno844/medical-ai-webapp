@@ -153,6 +153,8 @@ def access_secret(project_id, secret_id, version_id="latest", default=None):
         return default
 
 
+ENVIRONMENT = "test"
+
 # Project settings
 GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 

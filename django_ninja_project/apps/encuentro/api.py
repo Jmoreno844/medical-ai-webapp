@@ -20,6 +20,20 @@ from django.conf import settings
 import uuid
 from google.oauth2 import service_account
 
+
+# Helper function to get GCS client based on environment
+def get_storage_client():
+    if getattr(settings, "ENVIRONMENT", "dev") == "dev":
+        # For development, use the service account credentials file
+        credentials = service_account.Credentials.from_service_account_file(
+            settings.GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH
+        )
+        return storage.Client(credentials=credentials)
+    else:
+        # For test/production environments, use default credentials
+        return storage.Client()
+
+
 router = Router(tags=["encuentros"])
 
 
@@ -169,11 +183,8 @@ def generate_upload_url(request, encuentro_id: int, payload: AudioUploadRequest)
         if request.user.id != encuentro.id_medico.id:
             return {"success": False, "error": "Not authorized"}
 
-        # Initialize GCS client with service account credentials
-        credentials = service_account.Credentials.from_service_account_file(
-            settings.GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH
-        )
-        storage_client = storage.Client(credentials=credentials)
+        # Initialize GCS client based on environment
+        storage_client = get_storage_client()
         bucket = storage_client.bucket(settings.GCS_BUCKET_NAME)
 
         # Generate unique filename
@@ -240,11 +251,8 @@ def delete_audio(request, encuentro_id: int):
 
         # Check if there's an audio file to delete
         if encuentro.audio_file_name:
-            # Initialize GCS client with service account credentials
-            credentials = service_account.Credentials.from_service_account_file(
-                settings.GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH
-            )
-            storage_client = storage.Client(credentials=credentials)
+            # Initialize GCS client based on environment
+            storage_client = get_storage_client()
             bucket = storage_client.bucket(settings.GCS_BUCKET_NAME)
 
             # Delete the blob from cloud storage
