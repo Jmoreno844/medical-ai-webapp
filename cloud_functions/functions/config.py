@@ -95,19 +95,13 @@ def get_environment():
     env = os.environ.get("ENVIRONMENT", "").lower()
 
     # If environment explicitly set
-    if env in ["local", "test", "production"]:
+    if env in ["dev", "test", "production"]:
         return env
 
-    # Auto-detect GitHub Actions
-    if os.environ.get("GITHUB_ACTIONS") == "true":
-        return "test"
-
-    # Auto-detect Google Cloud Run
-    if os.environ.get("K_SERVICE") or os.environ.get("FUNCTION_TARGET"):
-        return "production"
+    #
 
     # Default to local
-    return "local"
+    return "dev"
 
 
 def is_production():

@@ -1,15 +1,13 @@
 [
-    {
-        "origin": [
-            "http://localhost:5173",
-            "https://your-production-domain.com"
-        ],
-        "method": ["PUT", "GET", "HEAD"],
-        "responseHeader": [
-            "Content-Type",
-            "Content-MD5",
-            "Content-Disposition"
-        ],
-        "maxAgeSeconds": 3600
-    }
+  {
+    "origin": ["http://localhost:5173", "https://medapp.sebastianmoreno.lat/"],
+    "method": ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
+    "responseHeader": [
+      "Content-Type",
+      "Access-Control-Allow-Origin",
+      "Content-Length",
+      "Authorization"
+    ],
+    "maxAgeSeconds": 3600
+  }
 ]

@@ -169,6 +169,7 @@ FALLBACK_SECRET_KEY = os.environ.get(
 SECRET_KEY = access_secret(
     GCP_PROJECT_ID, "django_secret_key", default=FALLBACK_SECRET_KEY
 )
+JWT_SECRET_KEY = access_secret(GCP_PROJECT_ID, "JWT_SECRET_KEY", default="not-loaded")
 
 SERVICE_ACCOUNT_JSON = access_secret(GCP_PROJECT_ID, "serviceaccountkey", default="{}")
 

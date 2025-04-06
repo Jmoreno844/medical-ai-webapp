@@ -9,6 +9,7 @@ from uuid import uuid4
 import json
 from datetime import datetime, timedelta
 from ninja.security import django_auth
+from django.views.decorators.csrf import csrf_exempt
 
 from apps.documentos.models import Documento
 from apps.documentos.schemas import (
@@ -57,6 +58,7 @@ def get_cloud_function_url(function_name):
 
 
 @router.post("/document/generation-chunk", auth=JWTAuth())
+@csrf_exempt
 def receive_generation_chunk(request, payload: GenerationChunkIn, auth=None):
     """
     Receive a chunk of generated content from the cloud function.
@@ -150,8 +152,11 @@ def receive_generation_chunk(request, payload: GenerationChunkIn, auth=None):
 
 
 @router.patch(
-    "/documento_by_function/{documento_id}", response=SuccessResponse, auth=JWTAuth()
+    "/documento_by_function/{documento_id}",
+    response=SuccessResponse,
+    auth=JWTAuth(),
 )
+@csrf_exempt
 def update_documento_content(
     request, documento_id: int, payload: DocumentoUpdateIn, auth=None
 ):

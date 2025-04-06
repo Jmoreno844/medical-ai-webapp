@@ -17,20 +17,17 @@ def get_api_base_url():
     """Get the Django API base URL from environment variables."""
     api_base_url = os.environ.get("DJANGO_API_BASE_URL")
     if not api_base_url:
+        # Default still includes /api for backward compatibility
         default_url = "http://localhost:8000/api"
         logger.warning(f"DJANGO_API_BASE_URL not set, using default: {default_url}")
         return default_url
-    return api_base_url
 
+    # Ensure the URL doesn't end with a slash before adding /api
+    if api_base_url.endswith("/"):
+        api_base_url = api_base_url[:-1]
 
-def get_api_auth_token():
-    """Get the Django API authentication token from environment variables."""
-    token = os.environ.get("DJANGO_API_AUTH_TOKEN")
-    if token:
-        logger.debug("Using authentication token from environment variables")
-    else:
-        logger.debug("No authentication token provided")
-    return token
+    # Add /api to the base URL
+    return f"{api_base_url}/api"
 
 
 def notify_transcription_complete(
@@ -51,7 +48,7 @@ def notify_transcription_complete(
 
     # Get auth token from parameter or environment
     if not token_auth:
-        token_auth = get_api_auth_token()
+        logger.debug("No authentication token provided")
 
     # Prepare headers with token
     headers = {
@@ -138,13 +135,6 @@ def update_document_content(
             )
     else:
         logger.warning("No auth token provided to update_document_content function")
-        token_auth = get_api_auth_token()
-        if token_auth:
-            logger.info("Using fallback token from environment")
-        else:
-            logger.error(
-                "⚠️ No auth token available from any source - request will likely fail"
-            )
 
     # Prepare headers with improved token handling
     headers = {
@@ -294,9 +284,7 @@ def send_generation_chunk(
 
     # Get auth token from parameter or environment
     if not token_auth:
-        token_auth = get_api_auth_token()
-        if not token_auth:
-            return {"success": False, "error": "No authentication token available"}
+        return {"success": False, "error": "No authentication token available"}
 
     # Prepare headers with token - keep improved token handling
     headers = {"Content-Type": "application/json"}

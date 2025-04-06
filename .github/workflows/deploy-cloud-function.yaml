@@ -1,0 +1,82 @@
+name: Deploy Cloud Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "cloud_functions/functions/**"
+  workflow_dispatch:
+
+env:
+  GCP_PROJECT: medical-ai-web-app
+  GCP_REGION: us-east1
+
+jobs:
+  deploy-functions:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+
+      - name: Deploy Transcription Function
+        run: |
+          cd cloud_functions/functions
+          gcloud functions deploy transcription-endpoint \
+            --gen2 \
+            --runtime=python39 \
+            --region=${{ env.GCP_REGION }} \
+            --source=. \
+            --entry-point=transcription_endpoint \
+            --trigger-http \
+            --allow-unauthenticated \
+            --min-instances=0 \
+            --max-instances=10 \
+            --memory=1024MB \
+            --timeout=300s \
+            --service-account=cloud-functions-runtime@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com \
+            --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=gemini-2.0-flash,ENVIRONMENT=test,DJANGO_API_BASE_URL=${{ secrets.VITE_API_URL }}
+
+      - name: Deploy Document Workflow Function
+        run: |
+          cd cloud_functions/functions
+          gcloud functions deploy document-workflow \
+            --gen2 \
+            --runtime=python39 \
+            --region=${{ env.GCP_REGION }} \
+            --source=. \
+            --entry-point=generate_document_workflow \
+            --trigger-http \
+            --allow-unauthenticated \
+            --min-instances=0 \
+            --max-instances=10 \
+            --memory=1024MB \
+            --timeout=300s \
+            --service-account=cloud-functions-runtime@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com \
+            --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=gemini-2.0-flash,ENVIRONMENT=test,DJANGO_API_BASE_URL=${{ secrets.VITE_API_URL }}
+
+      - name: Deploy Document Streaming Function
+        run: |
+          cd cloud_functions/functions
+          gcloud functions deploy document-streaming \
+            --gen2 \
+            --runtime=python39 \
+            --region=${{ env.GCP_REGION }} \
+            --source=. \
+            --entry-point=document_streaming_generation \
+            --trigger-http \
+            --min-instances=0 \
+            --max-instances=10 \
+            --memory=1024MB \
+            --timeout=300s \
+            --service-account=cloud-functions-runtime@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com \
+            --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=gemini-2.0-flash,ENVIRONMENT=test,DJANGO_API_BASE_URL=${{ secrets.VITE_API_URL }}

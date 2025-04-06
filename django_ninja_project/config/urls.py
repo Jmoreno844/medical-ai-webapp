@@ -7,6 +7,7 @@ from apps.users.api import router as accounts_router
 from apps.encuentro.api import router as encuentro_router
 from apps.pacientes.api import router as pacientes_router
 from apps.plantillas.api import router as plantillas_router
+from django.conf import settings
 
 # Replace the single router import with imports from the package
 from apps.documentos.api import (
@@ -17,7 +18,10 @@ from apps.documentos.api import (
 from apps.generative_ai.api import router as generative_ai_router
 
 api = NinjaAPI(
-    title="Medical API", version="1.0.0", urls_namespace="medical_api", csrf=True
+    title="Medical API",
+    version="1.0.0",
+    urls_namespace="medical_api",
+    csrf=not getattr(settings, "ENVIRONMENT", "") == "dev",  # Disable in dev only
 )
 
 
