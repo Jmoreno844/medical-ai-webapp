@@ -44,7 +44,7 @@ Your task is to generate a medical document based on the following components:
 1. TEMPLATE: 
 {template}
 
-2. PATIENT CONTEXT:
+2. DOCTOR CONTEXT:
 {context}
 
 3. CONVERSATION TRANSCRIPT:
@@ -60,7 +60,7 @@ Instructions:
 - Include dates, times, and any specific data mentioned in the transcript.
 - Do not invent information that is not present in the provided data.
 
-Generate the complete document:
+Generate the the document based on the template, if the template has info that cannot be obtained from the context nor the transcription then skip that part of the template::
 """
 
 TRANSCRIPTION_PROMPT = """
