@@ -7,6 +7,7 @@ import logging
 import datetime
 import socket
 import sys
+import json
 from .base import *  # noqa: F403, F401
 
 
@@ -168,6 +169,8 @@ FALLBACK_SECRET_KEY = os.environ.get(
 SECRET_KEY = access_secret(
     GCP_PROJECT_ID, "django_secret_key", default=FALLBACK_SECRET_KEY
 )
+
+SERVICE_ACCOUNT_JSON = access_secret(GCP_PROJECT_ID, "serviceaccountkey", default="{}")
 
 # Change to DEBUG mode to help diagnose issues
 DEBUG = True
