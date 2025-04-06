@@ -212,6 +212,7 @@ jobs:
             --max-instances=3
           env_vars: |
             DJANGO_SETTINGS_MODULE=config.settings.test
+            GCS_BUCKET_NAME=${{ secrets.GCS_BUCKET_NAME }}
             GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }}
             ENVIRONMENT=test
             ENABLE_SILK=true

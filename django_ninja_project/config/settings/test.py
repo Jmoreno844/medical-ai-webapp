@@ -157,6 +157,7 @@ ENVIRONMENT = "test"
 
 # Project settings
 GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
+GCS_BUCKET_NAME = os.environ.get("GCS_BUCKET_NAME", "not-loaded")
 
 # Security settings - Using Google Secret Manager with fallback
 # Generate a fallback secret key for testing if Secret Manager is unavailable
