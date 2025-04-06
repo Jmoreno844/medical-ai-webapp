@@ -44,7 +44,7 @@ jobs:
             --memory=1024MB \
             --timeout=300s \
             --service-account=cloud-functions-runtime@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com \
-            --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=gemini-2.0-flash,ENVIRONMENT=test,DJANGO_API_BASE_URL=${{ secrets.VITE_API_URL }}
+            --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=gemini-2.0-flash,ENVIRONMENT=test,DJANGO_API_BASE_URL=${{ vars.VITE_API_URL }}
 
       - name: Deploy Document Workflow Function
         run: |
@@ -62,4 +62,4 @@ jobs:
             --memory=1024MB \
             --timeout=300s \
             --service-account=cloud-functions-runtime@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com \
-            --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=gemini-2.0-flash,ENVIRONMENT=test,DJANGO_API_BASE_URL=${{ secrets.VITE_API_URL }}
+            --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=gemini-2.0-flash,ENVIRONMENT=test,DJANGO_API_BASE_URL=${{ vars.VITE_API_URL }}
