@@ -21,199 +21,126 @@ export function DocumentContentPlugin({
   refreshTrigger,
   forceRefresh = false,
   streamingContent,
-  documentType, // Read document type
+  documentType,
 }: DocumentContentPluginProps): React.ReactElement | null {
   const [editor] = useLexicalComposerContext();
-  const lastUpdatedContentRef = useRef<string>("");
-  const lastStreamContentRef = useRef<string>("");
-  const isTranscription = documentType === "transcripcion"; // Check if this is a transcription document
+  const lastAppliedContentRef = useRef<string | null>(null);
+  const lastAppliedDocumentIdRef = useRef<number | null>(null);
+  const isMountedRef = useRef(false);
 
-  // Effect to update editor content when document changes or refresh triggers
   useEffect(() => {
-    // Debug logging to track content transitions
-    if (streamingContent) {
-      console.log(
-        `🔄 Document ${documentId}: Using streaming content (${streamingContent.length} chars)`
-      );
-      lastStreamContentRef.current = streamingContent;
-    } else if (content) {
-      console.log(
-        `📄 Document ${documentId}: Using regular content (${content.length} chars)`
-      );
-    } else if (lastStreamContentRef.current) {
-      console.log(
-        `🔍 Document ${documentId}: Fallback to last stream content (${lastStreamContentRef.current.length} chars)`
-      );
-    }
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
-    // Handle streaming content updates if provided
-    if (streamingContent && streamingContent.length > 5) {
-      // Skip if unchanged
-      if (streamingContent === lastStreamContentRef.current) {
-        return;
-      }
+  useEffect(() => {
+    if (!isMountedRef.current || !editor) return;
 
-      console.log(
-        `🔄 Document ${documentId}: Using streaming content (${streamingContent.length} chars)`
-      );
+    const isDocumentChanged = lastAppliedDocumentIdRef.current !== documentId;
 
-      lastStreamContentRef.current = streamingContent;
+    console.log(
+      `📄 Plugin Effect Start: Doc ${documentId}, PrevDoc: ${
+        lastAppliedDocumentIdRef.current
+      }, isLoading: ${isLoading}, isDocChanged: ${isDocumentChanged}, contentLen: ${
+        content?.length ?? "N/A"
+      }, lastAppliedContentLen: ${
+        lastAppliedContentRef.current?.length ?? "N/A"
+      }`
+    );
 
-      editor.update(() => {
-        // Clear editor
+    editor.update(
+      () => {
+        if (!isMountedRef.current) return; // Re-check mount status inside closure
+
         const root = $getRoot();
-        root.clear();
 
-        // If no content, just add an empty paragraph
-        if (!streamingContent) {
-          const paragraph = $createParagraphNode();
-          root.append(paragraph);
-          return;
+        // --- Immediate Clear Logic ---
+        // Clear the editor if the document ID has changed OR if loading has just started.
+        // This prevents displaying stale content during the fetch.
+        if (isDocumentChanged || isLoading) {
+          // Only clear if we haven't already applied empty content for this loading state/doc change
+          const currentEditorContent = root.getTextContent(); // Check actual editor state
+          if (currentEditorContent !== "" || isDocumentChanged) {
+            console.log(
+              `📄 Clearing editor: Doc changed (${isDocumentChanged}), isLoading (${isLoading}). Current editor content length: ${currentEditorContent.length}`
+            );
+            root.clear();
+            const paragraph = $createParagraphNode();
+            root.append(paragraph);
+            // Reset ref immediately after clearing due to load/change
+            lastAppliedContentRef.current = "";
+          } else {
+            console.log(
+              `📄 Skipping clear: Editor already empty for Doc ${documentId} while loading or doc changed.`
+            );
+          }
         }
 
-        // For streaming content, we should not parse markdown
-        // Simple content parsing: split by new lines
-        const lines = streamingContent.split("\n");
+        // --- Content Application Logic ---
+        // Apply content only when *not* loading and the content is different from what's applied.
+        // This runs *after* loading finishes or if it wasn't loading.
+        if (!isLoading) {
+          const newContent = streamingContent ?? content; // Prioritize streaming content if available
 
-        lines.forEach((line) => {
-          const paragraph = $createParagraphNode();
-          paragraph.append($createTextNode(line));
-          root.append(paragraph);
-        });
-      });
-
-      // Important: Save the streaming content as the last updated content
-      lastUpdatedContentRef.current = streamingContent;
-      return;
-    }
-    // ENHANCED: Better detection of content truncation after streaming ends
-    else if (
-      lastStreamContentRef.current &&
-      (!content || content.length < lastStreamContentRef.current.length * 0.9) && // If content prop is significantly shorter than streamed
-      !isLoading // And we are not currently loading new content
-    ) {
-      console.log(
-        `⚠️ Document ${documentId}: Content prop (${
-          content ? content.length : 0
-        } chars) is shorter than last streamed content (${
-          lastStreamContentRef.current.length
-        } chars). Preserving streamed content temporarily.`
-      );
-
-      // Use the last streaming content we had
-      const savedStreamContent = lastStreamContentRef.current;
-
-      // REMOVE direct cache update - ContentContext should handle this
-      // if (window.documentContentCache) {
-      //   window.documentContentCache.set(documentId, savedStreamContent);
-      //   console.log(
-      //     `🛡️ Cache updated with preserved content (${savedStreamContent.length} chars)`
-      //   );
-      // }
-
-      // Update editor with preserved content
-      editor.update(() => {
-        const root = $getRoot();
-        root.clear();
-        // Use markdown conversion here if the final content is expected to be markdown
-        // If streaming content is plain text, use the previous logic
-        $convertFromMarkdownString(savedStreamContent, TRANSFORMERS);
-        // const lines = savedStreamContent.split("\n");
-        // lines.forEach((line) => {
-        //   const paragraph = $createParagraphNode();
-        //   paragraph.append($createTextNode(line));
-        //   root.append(paragraph);
-        // });
-      });
-
-      // Set last updated ref to prevent immediate re-render with potentially empty 'content' prop
-      lastUpdatedContentRef.current = savedStreamContent;
-
-      // Clear the last stream ref now that we've used it as the primary content
-      // This prevents this block from running again unless new streaming occurs
-      lastStreamContentRef.current = "";
-
-      return; // Prevent falling through to the regular content update logic immediately
-    }
-    // Handle the transition when streaming completes and content prop is updated
-    else if (lastStreamContentRef.current && content && content.length > 0) {
-        console.log(` transitioning from stream (${lastStreamContentRef.current.length}) to final content (${content.length})`);
-        // Clear the stream ref as we are now using the final content prop
-        lastStreamContentRef.current = "";
-        // Allow the regular content update logic below to handle the final content
-    }
-
-    // Regular document content updates (non-streaming, or after streaming completes)
-    if ((content && !isLoading) || forceRefresh) {
-      // Skip if content is suspiciously short and we have better content
-      // This check might be less necessary now but keep for safety
-      // if (
-      //   content.length <= 5 &&
-      //   lastStreamContentRef.current && // Check removed as it's cleared above
-      //   lastUpdatedContentRef.current.length > 100 // Compare with last known good content
-      // ) {
-      //   console.log(
-      //     `⚠️ Rejecting suspicious short content update (${content.length} chars vs ${lastUpdatedContentRef.current.length} chars stored)`
-      //   );
-      //   return;
-      // }
-
-      // Check content length difference first
-      const contentLengthChanged =
-        lastUpdatedContentRef.current?.length !== content.length;
-
-      // Skip if content is the same as last updated content AND not forced
-      if (
-        content === lastUpdatedContentRef.current &&
-        !forceRefresh
-      ) {
-        // console.log( // Reduce noise
-        //   `📄 Document ${documentId}: Content unchanged, skipping update`
-        // );
-        return;
-      }
-
-      // Add special handling for transcription documents to always update if content differs
-      // if (isTranscription && lastUpdatedContentRef.current !== content) { // This might cause unnecessary updates if only whitespace changes
-      //   console.log(
-      //     `📝 Document ${documentId}: Transcription content update, forcing refresh`
-      //   );
-      // }
-
-      console.log(
-        `📄 Document ${documentId}: Applying regular content update (${content.length} chars)` +
-          (contentLengthChanged ? " - Content length changed" : "") +
-          (forceRefresh ? " - Force Refresh" : "")
-      );
-
-      // Always update lastUpdatedContentRef before applying changes
-      lastUpdatedContentRef.current = content;
-
-      editor.update(() => {
-        // Clear editor
-        const root = $getRoot();
-        root.clear();
-
-        // If no content, just add an empty paragraph
-        if (!content) {
-          const paragraph = $createParagraphNode();
-          root.append(paragraph);
-          return;
+          if (newContent !== lastAppliedContentRef.current) {
+            console.log(
+              `📄 Applying content: Doc ${documentId}, isLoading: ${isLoading}, New content length: ${
+                newContent?.length ?? 0
+              }`
+            );
+            root.clear(); // Clear before applying new content
+            if (newContent && newContent.trim() !== "") {
+              try {
+                // Use Markdown conversion for both regular and streaming for consistency
+                $convertFromMarkdownString(newContent, TRANSFORMERS);
+                console.log(
+                  `📄 Applied content successfully for Doc ${documentId}`
+                );
+              } catch (error) {
+                console.error(
+                  `📄 Error converting Markdown for Doc ${documentId}:`,
+                  error
+                );
+                // Fallback: insert as plain text paragraph
+                const paragraph = $createParagraphNode();
+                paragraph.append($createTextNode(newContent));
+                root.append(paragraph);
+              }
+            } else {
+              // Ensure empty content results in a single empty paragraph
+              const paragraph = $createParagraphNode();
+              root.append(paragraph);
+              console.log(`📄 Applied empty paragraph for Doc ${documentId}`);
+            }
+            lastAppliedContentRef.current = newContent; // Update ref *after* successful application
+          } else {
+            console.log(
+              `📄 Skipping content application: Content unchanged for Doc ${documentId}`
+            );
+          }
+        } else {
+          console.log(
+            `📄 Skipping content application: Still loading Doc ${documentId}`
+          );
         }
+      },
+      { tag: "document-content-plugin-update" }
+    ); // Add tag for debugging Lexical updates
 
-        // Convert markdown to rich text
-        $convertFromMarkdownString(content, TRANSFORMERS);
-      });
+    // Update the document ID ref *after* the update logic has run
+    if (isDocumentChanged) {
+      lastAppliedDocumentIdRef.current = documentId;
     }
   }, [
     documentId,
     content,
     isLoading,
-    refreshTrigger,
-    forceRefresh,
-    editor,
     streamingContent,
-    documentType, // Add documentType to dependencies
+    editor,
+    documentType,
+    refreshTrigger,
   ]);
 
   return null;

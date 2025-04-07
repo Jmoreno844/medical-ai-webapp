@@ -8,7 +8,8 @@ import React, {
 } from "react";
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { useDocumentContext } from "./DocumentContext";
-import { useContentContext } from "./ContentContext"; // Add this import
+import { useContentContext } from "./ContentContext"; 
+import { useTranscriptionContext } from "./TranscriptionContext"; // Add this import
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -73,7 +74,8 @@ export function GenerationProvider({
 }) {
   const { documents, addDocument, saveDocument, selectDocument } =
     useDocumentContext();
-  const { updateDocumentContent } = useContentContext(); // Get the update function
+  const { updateDocumentContent } = useContentContext();
+  const { hasBeenTranscribed } = useTranscriptionContext(); // Add this line to get transcription status
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -363,17 +365,15 @@ export function GenerationProvider({
         throw new Error("No se encontró el documento de contexto");
       }
 
-      // Check if transcription content is empty
-      if (
-        !transcriptionDoc.contenido ||
-        transcriptionDoc.contenido.trim() === ""
-      ) {
+      // Check if transcription has been completed using the hasBeenTranscribed flag
+      // instead of checking the document content
+      if (!hasBeenTranscribed) {
         throw new Error(
           "You must perform the transcription before generating a document"
         );
       }
 
-      console.log("📄 Documentos encontrados:", {
+      console.log("📄 Documents found:", {
         transcripcion: transcriptionDoc.id,
         contexto: contextDoc.id,
       });
@@ -445,6 +445,7 @@ export function GenerationProvider({
     selectedPlantillaId,
     connectToSSE,
     selectDocument,
+    hasBeenTranscribed, // Add hasBeenTranscribed to the dependencies
   ]);
 
   // Filter plantillas based on search query

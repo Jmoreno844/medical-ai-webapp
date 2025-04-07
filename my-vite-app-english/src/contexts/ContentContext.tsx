@@ -100,9 +100,13 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
       // Return cached content if available and not force refreshing
       if (!shouldForceRefresh && documentContentCache.has(docId)) {
         const cachedContent = documentContentCache.get(docId);
-        if (cachedContent && cachedContent.trim().length > 0) {
+
+        // Check for undefined instead of truthy to properly handle empty strings
+        if (cachedContent !== undefined) {
           console.log(
-            `[CACHE_HIT ✅] Document ${docId}: Using cached content (${cachedContent.length} chars)`
+            `[CACHE_HIT ✅] Document ${docId}: Using cached content (${
+              cachedContent?.length ?? 0
+            } chars)`
           );
           // Mark document as loaded even when using cache
           loadedDocumentsRef.current.add(docId);
@@ -111,12 +115,14 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
           if (docId === activeDocumentId) {
             setDocumentContent(cachedContent);
             setContentLoadedSuccessfully(true);
+            // Ensure loading is false when using cache for the active doc
+            setIsLoadingContent(false);
           }
 
           return cachedContent;
         }
         console.log(
-          `[CACHE_INVALID ⚠️] Document ${docId}: Cache entry exists but is empty, fetching from database`
+          `[CACHE_INVALID ⚠️] Document ${docId}: Cache entry exists but is undefined, fetching from database`
         );
       } else {
         if (shouldForceRefresh) {
@@ -149,24 +155,18 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
         // Mark this document as loaded after successful fetch
         loadedDocumentsRef.current.add(docId);
 
-        // Only cache non-empty content
-        if (content.trim().length > 0) {
+        // Always cache the content, even if it's empty
+        console.log(
+          `[CACHE_UPDATE 📝] Document ${docId}: Storing content in cache (${content.length} chars)`
+        );
+        setDocumentContentCache((prev) => {
+          const newCache = new Map(prev);
+          newCache.set(docId, content); // Always cache, even empty content
           console.log(
-            `[CACHE_UPDATE 📝] Document ${docId}: Storing content in cache`
+            `[CACHE_STATUS] Updated size: ${newCache.size} documents`
           );
-          setDocumentContentCache((prev) => {
-            const newCache = new Map(prev);
-            newCache.set(docId, content);
-            console.log(
-              `[CACHE_STATUS] Updated size: ${newCache.size} documents`
-            );
-            return newCache;
-          });
-        } else {
-          console.log(
-            `[CACHE_SKIP ⚠️] Document ${docId}: Not caching empty content`
-          );
-        }
+          return newCache;
+        });
 
         // Update state for active document
         if (docId === activeDocumentId) {
