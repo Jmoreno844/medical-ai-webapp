@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { useDocumentContext } from "./DocumentContext";
+import { useContentContext } from "./ContentContext"; // Add this import
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -72,6 +73,7 @@ export function GenerationProvider({
 }) {
   const { documents, addDocument, saveDocument, selectDocument } =
     useDocumentContext();
+  const { updateDocumentContent } = useContentContext(); // Get the update function
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -211,14 +213,15 @@ export function GenerationProvider({
 
               case "generation_chunk":
                 const newChunk = data.chunk || "";
+                const targetDocumentIdForChunk = generationStatus.documentId; // Capture documentId for chunk saving
 
                 setGenerationStatus((prev) => {
                   const updatedContent = prev.content + newChunk;
 
                   // Save content to document
-                  if (saveDocument && documentId && newChunk) {
+                  if (saveDocument && targetDocumentIdForChunk && newChunk) {
                     // Use the full accumulated content for saving
-                    saveDocument(documentId, updatedContent).catch((err) =>
+                    saveDocument(targetDocumentIdForChunk, updatedContent).catch((err) =>
                       console.error("Error saving document content:", err)
                     );
                   }
@@ -233,32 +236,41 @@ export function GenerationProvider({
 
               case "generation_complete":
                 const finalContent = data.chunk || generationStatus.content;
+                const targetDocumentId = generationStatus.documentId; // Capture documentId
 
                 console.log(
                   `✅ Generation complete - Final content length: ${finalContent.length} chars`
                 );
 
-                // CRITICAL: Update the document content cache directly to prevent race condition
-                if (window.documentContentCache && documentId) {
-                  window.documentContentCache.set(documentId, finalContent);
-                  console.log(
-                    `💾 Manually updated cache for document ${documentId} with ${finalContent.length} chars`
-                  );
-                }
+                // CRITICAL: Remove direct cache update - rely on ContentContext update
+                // if (window.documentContentCache && targetDocumentId) {
+                //   window.documentContentCache.set(targetDocumentId, finalContent);
+                //   console.log(
+                //     `💾 Manually updated cache for document ${targetDocumentId} with ${finalContent.length} chars`
+                //   );
+                // }
 
                 // Save final content to database
-                if (saveDocument && documentId) {
+                if (saveDocument && targetDocumentId) {
                   try {
-                    await saveDocument(documentId, finalContent);
+                    const saveSuccess = await saveDocument(targetDocumentId, finalContent);
                     console.log(
-                      `📝 Final content saved to database (${finalContent.length} chars)`
+                      `📝 Final content saved to database (${finalContent.length} chars), Success: ${saveSuccess}`
                     );
+
+                    // *** IMPORTANT: Update ContentContext state AFTER successful save ***
+                    if (saveSuccess && updateDocumentContent) {
+                       updateDocumentContent(targetDocumentId, finalContent);
+                       console.log(`🔄 Explicitly updated ContentContext state for document ${targetDocumentId}`);
+                    }
+                    // *** END CHANGE ***
+
                   } catch (err) {
                     console.error("❌ Error saving final content:", err);
                   }
                 }
 
-                // Only after saving content, update the state
+                // Only after saving content and updating context, update the local state
                 setGenerationStatus((prev) => ({
                   ...prev,
                   content: finalContent,
@@ -268,29 +280,21 @@ export function GenerationProvider({
 
                 setIsGenerating(false);
 
-                // Force editor refresh to properly parse markdown
+                // Force editor refresh (ensure context update has propagated)
+                // Using a timeout helps ensure React state updates are processed
                 setTimeout(() => {
-                  if (selectDocument && documentId) {
-                    // Force reinitialization by switching to another doc and back
-                    const currentDocId = documentId;
-
-                    // Find another document to temporarily switch to
-                    const otherDoc = documents.find(
-                      (doc) => doc.id !== currentDocId
-                    );
-
-                    if (otherDoc) {
-                      // Switch away and back to trigger Markdown parsing
-                      selectDocument(otherDoc.id);
-                      setTimeout(() => selectDocument(currentDocId), 50);
-                    } else {
-                      // If no other doc exists, just trigger a context refresh
-                      if (window.triggerEditorRefresh) {
-                        window.triggerEditorRefresh();
-                      }
-                    }
+                  if (selectDocument && targetDocumentId) {
+                    // Re-select the document to potentially trigger necessary updates
+                    // This might be redundant if ContentContext update works correctly, but keep for now
+                    selectDocument(targetDocumentId);
+                    console.log(`🔄 Re-selected document ${targetDocumentId} to potentially refresh UI`);
                   }
-                }, 300); // Short delay to ensure content is fully saved
+                  // Trigger general editor refresh if needed (fallback)
+                  if (window.triggerEditorRefresh) {
+                    window.triggerEditorRefresh();
+                    console.log(`🔄 Triggered general editor refresh`);
+                  }
+                }, 100); // Short delay
 
                 break;
 
@@ -324,7 +328,8 @@ export function GenerationProvider({
         return null;
       }
     },
-    [saveDocument, generationStatus.content]
+    // Update dependency array
+    [saveDocument, generationStatus.content, generationStatus.documentId, updateDocumentContent, selectDocument, documents, API_URL]
   );
 
   const generateDocumentation = useCallback(async () => {

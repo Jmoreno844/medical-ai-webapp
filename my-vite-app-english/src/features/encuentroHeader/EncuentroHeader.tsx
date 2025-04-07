@@ -35,6 +35,7 @@ const EncuentroHeaderContent: React.FC = () => {
     progressPercentage,
 
     // Current encounter data
+    encounterId, // <<< Get encounterId from context
     encounterName,
     encounterDate,
     isPatientConnected,
@@ -91,8 +92,8 @@ const EncuentroHeaderContent: React.FC = () => {
               <GenerateDocumentationButton />
             </div>
 
-            {/* VoiceRecorder now uses context directly */}
-            <VoiceRecorder />
+            {/* VoiceRecorder now uses context directly and gets a key */}
+            <VoiceRecorder key={encounterId} /> {/* <<< Add key prop */}
           </div>
         </div>
       </nav>
@@ -206,10 +207,13 @@ const EncuentroHeaderContent: React.FC = () => {
 const EncuentroHeader: React.FC = () => {
   // Get ID from URL
   const { id } = useParams<{ id: string }>();
-  const encounterId = id ? parseInt(id, 10) : 0;
+  // Ensure encounterId is always a number, defaulting to 0 if id is undefined/invalid
+  const encounterId = id ? parseInt(id, 10) || 0 : 0;
 
+  // Add a key to EncuentroProvider as well, to ensure it fully resets if needed,
+  // although the internal logic should handle encounterId changes.
   return (
-    <EncuentroProvider encounterId={encounterId}>
+    <EncuentroProvider key={encounterId} encounterId={encounterId}>
       <EncuentroHeaderContent />
     </EncuentroProvider>
   );

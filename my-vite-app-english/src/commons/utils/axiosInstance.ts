@@ -32,28 +32,26 @@ axiosInstance.interceptors.request.use(
         const csrfResponse = await axios.get(`${API_URL}/api/csrf`, {
           withCredentials: true,
         });
-        console.log("📥 CSRF Response:", csrfResponse.data);
+        //   console.log("📥 CSRF Response:", csrfResponse.data);
         // Get the token after the API call
         csrfToken = getCsrfToken();
       } catch (error) {
         console.error("❌ Error fetching CSRF token:", error);
       }
     } else {
-      console.log("✅ Using existing CSRF token from cookies");
+      // console.log("✅ Using existing CSRF token from cookies");
     }
 
     // Add logging for CSRF token and request details
     console.log(`🔒 Request: ${config.method?.toUpperCase()} ${config.url}`);
-    console.log(`🔑 CSRF Token: ${csrfToken || "NOT SET"}`);
-    console.log(`🍪 All Cookies: ${document.cookie}`);
+    // console.log(`🔑 CSRF Token: ${csrfToken || "NOT SET"}`);
+    //  console.log(`🍪 All Cookies: ${document.cookie}`);
 
     if (csrfToken) {
       config.headers["X-CSRFToken"] = csrfToken;
-      console.log(
-        `✅ Added X-CSRFToken header: ${csrfToken.substring(0, 10)}...`
-      );
+      //   console.log(   `✅ Added X-CSRFToken header: ${csrfToken.substring(0, 10)}...`);
     } else {
-      console.warn(`⚠️ No CSRF token available for request to ${config.url}`);
+      //  console.warn(`⚠️ No CSRF token available for request to ${config.url}`);
     }
 
     return config;
@@ -70,16 +68,14 @@ axiosInstance.interceptors.response.use(
     const setCookieHeader = response.headers["set-cookie"];
     if (setCookieHeader && typeof document !== "undefined") {
       // The browser will automatically handle the cookie update
-      console.debug("New cookies received from server");
+      //  console.debug("New cookies received from server");
     }
     return response;
   },
   (error) => {
     // Enhanced error handling with specific CORS error detection
     if (error.message === "Network Error" || error.code === "ERR_NETWORK") {
-      console.error(
-        "CORS or network error detected. Check your CORS configuration."
-      );
+      //   console.error("CORS or network error detected. Check your CORS configuration.");
     }
 
     console.error("API Error:", {

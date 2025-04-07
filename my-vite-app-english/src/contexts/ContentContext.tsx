@@ -26,7 +26,7 @@ type ContentContextType = {
     docId: number,
     forceRefresh?: boolean
   ) => Promise<string | null>;
-  reloadContent: () => Promise<void>;
+  reloadContent: (forceRefresh?: boolean) => Promise<void>;
   triggerEditorRefresh: () => void;
   saveContent: (docId: number, content: string) => Promise<boolean>;
   updateDocumentContent: (docId: number, content: string) => void; // New function
@@ -193,12 +193,13 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
   // Wrapper for saving content that uses DocumentContext's saveDocument
   const saveContent = useCallback(
     async (docId: number, content: string): Promise<boolean> => {
-      // Normalize line breaks before comparing
+      // Normalize line breaks and whitespace before comparing
       const normalizeBreaks = (text: string): string => {
         return text
           .replace(/\r\n/g, "\n")
           .replace(/\r/g, "\n")
-          .replace(/\n\n/g, "\n")
+          .replace(/\n\n+/g, "\n\n") // Collapse multiple newlines to max two
+          .replace(/[ \t]+/g, " ") // Collapse multiple spaces
           .trim();
       };
 
@@ -237,11 +238,17 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
   );
 
   // Reload content function
-  const reloadContent = useCallback(async (): Promise<void> => {
-    if (activeDocumentId) {
-      await fetchDocumentContent(activeDocumentId, true);
-    }
-  }, [activeDocumentId, fetchDocumentContent]);
+  const reloadContent = useCallback(
+    async (forceRefresh: boolean = false): Promise<void> => {
+      if (activeDocumentId) {
+        console.log(
+          `[RELOAD_CONTENT] Document ${activeDocumentId}, forceRefresh: ${forceRefresh}`
+        );
+        await fetchDocumentContent(activeDocumentId, forceRefresh);
+      }
+    },
+    [activeDocumentId, fetchDocumentContent]
+  );
 
   // Load content when active document changes
   useEffect(() => {

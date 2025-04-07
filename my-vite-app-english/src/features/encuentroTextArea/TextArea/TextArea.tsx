@@ -36,6 +36,7 @@ const TextArea: React.FC = () => {
     reloadContent,
     saveContent,
     editorRefreshTrigger,
+    documentContentCache, // Add this line
   } = useContentContext();
 
   const { generationStatus } = useGenerationContext();
@@ -56,14 +57,29 @@ const TextArea: React.FC = () => {
         `[TEXT_AREA] Refresh trigger changed to ${editorRefreshTrigger} for document ${activeDocument.id}`
       );
       previousRefreshTriggerRef.current = editorRefreshTrigger;
+
+      // Check if the document is already in the cache
+      if (documentContentCache.has(activeDocument.id)) {
+        console.log(
+          `[TEXT_AREA] Document ${activeDocument.id} already in cache, skipping reloadContent`
+        );
+        return; // Skip reloadContent if already cached
+      }
+
       if (typeof reloadContent === "function") {
         console.log(
           `[TEXT_AREA] Calling reloadContent for document ${activeDocument.id}`
         );
-        reloadContent();
+        const forceRefresh = false;
+        reloadContent(forceRefresh);
       }
     }
-  }, [editorRefreshTrigger, activeDocument, reloadContent]);
+  }, [
+    editorRefreshTrigger,
+    activeDocument,
+    reloadContent,
+    documentContentCache,
+  ]);
 
   // Enhanced logic to track transcription updates
   useEffect(() => {
@@ -77,7 +93,8 @@ const TextArea: React.FC = () => {
           transcriptionCompleteTimestamp
         ).toISOString()}`
       );
-      reloadContent();
+      // Force refresh for transcription updates since we need the latest content
+      reloadContent(true);
     }
   }, [transcriptionCompleteTimestamp, activeDocument, reloadContent]);
 

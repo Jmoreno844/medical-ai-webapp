@@ -47,7 +47,7 @@ export function DocumentProvider({
 }) {
   const [documents, setDocuments] = useState<DocumentoOut[]>([]);
   const [activeDocumentId, setActiveDocumentId] = useState<number | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false); // Changed initial state to false
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [pendingSave, setPendingSave] = useState<{
@@ -58,51 +58,67 @@ export function DocumentProvider({
   // Track if this is the initial mount of the component
   const isInitialMount = useRef(true);
 
+  // Add ref to track loaded encounter
+  const loadedEncounterIdRef = useRef<number | null>(null);
+
   /**
    * Fetch all documents for an encounter
    */
   const fetchDocuments = useCallback(async () => {
-    if (!encounterId) return;
+    if (!encounterId || loading) {
+      console.log(
+        `[DOC_CONTEXT] fetchDocuments skipped (encounterId: ${encounterId}, loading: ${loading})`
+      );
+      return;
+    }
+
+    console.log(
+      `[DOC_CONTEXT] Attempting to fetch documents for encounter ${encounterId}`
+    );
+    setLoading(true);
+    setError(null);
 
     try {
-      setLoading(true);
       const response = await axiosInstance.get(
         `/api/documento/encuentro/${encounterId}`
       );
-
       const data = response.data;
+
+      console.log(
+        `[DOC_CONTEXT] Successfully fetched ${data.length} documents for encounter ${encounterId}`
+      );
       setDocuments(data);
+      loadedEncounterIdRef.current = encounterId;
 
-      // Set the first document as active if available, using the same sorting criteria as TabBar
-      if (data.length > 0 && !activeDocumentId) {
-        // Sort documents by date and ID before selecting the first one
-        const sortedDocs = [...data].sort((a, b) => {
-          const dateA = new Date(a.fecha_creacion).getTime();
-          const dateB = new Date(b.fecha_creacion).getTime();
+      setActiveDocumentId((prevActiveId) => {
+        if (data.length > 0 && !prevActiveId) {
+          const sortedDocs = [...data].sort((a, b) => {
+            const dateA = new Date(a.fecha_creacion).getTime();
+            const dateB = new Date(b.fecha_creacion).getTime();
+            if (dateA !== dateB) return dateA - dateB;
+            return a.id - b.id;
+          });
+          return sortedDocs[0].id;
+        }
+        return prevActiveId;
+      });
 
-          // If dates are different, sort by date
-          if (dateA !== dateB) {
-            return dateA - dateB;
-          }
-
-          // If dates are the same, use ID as a tiebreaker
-          return a.id - b.id;
-        });
-
-        // Select the first document from the sorted array
-        setActiveDocumentId(sortedDocs[0].id);
-      }
+      setError(null);
     } catch (err: any) {
-      console.error("Failed to fetch documents:", err);
+      console.error(
+        `[DOC_CONTEXT] Failed to fetch documents for encounter ${encounterId}:`,
+        err
+      );
       setError(
         err.response?.data?.detail ||
           err.message ||
           "Error desconocido al cargar los documentos"
       );
+      loadedEncounterIdRef.current = null;
     } finally {
       setLoading(false);
     }
-  }, [encounterId, activeDocumentId]);
+  }, [encounterId, loading]);
 
   /**
    * Select a document as active
@@ -264,24 +280,38 @@ export function DocumentProvider({
     setDocuments((prev) => [...prev, newDocument]);
   }, []);
 
-  // Load documents when encounterId changes
+  // Load documents when encounterId changes AND check loaded ref
   useEffect(() => {
     if (encounterId) {
-      if (isInitialMount.current) {
-        isInitialMount.current = false;
+      if (encounterId !== loadedEncounterIdRef.current) {
+        console.log(
+          `[DOC_CONTEXT] Encounter changed to ${encounterId} (previously loaded: ${loadedEncounterIdRef.current}). Fetching documents.`
+        );
+        fetchDocuments(); // Initiate fetch
+      } else {
+        console.log(
+          `[DOC_CONTEXT] Encounter ${encounterId} documents already loaded. Skipping fetch.`
+        );
+        // Ensure loading state is correct if we skipped fetch but it might have been true
+        if (loading) setLoading(false);
       }
-      fetchDocuments();
+    } else {
+      // Handle encounterId becoming null/invalid
+      console.log(
+        `[DOC_CONTEXT] encounterId is null or invalid. Resetting state.`
+      );
+      setDocuments([]);
+      setActiveDocumentId(null);
+      loadedEncounterIdRef.current = null;
+      setLoading(false); // Ensure loading is false
+      setError(null);
     }
 
-    // Cleanup function
+    // Cleanup function (optional) - no changes needed here
     return () => {
-      if (encounterId) {
-        console.log(
-          `[DOC_CONTEXT] Cleanup function called for encounter ${encounterId}`
-        );
-      }
+      // console.log(`[DOC_CONTEXT] Cleanup for encounter effect (current encounterId: ${encounterId})`);
     };
-  }, [encounterId, fetchDocuments]);
+  }, [encounterId, fetchDocuments]); // NEW - Corrected dependency array
 
   // Get the active document
   const activeDocument =

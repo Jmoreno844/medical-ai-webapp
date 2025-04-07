@@ -91,6 +91,9 @@ export function TranscriptionProvider({
     useState<number | null>(null);
   const [hasBeenTranscribed, setHasBeenTranscribed] = useState<boolean>(false);
 
+  // Ref to track initial mount
+  const isInitialMount = useRef(true);
+
   // Move the initial log into a useEffect with empty dependency array to run only once on mount
   useEffect(() => {
     console.log(
@@ -602,6 +605,53 @@ export function TranscriptionProvider({
       }
     }
   }, [encuentro]); // Remove hasBeenTranscribed from dependencies
+
+  // --- Effect to Reset State on encounterId Change ---
+  useEffect(() => {
+    console.log(`[TRANSCRIPTION][EFFECT_ENCOUNTER] Encounter ID changed to: ${encounterId}. Initial mount: ${isInitialMount.current}`);
+
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      // Initial setup based on props is handled by useState and the effect syncing with `encuentro`
+      console.log(`[TRANSCRIPTION][EFFECT_ENCOUNTER] Initial mount for ${encounterId}. Skipping reset.`);
+      // Ensure initial doc ID is set if provided
+      if (initialTranscriptionDocId !== transcriptionDocId) {
+         setTranscriptionDocId(initialTranscriptionDocId);
+      }
+      return;
+    }
+
+    // Reset logic for subsequent encounter changes or invalid encounterId
+    console.log(`[TRANSCRIPTION][EFFECT_ENCOUNTER] Resetting state due to encounter change to ${encounterId}.`);
+
+    // 1. Close existing SSE connection
+    if (eventSourceRef.current) {
+      console.log("[TRANSCRIPTION][RESET] Closing existing SSE connection.");
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    // 2. Reset transcription status states
+    setIsTranscribing(false);
+    setTranscriptionStatus("idle");
+    setErrorMessage(null);
+    setTranscriptionCompleteTimestamp(null);
+
+    // 3. Reset transcriptionDocId based on new initial prop
+    setTranscriptionDocId(initialTranscriptionDocId ?? null);
+
+    // 4. Reset hasBeenTranscribed (the effect below will sync with the new encounter data)
+    console.log(`[TRANSCRIPTION][RESET] Setting hasBeenTranscribed to false temporarily.`);
+    setHasBeenTranscribed(false);
+
+    // 5. Reset voice recorder state implicitly
+    // The useVoiceRecorder hook depends on transcriptionDocId.
+    // Since we updated transcriptionDocId above, the hook should re-run its internal logic
+    // to check audio existence etc. for the new document ID (or null).
+    console.log(`[TRANSCRIPTION][RESET] Relying on useVoiceRecorder to update based on new transcriptionDocId: ${initialTranscriptionDocId ?? null}`);
+
+
+  }, [encounterId, initialTranscriptionDocId]); // Dependencies: Run when encounter or its initial doc ID changes
 
   return (
     <TranscriptionContext.Provider value={value}>
