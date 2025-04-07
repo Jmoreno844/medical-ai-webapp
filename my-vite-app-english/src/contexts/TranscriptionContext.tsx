@@ -179,8 +179,8 @@ export function TranscriptionProvider({
     }
   }, [transcriptionDocId, updateEncuentro, hasBeenTranscribed]);
 
-  // Use the voice recorder hook with transcription document ID
-  const voiceRecorder = useVoiceRecorder(transcriptionDocId);
+  // Use the voice recorder hook with encounterId
+  const voiceRecorder = useVoiceRecorder(encounterId, transcriptionDocId);
 
   // Add a function to reset the transcription state
   const resetTranscriptionState = () => {
@@ -189,24 +189,46 @@ export function TranscriptionProvider({
     setIsTranscribing(false);
   };
 
-  // Monitor the hasBeenTranscribed value from the recorder and sync it
+  // Monitor the hasBeenTranscribed value from the recorder and sync it (One-way: Recorder true -> Context true)
   useEffect(() => {
+    // Prevent sync if the recorder is still checking audio for the potentially new encounter
+    // or if the context's transcriptionDocId hasn't settled yet.
+    if (voiceRecorder.isCheckingAudio) {
+      console.log(
+        `[TRANSCRIPTION][SYNC] Skipping sync: recorder is checking audio.`
+      );
+      return;
+    }
+
+    // It's also possible the transcriptionDocId passed to the hook hasn't updated yet,
+    // though the reset effect *should* handle this. Add logging for clarity.
     console.log(
-      `[TRANSCRIPTION][SYNC] Recorder hasBeenTranscribed: ${voiceRecorder.hasBeenTranscribed}, context hasBeenTranscribed: ${hasBeenTranscribed}`
+      `[TRANSCRIPTION][SYNC_CHECK] Recorder HBT: ${voiceRecorder.hasBeenTranscribed}, Context HBT: ${hasBeenTranscribed}, Context docId: ${transcriptionDocId}, Recorder Checking: ${voiceRecorder.isCheckingAudio}`
     );
 
-    // Only pull in the recorder's "true" value.
-    // If SSE/Context is already true, keep it that way.
+    // Sync ONLY if recorder says true AND context currently says false.
+    // This handles the case where audio exists initially for an encounter after the check completes.
+    // It avoids overwriting a 'true' state set by SSE or a 'false' state set by stopRecording/reset.
     if (
       voiceRecorder.hasBeenTranscribed === true &&
-      hasBeenTranscribed === false
+      hasBeenTranscribed === false &&
+      !voiceRecorder.isCheckingAudio // Double check recorder is not checking
     ) {
       console.log(
-        `[TRANSCRIPTION][SYNC] Setting hasBeenTranscribed from ${hasBeenTranscribed} to true, source: recorder sync`
+        `[TRANSCRIPTION][SYNC_APPLY] Setting hasBeenTranscribed from false to true. Source: recorder sync (initial audio check likely)`
       );
       setHasBeenTranscribed(true);
+    } else {
+      console.log(`[TRANSCRIPTION][SYNC] No sync action needed.`);
     }
-  }, [voiceRecorder.hasBeenTranscribed, hasBeenTranscribed]);
+
+    // DO NOT sync false from the recorder to the context, as other sources (SSE, stopRecording) manage that.
+  }, [
+    voiceRecorder.hasBeenTranscribed,
+    hasBeenTranscribed,
+    voiceRecorder.isCheckingAudio,
+    transcriptionDocId,
+  ]);
 
   // Set transcription ID when it's discovered
   useEffect(() => {
@@ -548,6 +570,35 @@ export function TranscriptionProvider({
     // We don't update has_been_transcribed when deleting
   }, [voiceRecorder.deleteRecording]);
 
+  // Effect to Reset Context State on encounterId Change - KEEP THIS
+  useEffect(() => {
+    console.log(
+      `[TRANSCRIPTION_CTX] Provider Effect for encounterId: ${encounterId}. Initial mount: ${isInitialMount.current}`
+    );
+
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    console.log(
+      `[TRANSCRIPTION_CTX] Resetting context state for new encounter ${encounterId}.`
+    );
+
+    // Close existing SSE connection
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    // Reset transcription process state
+    setIsTranscribing(false);
+    setTranscriptionStatus("idle");
+    setErrorMessage(null);
+    setTranscriptionCompleteTimestamp(null);
+    setHasBeenTranscribed(false);
+  }, [encounterId]);
+
   // Create the combined context value
   const value: TranscriptionContextType = {
     // State from voice recorder
@@ -608,21 +659,29 @@ export function TranscriptionProvider({
 
   // --- Effect to Reset State on encounterId Change ---
   useEffect(() => {
-    console.log(`[TRANSCRIPTION][EFFECT_ENCOUNTER] Encounter ID changed to: ${encounterId}. Initial mount: ${isInitialMount.current}`);
+    console.log(
+      `[TRANSCRIPTION][EFFECT_ENCOUNTER] Encounter ID changed to: ${encounterId}. Initial mount: ${isInitialMount.current}`
+    );
 
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      // Initial setup based on props is handled by useState and the effect syncing with `encuentro`
-      console.log(`[TRANSCRIPTION][EFFECT_ENCOUNTER] Initial mount for ${encounterId}. Skipping reset.`);
+      console.log(
+        `[TRANSCRIPTION][EFFECT_ENCOUNTER] Initial mount for ${encounterId}. Skipping reset.`
+      );
       // Ensure initial doc ID is set if provided
       if (initialTranscriptionDocId !== transcriptionDocId) {
-         setTranscriptionDocId(initialTranscriptionDocId);
+        console.log(
+          `[TRANSCRIPTION][EFFECT_ENCOUNTER] Setting initial doc ID: ${initialTranscriptionDocId}`
+        );
+        setTranscriptionDocId(initialTranscriptionDocId);
       }
       return;
     }
 
-    // Reset logic for subsequent encounter changes or invalid encounterId
-    console.log(`[TRANSCRIPTION][EFFECT_ENCOUNTER] Resetting state due to encounter change to ${encounterId}.`);
+    // Reset logic for subsequent encounter changes
+    console.log(
+      `[TRANSCRIPTION][EFFECT_ENCOUNTER] Resetting state due to encounter change to ${encounterId}.`
+    );
 
     // 1. Close existing SSE connection
     if (eventSourceRef.current) {
@@ -637,21 +696,24 @@ export function TranscriptionProvider({
     setErrorMessage(null);
     setTranscriptionCompleteTimestamp(null);
 
-    // 3. Reset transcriptionDocId based on new initial prop
-    setTranscriptionDocId(initialTranscriptionDocId ?? null);
+    // 3. Reset transcriptionDocId based on new initial prop from AppProviders
+    const newDocId = initialTranscriptionDocId ?? null;
+    console.log(
+      `[TRANSCRIPTION][RESET] Setting transcriptionDocId to: ${newDocId}`
+    );
+    setTranscriptionDocId(newDocId);
 
-    // 4. Reset hasBeenTranscribed (the effect below will sync with the new encounter data)
-    console.log(`[TRANSCRIPTION][RESET] Setting hasBeenTranscribed to false temporarily.`);
-    setHasBeenTranscribed(false);
+    // 4. Reset hasBeenTranscribed (the effect syncing with `encuentro` should handle the final value)
+    console.log(
+      `[TRANSCRIPTION][RESET] Setting hasBeenTranscribed to false temporarily.`
+    );
+    setHasBeenTranscribed(false); // Reset to false, let the encuentro sync correct it
 
-    // 5. Reset voice recorder state implicitly
-    // The useVoiceRecorder hook depends on transcriptionDocId.
-    // Since we updated transcriptionDocId above, the hook should re-run its internal logic
-    // to check audio existence etc. for the new document ID (or null).
-    console.log(`[TRANSCRIPTION][RESET] Relying on useVoiceRecorder to update based on new transcriptionDocId: ${initialTranscriptionDocId ?? null}`);
-
-
-  }, [encounterId, initialTranscriptionDocId]); // Dependencies: Run when encounter or its initial doc ID changes
+    // 5. Reset voice recorder state implicitly via dependency change
+    console.log(
+      `[TRANSCRIPTION][RESET] Relying on useVoiceRecorder hook internal effects to reset based on new transcriptionDocId: ${newDocId}`
+    );
+  }, [encounterId, initialTranscriptionDocId]);
 
   return (
     <TranscriptionContext.Provider value={value}>
