@@ -9,6 +9,7 @@ import React, {
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { useVoiceRecorder } from "../features/encuentroHeader/hooks/audio/useVoiceRecorder";
 import { useContentContext } from "./ContentContext"; // Add ContentContext import
+import { useEncuentroContext } from "./EncuentroContext"; // Add EncuentroContext import
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -18,8 +19,6 @@ type TranscriptionContextType = {
   transcriptionDocId: number | null;
   transcriptionCompleteTimestamp: number | null;
   hasBeenTranscribed: boolean;
-  freshlyCompleted: boolean;
-  resetFreshlyCompleted: () => void;
 
   // Recording state
   isRecording: boolean;
@@ -74,6 +73,9 @@ export function TranscriptionProvider({
     null
   );
 
+  // Get EncuentroContext access
+  const { encuentro, updateEncuentro } = useEncuentroContext();
+
   // Use try-catch to avoid errors if ContentContext is not yet available
   try {
     contentContext.current = useContentContext();
@@ -88,7 +90,19 @@ export function TranscriptionProvider({
   const [transcriptionCompleteTimestamp, setTranscriptionCompleteTimestamp] =
     useState<number | null>(null);
   const [hasBeenTranscribed, setHasBeenTranscribed] = useState<boolean>(false);
-  const [freshlyCompleted, setFreshlyCompleted] = useState<boolean>(false);
+
+  // Add log for initial state
+  console.log(
+    `[TRANSCRIPTION][INIT] hasBeenTranscribed initial value: ${hasBeenTranscribed}`
+  );
+
+  // Wrap setState to add logging
+  const loggedSetHasBeenTranscribed = (value: boolean) => {
+    console.log(
+      `[TRANSCRIPTION][SET] Setting hasBeenTranscribed from ${hasBeenTranscribed} to ${value}, source: explicit call`
+    );
+    setHasBeenTranscribed(value);
+  };
 
   // Add direct state management instead of using useTranscription hook
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -108,15 +122,21 @@ export function TranscriptionProvider({
   // Store the current EventSource instance
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  // Function to reset freshlyCompleted flag
-  const resetFreshlyCompleted = useCallback(() => {
-    setFreshlyCompleted(false);
-  }, []);
-
   // Enhanced handleTranscriptionComplete function
   const handleTranscriptionComplete = useCallback(() => {
     setTranscriptionCompleteTimestamp(Date.now());
+    console.log(
+      `[TRANSCRIPTION][COMPLETE] Setting hasBeenTranscribed from ${hasBeenTranscribed} to true, source: transcriptionComplete`
+    );
     setHasBeenTranscribed(true);
+
+    // Update the encuentro context and backend
+    updateEncuentro({ has_been_transcribed: true }).catch((error) =>
+      console.error(
+        "[TRANSCRIPTION] Error updating has_been_transcribed:",
+        error
+      )
+    );
 
     // If transcription document exists
     if (transcriptionDocId) {
@@ -152,7 +172,7 @@ export function TranscriptionProvider({
           });
       }
     }
-  }, [transcriptionDocId]);
+  }, [transcriptionDocId, updateEncuentro, hasBeenTranscribed]);
 
   // Use the voice recorder hook with transcription document ID
   const voiceRecorder = useVoiceRecorder(transcriptionDocId);
@@ -166,12 +186,19 @@ export function TranscriptionProvider({
 
   // Monitor the hasBeenTranscribed value from the recorder and sync it
   useEffect(() => {
+    console.log(
+      `[TRANSCRIPTION][SYNC] Recorder hasBeenTranscribed: ${voiceRecorder.hasBeenTranscribed}, context hasBeenTranscribed: ${hasBeenTranscribed}`
+    );
+
     // Only pull in the recorder's "true" value.
     // If SSE/Context is already true, keep it that way.
     if (
       voiceRecorder.hasBeenTranscribed === true &&
       hasBeenTranscribed === false
     ) {
+      console.log(
+        `[TRANSCRIPTION][SYNC] Setting hasBeenTranscribed from ${hasBeenTranscribed} to true, source: recorder sync`
+      );
       setHasBeenTranscribed(true);
     }
   }, [voiceRecorder.hasBeenTranscribed, hasBeenTranscribed]);
@@ -196,16 +223,6 @@ export function TranscriptionProvider({
       }
     };
   }, []);
-
-  // Monitor the voiceRecorder.audioExists state and reset transcription when audio is deleted
-  useEffect(() => {
-    if (!voiceRecorder.audioExists) {
-      // Audio has been deleted, clear transcription data
-      setHasBeenTranscribed(false);
-      setFreshlyCompleted(false);
-      setTranscriptionDocId(null);
-    }
-  }, [voiceRecorder.audioExists]);
 
   // Function to get a secure SSE token
   const getSSEToken = async (id_documento: number): Promise<string | null> => {
@@ -285,9 +302,10 @@ export function TranscriptionProvider({
             );
             setTranscriptionStatus("success");
 
-            // Set both flags - order matters!
+            console.log(
+              `[TRANSCRIPTION][SSE] Setting hasBeenTranscribed from ${hasBeenTranscribed} to true, source: SSE transcription_complete`
+            );
             setHasBeenTranscribed(true);
-            setFreshlyCompleted(true);
 
             // Call the callback when transcription completes
             console.log(
@@ -494,14 +512,43 @@ export function TranscriptionProvider({
     }
   }, [transcriptionDocId]);
 
+  // Wrap startRecording to update EncuentroContext state
+  const startRecording = useCallback(() => {
+    // First call the original startRecording
+    voiceRecorder.startRecording();
+  }, [voiceRecorder.startRecording]);
+
+  // Wrap stopRecording to handle EncuentroContext updates
+  const stopRecording = useCallback(() => {
+    voiceRecorder.stopRecording();
+    console.log("SETTING HAS_BEEN_TRANSCRIBED TO FALSE");
+    // Now set has_been_transcribed to false once new audio finishes uploading
+    updateEncuentro({ has_been_transcribed: false }).catch((error) =>
+      console.error(
+        "[TRANSCRIPTION] Error updating has_been_transcribed:",
+        error
+      )
+    );
+    console.log(
+      `[TRANSCRIPTION][STOP] Setting hasBeenTranscribed from ${hasBeenTranscribed} to false, source: stopRecording`
+    );
+    setHasBeenTranscribed(false);
+  }, [voiceRecorder, updateEncuentro, hasBeenTranscribed]);
+
+  // Wrap deleteRecording to handle EncuentroContext updates
+  const deleteRecording = useCallback(async () => {
+    // Just call the original deleteRecording without changing has_been_transcribed
+    await voiceRecorder.deleteRecording();
+
+    // We don't update has_been_transcribed when deleting
+  }, [voiceRecorder.deleteRecording]);
+
   // Create the combined context value
   const value: TranscriptionContextType = {
     // State from voice recorder
     transcriptionDocId,
     transcriptionCompleteTimestamp,
     hasBeenTranscribed,
-    freshlyCompleted,
-    resetFreshlyCompleted,
     isRecording: voiceRecorder.isRecording,
     isPaused: voiceRecorder.isPaused,
     duration: voiceRecorder.duration,
@@ -515,19 +562,39 @@ export function TranscriptionProvider({
     transcriptionStatus,
     errorMessage,
 
-    // Audio recording actions from voice recorder
-    startRecording: voiceRecorder.startRecording,
-    stopRecording: voiceRecorder.stopRecording,
+    // Audio recording actions from voice recorder - use wrapped versions
+    startRecording,
+    stopRecording,
     pauseResumeRecording: voiceRecorder.pauseResumeRecording,
-    deleteRecording: voiceRecorder.deleteRecording,
+    deleteRecording,
 
     // Transcription actions
     transcribeAudio,
     resetTranscriptionState,
-    setHasBeenTranscribed,
+    setHasBeenTranscribed: loggedSetHasBeenTranscribed,
     onTranscriptionComplete: handleTranscriptionComplete,
     checkTranscriptionContent,
   };
+
+  useEffect(() => {
+    console.log(
+      `[TRANSCRIPTION][EFFECT] hasBeenTranscribed changed to: ${hasBeenTranscribed}`
+    );
+    return () => {
+      console.log(
+        `[TRANSCRIPTION][CLEANUP] Last value of hasBeenTranscribed before cleanup: ${hasBeenTranscribed}`
+      );
+    };
+  }, [hasBeenTranscribed]);
+
+  useEffect(() => {
+    if (encuentro) {
+      console.log(
+        `[TRANSCRIPTION][INIT] Setting hasBeenTranscribed from ${hasBeenTranscribed} to ${!!encuentro.has_been_transcribed}, source: encuentro data`
+      );
+      setHasBeenTranscribed(!!encuentro.has_been_transcribed);
+    }
+  }, [encuentro, hasBeenTranscribed]);
 
   return (
     <TranscriptionContext.Provider value={value}>

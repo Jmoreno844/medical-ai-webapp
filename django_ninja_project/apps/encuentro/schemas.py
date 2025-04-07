@@ -9,7 +9,7 @@ class EncuentroCreate(Schema):
     fecha: datetime  # Changed from date to datetime
 
 
-class EncuentroOut(Schema):
+class EncuentrosOut(Schema):
     id: int
     id_medico: int
     id_paciente: Optional[int]
@@ -18,11 +18,22 @@ class EncuentroOut(Schema):
     fecha: datetime  # Changed from date to datetime
 
 
+class SingleEncuentroOut(Schema):
+    id: int
+    id_medico: int
+    id_paciente: Optional[int]
+    paciente_conectado: Optional[bool]
+    nombre_encuentro: str
+    fecha: datetime  # Changed from date to datetime
+    has_been_transcribed: bool
+
+
 class EncuentroUpdate(Schema):
     id_paciente: Optional[int] = None
     paciente_conectado: Optional[bool] = None
     nombre_encuentro: Optional[str] = None
     fecha: Optional[datetime] = None
+    has_been_transcribed: Optional[bool] = None
 
     class Config:
         exclude_unset = True

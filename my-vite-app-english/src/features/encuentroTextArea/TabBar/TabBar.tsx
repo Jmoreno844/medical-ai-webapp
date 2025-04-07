@@ -20,8 +20,9 @@ import {
 import { Trash } from "lucide-react";
 
 // Import context
-import { useDocumentContext } from "../../../contexts/DocumentContext";
-import { useGenerationContext } from "../../../contexts/GenerationContext";
+import { useDocumentContext } from "@/contexts/DocumentContext";
+import { useGenerationContext } from "@/contexts/GenerationContext";
+import { useTranscriptionContext } from "@/contexts/TranscriptionContext"; // Updated import
 
 const TabBar: React.FC = () => {
   // Get state from context
@@ -29,6 +30,7 @@ const TabBar: React.FC = () => {
     useDocumentContext();
 
   const { openGenerationModal } = useGenerationContext();
+  const { hasBeenTranscribed } = useTranscriptionContext(); // Use hasBeenTranscribed directly
 
   // Local state for UI
   const [documentToDelete, setDocumentToDelete] = useState(null);
@@ -131,8 +133,17 @@ const TabBar: React.FC = () => {
           {/* Add document generation button */}
           <button
             onClick={openGenerationModal}
-            className="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors self-center mx-2"
-            title="Generate documentation"
+            disabled={!hasBeenTranscribed}
+            className={`p-2 ${
+              hasBeenTranscribed
+                ? "text-blue-600 hover:bg-blue-100"
+                : "text-gray-400 cursor-not-allowed"
+            } rounded-full transition-colors self-center mx-2`}
+            title={
+              hasBeenTranscribed
+                ? "Generate documentation"
+                : "Transcribe audio first to generate documentation"
+            }
             aria-label="Generate documentation"
           >
             <svg

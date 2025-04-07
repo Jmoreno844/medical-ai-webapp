@@ -9,7 +9,10 @@ import GenerateDocumentationButton from "./subcomponents/GenerateDocumentationBu
 // Import context hooks
 import { useTranscriptionContext } from "../../contexts/TranscriptionContext";
 import { useGenerationContext } from "../../contexts/GenerationContext";
-import { useEncuentroHeader } from "./hooks/useEncuentroHeader";
+import {
+  useEncuentroContext,
+  EncuentroProvider,
+} from "../../contexts/EncuentroContext";
 
 /**
  * EncuentroHeader component for the encounter page
@@ -19,16 +22,8 @@ import { useEncuentroHeader } from "./hooks/useEncuentroHeader";
  *
  * @returns React component
  */
-const EncuentroHeader: React.FC = () => {
-  // Get ID from URL
-  const { id } = useParams<{ id: string }>();
-  const encounterId = id ? parseInt(id, 10) : 0;
-
-  // Use contexts
-  const { hasBeenTranscribed } = useTranscriptionContext();
-  const { openGenerationModal } = useGenerationContext();
-
-  // Use the hook with the encounter ID
+const EncuentroHeaderContent: React.FC = () => {
+  // Use the encounter context instead of the hook
   const {
     // Modal states
     isModalOpen,
@@ -64,7 +59,7 @@ const EncuentroHeader: React.FC = () => {
     handleDeleteClick,
     handleDeleteConfirm,
     updateEncounterDate,
-  } = useEncuentroHeader(encounterId);
+  } = useEncuentroContext();
 
   return (
     <>
@@ -202,6 +197,21 @@ const EncuentroHeader: React.FC = () => {
         </div>
       </Modal>
     </>
+  );
+};
+
+/**
+ * Wrapper component that provides the EncuentroContext to the EncuentroHeaderContent
+ */
+const EncuentroHeader: React.FC = () => {
+  // Get ID from URL
+  const { id } = useParams<{ id: string }>();
+  const encounterId = id ? parseInt(id, 10) : 0;
+
+  return (
+    <EncuentroProvider encounterId={encounterId}>
+      <EncuentroHeaderContent />
+    </EncuentroProvider>
   );
 };
 

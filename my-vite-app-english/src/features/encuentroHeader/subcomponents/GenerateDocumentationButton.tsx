@@ -6,8 +6,8 @@ import { useGenerationContext } from "@/contexts/GenerationContext";
 /**
  * Button to generate documentation based on transcription
  *
- * Uses TranscriptionContext to check content availability and
- * GenerationContext to trigger document generation
+ * Uses TranscriptionContext to check content availability
+ * and GenerationContext to trigger document generation
  *
  * @returns React component
  */
@@ -19,7 +19,9 @@ const GenerateDocumentationButton: React.FC = () => {
     checkTranscriptionContent,
     freshlyCompleted,
     resetFreshlyCompleted,
+    isRecording,
   } = useTranscriptionContext();
+
   const { openGenerationModal } = useGenerationContext();
 
   // Local state to track content checking
@@ -67,7 +69,6 @@ const GenerateDocumentationButton: React.FC = () => {
   ]);
 
   // Check content when transcription status changes or on mount
-  // Keep original effect for handling other cases
   useEffect(() => {
     // Only proceed if transcription is completed
     if (!hasBeenTranscribed || !transcriptionDocId) {
@@ -79,23 +80,6 @@ const GenerateDocumentationButton: React.FC = () => {
     if (freshlyCompleted) {
       return;
     }
-
-    const verifyContent = async () => {
-      setIsCheckingContent(true);
-      try {
-        console.log("[GENERATE_BTN] Checking transcription content");
-        const contentAvailable = await checkTranscriptionContent();
-        console.log(`[GENERATE_BTN] Content check result: ${contentAvailable}`);
-        setHasContent(contentAvailable);
-      } catch (error) {
-        console.error("[GENERATE_BTN] Error checking content:", error);
-        setHasContent(false);
-      } finally {
-        setIsCheckingContent(false);
-      }
-    };
-
-    verifyContent();
   }, [
     hasBeenTranscribed,
     transcriptionDocId,
@@ -103,20 +87,28 @@ const GenerateDocumentationButton: React.FC = () => {
     freshlyCompleted,
   ]);
 
-  // Button is enabled when transcription completed with content
-  const isEnabled = hasBeenTranscribed && hasContent && !isCheckingContent;
+  // Button is enabled based on three conditions:
+  // 1. The transcription has been completed
+  // 2. The transcription has content
+  // 3. We're not currently recording or checking content
+  console.log("hasBeenTranscribed", hasBeenTranscribed);
+  console.log("hasContent", hasContent);
+  console.log("isRecording", isRecording);
+  console.log("isCheckingContent", isCheckingContent);
+  const isEnabled = hasBeenTranscribed && !isRecording && !isCheckingContent;
 
   // Dynamic tooltip based on state
   const getTooltipContent = () => {
     if (isCheckingContent) {
       return "Checking transcription content...";
     }
+    if (isRecording) {
+      return "Cannot generate while recording";
+    }
     if (!hasBeenTranscribed) {
       return "You must transcribe the audio first";
     }
-    if (!hasContent) {
-      return "The transcription appears to be empty";
-    }
+
     return "Generate documentation from transcription";
   };
 

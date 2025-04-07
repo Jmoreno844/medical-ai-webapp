@@ -3,6 +3,7 @@ import { DocumentProvider } from "./DocumentContext";
 import { ContentProvider } from "./ContentContext";
 import { GenerationProvider } from "./GenerationContext";
 import { TranscriptionProvider } from "./TranscriptionContext";
+import { EncuentroProvider } from "./EncuentroContext"; // Add this
 
 type AppProvidersProps = {
   children: React.ReactNode;
@@ -26,17 +27,19 @@ export function AppProviders({
 }: AppProvidersProps) {
   // The order is important for dependency resolution
   return (
-    <DocumentProvider encounterId={encounterId}>
-      <ContentProvider>
-        <TranscriptionProvider
-          initialTranscriptionDocId={initialTranscriptionDocId}
-          encounterId={encounterId}
-        >
-          <GenerationProvider encounterId={encounterId}>
-            {children}
-          </GenerationProvider>
-        </TranscriptionProvider>
-      </ContentProvider>
-    </DocumentProvider>
+    <EncuentroProvider encounterId={encounterId}>
+      <DocumentProvider encounterId={encounterId}>
+        <ContentProvider>
+          <TranscriptionProvider
+            initialTranscriptionDocId={initialTranscriptionDocId}
+            encounterId={encounterId}
+          >
+            <GenerationProvider encounterId={encounterId}>
+              {children}
+            </GenerationProvider>
+          </TranscriptionProvider>
+        </ContentProvider>
+      </DocumentProvider>
+    </EncuentroProvider>
   );
 }

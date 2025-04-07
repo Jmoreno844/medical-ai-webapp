@@ -6,7 +6,8 @@ from .models import Encuentro
 from .schemas import (
     EncuentroCreate,
     EncuentroUpdate,
-    EncuentroOut,
+    EncuentrosOut,
+    SingleEncuentroOut,
     EmptyEncuentroResponse,
     AudioUploadRequest,
     AudioUploadResponse,
@@ -41,7 +42,7 @@ def get_storage_client():
 router = Router(tags=["encuentros"])
 
 
-@router.get("/encuentros", response=List[EncuentroOut], auth=django_auth)
+@router.get("/encuentros", response=List[EncuentrosOut], auth=django_auth)
 def list_encuentros(request):
     # Only return encounters for the authenticated doctor
     encounters = Encuentro.objects.filter(id_medico=request.user.id)
@@ -64,7 +65,7 @@ def list_encuentros(request):
     return result
 
 
-@router.get("/encuentros/{encuentro_id}", response=EncuentroOut, auth=django_auth)
+@router.get("/encuentros/{encuentro_id}", response=SingleEncuentroOut, auth=django_auth)
 def get_encuentro(request, encuentro_id: int):
     # Get the encounter or return 404
     encuentro = get_object_or_404(Encuentro, id=encuentro_id)
@@ -81,6 +82,7 @@ def get_encuentro(request, encuentro_id: int):
         "paciente_conectado": encuentro.paciente_conectado,
         "nombre_encuentro": encuentro.nombre_encuentro,
         "fecha": encuentro.fecha,
+        "has_been_transcribed": encuentro.has_been_transcribed,
     }
 
 
@@ -113,7 +115,9 @@ def create_empty_encuentro(request, payload: EmptyPayload = None):
     return {"id": encuentro.id}
 
 
-@router.patch("/encuentros/{encuentro_id}", response=EncuentroOut, auth=django_auth)
+@router.patch(
+    "/encuentros/{encuentro_id}", response=SingleEncuentroOut, auth=django_auth
+)
 def update_encuentro(request, encuentro_id: int, payload: EncuentroUpdate):
     encuentro = get_object_or_404(Encuentro, id=encuentro_id)
 
@@ -158,6 +162,7 @@ def update_encuentro(request, encuentro_id: int, payload: EncuentroUpdate):
         "paciente_conectado": encuentro.paciente_conectado,
         "nombre_encuentro": encuentro.nombre_encuentro,
         "fecha": encuentro.fecha,
+        "has_been_transcribed": encuentro.has_been_transcribed,
     }
 
 
@@ -269,7 +274,6 @@ def delete_audio(request, encuentro_id: int):
         encuentro.audio_uploaded_at = None
         encuentro.audio_expires_at = None
         encuentro.audio_duration_seconds = None
-        encuentro.has_been_transcribed = False
         encuentro.save()
 
         return {"success": True}
