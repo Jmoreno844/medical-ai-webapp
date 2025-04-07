@@ -87,14 +87,6 @@ const GenerateDocumentationButton: React.FC = () => {
     freshlyCompleted,
   ]);
 
-  // Button is enabled based on three conditions:
-  // 1. The transcription has been completed
-  // 2. The transcription has content
-  // 3. We're not currently recording or checking content
-  console.log("hasBeenTranscribed", hasBeenTranscribed);
-  console.log("hasContent", hasContent);
-  console.log("isRecording", isRecording);
-  console.log("isCheckingContent", isCheckingContent);
   const isEnabled = hasBeenTranscribed && !isRecording && !isCheckingContent;
 
   // Dynamic tooltip based on state

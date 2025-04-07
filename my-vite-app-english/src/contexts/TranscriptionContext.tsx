@@ -91,10 +91,12 @@ export function TranscriptionProvider({
     useState<number | null>(null);
   const [hasBeenTranscribed, setHasBeenTranscribed] = useState<boolean>(false);
 
-  // Add log for initial state
-  console.log(
-    `[TRANSCRIPTION][INIT] hasBeenTranscribed initial value: ${hasBeenTranscribed}`
-  );
+  // Move the initial log into a useEffect with empty dependency array to run only once on mount
+  useEffect(() => {
+    console.log(
+      `[TRANSCRIPTION][INIT] hasBeenTranscribed initial value: ${hasBeenTranscribed}`
+    );
+  }, []);
 
   // Wrap setState to add logging
   const loggedSetHasBeenTranscribed = (value: boolean) => {
@@ -587,14 +589,19 @@ export function TranscriptionProvider({
     };
   }, [hasBeenTranscribed]);
 
+  // Fix the problematic effect by removing hasBeenTranscribed from dependencies
+  // and adding a conditional check to prevent unnecessary updates
   useEffect(() => {
-    if (encuentro) {
-      console.log(
-        `[TRANSCRIPTION][INIT] Setting hasBeenTranscribed from ${hasBeenTranscribed} to ${!!encuentro.has_been_transcribed}, source: encuentro data`
-      );
-      setHasBeenTranscribed(!!encuentro.has_been_transcribed);
+    if (encuentro && encuentro.has_been_transcribed !== undefined) {
+      // Only update if the value is different to avoid loops
+      if (!!encuentro.has_been_transcribed !== hasBeenTranscribed) {
+        console.log(
+          `[TRANSCRIPTION][INIT] Setting hasBeenTranscribed from ${hasBeenTranscribed} to ${!!encuentro.has_been_transcribed}, source: encuentro data`
+        );
+        setHasBeenTranscribed(!!encuentro.has_been_transcribed);
+      }
     }
-  }, [encuentro, hasBeenTranscribed]);
+  }, [encuentro]); // Remove hasBeenTranscribed from dependencies
 
   return (
     <TranscriptionContext.Provider value={value}>
