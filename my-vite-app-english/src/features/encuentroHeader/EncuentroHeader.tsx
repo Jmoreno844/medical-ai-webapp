@@ -93,10 +93,7 @@ const EncuentroHeader: React.FC = () => {
           <div className="flex items-center">
             {/* Generate Documentation Button - Now using context */}
             <div className="mr-4">
-              <GenerateDocumentationButton
-                onClick={openGenerationModal}
-                hasBeenTranscribed={hasBeenTranscribed}
-              />
+              <GenerateDocumentationButton />
             </div>
 
             {/* VoiceRecorder now uses context directly */}

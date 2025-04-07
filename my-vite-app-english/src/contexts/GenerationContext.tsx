@@ -267,6 +267,31 @@ export function GenerationProvider({
                 }));
 
                 setIsGenerating(false);
+
+                // Force editor refresh to properly parse markdown
+                setTimeout(() => {
+                  if (selectDocument && documentId) {
+                    // Force reinitialization by switching to another doc and back
+                    const currentDocId = documentId;
+
+                    // Find another document to temporarily switch to
+                    const otherDoc = documents.find(
+                      (doc) => doc.id !== currentDocId
+                    );
+
+                    if (otherDoc) {
+                      // Switch away and back to trigger Markdown parsing
+                      selectDocument(otherDoc.id);
+                      setTimeout(() => selectDocument(currentDocId), 50);
+                    } else {
+                      // If no other doc exists, just trigger a context refresh
+                      if (window.triggerEditorRefresh) {
+                        window.triggerEditorRefresh();
+                      }
+                    }
+                  }
+                }, 300); // Short delay to ensure content is fully saved
+
                 break;
 
               case "generation_error":

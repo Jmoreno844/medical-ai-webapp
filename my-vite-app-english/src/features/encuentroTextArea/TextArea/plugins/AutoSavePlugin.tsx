@@ -18,7 +18,6 @@ export function AutoSavePlugin({
   hasInitialContent = false,
   saveInterval = 2000,
 }: AutoSavePluginProps) {
-  // Implementation stays largely the same
   const [editor] = useLexicalComposerContext();
   const [isSaving, setIsSaving] = useState(false);
   const lastSavedContentRef = useRef<string>("");
@@ -36,10 +35,11 @@ export function AutoSavePlugin({
   };
 
   const handleSave = async (force: boolean = false) => {
-    // ...existing code...
+    // Fetch the Markdown version of your content
     const currentContent = getDocumentContent();
     const lastSaved = lastSavedContentRef.current;
 
+    // Skip if content hasn't changed and not forced
     if (
       savingRef.current ||
       (!force && currentContent.trim() === lastSaved.trim())
@@ -47,6 +47,7 @@ export function AutoSavePlugin({
       return;
     }
 
+    // Skip saving empty content if the doc previously had content
     if (hasInitialContent && currentContent.trim() === "") {
       return;
     }
@@ -55,8 +56,10 @@ export function AutoSavePlugin({
       savingRef.current = true;
       setIsSaving(true);
 
+      // Save the Markdown content (includes "**" markers)
       await onSave(documentId, currentContent);
 
+      // Only update ref if content hasn't changed during save
       if (currentContent === getDocumentContent()) {
         lastSavedContentRef.current = currentContent;
       }
@@ -73,7 +76,6 @@ export function AutoSavePlugin({
 
   // Register save function with the parent component
   useEffect(() => {
-    // ...existing code...
     if (registerSaveFunction) {
       registerSaveFunction(handleSave);
       return () => registerSaveFunction(() => Promise.resolve());
@@ -82,14 +84,15 @@ export function AutoSavePlugin({
 
   // Auto-save listener
   useEffect(() => {
-    // ...existing code...
     let timer: NodeJS.Timeout | null = null;
     let lastSavedContent = lastSavedContentRef.current;
 
     const removeUpdateListener = editor.registerUpdateListener(() => {
+      // Editor content changed, reset any pending save timer
       if (timer) clearTimeout(timer);
 
       const currentContent = getDocumentContent();
+      // Only schedule a save if new content is different
       if (currentContent !== lastSavedContent) {
         lastSavedContent = currentContent;
         timer = setTimeout(() => handleSave(false), saveInterval);

@@ -8,8 +8,7 @@ import React, {
 } from "react";
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { useVoiceRecorder } from "../features/encuentroHeader/hooks/audio/useVoiceRecorder";
-// Remove the useTranscription import as we'll handle state directly
-// import useTranscription from "../features/encuentroHeader/hooks/useTranscription";
+import { useContentContext } from "./ContentContext"; // Add ContentContext import
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -19,6 +18,8 @@ type TranscriptionContextType = {
   transcriptionDocId: number | null;
   transcriptionCompleteTimestamp: number | null;
   hasBeenTranscribed: boolean;
+  freshlyCompleted: boolean;
+  resetFreshlyCompleted: () => void;
 
   // Recording state
   isRecording: boolean;
@@ -48,6 +49,9 @@ type TranscriptionContextType = {
   setHasBeenTranscribed: (value: boolean) => void;
   onTranscriptionComplete: () => void;
   resetTranscriptionState: () => void;
+
+  // New method to check transcription content
+  checkTranscriptionContent: () => Promise<boolean>;
 };
 
 // Create the context
@@ -65,6 +69,18 @@ export function TranscriptionProvider({
   initialTranscriptionDocId?: number | null;
   encounterId: number;
 }) {
+  // Get ContentContext access
+  const contentContext = useRef<ReturnType<typeof useContentContext> | null>(
+    null
+  );
+
+  // Use try-catch to avoid errors if ContentContext is not yet available
+  try {
+    contentContext.current = useContentContext();
+  } catch (error) {
+    console.warn("[TRANSCRIPTION] ContentContext not yet available");
+  }
+
   // Track transcription document
   const [transcriptionDocId, setTranscriptionDocId] = useState<number | null>(
     initialTranscriptionDocId
@@ -72,6 +88,7 @@ export function TranscriptionProvider({
   const [transcriptionCompleteTimestamp, setTranscriptionCompleteTimestamp] =
     useState<number | null>(null);
   const [hasBeenTranscribed, setHasBeenTranscribed] = useState<boolean>(false);
+  const [freshlyCompleted, setFreshlyCompleted] = useState<boolean>(false);
 
   // Add direct state management instead of using useTranscription hook
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -91,17 +108,49 @@ export function TranscriptionProvider({
   // Store the current EventSource instance
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  // Handle transcription complete action
+  // Function to reset freshlyCompleted flag
+  const resetFreshlyCompleted = useCallback(() => {
+    setFreshlyCompleted(false);
+  }, []);
+
+  // Enhanced handleTranscriptionComplete function
   const handleTranscriptionComplete = useCallback(() => {
     setTranscriptionCompleteTimestamp(Date.now());
     setHasBeenTranscribed(true);
 
-    // If we have access to document cache, clear it for this document
-    if (window.documentContentCache && transcriptionDocId) {
+    // If transcription document exists
+    if (transcriptionDocId) {
       console.log(
-        `[TRANSCRIPTION] Clearing cache for document ${transcriptionDocId}`
+        `[TRANSCRIPTION] Transcription completed for document ${transcriptionDocId}`
       );
-      window.documentContentCache.delete(transcriptionDocId);
+
+      // Clear the cache so we can get fresh content
+      if (window.documentContentCache) {
+        console.log(
+          `[TRANSCRIPTION] Clearing cache for document ${transcriptionDocId}`
+        );
+        window.documentContentCache.delete(transcriptionDocId);
+      }
+
+      // Force fetch fresh content from the server if ContentContext is available
+      if (contentContext.current) {
+        contentContext.current
+          .fetchDocumentContent(transcriptionDocId, true)
+          .then((content) => {
+            console.log(
+              `[TRANSCRIPTION] Fetched fresh content for document ${transcriptionDocId}`
+            );
+
+            // Trigger editor refresh to ensure content is updated in the editor
+            contentContext.current?.triggerEditorRefresh();
+          })
+          .catch((error) => {
+            console.error(
+              `[TRANSCRIPTION] Error fetching updated content:`,
+              error
+            );
+          });
+      }
     }
   }, [transcriptionDocId]);
 
@@ -117,8 +166,13 @@ export function TranscriptionProvider({
 
   // Monitor the hasBeenTranscribed value from the recorder and sync it
   useEffect(() => {
-    if (voiceRecorder.hasBeenTranscribed !== hasBeenTranscribed) {
-      setHasBeenTranscribed(voiceRecorder.hasBeenTranscribed);
+    // Only pull in the recorder's "true" value.
+    // If SSE/Context is already true, keep it that way.
+    if (
+      voiceRecorder.hasBeenTranscribed === true &&
+      hasBeenTranscribed === false
+    ) {
+      setHasBeenTranscribed(true);
     }
   }, [voiceRecorder.hasBeenTranscribed, hasBeenTranscribed]);
 
@@ -142,6 +196,16 @@ export function TranscriptionProvider({
       }
     };
   }, []);
+
+  // Monitor the voiceRecorder.audioExists state and reset transcription when audio is deleted
+  useEffect(() => {
+    if (!voiceRecorder.audioExists) {
+      // Audio has been deleted, clear transcription data
+      setHasBeenTranscribed(false);
+      setFreshlyCompleted(false);
+      setTranscriptionDocId(null);
+    }
+  }, [voiceRecorder.audioExists]);
 
   // Function to get a secure SSE token
   const getSSEToken = async (id_documento: number): Promise<string | null> => {
@@ -208,7 +272,7 @@ export function TranscriptionProvider({
         );
       };
 
-      // Message received
+      // Message received - enhanced with content updates
       eventSource.onmessage = (event) => {
         console.log("[USE_TRANSCRIPTION] SSE message received", event.data);
         try {
@@ -221,6 +285,10 @@ export function TranscriptionProvider({
             );
             setTranscriptionStatus("success");
 
+            // Set both flags - order matters!
+            setHasBeenTranscribed(true);
+            setFreshlyCompleted(true);
+
             // Call the callback when transcription completes
             console.log(
               "[USE_TRANSCRIPTION] Calling onTranscriptionComplete callback"
@@ -230,6 +298,27 @@ export function TranscriptionProvider({
             // Close the connection since we no longer need updates
             eventSource.close();
             eventSourceRef.current = null;
+          }
+
+          // If we receive content updates during transcription
+          if (data.event === "transcription_update" && data.content) {
+            console.log(
+              `[USE_TRANSCRIPTION] Received content update for document ${id_documento}`
+            );
+
+            // Update cache with intermediate content if available
+            if (window.documentContentCache && transcriptionDocId) {
+              window.documentContentCache.set(transcriptionDocId, data.content);
+
+              // If ContentContext is available, update content and trigger refresh
+              if (contentContext.current) {
+                contentContext.current.updateDocumentContent(
+                  transcriptionDocId,
+                  data.content
+                );
+                contentContext.current.triggerEditorRefresh();
+              }
+            }
           }
         } catch (error) {
           console.error(
@@ -315,12 +404,104 @@ export function TranscriptionProvider({
     }
   };
 
+  /**
+   * Checks if the transcription document has content
+   * Uses ContentContext if available, otherwise makes a direct API call
+   * Also ensures content is properly cached
+   *
+   * @returns Promise resolving to true if content exists and is not empty
+   */
+  const checkTranscriptionContent = useCallback(async (): Promise<boolean> => {
+    if (!transcriptionDocId) return false;
+
+    console.log(
+      `[TRANSCRIPTION] Checking content for document ${transcriptionDocId}`
+    );
+
+    // First check if content is in cache
+    if (window.documentContentCache?.has(transcriptionDocId)) {
+      const content = window.documentContentCache.get(transcriptionDocId);
+      const hasContent = !!content && content.trim().length > 0;
+      console.log(
+        `[TRANSCRIPTION] Content found in cache: ${
+          hasContent ? "Not empty" : "Empty"
+        }`
+      );
+      return hasContent;
+    }
+
+    console.log(`[TRANSCRIPTION] Content not in cache, fetching from server`);
+
+    // If ContentContext is available, try using it
+    if (contentContext.current) {
+      try {
+        console.log(`[TRANSCRIPTION] Using ContentContext to fetch content`);
+        const content = await contentContext.current.fetchDocumentContent(
+          transcriptionDocId,
+          true
+        );
+        const hasContent = !!content && content.trim().length > 0;
+        console.log(
+          `[TRANSCRIPTION] Content fetched via context: ${
+            hasContent ? "Not empty" : "Empty"
+          }`
+        );
+        return hasContent;
+      } catch (error) {
+        console.error(
+          `[TRANSCRIPTION] Error fetching via ContentContext:`,
+          error
+        );
+      }
+    }
+
+    // Fallback to direct API call
+    try {
+      console.log(`[TRANSCRIPTION] Fallback: Direct API call`);
+      const response = await axiosInstance.get(
+        `/api/documento/${transcriptionDocId}`
+      );
+      const content = response.data?.contenido || "";
+
+      // Save to cache
+      if (content) {
+        console.log(`[TRANSCRIPTION] Saving fetched content to cache`);
+
+        // Update window cache for compatibility
+        if (window.documentContentCache) {
+          window.documentContentCache.set(transcriptionDocId, content);
+        }
+
+        // Also update ContentContext if available
+        if (contentContext.current) {
+          contentContext.current.updateDocumentContent(
+            transcriptionDocId,
+            content
+          );
+        }
+      }
+
+      const hasContent = !!content && content.trim().length > 0;
+      console.log(
+        `[TRANSCRIPTION] Content from API: ${
+          hasContent ? "Not empty" : "Empty"
+        }`
+      );
+      return hasContent;
+    } catch (error) {
+      console.error(`[TRANSCRIPTION] Error in direct API fetch:`, error);
+      return false;
+    }
+  }, [transcriptionDocId]);
+
   // Create the combined context value
   const value: TranscriptionContextType = {
     // State from voice recorder
     transcriptionDocId,
     transcriptionCompleteTimestamp,
     hasBeenTranscribed,
+    freshlyCompleted,
+    resetFreshlyCompleted,
     isRecording: voiceRecorder.isRecording,
     isPaused: voiceRecorder.isPaused,
     duration: voiceRecorder.duration,
@@ -345,6 +526,7 @@ export function TranscriptionProvider({
     resetTranscriptionState,
     setHasBeenTranscribed,
     onTranscriptionComplete: handleTranscriptionComplete,
+    checkTranscriptionContent,
   };
 
   return (

@@ -29,6 +29,7 @@ type ContentContextType = {
   reloadContent: () => Promise<void>;
   triggerEditorRefresh: () => void;
   saveContent: (docId: number, content: string) => Promise<boolean>;
+  updateDocumentContent: (docId: number, content: string) => void; // New function
 };
 
 // Create the context
@@ -52,18 +53,19 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
   // Track which documents have been loaded to avoid unnecessary refreshes
   const loadedDocumentsRef = useRef<Set<number>>(new Set());
 
-  // Make the cache globally available (until fully migrated)
-  useEffect(() => {
-    (window as any).documentContentCache = documentContentCache;
-    return () => {
-      delete (window as any).documentContentCache;
-    };
-  }, [documentContentCache]);
-
-  // Trigger editor refresh
   const triggerEditorRefresh = useCallback(() => {
     setEditorRefreshTrigger((prev) => prev + 1);
   }, []);
+
+  // Make the cache and triggerEditorRefresh globally available
+  useEffect(() => {
+    (window as any).documentContentCache = documentContentCache;
+    (window as any).triggerEditorRefresh = triggerEditorRefresh;
+    return () => {
+      delete (window as any).documentContentCache;
+      delete (window as any).triggerEditorRefresh;
+    };
+  }, [documentContentCache, triggerEditorRefresh]);
 
   // Fetch document content function
   const fetchDocumentContent = useCallback(
@@ -258,6 +260,28 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Add new function to update document content directly (for real-time updates)
+  const updateDocumentContent = useCallback(
+    (docId: number, content: string) => {
+      // Only update if it's the active document
+      if (docId === activeDocumentId) {
+        console.log(
+          `[CONTENT_UPDATE] Directly updating content for document ${docId}`
+        );
+        setDocumentContent(content);
+        setContentLoadedSuccessfully(true);
+      }
+
+      // Update the cache regardless
+      setDocumentContentCache((prev) => {
+        const newCache = new Map(prev);
+        newCache.set(docId, content);
+        return newCache;
+      });
+    },
+    [activeDocumentId]
+  );
+
   // Create the context value
   const value: ContentContextType = {
     documentContent,
@@ -271,6 +295,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
     reloadContent,
     triggerEditorRefresh,
     saveContent,
+    updateDocumentContent, // Include the new function
   };
 
   return (

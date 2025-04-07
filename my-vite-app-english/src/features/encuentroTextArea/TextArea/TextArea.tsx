@@ -65,6 +65,22 @@ const TextArea: React.FC = () => {
     }
   }, [editorRefreshTrigger, activeDocument, reloadContent]);
 
+  // Enhanced logic to track transcription updates
+  useEffect(() => {
+    if (
+      transcriptionCompleteTimestamp &&
+      activeDocument?.tipo === "transcripcion" &&
+      activeDocument.id === previousDocIdRef.current
+    ) {
+      console.log(
+        `[TEXT_AREA] Transcription completed at ${new Date(
+          transcriptionCompleteTimestamp
+        ).toISOString()}`
+      );
+      reloadContent();
+    }
+  }, [transcriptionCompleteTimestamp, activeDocument, reloadContent]);
+
   // Custom save wrapper
   const handleSave = useCallback(
     async (docId: number, content: string) => {
@@ -211,7 +227,7 @@ const TextArea: React.FC = () => {
       {/* Editor */}
       <div className="border rounded-md flex-1 bg-white">
         <LexicalComposer
-          key={`persistent-editor-${editorRefreshTrigger}`}
+          key={`editor-${activeDocumentId}-refresh-${editorRefreshTrigger}`}
           initialConfig={initialConfig}
         >
           <div className="editor-container h-full">
