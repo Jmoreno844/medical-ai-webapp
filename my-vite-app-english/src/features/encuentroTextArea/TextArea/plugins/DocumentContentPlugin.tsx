@@ -11,7 +11,7 @@ interface DocumentContentPluginProps {
   refreshTrigger?: number;
   forceRefresh?: boolean;
   streamingContent?: string;
-  documentType?: string; // Add document type to determine refresh behavior
+  documentType?: string;
 }
 
 export function DocumentContentPlugin({
@@ -40,96 +40,60 @@ export function DocumentContentPlugin({
 
     const isDocumentChanged = lastAppliedDocumentIdRef.current !== documentId;
 
-    console.log(
-      `📄 Plugin Effect Start: Doc ${documentId}, PrevDoc: ${
-        lastAppliedDocumentIdRef.current
-      }, isLoading: ${isLoading}, isDocChanged: ${isDocumentChanged}, contentLen: ${
-        content?.length ?? "N/A"
-      }, lastAppliedContentLen: ${
-        lastAppliedContentRef.current?.length ?? "N/A"
-      }`
-    );
-
     editor.update(
       () => {
-        if (!isMountedRef.current) return; // Re-check mount status inside closure
+        if (!isMountedRef.current) return;
 
         const root = $getRoot();
 
-        // --- Immediate Clear Logic ---
-        // Clear the editor if the document ID has changed OR if loading has just started.
-        // This prevents displaying stale content during the fetch.
+        // Clear editor when document changes or loading starts
         if (isDocumentChanged || isLoading) {
-          // Only clear if we haven't already applied empty content for this loading state/doc change
-          const currentEditorContent = root.getTextContent(); // Check actual editor state
+          const currentEditorContent = root.getTextContent();
           if (currentEditorContent !== "" || isDocumentChanged) {
             console.log(
-              `📄 Clearing editor: Doc changed (${isDocumentChanged}), isLoading (${isLoading}). Current editor content length: ${currentEditorContent.length}`
+              `📄 Clearing editor: Doc changed (${isDocumentChanged}), isLoading (${isLoading})`
             );
             root.clear();
             const paragraph = $createParagraphNode();
             root.append(paragraph);
-            // Reset ref immediately after clearing due to load/change
             lastAppliedContentRef.current = "";
-          } else {
-            console.log(
-              `📄 Skipping clear: Editor already empty for Doc ${documentId} while loading or doc changed.`
-            );
           }
         }
 
-        // --- Content Application Logic ---
-        // Apply content only when *not* loading and the content is different from what's applied.
-        // This runs *after* loading finishes or if it wasn't loading.
+        // Apply content when not loading
         if (!isLoading) {
-          const newContent = streamingContent ?? content; // Prioritize streaming content if available
+          const newContent = streamingContent ?? content;
 
           if (newContent !== lastAppliedContentRef.current) {
             console.log(
-              `📄 Applying content: Doc ${documentId}, isLoading: ${isLoading}, New content length: ${
+              `📄 Applying content: Doc ${documentId}, content length: ${
                 newContent?.length ?? 0
               }`
             );
-            root.clear(); // Clear before applying new content
+            
+            root.clear();
+            
             if (newContent && newContent.trim() !== "") {
               try {
-                // Use Markdown conversion for both regular and streaming for consistency
                 $convertFromMarkdownString(newContent, TRANSFORMERS);
-                console.log(
-                  `📄 Applied content successfully for Doc ${documentId}`
-                );
               } catch (error) {
-                console.error(
-                  `📄 Error converting Markdown for Doc ${documentId}:`,
-                  error
-                );
-                // Fallback: insert as plain text paragraph
+                console.error(`Error converting Markdown for Doc ${documentId}:`, error);
                 const paragraph = $createParagraphNode();
                 paragraph.append($createTextNode(newContent));
                 root.append(paragraph);
               }
             } else {
-              // Ensure empty content results in a single empty paragraph
               const paragraph = $createParagraphNode();
               root.append(paragraph);
-              console.log(`📄 Applied empty paragraph for Doc ${documentId}`);
             }
-            lastAppliedContentRef.current = newContent; // Update ref *after* successful application
-          } else {
-            console.log(
-              `📄 Skipping content application: Content unchanged for Doc ${documentId}`
-            );
+            
+            lastAppliedContentRef.current = newContent;
           }
-        } else {
-          console.log(
-            `📄 Skipping content application: Still loading Doc ${documentId}`
-          );
         }
       },
       { tag: "document-content-plugin-update" }
-    ); // Add tag for debugging Lexical updates
+    );
 
-    // Update the document ID ref *after* the update logic has run
     if (isDocumentChanged) {
       lastAppliedDocumentIdRef.current = documentId;
     }

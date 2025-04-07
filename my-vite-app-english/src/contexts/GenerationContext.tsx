@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { useDocumentContext } from "./DocumentContext";
-import { useContentContext } from "./ContentContext"; 
+import { useContentContext } from "./ContentContext";
 import { useTranscriptionContext } from "./TranscriptionContext"; // Add this import
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -223,7 +223,10 @@ export function GenerationProvider({
                   // Save content to document
                   if (saveDocument && targetDocumentIdForChunk && newChunk) {
                     // Use the full accumulated content for saving
-                    saveDocument(targetDocumentIdForChunk, updatedContent).catch((err) =>
+                    saveDocument(
+                      targetDocumentIdForChunk,
+                      updatedContent
+                    ).catch((err) =>
                       console.error("Error saving document content:", err)
                     );
                   }
@@ -237,67 +240,71 @@ export function GenerationProvider({
                 break;
 
               case "generation_complete":
-                const finalContent = data.chunk || generationStatus.content;
-                const targetDocumentId = generationStatus.documentId; // Capture documentId
+                // Use setGenerationStatus functional update to get the latest state reliably
+                setGenerationStatus((prevStatus) => {
+                  const finalContent = data.chunk || prevStatus.content;
+                  const targetDocumentId = prevStatus.documentId; // Get ID from the latest state
 
-                console.log(
-                  `✅ Generation complete - Final content length: ${finalContent.length} chars`
-                );
+                  console.log(
+                    `✅ Generation complete - Target Doc ID: ${targetDocumentId}, Final content length: ${finalContent.length} chars`
+                  );
 
-                // CRITICAL: Remove direct cache update - rely on ContentContext update
-                // if (window.documentContentCache && targetDocumentId) {
-                //   window.documentContentCache.set(targetDocumentId, finalContent);
-                //   console.log(
-                //     `💾 Manually updated cache for document ${targetDocumentId} with ${finalContent.length} chars`
-                //   );
-                // }
+                  // Save final content to database using the correct targetDocumentId
+                  if (saveDocument && targetDocumentId) {
+                    saveDocument(targetDocumentId, finalContent)
+                      .then((saveSuccess) => {
+                        console.log(
+                          `📝 Final content saved to database (Doc ${targetDocumentId}, ${finalContent.length} chars), Success: ${saveSuccess}`
+                        );
 
-                // Save final content to database
-                if (saveDocument && targetDocumentId) {
-                  try {
-                    const saveSuccess = await saveDocument(targetDocumentId, finalContent);
-                    console.log(
-                      `📝 Final content saved to database (${finalContent.length} chars), Success: ${saveSuccess}`
+                        // IMPORTANT: Update ContentContext state AFTER successful save using the correct targetDocumentId
+                        if (saveSuccess && updateDocumentContent) {
+                          updateDocumentContent(targetDocumentId, finalContent); // Use correct targetDocumentId
+                          console.log(
+                            `🔄 Explicitly updated ContentContext state for document ${targetDocumentId}` // Log correct ID
+                          );
+                        }
+
+                        // Force editor refresh AFTER state updates, keep the correct document selected
+                        setTimeout(() => {
+                          // Ensure the correct document remains selected
+                          if (selectDocument && targetDocumentId) {
+                            selectDocument(targetDocumentId); // Use correct targetDocumentId
+                            console.log(
+                              `🔄 Ensured document ${targetDocumentId} is selected to refresh UI` // Log correct ID
+                            );
+                          }
+                          if (window.triggerEditorRefresh) {
+                            window.triggerEditorRefresh();
+                            console.log(`🔄 Triggered general editor refresh`);
+                          }
+                        }, 100); // Timeout allows state to propagate
+                      })
+                      .catch((err) => {
+                        console.error(
+                          `❌ Error saving final content for Doc ${targetDocumentId}:`,
+                          err
+                        );
+                      });
+                  } else {
+                    console.warn(
+                      `⚠️ Skipped final save/update for Doc ${targetDocumentId} (saveDocument or targetDocumentId missing)`
                     );
-
-                    // *** IMPORTANT: Update ContentContext state AFTER successful save ***
-                    if (saveSuccess && updateDocumentContent) {
-                       updateDocumentContent(targetDocumentId, finalContent);
-                       console.log(`🔄 Explicitly updated ContentContext state for document ${targetDocumentId}`);
-                    }
-                    // *** END CHANGE ***
-
-                  } catch (err) {
-                    console.error("❌ Error saving final content:", err);
                   }
-                }
 
-                // Only after saving content and updating context, update the local state
-                setGenerationStatus((prev) => ({
-                  ...prev,
-                  content: finalContent,
-                  isComplete: true,
-                  inProgress: false,
-                }));
+                  // Update local state after initiating save/update
+                  return {
+                    ...prevStatus,
+                    content: finalContent,
+                    isComplete: true,
+                    inProgress: false,
+                    error: null, // Clear error on success
+                  };
+                });
 
+                // Move setIsGenerating outside setGenerationStatus
                 setIsGenerating(false);
-
-                // Force editor refresh (ensure context update has propagated)
-                // Using a timeout helps ensure React state updates are processed
-                setTimeout(() => {
-                  if (selectDocument && targetDocumentId) {
-                    // Re-select the document to potentially trigger necessary updates
-                    // This might be redundant if ContentContext update works correctly, but keep for now
-                    selectDocument(targetDocumentId);
-                    console.log(`🔄 Re-selected document ${targetDocumentId} to potentially refresh UI`);
-                  }
-                  // Trigger general editor refresh if needed (fallback)
-                  if (window.triggerEditorRefresh) {
-                    window.triggerEditorRefresh();
-                    console.log(`🔄 Triggered general editor refresh`);
-                  }
-                }, 100); // Short delay
-
+                setError(null); // Clear any previous generation error
                 break;
 
               case "generation_error":
@@ -312,6 +319,14 @@ export function GenerationProvider({
             }
           } catch (err) {
             console.error("❌ Error processing SSE message:", err);
+            // Update status on error
+            setGenerationStatus((prev) => ({
+              ...prev,
+              error: "Error processing message",
+              inProgress: false,
+            }));
+            setIsGenerating(false);
+            setError("Error processing message");
           }
         };
 
@@ -331,7 +346,7 @@ export function GenerationProvider({
       }
     },
     // Update dependency array
-    [saveDocument, generationStatus.content, generationStatus.documentId, updateDocumentContent, selectDocument, documents, API_URL]
+    [saveDocument, updateDocumentContent, selectDocument, API_URL]
   );
 
   const generateDocumentation = useCallback(async () => {
