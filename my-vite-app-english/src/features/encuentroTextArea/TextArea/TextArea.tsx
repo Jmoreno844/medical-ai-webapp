@@ -1,17 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { DocumentoOut } from "@/types/documento";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
-// Fix the import name - change LexicalMarkdownShortcutPlugin to MarkdownShortcutPlugin
 import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
-import {
-  $convertFromMarkdownString,
-  $convertToMarkdownString,
-  TRANSFORMERS,
-} from "@lexical/markdown";
+import { TRANSFORMERS } from "@lexical/markdown";
 
 // Import custom plugins
 import {
@@ -21,170 +15,60 @@ import {
   AutoSavePlugin,
 } from "./plugins";
 
-// Import custom hooks and utilities
-import { useDocumentContent } from "../../encuentro/hooks/useDocumentContent";
+// Import context hooks
+import { useDocumentContext } from "../../../contexts/DocumentContext";
+import { useContentContext } from "../../../contexts/ContentContext";
+import { useGenerationContext } from "../../../contexts/GenerationContext";
+import { useTranscriptionContext } from "../../../contexts/TranscriptionContext";
+
+// Import utilities
 import { createEditorConfig } from "./utils/editorConfig";
 
-// Create a global cache reference for direct access
-declare global {
-  interface Window {
-    documentContentCache?: Map<number, string>;
-  }
-}
+const TextArea: React.FC = () => {
+  // Get state from contexts instead of props
+  const { activeDocument, activeDocumentId } = useDocumentContext();
 
-interface TextAreaProps {
-  /**
-   * Current document to display/edit
-   */
-  document: DocumentoOut | null;
-
-  /**
-   * All available documents
-   */
-  allDocuments: DocumentoOut[];
-
-  /**
-   * Active document ID
-   */
-  activeDocumentId: number | null;
-
-  /**
-   * Whether the editor is in read-only mode
-   */
-  readOnly?: boolean;
-
-  /**
-   * Function to save document content
-   */
-  onSave?: (documentId: number, content: string) => Promise<void>;
-
-  /**
-   * Function to register the save function with the parent component
-   */
-  registerSaveFunction?: (saveFunc: (force?: boolean) => Promise<void>) => void;
-
-  /**
-   * Cache of document content
-   */
-  documentContentCache?: Map<number, string>;
-
-  /**
-   * Function to fetch document content
-   */
-  fetchDocumentContent?: (docId: number) => Promise<string | null>;
-
-  /**
-   * Whether document content is currently loading
-   */
-  isLoadingContent?: boolean;
-
-  /**
-   * List of document IDs that have already been loaded
-   */
-  loadedDocumentIds?: number[];
-
-  /**
-   * Callback when document switches
-   */
-  onDocumentSwitch?: (oldDocId: number | null, newDocId: number | null) => void;
-
-  /**
-   * Force refresh trigger - increment to force the editor to reload content
-   */
-  refreshTrigger?: number;
-
-  generationStatus?: {
-    inProgress: boolean;
-    documentId: number | null;
-    content: string;
-    error: string | null;
-    isComplete: boolean;
-  };
-
-  transcriptionCompleteTimestamp?: number | null;
-  registerReloadFunction?: (reloadFunc: () => Promise<void>) => void; // New prop for registering reload function
-}
-
-/**
- * TextArea component for editing and displaying medical documents
- * Uses Lexical editor for rich text editing capabilities
- */
-const TextArea: React.FC<TextAreaProps> = ({
-  document,
-  allDocuments,
-  activeDocumentId,
-  readOnly = true,
-  onSave,
-  registerSaveFunction,
-  documentContentCache,
-  fetchDocumentContent,
-  isLoadingContent = false,
-  loadedDocumentIds = [],
-  onDocumentSwitch,
-  refreshTrigger = 0,
-  generationStatus,
-  transcriptionCompleteTimestamp,
-  registerReloadFunction,
-}) => {
-  // Track the previous document to detect changes
-  const previousDocIdRef = useRef<number | null>(null);
-
-  // Track the refresh trigger to detect external content updates
-  const previousRefreshTriggerRef = useRef(refreshTrigger);
-
-  // Check if this document has been loaded before - moved up before potential early return
-  const isDocumentLoaded = document
-    ? loadedDocumentIds?.includes(document.id) || false
-    : false;
-
-  // Make the cache globally available for direct updates
-  useEffect(() => {
-    // Make the cache globally available for direct updates
-    if (documentContentCache) {
-      window.documentContentCache = documentContentCache;
-    }
-
-    return () => {
-      // Clean up on unmount
-      delete window.documentContentCache;
-    };
-  }, [documentContentCache]);
-
-  // Initialize content state - also moved above early return
   const {
     documentContent,
     fetchError,
-    isLoading: isContentLoading,
+    isLoadingContent,
     contentLoadedSuccessfully,
-    reloadContent, // Add this method to useDocumentContent hook or implement inline
-  } = useDocumentContent({
-    document: document || ({} as DocumentoOut), // Provide fallback
-    fetchDocumentContent,
-    documentContentCache,
-    isDocumentLoaded,
-  });
+    reloadContent,
+    saveContent,
+    editorRefreshTrigger,
+  } = useContentContext();
 
-  // Detect external content updates via refreshTrigger
+  const { generationStatus } = useGenerationContext();
+  const { transcriptionCompleteTimestamp } = useTranscriptionContext();
+
+  // Local state & refs
+  const [showGenerationSuccess, setShowGenerationSuccess] = useState(false);
+  const previousDocIdRef = useRef(null);
+  const previousRefreshTriggerRef = useRef(editorRefreshTrigger);
+
+  // Update refresh trigger when needed
   useEffect(() => {
-    if (document && refreshTrigger !== previousRefreshTriggerRef.current) {
+    if (
+      activeDocument &&
+      editorRefreshTrigger !== previousRefreshTriggerRef.current
+    ) {
       console.log(
-        `[TEXT_AREA] Refresh trigger changed from ${previousRefreshTriggerRef.current} to ${refreshTrigger} for document ${document.id}`
+        `[TEXT_AREA] Refresh trigger changed to ${editorRefreshTrigger} for document ${activeDocument.id}`
       );
-      previousRefreshTriggerRef.current = refreshTrigger;
+      previousRefreshTriggerRef.current = editorRefreshTrigger;
       if (typeof reloadContent === "function") {
         console.log(
-          `[TEXT_AREA] Calling reloadContent for document ${document.id}`
+          `[TEXT_AREA] Calling reloadContent for document ${activeDocument.id}`
         );
         reloadContent();
       }
     }
-  }, [refreshTrigger, document, documentContentCache, reloadContent]);
+  }, [editorRefreshTrigger, activeDocument, reloadContent]);
 
-  // Define all hooks before conditional logic
-  // Custom save wrapper to prevent saving empty content for documents that had content
+  // Custom save wrapper
   const handleSave = useCallback(
     async (docId: number, content: string) => {
-      // Check if we're trying to save empty content for a document that previously had content
+      // Prevent saving empty content for documents that previously had content
       if (contentLoadedSuccessfully && content.trim() === "") {
         console.error(
           "Prevented saving empty content for a document that previously had content"
@@ -192,86 +76,29 @@ const TextArea: React.FC<TextAreaProps> = ({
         return;
       }
 
-      // Proceed with normal save
-      if (onSave) {
-        await onSave(docId, content);
-      }
+      await saveContent(docId, content);
     },
-    [onSave, contentLoadedSuccessfully]
+    [saveContent, contentLoadedSuccessfully]
   );
 
-  // Replace the current document switching effect with an optimized version
+  // Track document changes
   useEffect(() => {
-    // Only run if we have a document
-    if (!document) return;
+    if (!activeDocument) return;
 
-    // Create stable function to avoid depending on onDocumentSwitch
-    function notifyDocumentSwitch() {
-      if (onDocumentSwitch && document.id !== previousDocIdRef.current) {
-        onDocumentSwitch(previousDocIdRef.current, document.id);
-        previousDocIdRef.current = document.id;
-      }
-    }
-
-    // Run once per document change
-    notifyDocumentSwitch();
-
-    // No cleanup needed, we're just tracking changes
-  }, [document?.id]); // Only depend on document.id, not the entire document object
-
-  // Monitor generationStatus and manually update the cache
-  useEffect(() => {
-    if (!generationStatus || !documentContentCache) return;
-
-    // When streaming content changes, update our cache to ensure it's always current
-    if (
-      generationStatus.inProgress &&
-      generationStatus.documentId &&
-      generationStatus.content
-    ) {
-      const docId = generationStatus.documentId;
-      const content = generationStatus.content;
-
-      // Keep the cache updated with streaming content
-      if (content.length > 5) {
-        // Only update if we have meaningful content
-        console.log(
-          `🔄 Syncing streaming content to cache (${content.length} chars)`
-        );
-        documentContentCache.set(docId, content);
-      }
-    }
-  }, [
-    generationStatus?.content,
-    generationStatus?.documentId,
-    documentContentCache,
-  ]);
-
-  // Log component lifecycle for debugging
-  useEffect(() => {
-    if (document) {
-      console.log(`[TEXT_AREA] Document ${document.id}: Content updated`);
-    }
-  }, [document, documentContent]);
-
-  // Log cache status for debugging
-  useEffect(() => {
-    if (document && documentContentCache?.has(document.id)) {
+    if (activeDocument.id !== previousDocIdRef.current) {
       console.log(
-        `[CACHE_DATA] Document ${document.id}: Cached content available`
+        `[DOC_SWITCH] Changed from document ${previousDocIdRef.current} to ${activeDocument.id}`
       );
+      previousDocIdRef.current = activeDocument.id;
     }
-  }, [document, documentContentCache]);
+  }, [activeDocument?.id]);
 
-  // State for temporary display of generation success indicator
-  const [showGenerationSuccess, setShowGenerationSuccess] = useState(false);
-
-  // When generation completes, show the indicator for 2 seconds
+  // Show generation success indicator
   useEffect(() => {
     if (
       generationStatus?.isComplete &&
-      document &&
-      generationStatus.documentId === document.id
+      activeDocument &&
+      generationStatus.documentId === activeDocument.id
     ) {
       setShowGenerationSuccess(true);
       const timer = setTimeout(() => {
@@ -279,24 +106,10 @@ const TextArea: React.FC<TextAreaProps> = ({
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [generationStatus, document]);
+  }, [generationStatus, activeDocument]);
 
-  // Register the reload content function with parent component
-  useEffect(() => {
-    if (
-      registerReloadFunction &&
-      document &&
-      typeof reloadContent === "function"
-    ) {
-      console.log(
-        `[TEXT_AREA] Registering reload function for document ${document.id}`
-      );
-      registerReloadFunction(reloadContent);
-    }
-  }, [document?.id, reloadContent, registerReloadFunction]);
-
-  // Only proceed with rendering editor if we have a document
-  if (!document) {
+  // Early return if no document
+  if (!activeDocument) {
     return (
       <div className="flex items-center justify-center h-full text-gray-600 text-xl font-medium">
         Select a document
@@ -312,17 +125,10 @@ const TextArea: React.FC<TextAreaProps> = ({
   // Create editor configuration
   const initialConfig = createEditorConfig(onError);
 
-  // Determine if we should show the loading indicator
-  const showLoading = isLoadingContent || isContentLoading;
-
-  // Check if content is from cache for debugging
-  const isFromCache =
-    (document && documentContentCache?.has(document.id)) || false;
-
-  // Extract streaming content when this is the active generated document
+  // Check if content is being streamed for this document
   const streamingContent =
-    document &&
-    generationStatus?.documentId === document.id &&
+    activeDocument &&
+    generationStatus?.documentId === activeDocument.id &&
     generationStatus.inProgress
       ? generationStatus.content
       : undefined;
@@ -330,19 +136,17 @@ const TextArea: React.FC<TextAreaProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Loading indicator */}
-      {showLoading && (
+      {isLoadingContent && (
         <div className="bg-gray-100 p-2 text-center text-gray-600 text-sm">
-          Cargando contenido...
+          Loading content...
         </div>
       )}
 
-      {/* Enhanced streaming indicator when content is being streamed */}
+      {/* Streaming indicator */}
       {streamingContent !== undefined && (
         <div className="bg-purple-100 p-2 border-b border-purple-200">
           <div className="flex items-center justify-between">
-            <div className="w-24 invisible">
-              {/* Empty space for balance */}
-            </div>
+            <div className="w-24 invisible"></div>
             <div className="flex items-center">
               <div className="animate-pulse h-3 w-3 rounded-full bg-purple-500 mr-2"></div>
               <span className="text-purple-800 font-medium">
@@ -362,7 +166,7 @@ const TextArea: React.FC<TextAreaProps> = ({
         </div>
       )}
 
-      {/* Add a progress bar for better visual feedback */}
+      {/* Progress bar */}
       {streamingContent !== undefined && (
         <div className="h-1 w-full bg-purple-200">
           <div
@@ -377,7 +181,7 @@ const TextArea: React.FC<TextAreaProps> = ({
         </div>
       )}
 
-      {/* Display generation success indicator for 2 seconds */}
+      {/* Generation success indicator */}
       {showGenerationSuccess && (
         <div className="bg-green-100 p-2 border-b border-green-200 text-green-800">
           <div className="flex items-center justify-center">
@@ -397,27 +201,6 @@ const TextArea: React.FC<TextAreaProps> = ({
         </div>
       )}
 
-      {/* Cache status indicator (for debugging) */}
-      {/*
-      {!showLoading && isFromCache && (
-        <div className="bg-green-100 p-1 text-center text-green-600 text-xs flex justify-center items-center">
-          <span className="mr-1">🔄</span>
-          Contenido cargado desde caché (
-          {documentContentCache?.get(document.id)?.length || 0} caracteres)
-        </div>
-      )}
- */}
-      {/* Source indicator when content is from API/database */}
-      {/*
-
-      {!showLoading && !isFromCache && documentContent && (
-        <div className="bg-blue-100 p-1 text-center text-blue-600 text-xs flex justify-center items-center">
-          <span className="mr-1">🔍</span>
-          Contenido cargado desde base de datos ({documentContent.length}{" "}
-          caracteres)
-        </div>
-      )}
- */}
       {/* Error display */}
       {fetchError && (
         <div className="bg-red-100 p-2 text-center text-red-600 text-sm">
@@ -425,10 +208,10 @@ const TextArea: React.FC<TextAreaProps> = ({
         </div>
       )}
 
-      {/* Use a persistent editor without document ID in the key */}
+      {/* Editor */}
       <div className="border rounded-md flex-1 bg-white">
         <LexicalComposer
-          key={`persistent-editor-${refreshTrigger}`} // Add refreshTrigger to key to force remount when needed
+          key={`persistent-editor-${editorRefreshTrigger}`}
           initialConfig={initialConfig}
         >
           <div className="editor-container h-full">
@@ -438,7 +221,9 @@ const TextArea: React.FC<TextAreaProps> = ({
               }
               placeholder={
                 <div className="text-gray-400 absolute top-3 left-4 pointer-events-none">
-                  {readOnly ? "" : "Comience a escribir..."}
+                  {activeDocument.tipo === "transcripcion"
+                    ? ""
+                    : "Start typing..."}
                 </div>
               }
               ErrorBoundary={LexicalErrorBoundary}
@@ -446,27 +231,27 @@ const TextArea: React.FC<TextAreaProps> = ({
 
             {/* Core plugins */}
             <HistoryPlugin />
-            {/* Fixed component name from LexicalMarkdownShortcutPlugin to MarkdownShortcutPlugin */}
             <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
             <DocumentContentPlugin
-              documentId={document.id}
+              documentId={activeDocument.id}
               content={documentContent}
-              isLoading={showLoading}
-              refreshTrigger={refreshTrigger} // Pass refresh trigger to plugin
-              forceRefresh={false} // Remove the force refresh, use streaming instead
-              streamingContent={streamingContent} // Pass streaming content here
-              documentType={document.tipo} // Pass document type
+              isLoading={isLoadingContent}
+              refreshTrigger={editorRefreshTrigger}
+              forceRefresh={false}
+              streamingContent={streamingContent}
+              documentType={activeDocument.tipo}
             />
-            <ReadOnlyPlugin isReadOnly={readOnly} />
+            <ReadOnlyPlugin
+              isReadOnly={activeDocument.tipo === "transcripcion"}
+            />
 
             {/* Conditional plugins for edit mode */}
-            {!readOnly && (
+            {activeDocument.tipo !== "transcripcion" && (
               <>
                 <AutoFocusPlugin />
                 <AutoSavePlugin
                   onSave={handleSave}
-                  documentId={document.id}
-                  registerSaveFunction={registerSaveFunction}
+                  documentId={activeDocument.id}
                   hasInitialContent={contentLoadedSuccessfully}
                 />
               </>

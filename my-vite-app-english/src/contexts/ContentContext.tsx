@@ -1,0 +1,288 @@
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
+import { DocumentoOut } from "@/types/documento";
+import axiosInstance from "@/commons/utils/axiosInstance";
+import { useDocumentContext } from "./DocumentContext";
+
+// Define the context type
+type ContentContextType = {
+  // State
+  documentContent: string;
+  isLoadingContent: boolean;
+  fetchError: string | null;
+  contentLoadedSuccessfully: boolean;
+  documentContentCache: Map<number, string>;
+  editorRefreshTrigger: number;
+  loadedDocumentIds: number[];
+
+  // Actions
+  fetchDocumentContent: (
+    docId: number,
+    forceRefresh?: boolean
+  ) => Promise<string | null>;
+  reloadContent: () => Promise<void>;
+  triggerEditorRefresh: () => void;
+  saveContent: (docId: number, content: string) => Promise<boolean>;
+};
+
+// Create the context
+const ContentContext = createContext<ContentContextType | undefined>(undefined);
+
+// Create the provider
+export function ContentProvider({ children }: { children: React.ReactNode }) {
+  const { activeDocument, activeDocumentId, saveDocument } =
+    useDocumentContext();
+
+  const [documentContent, setDocumentContent] = useState<string>("");
+  const [isLoadingContent, setIsLoadingContent] = useState<boolean>(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [contentLoadedSuccessfully, setContentLoadedSuccessfully] =
+    useState<boolean>(false);
+  const [documentContentCache, setDocumentContentCache] = useState<
+    Map<number, string>
+  >(new Map());
+  const [editorRefreshTrigger, setEditorRefreshTrigger] = useState<number>(0);
+
+  // Track which documents have been loaded to avoid unnecessary refreshes
+  const loadedDocumentsRef = useRef<Set<number>>(new Set());
+
+  // Make the cache globally available (until fully migrated)
+  useEffect(() => {
+    (window as any).documentContentCache = documentContentCache;
+    return () => {
+      delete (window as any).documentContentCache;
+    };
+  }, [documentContentCache]);
+
+  // Trigger editor refresh
+  const triggerEditorRefresh = useCallback(() => {
+    setEditorRefreshTrigger((prev) => prev + 1);
+  }, []);
+
+  // Fetch document content function
+  const fetchDocumentContent = useCallback(
+    async (docId: number, forceRefresh = false): Promise<string | null> => {
+      console.log(
+        `[DOC_FETCH] Request for document ${docId}, forceRefresh: ${forceRefresh}`
+      );
+      console.log(
+        `[CACHE_STATUS] Size: ${
+          documentContentCache.size
+        } documents, Loaded docs: ${Array.from(loadedDocumentsRef.current).join(
+          ", "
+        )}`
+      );
+
+      // Mark this document as loaded
+      const isFirstLoad = !loadedDocumentsRef.current.has(docId);
+
+      // Only force refresh on first load for this document
+      const shouldForceRefresh = isFirstLoad && forceRefresh;
+
+      if (isFirstLoad) {
+        console.log(
+          `[DOC_LOAD ⚠️] Document ${docId}: First time loading this document`
+        );
+      } else {
+        console.log(
+          `[DOC_LOAD ℹ️] Document ${docId}: Document was previously loaded`
+        );
+      }
+
+      // Return cached content if available and not force refreshing
+      if (!shouldForceRefresh && documentContentCache.has(docId)) {
+        const cachedContent = documentContentCache.get(docId);
+        if (cachedContent && cachedContent.trim().length > 0) {
+          console.log(
+            `[CACHE_HIT ✅] Document ${docId}: Using cached content (${cachedContent.length} chars)`
+          );
+          // Mark document as loaded even when using cache
+          loadedDocumentsRef.current.add(docId);
+
+          // Update state for active document
+          if (docId === activeDocumentId) {
+            setDocumentContent(cachedContent);
+            setContentLoadedSuccessfully(true);
+          }
+
+          return cachedContent;
+        }
+        console.log(
+          `[CACHE_INVALID ⚠️] Document ${docId}: Cache entry exists but is empty, fetching from database`
+        );
+      } else {
+        if (shouldForceRefresh) {
+          console.log(
+            `[CACHE_BYPASS ⏭️] Document ${docId}: Force refresh requested (first load)`
+          );
+        } else if (forceRefresh) {
+          console.log(
+            `[CACHE_IGNORE ℹ️] Document ${docId}: Force refresh requested but document already loaded, using cache`
+          );
+        } else {
+          console.log(`[CACHE_MISS ❌] Document ${docId}: Not in cache`);
+        }
+      }
+
+      try {
+        setIsLoadingContent(true);
+        setFetchError(null);
+        console.log(`[DB_FETCH 🔍] Document ${docId}: Fetching from database`);
+
+        const response = await axiosInstance.get(`/api/documento/${docId}`);
+
+        const documentData = response.data;
+        const content = documentData.contenido || "";
+
+        console.log(
+          `[DB_FETCH ✅] Document ${docId}: Received ${content.length} chars from database`
+        );
+
+        // Mark this document as loaded after successful fetch
+        loadedDocumentsRef.current.add(docId);
+
+        // Only cache non-empty content
+        if (content.trim().length > 0) {
+          console.log(
+            `[CACHE_UPDATE 📝] Document ${docId}: Storing content in cache`
+          );
+          setDocumentContentCache((prev) => {
+            const newCache = new Map(prev);
+            newCache.set(docId, content);
+            console.log(
+              `[CACHE_STATUS] Updated size: ${newCache.size} documents`
+            );
+            return newCache;
+          });
+        } else {
+          console.log(
+            `[CACHE_SKIP ⚠️] Document ${docId}: Not caching empty content`
+          );
+        }
+
+        // Update state for active document
+        if (docId === activeDocumentId) {
+          setDocumentContent(content);
+          setContentLoadedSuccessfully(true);
+        }
+
+        return content;
+      } catch (err: any) {
+        console.error(`[DB_FETCH ❌] Document ${docId}: Failed to fetch:`, err);
+        setFetchError(
+          err.response?.data?.detail ||
+            err.message ||
+            "Error al cargar el contenido del documento"
+        );
+        return null;
+      } finally {
+        setIsLoadingContent(false);
+      }
+    },
+    [documentContentCache, activeDocumentId]
+  );
+
+  // Wrapper for saving content that uses DocumentContext's saveDocument
+  const saveContent = useCallback(
+    async (docId: number, content: string): Promise<boolean> => {
+      // Normalize line breaks before comparing
+      const normalizeBreaks = (text: string): string => {
+        return text
+          .replace(/\r\n/g, "\n")
+          .replace(/\r/g, "\n")
+          .replace(/\n\n/g, "\n")
+          .trim();
+      };
+
+      try {
+        // Check if content in cache is the same (if available)
+        const cachedContent = documentContentCache.get(docId);
+        if (
+          cachedContent &&
+          normalizeBreaks(cachedContent) === normalizeBreaks(content)
+        ) {
+          console.log(
+            `[DOC_SAVE] Document ${docId}: Content unchanged from cache, skipping save`
+          );
+          return true; // Return success without API call
+        }
+
+        // Save via DocumentContext
+        const success = await saveDocument(docId, content);
+
+        // Update cache after successful save
+        if (success) {
+          setDocumentContentCache((prev) => {
+            const newCache = new Map(prev);
+            newCache.set(docId, content);
+            return newCache;
+          });
+        }
+
+        return success;
+      } catch (error) {
+        console.error("Error in saveContent:", error);
+        return false;
+      }
+    },
+    [documentContentCache, saveDocument]
+  );
+
+  // Reload content function
+  const reloadContent = useCallback(async (): Promise<void> => {
+    if (activeDocumentId) {
+      await fetchDocumentContent(activeDocumentId, true);
+    }
+  }, [activeDocumentId, fetchDocumentContent]);
+
+  // Load content when active document changes
+  useEffect(() => {
+    if (activeDocumentId) {
+      fetchDocumentContent(activeDocumentId);
+    } else {
+      setDocumentContent("");
+      setContentLoadedSuccessfully(false);
+    }
+  }, [activeDocumentId, fetchDocumentContent]);
+
+  // Clear cache when component unmounts
+  useEffect(() => {
+    return () => {
+      console.log(`[CACHE_CLEAR 🧹] ContentContext unmounting, clearing cache`);
+    };
+  }, []);
+
+  // Create the context value
+  const value: ContentContextType = {
+    documentContent,
+    isLoadingContent,
+    fetchError,
+    contentLoadedSuccessfully,
+    documentContentCache,
+    editorRefreshTrigger,
+    loadedDocumentIds: Array.from(loadedDocumentsRef.current),
+    fetchDocumentContent,
+    reloadContent,
+    triggerEditorRefresh,
+    saveContent,
+  };
+
+  return (
+    <ContentContext.Provider value={value}>{children}</ContentContext.Provider>
+  );
+}
+
+// Custom hook
+export function useContentContext() {
+  const context = useContext(ContentContext);
+  if (context === undefined) {
+    throw new Error("useContentContext must be used within a ContentProvider");
+  }
+  return context;
+}

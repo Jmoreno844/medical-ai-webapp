@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useRef } from "react";
 import {
-  DocumentoOut,
   DOCUMENT_TYPE_LABELS,
   DOCUMENT_TYPE_LABELS_LONG,
 } from "@/types/documento";
@@ -20,96 +19,80 @@ import {
 } from "@/commons/components/ui/dropdown-menu";
 import { Trash } from "lucide-react";
 
-interface TabBarProps {
-  documents: DocumentoOut[];
-  activeDocumentId: number | null;
-  onSelectDocument: (documentId: number) => void;
-  onGenerateDocumentation?: () => void;
-  onDeleteDocument?: (documentId: number) => Promise<boolean>;
-}
+// Import context
+import { useDocumentContext } from "../../../contexts/DocumentContext";
+import { useGenerationContext } from "../../../contexts/GenerationContext";
 
-const TabBar: React.FC<TabBarProps> = ({
-  documents,
-  activeDocumentId,
-  onSelectDocument,
-  onGenerateDocumentation,
-  onDeleteDocument,
-}) => {
-  // State for the delete confirmation dialog
-  const [documentToDelete, setDocumentToDelete] = useState<DocumentoOut | null>(
-    null
-  );
+const TabBar: React.FC = () => {
+  // Get state from context
+  const { documents, activeDocumentId, selectDocument, deleteDocument } =
+    useDocumentContext();
+
+  const { openGenerationModal } = useGenerationContext();
+
+  // Local state for UI
+  const [documentToDelete, setDocumentToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  // Ref for the DropdownMenu trigger and right-clicked document
+  const [deleteError, setDeleteError] = useState(null);
   const dropdownTriggerRef = useRef<HTMLButtonElement>(null);
-  const [activeDropdownDoc, setActiveDropdownDoc] =
-    useState<DocumentoOut | null>(null);
+  const [activeDropdownDoc, setActiveDropdownDoc] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Sort documents with a stable sort order that won't change between renders
+  // Sort documents (same code as before)
   const sortedDocuments = useMemo(() => {
-    // Create a new array to avoid mutating the original
     return [...documents].sort((a, b) => {
-      // Primary sort by creation date
       const dateA = new Date(a.fecha_creacion).getTime();
       const dateB = new Date(b.fecha_creacion).getTime();
 
-      // If dates are different, sort by date
       if (dateA !== dateB) {
         return dateA - dateB;
       }
 
-      // If dates are the same, use ID as a tiebreaker for stable ordering
       return a.id - b.id;
     });
   }, [documents]);
 
-  // Check if a document can show context menu (all EXCEPT "contexto" and "transcripcion")
-  const canShowContextMenu = (doc: DocumentoOut): boolean => {
+  // Check if a document can show context menu
+  const canShowContextMenu = (doc) => {
     const tipo = doc.tipo.toLowerCase();
     return tipo !== "contexto" && tipo !== "transcripcion";
   };
 
-  // Handler for right-click on tabs
-  const handleContextMenu = (e: React.MouseEvent, doc: DocumentoOut) => {
-    // Only show context menu for documents that are not contexto or transcripcion
+  // Handle right-click on tabs
+  const handleContextMenu = (e, doc) => {
     if (canShowContextMenu(doc)) {
-      e.preventDefault(); // Prevent the browser's default context menu
+      e.preventDefault();
       setActiveDropdownDoc(doc);
       setDropdownOpen(true);
 
-      // Position the menu at the cursor position
       if (dropdownTriggerRef.current) {
         const clickX = e.clientX;
         const clickY = e.clientY;
         dropdownTriggerRef.current.style.position = "absolute";
         dropdownTriggerRef.current.style.left = `${clickX}px`;
         dropdownTriggerRef.current.style.top = `${clickY}px`;
-        dropdownTriggerRef.current.click(); // Programmatically open the dropdown
+        dropdownTriggerRef.current.click();
       }
     }
   };
 
   // Handle document deletion
   const handleDeleteDocument = async () => {
-    if (!documentToDelete || !onDeleteDocument) return;
+    if (!documentToDelete) return;
 
     setIsDeleting(true);
     setDeleteError(null);
 
     try {
-      const success = await onDeleteDocument(documentToDelete.id);
+      const success = await deleteDocument(documentToDelete.id);
       if (!success) {
-        setDeleteError("Error al eliminar el documento");
+        setDeleteError("Error deleting document");
       } else {
-        // Close the dialog after successful deletion
         setDocumentToDelete(null);
       }
     } catch (error) {
       console.error("Error deleting document:", error);
-      setDeleteError("Error al eliminar el documento");
+      setDeleteError("Error deleting document");
     } finally {
       setIsDeleting(false);
     }
@@ -130,14 +113,14 @@ const TabBar: React.FC<TabBarProps> = ({
           {sortedDocuments.map((doc) => (
             <button
               key={doc.id}
-              onClick={() => onSelectDocument(doc.id)}
+              onClick={() => selectDocument(doc.id)}
               onContextMenu={(e) => handleContextMenu(e, doc)}
               className={`px-4 py-2 min-w-[120px] text-sm font-medium whitespace-nowrap transition-colors
-                                ${
-                                  activeDocumentId === doc.id
-                                    ? "bg-white text-blue-600 border-t-2 border-blue-600"
-                                    : "text-gray-600 hover:bg-gray-200"
-                                }`}
+                ${
+                  activeDocumentId === doc.id
+                    ? "bg-white text-blue-600 border-t-2 border-blue-600"
+                    : "text-gray-600 hover:bg-gray-200"
+                }`}
               aria-label={`Select ${getTabLabel(doc)}`}
               data-document-type={doc.tipo}
             >
@@ -145,28 +128,26 @@ const TabBar: React.FC<TabBarProps> = ({
             </button>
           ))}
 
-          {/* Add document generation button right after the tabs */}
-          {onGenerateDocumentation && (
-            <button
-              onClick={onGenerateDocumentation}
-              className="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors self-center mx-2"
-              title="Generar documentación"
-              aria-label="Generar documentación"
+          {/* Add document generation button */}
+          <button
+            onClick={openGenerationModal}
+            className="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors self-center mx-2"
+            title="Generate documentation"
+            aria-label="Generate documentation"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
-          )}
+              <path
+                fillRule="evenodd"
+                d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -207,7 +188,7 @@ const TabBar: React.FC<TabBarProps> = ({
           </DialogHeader>
 
           <div className="">
-            <p>¿Are you sure you want to delete this document?</p>
+            <p>Are you sure you want to delete this document?</p>
             <p className="font-medium mt-8 mb-4 text-center">
               {documentToDelete && getDocumentTitle(documentToDelete)}
             </p>
@@ -232,7 +213,7 @@ const TabBar: React.FC<TabBarProps> = ({
               variant="destructive"
               onClick={handleDeleteDocument}
               disabled={isDeleting}
-              className="bg-red-600 text-white hover:bg-red-700 border border-red-600 font-medium" // Force proper colors
+              className="bg-red-600 text-white hover:bg-red-700 border border-red-600 font-medium"
             >
               {isDeleting ? "Deleting..." : "Delete"}
             </Button>
@@ -243,8 +224,8 @@ const TabBar: React.FC<TabBarProps> = ({
   );
 };
 
-// Helper function to get document title for display in the tab bar
-function getDocumentTitle(doc?: DocumentoOut): string {
+// Helper functions (same as before)
+function getDocumentTitle(doc) {
   if (!doc) return "";
 
   const docType = DOCUMENT_TYPE_LABELS_LONG[doc.tipo.toLowerCase()] || doc.tipo;
@@ -257,8 +238,7 @@ function getDocumentTitle(doc?: DocumentoOut): string {
   return `${docType} - ${date}`;
 }
 
-// Helper function to generate readable tab labels (kept for backward compatibility)
-function getTabLabel(doc: DocumentoOut): string {
+function getTabLabel(doc) {
   return DOCUMENT_TYPE_LABELS[doc.tipo.toLowerCase()] || doc.tipo;
 }
 

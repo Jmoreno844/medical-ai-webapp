@@ -1,46 +1,37 @@
 import React, { useEffect } from "react";
 import Tooltip from "@/commons/components/Tooltip";
-import useTranscription from "../hooks/useTranscription";
+import { useTranscriptionContext } from "../../../contexts/TranscriptionContext";
+import { useParams } from "react-router-dom";
 
 interface TranscribeButtonProps {
-  transcriptionDocId?: number;
-  audioBlob: Blob | null;
-  isRecording: boolean;
-  audioExists?: boolean;
-  hasBeenTranscribed?: boolean; // Add this prop
-  onTranscriptionComplete?: () => void;
-  resetKey?: number; // Add this to trigger resets when audio is deleted
+  resetKey?: number; // Used to trigger resets when audio is deleted
 }
 
 /**
  * Button to trigger audio transcription
  *
- * Uses a custom hook to make API call to transcribe audio
+ * Uses TranscriptionContext to handle all state and actions
  */
 const TranscribeButton: React.FC<TranscribeButtonProps> = ({
-  transcriptionDocId,
-  audioBlob,
-  isRecording,
-  audioExists = false,
-  hasBeenTranscribed = false, // Default to false
-  onTranscriptionComplete,
-  resetKey = 0, // Default value
+  resetKey = 0,
 }) => {
+  // Get encounter ID from URL
+  const { id } = useParams<{ id: string }>();
+  const encounterId = id ? parseInt(id, 10) : 0;
+
+  // Use transcription context
   const {
-    transcribeAudio,
-    isLoading,
+    transcriptionDocId,
+    audioBlob,
+    isRecording,
+    audioExists,
+    hasBeenTranscribed,
+    isTranscribing,
     transcriptionStatus,
     errorMessage,
     resetTranscriptionState,
-    setTranscriptionStatus, // Make sure to extract this
-  } = useTranscription(onTranscriptionComplete);
-
-  // Set initial transcription status based on hasBeenTranscribed
-  useEffect(() => {
-    if (hasBeenTranscribed) {
-      setTranscriptionStatus("success");
-    }
-  }, [hasBeenTranscribed, setTranscriptionStatus]);
+    transcribeAudio,
+  } = useTranscriptionContext();
 
   // Reset transcription state when resetKey changes or audio is deleted
   useEffect(() => {
@@ -52,7 +43,10 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
   // Determine if we have audio to transcribe
   const hasAudioToTranscribe = audioBlob || audioExists;
   const isDisabled =
-    !transcriptionDocId || isRecording || isLoading || !hasAudioToTranscribe;
+    !transcriptionDocId ||
+    isRecording ||
+    isTranscribing ||
+    !hasAudioToTranscribe;
 
   const handleTranscribe = async () => {
     console.log("[TRANSCRIBE_BUTTON] Transcribe button clicked");
@@ -64,27 +58,16 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
     }
 
     try {
-      // Extract encounter ID from URL path
-      const urlParts =
-        typeof window !== "undefined"
-          ? window.location.pathname.split("/")
-          : [];
-      const encounterIdFromUrl = parseInt(urlParts[urlParts.length - 1]) || 0;
-
-      if (!encounterIdFromUrl) {
-        throw new Error("Could not determine encounter ID");
-      }
-
       if (!transcriptionDocId) {
         throw new Error("Missing transcription document ID");
       }
 
       console.log(
-        `[TRANSCRIBE_BUTTON] Initiating transcription for document ${transcriptionDocId} and encounter ${encounterIdFromUrl}`
+        `[TRANSCRIBE_BUTTON] Initiating transcription for document ${transcriptionDocId} and encounter ${encounterId}`
       );
 
-      // Call the transcribeAudio function from the hook
-      await transcribeAudio(transcriptionDocId, encounterIdFromUrl);
+      // Call the transcribeAudio function from the context
+      await transcribeAudio(transcriptionDocId, encounterId);
     } catch (error) {
       console.error("[TRANSCRIBE_BUTTON] Error in transcribe handler:", error);
     }
@@ -107,7 +90,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
 
   // Button content based on state
   const renderButtonContent = () => {
-    if (isLoading) {
+    if (isTranscribing) {
       return (
         <>
           <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -116,7 +99,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
       );
     }
 
-    if (transcriptionStatus === "success") {
+    if (transcriptionStatus === "success" || hasBeenTranscribed) {
       return (
         <>
           <svg
@@ -180,15 +163,15 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
       <Tooltip
         content={
           isDisabled
-            ? "Debe grabar audio primero"
-            : errorMessage || "Transcribir audio a texto"
+            ? "Record audio first"
+            : errorMessage || "Transcribe audio to text"
         }
       >
         <button
           onClick={handleTranscribe}
           disabled={isDisabled}
           className={buttonClasses}
-          aria-label="Transcribir audio a texto"
+          aria-label="Transcribe audio to text"
         >
           {renderButtonContent()}
         </button>
