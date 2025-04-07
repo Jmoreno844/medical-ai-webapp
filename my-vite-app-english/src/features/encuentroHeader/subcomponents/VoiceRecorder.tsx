@@ -22,8 +22,8 @@ const VoiceRecorder: React.FC = () => {
     isRecording,
     isPaused,
     duration,
-    audioBlob,
-    audioExists,
+    // audioBlob, // No longer needed for visibility logic here
+    audioExists, // Use this directly
     isCheckingAudio,
     isDeleting,
     startRecording,
@@ -32,92 +32,75 @@ const VoiceRecorder: React.FC = () => {
     deleteRecording,
   } = useTranscriptionContext();
 
-  // UI state management
+  // UI state management - Simplified
   const [showPauseButton, setShowPauseButton] = useState(false);
   const [showStartStopButton, setShowStartStopButton] = useState(true);
-  const [hasRecordingActivity, setHasRecordingActivity] = useState(false);
-  const [resetCounter, setResetCounter] = useState(0);
+  // Remove hasRecordingActivity state
+  // Remove resetCounter state
 
   /**
    * Update UI based on recording state
    */
   useEffect(() => {
-    // Only show pause button during active recording, hide when stopped
-    setShowPauseButton(isRecording);
+    // Show pause button only during active recording
+    setShowPauseButton(isRecording && !isPaused);
 
-    // Hide start/stop button only when we have a completed recording
-    if (!isRecording && (audioBlob || audioExists)) {
-      setShowStartStopButton(false);
-    } else {
-      setShowStartStopButton(true);
-    }
+    // Show start/stop button if not recording AND audio doesn't exist yet
+    // Or if checking audio (initial state)
+    setShowStartStopButton(!isRecording && !audioExists);
 
-    // If audio exists, we should show the delete button
-    if (audioExists && !isCheckingAudio) {
-      setHasRecordingActivity(true);
-    }
-  }, [isRecording, audioBlob, audioExists, isCheckingAudio]);
+    // Note: No need to manage hasRecordingActivity anymore
+  }, [isRecording, isPaused, audioExists, isCheckingAudio]); // Updated dependencies
 
   /**
    * Handle recording start/stop
    */
   const handleStartStop = () => {
-    // If recording is active, stop it
     if (isRecording) {
-      // If currently paused, resume before stopping to ensure proper cleanup
       if (isPaused) {
-        pauseResumeRecording(); // Resume first
+        pauseResumeRecording();
       }
-      stopRecording(); // Then stop
-      setHasRecordingActivity(true);
-    }
-    // If not recording, start a new recording
-    else {
+      stopRecording();
+      // No need to set hasRecordingActivity
+    } else {
       startRecording();
-      setHasRecordingActivity(true);
+      // No need to set hasRecordingActivity
     }
   };
 
   /**
-   * Custom delete handler to reset all states
+   * Custom delete handler
    */
   const handleDelete = () => {
-    // Call the context's delete function
     deleteRecording();
-
-    // Reset UI state
-    setHasRecordingActivity(false);
+    // Reset UI state - simplified
     setShowPauseButton(false);
-    setShowStartStopButton(true);
-
-    // Increment reset counter to trigger TranscribeButton reset
-    setResetCounter((prev) => prev + 1);
-
-    // Force re-render in next tick to ensure consistent state
-    requestAnimationFrame(() => {
-      setShowStartStopButton(true);
-    });
+    setShowStartStopButton(true); // Show start button after delete
+    // No need to manage hasRecordingActivity or resetCounter
   };
 
   // Show loading state while checking audio existence
   if (isCheckingAudio) {
     return (
-      <div className="flex items-center space-x-4">
-        <span className="text-gray-500">Checking for existing audio...</span>
+      <div className="flex items-center space-x-4 p-2">
+        {" "}
+        {/* Added padding */}
+        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-gray-500"></div>
+        <span className="text-gray-500">Checking audio...</span>
       </div>
     );
   }
 
   return (
     <div className="flex items-center space-x-4">
-      {/* Transcribe button now uses context directly through its own component */}
-      <TranscribeButton resetKey={resetCounter} />
+      {/* Transcribe button - remove resetKey */}
+      <TranscribeButton />
 
       <TimerDisplay duration={duration} />
       <MicrophoneIcon isRecording={isRecording} isPaused={isPaused} />
 
-      {/* Only show pause/resume button during active recording */}
-      {showPauseButton && (
+      {/* Show pause/resume button only during active, unpaused recording */}
+      {isRecording && (
         <PauseResumeButton
           isRecording={isRecording}
           isPaused={isPaused}
@@ -125,13 +108,14 @@ const VoiceRecorder: React.FC = () => {
         />
       )}
 
-      {/* Always ensure start button visibility */}
-      {(showStartStopButton || (!hasRecordingActivity && !audioExists)) && (
+      {/* Show start/stop button if not recording AND audio doesn't exist */}
+      {showStartStopButton && (
         <StartStopButton isRecording={isRecording} onClick={handleStartStop} />
       )}
 
-      {/* Show delete button when recording has started or completed or audio exists */}
-      {(hasRecordingActivity || audioExists) && (
+      {/* Show delete button ONLY if audio exists for the current encounter */}
+      {/* Ensure it's not shown while checking */}
+      {audioExists && !isCheckingAudio && (
         <DeleteButton onClick={handleDelete} isDeleting={isDeleting} />
       )}
 
