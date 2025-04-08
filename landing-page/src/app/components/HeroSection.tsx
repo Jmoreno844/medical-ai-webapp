@@ -53,13 +53,19 @@ export default function HeroSection() {
             </p>
           </div>
           <div className="flex flex-col items-center sm:flex-row gap-4">
-            <Button
-              size="lg"
-              className="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-6 py-3"
+            <a
+              href="https://medapp.sebastianmoreno.lat"
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              Start Your Free Trial
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
+              <Button
+                size="lg"
+                className="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-6 py-3"
+              >
+                Try It Yourself
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </a>
             <Button
               size="lg"
               variant="outline"

@@ -1,6 +1,6 @@
 "use client";
 
-import { BrainCircuit, FileText, Mic, UploadCloud } from "lucide-react"; // Import relevant icons
+import { BrainCircuit, FileText, Mic } from "lucide-react"; // Import relevant icons
 
 // Define steps data (optional but good practice)
 const steps = [

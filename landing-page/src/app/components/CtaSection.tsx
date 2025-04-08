@@ -26,7 +26,7 @@ export default function CtaSection() {
             {" "}
             {/* Adjusted top padding */}
             {/* Link wrapping the Button */}
-            <Link href="/demo" legacyBehavior>
+            <Link href="https://medapp.sebastianmoreno.lat" legacyBehavior>
               {/* ===> REPLACE "/demo" with your actual link destination <=== */}
               <a className="block">
                 {" "}
