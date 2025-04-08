@@ -21,19 +21,19 @@ jobs:
         with:
           fetch-depth: 2 # Needed to check for changes between commits
 
-      - name: Check for changes in landing-page directory
+      - name: Check for changes in landing-page directory or workflow file
         id: check_changes
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "Changes detected due to manual workflow dispatch"
             echo "changes=true" >> $GITHUB_OUTPUT
           else
-            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep "^landing-page/" || echo "")
+            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep -E "^landing-page/|^\.github/workflows/landing-page-deployment\.yaml$" || echo "")
             if [ -z "$CHANGED_FILES" ]; then
-              echo "No changes in landing-page directory"
+              echo "No changes in landing-page directory or workflow file"
               echo "changes=false" >> $GITHUB_OUTPUT
             else
-              echo "Changes detected in landing-page directory"
+              echo "Changes detected in landing-page directory or workflow file"
               echo "changes=true" >> $GITHUB_OUTPUT
             fi
           fi
@@ -54,8 +54,6 @@ jobs:
       - name: Build static site
         if: steps.check_changes.outputs.changes == 'true'
         working-directory: ./landing-page
-        env:
-          VITE_API_URL: ${{ vars.VITE_API_URL }}
         run: npm run build
 
       - name: Set up Google Cloud SDK
@@ -70,15 +68,18 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
-      - name: Deploy to GCS bucket
+      - name: Deploy to GCS bu  cket
         if: steps.check_changes.outputs.changes == 'true'
         working-directory: ./landing-page
         run: |
-          echo "Syncing the dist directory to GCS bucket gs://${{ env.BUCKET_NAME }}"
-          gsutil -m rsync -r -d dist/ gs://${{ env.BUCKET_NAME }}/
-
-          # Set long cache control for static assets
-          gsutil -m setmeta -h "Cache-Control:public, max-age=31536000" gs://${{ env.BUCKET_NAME }}/assets/**
-
+          echo "Syncing the out directory to GCS bucket gs://${{ env.BUCKET_NAME }}"
+          gsutil -m rsync -r -d out/ gs://${{ env.BUCKET_NAME }}/
+              
+          # Set long cache control for Next.js static assets
+          gsutil -m setmeta -h "Cache-Control:public, max-age=31536000" gs://${{ env.BUCKET_NAME }}/_next/static/** || true
+              
+          # Set long cache control for image files (adjust extensions as needed)
+          gsutil -m setmeta -h "Cache-Control:public, max-age=31536000" gs://${{ env.BUCKET_NAME }}/**/*.{png,jpg,jpeg,gif,svg,webp} || true
+              
           # Set shorter cache control for HTML files
-          gsutil -m setmeta -h "Cache-Control:public, max-age=0, must-revalidate" gs://${{ env.BUCKET_NAME }}/*.html
+          gsutil -m setmeta -h "Cache-Control:public, max-age=0, must-revalidate" gs://${{ env.BUCKET_NAME }}/*.html || true
