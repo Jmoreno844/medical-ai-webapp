@@ -8,7 +8,7 @@ on:
 
 env:
   GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  BUCKET_NAME: test_medwebai_vite_cdn_bucket
+  BUCKET_NAME: test_medwebai_vite_spa_bucket
   NODE_ENV: test
 
 jobs:
@@ -21,19 +21,27 @@ jobs:
         with:
           fetch-depth: 2 # Needed to check for changes between commits
 
-      - name: Check for changes in my-vite-app-english directory
+      - name: Check for changes in my-vite-app-english directory or workflow file
         id: check_changes
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "Changes detected due to manual workflow dispatch"
             echo "changes=true" >> $GITHUB_OUTPUT
           else
-            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep "^my-vite-app-english/" || echo "")
-            if [ -z "$CHANGED_FILES" ]; then
-              echo "No changes in my-vite-app-english directory"
+            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
+            APP_CHANGES=$(echo "$CHANGED_FILES" | grep "^my-vite-app-english/" || echo "")
+            WORKFLOW_CHANGED=$(echo "$CHANGED_FILES" | grep "^.github/workflows/frontend-deployment-test.yaml$" || echo "")
+            
+            if [ -z "$APP_CHANGES" ] && [ -z "$WORKFLOW_CHANGED" ]; then
+              echo "No changes in my-vite-app-english directory or workflow file"
               echo "changes=false" >> $GITHUB_OUTPUT
             else
-              echo "Changes detected in my-vite-app-english directory"
+              if [ -n "$APP_CHANGES" ]; then
+                echo "Changes detected in my-vite-app-english directory"
+              fi
+              if [ -n "$WORKFLOW_CHANGED" ]; then
+                echo "Changes detected in workflow file"
+              fi
               echo "changes=true" >> $GITHUB_OUTPUT
             fi
           fi
