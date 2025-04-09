@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
@@ -120,15 +122,9 @@ export default function Navbar() {
           ))}
         </nav>
         <div>
-          <a
-            href="https://medapp.sebastianmoreno.lat"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Button className="bg-teal-500 hover:bg-teal-600 text-base font-semibold ml-28">
-              Try it
-            </Button>
-          </a>
+          <Button className="bg-teal-500 hover:bg-teal-600 text-base font-semibold ml-28">
+            Try it
+          </Button>
         </div>
       </div>
     </header>
