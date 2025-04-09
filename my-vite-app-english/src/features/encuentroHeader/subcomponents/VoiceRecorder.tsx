@@ -22,8 +22,7 @@ const VoiceRecorder: React.FC = () => {
     isRecording,
     isPaused,
     duration,
-    // audioBlob, // No longer needed for visibility logic here
-    audioExists, // Use this directly
+    audioExists,
     isCheckingAudio,
     isDeleting,
     startRecording,
@@ -35,8 +34,6 @@ const VoiceRecorder: React.FC = () => {
   // UI state management - Simplified
   const [showPauseButton, setShowPauseButton] = useState(false);
   const [showStartStopButton, setShowStartStopButton] = useState(true);
-  // Remove hasRecordingActivity state
-  // Remove resetCounter state
 
   /**
    * Update UI based on recording state
@@ -45,26 +42,18 @@ const VoiceRecorder: React.FC = () => {
     // Show pause button only during active recording
     setShowPauseButton(isRecording && !isPaused);
 
-    // Show start/stop button if not recording AND audio doesn't exist yet
-    // Or if checking audio (initial state)
-    setShowStartStopButton(!isRecording && !audioExists);
-
-    // Note: No need to manage hasRecordingActivity anymore
-  }, [isRecording, isPaused, audioExists, isCheckingAudio]); // Updated dependencies
+    // Show start/stop button if recording OR if not recording and no audio exists yet
+    setShowStartStopButton(isRecording || !audioExists);
+  }, [isRecording, isPaused, audioExists, isCheckingAudio]);
 
   /**
    * Handle recording start/stop
    */
   const handleStartStop = () => {
     if (isRecording) {
-      if (isPaused) {
-        pauseResumeRecording();
-      }
       stopRecording();
-      // No need to set hasRecordingActivity
     } else {
       startRecording();
-      // No need to set hasRecordingActivity
     }
   };
 
@@ -73,10 +62,6 @@ const VoiceRecorder: React.FC = () => {
    */
   const handleDelete = () => {
     deleteRecording();
-    // Reset UI state - simplified
-    setShowPauseButton(false);
-    setShowStartStopButton(true); // Show start button after delete
-    // No need to manage hasRecordingActivity or resetCounter
   };
 
   // Show loading state while checking audio existence
@@ -93,14 +78,11 @@ const VoiceRecorder: React.FC = () => {
 
   return (
     <div className="flex items-center space-x-4">
-      {/* Transcribe button - remove resetKey */}
       <TranscribeButton />
-
       <TimerDisplay duration={duration} />
       <MicrophoneIcon isRecording={isRecording} isPaused={isPaused} />
 
-      {/* Show pause/resume button only during active, unpaused recording */}
-      {isRecording && (
+      {showPauseButton && (
         <PauseResumeButton
           isRecording={isRecording}
           isPaused={isPaused}
@@ -108,13 +90,10 @@ const VoiceRecorder: React.FC = () => {
         />
       )}
 
-      {/* Show start/stop button if not recording AND audio doesn't exist */}
       {showStartStopButton && (
         <StartStopButton isRecording={isRecording} onClick={handleStartStop} />
       )}
 
-      {/* Show delete button ONLY if audio exists for the current encounter */}
-      {/* Ensure it's not shown while checking */}
       {audioExists && !isCheckingAudio && (
         <DeleteButton onClick={handleDelete} isDeleting={isDeleting} />
       )}
