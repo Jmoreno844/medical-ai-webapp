@@ -37,7 +37,7 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
   onClose,
   onGenerate,
   isGenerating,
-  //error,
+  error, // Uncomment this to use the error prop
   plantillas,
   isLoadingPlantillas,
   plantillasError,
@@ -50,19 +50,31 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Generar documentación médica"
-      primaryButtonText="Generar"
+      title="Generate Medical Documentation"
+      primaryButtonText="Generate"
       onPrimaryAction={onGenerate}
       isPrimaryDisabled={isGenerating || !selectedPlantillaId}
+      primaryButtonVariant="purple"
     >
       <div className="space-y-4">
+        {/* Error message box */}
+        {error && (
+          <div
+            className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+            role="alert"
+          >
+            <strong className="font-bold">Error: </strong>
+            <span className="block sm:inline">{error}</span>
+          </div>
+        )}
+
         {/* Search bar for plantillas */}
         <div>
           <label
             htmlFor="search-plantillas"
             className="block text-sm font-medium text-gray-700 mb-1"
           >
-            Buscar plantillas
+            Search Templates
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
@@ -85,7 +97,7 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
               id="search-plantillas"
               type="search"
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Buscar por nombre..."
+              placeholder="Search by name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -95,14 +107,14 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
         {/* Plantillas selection */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Seleccionar plantilla
+            Select a Template
           </label>
           <div className="border border-gray-300 rounded-md overflow-hidden max-h-64 overflow-y-auto">
             {isLoadingPlantillas ? (
               <div className="flex items-center justify-center p-4">
                 <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-600 mr-2"></div>
                 <span className="text-sm text-gray-600">
-                  Cargando plantillas...
+                  Loading templates...
                 </span>
               </div>
             ) : plantillasError ? (
@@ -112,8 +124,8 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
             ) : plantillas.length === 0 ? (
               <div className="p-4 text-sm text-gray-500 text-center">
                 {searchQuery
-                  ? "No se encontraron plantillas con ese nombre"
-                  : "No hay plantillas disponibles"}
+                  ? "No templates found with that name"
+                  : "No templates available"}
               </div>
             ) : (
               <div className="divide-y divide-gray-200">
@@ -145,8 +157,8 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
                         <span className="mr-3">{plantilla.tipo_documento}</span>
                         <span>
                           {plantilla.es_base
-                            ? "Plantilla base"
-                            : `Usada ${plantilla.veces_usada} veces`}
+                            ? "Base Template"
+                            : `Used ${plantilla.veces_usada} times`}
                         </span>
                       </div>
                     </div>

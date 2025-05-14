@@ -87,28 +87,29 @@ export default function PlantillasPage() {
   };
 
   const formatDate = (dateString: string | null) => {
-    if (!dateString) return "Nunca";
+    if (!dateString) return "Never";
 
     try {
       return format(new Date(dateString), "dd/MM/yyyy HH:mm", {
         locale: es,
       });
     } catch (e) {
-      return "Fecha inválida";
+      return "Date format error";
     }
   };
 
   return (
     <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Plantillas</h1>
+        <h1 className="text-2xl font-bold">Templates</h1>
         <Button
           onClick={openCreateModal}
           variant="outline"
-          className="flex items-center gap-2 bg-white"
+          className="flex items-center gap-2 bg-purple-600 text-white font-medium 
+          text-base hover:bg-purple-500 transition-colors hover:text-white"
         >
           <PlusCircle className="h-4 w-4" />
-          Crear Plantilla
+          Create Template
         </Button>
       </div>
 
@@ -116,7 +117,7 @@ export default function PlantillasPage() {
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
         <Input
           className="pl-10"
-          placeholder="Buscar plantillas por nombre..."
+          placeholder="Search templates by name..."
           value={searchQuery}
           onChange={(e) => handleSearch(e.target.value)}
         />
@@ -131,8 +132,8 @@ export default function PlantillasPage() {
       ) : plantillas.length === 0 ? (
         <div className="bg-slate-50 p-8 text-center rounded-md">
           {searchQuery
-            ? "No se encontraron plantillas con ese nombre."
-            : "No hay plantillas disponibles."}
+            ? "No templates found with that name."
+            : "No templates available."}
         </div>
       ) : (
         <div className="space-y-4">
@@ -143,9 +144,9 @@ export default function PlantillasPage() {
                   <div className="flex-1">
                     <h3 className="font-medium">{plantilla.nombre}</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2 text-sm text-gray-600">
-                      <div>Veces usada: {plantilla.veces_usada}</div>
-                      <div>Último uso: {formatDate(plantilla.ultimo_uso)}</div>
-                      <div>Tipo: {plantilla.es_base ? "Base" : "Propia"}</div>
+                      <div>Times used: {plantilla.veces_usada}</div>
+                      <div>Last use: {formatDate(plantilla.ultimo_uso)}</div>
+                      <div>Type: {plantilla.es_base ? "Base" : "Custom"}</div>
                     </div>
                   </div>
                   <DropdownMenu>
@@ -160,14 +161,14 @@ export default function PlantillasPage() {
                         className="flex items-center gap-2 cursor-pointer"
                       >
                         <Edit className="h-4 w-4" />
-                        Editar
+                        Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => openDeleteModal(plantilla)}
                         className="flex items-center gap-2 cursor-pointer text-red-600"
                       >
                         <Trash2 className="h-4 w-4" />
-                        Eliminar
+                        Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

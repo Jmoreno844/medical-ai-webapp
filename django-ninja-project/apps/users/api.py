@@ -2,6 +2,8 @@
 from ninja import Router
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.hashers import make_password
+from django.core.exceptions import ValidationError
+from django.contrib.auth.password_validation import validate_password
 from ninja.security import django_auth
 from typing import List
 from datetime import datetime, timedelta
@@ -20,6 +22,9 @@ from .schemas import (
     UserUpdateIn,
     UserProfileOut,
 )
+import uuid
+from django.core.cache import cache
+from ninja.throttling import AnonRateThrottle  # Import AnonRateThrottle
 
 logger = logging.getLogger(__name__)
 # Initialize the router
@@ -29,10 +34,21 @@ router = Router()
 def create_token(user):
     expiration = datetime.utcnow() + timedelta(hours=1)
     secret_key = os.getenv("JWT_SECRET_KEY", settings.SECRET_KEY)
+    token_id = str(uuid.uuid4())
+
     payload = {
         "user_id": user.id,
         "exp": expiration,
+        "iat": datetime.utcnow(),  # Issued at
+        "iss": "medical-web-app",  # Issuer
+        "aud": "api-client",  # Audience
+        "jti": token_id,  # JWT ID for revocation if needed
+        "role": user.role,
     }
+
+    # Store token ID in cache for potential revocation
+    cache.set(f"jwt_valid:{token_id}", user.id, 3600)
+
     return jwt.encode(payload, secret_key, algorithm="HS256")
 
 
@@ -41,6 +57,15 @@ def register_user(request, data: UserRegistrationIn):
     """Register a new user"""
     if User.objects.filter(email=data.email).exists():
         return 400, {"message": "Email already registered"}
+
+    # Add password validation
+    try:
+        validate_password(data.password)
+    except ValidationError as e:
+        return 400, {
+            "message": "Password validation failed",
+            "errors": list(e.messages),
+        }
 
     user = User.objects.create(
         email=data.email,
@@ -74,7 +99,12 @@ def register_user(request, data: UserRegistrationIn):
     return 201, user
 
 
-@router.post("/login", response={200: dict, 401: dict})
+# Apply AnonRateThrottle to the login endpoint
+@router.post(
+    "/login",
+    response={200: dict, 401: dict, 429: dict},
+    throttle=AnonRateThrottle("5/m"),
+)
 def login_user(request, data: UserLoginIn):
     """
     Login user using session authentication
@@ -88,9 +118,10 @@ def login_user(request, data: UserLoginIn):
         return 401, {"message": "Invalid credentials"}
 
     login(request, user)
-    # Configure session settings
-    request.session.set_expiry(3600)  # 1 hour expiry
+
+    # Record successful login
     logger.info(f"User logged in successfully: {user.id}")
+
     return 200, {"message": "Successfully logged in", "userId": user.id}
 
 
@@ -103,7 +134,12 @@ def logout_user(request):
     return {"message": "Successfully logged out"}
 
 
-@router.post("/jwt-token", response={200: AuthTokenOut, 401: dict})
+# Apply AnonRateThrottle to the jwt-token endpoint
+@router.post(
+    "/jwt-token",
+    response={200: AuthTokenOut, 401: dict, 429: dict},
+    throttle=AnonRateThrottle("5/m"),
+)
 def create_jwt_token(request, data: UserLoginIn):
     """Create JWT token for external services"""
     user = authenticate(request, email=data.email, password=data.password)
@@ -112,6 +148,28 @@ def create_jwt_token(request, data: UserLoginIn):
 
     token = create_token(user)
     return 200, {"token": token}
+
+
+# Implement token revocation endpoint
+@router.post("/revoke-token", response={200: dict, 401: dict})
+def revoke_token(request, token: str):
+    """Revoke a specific JWT token"""
+    try:
+        secret_key = os.getenv("JWT_SECRET_KEY", settings.SECRET_KEY)
+        payload = jwt.decode(token, secret_key, algorithms=["HS256"])
+        token_id = payload.get("jti")
+
+        if token_id:
+            # Delete from valid tokens cache and add to blacklist
+            cache.delete(f"jwt_valid:{token_id}")
+            cache.set(
+                f"jwt_blacklist:{token_id}", True, 3600 * 24 * 7
+            )  # Blacklist for a week
+            return 200, {"message": "Token revoked successfully"}
+    except (jwt.PyJWTError, KeyError):
+        pass
+
+    return 401, {"message": "Invalid token"}
 
 
 @router.get("/users", response=List[UserProfileOut], auth=django_auth)
@@ -157,9 +215,20 @@ def me(request):
     )
     logger.debug(f"Session ID: {request.session.session_key}")
 
-    if request.user and request.user.is_authenticated:
-        return 200, True
-    return 401, {"message": "Session not validated"}
+    if not request.user or not request.user.is_authenticated:
+        return 401, {"message": "Session not validated"}
+
+    # Add check for session timeout
+    last_activity = request.session.get("last_activity")
+    if last_activity and (
+        datetime.now().timestamp() - last_activity > 3600
+    ):  # 1 hour inactivity timeout
+        logout(request)
+        return 401, {"message": "Session expired due to inactivity"}
+
+    # Update last activity timestamp
+    request.session["last_activity"] = datetime.now().timestamp()
+    return 200, True
 
 
 @router.get("/me/data", response={200: UserProfileOut, 401: dict})

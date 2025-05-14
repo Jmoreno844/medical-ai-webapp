@@ -14,7 +14,7 @@ export default function HomePage() {
   const { showRightSidebar, toggleSidebar } = useEncountersSidebar();
   const navigationItems = useNavigationItems(toggleSidebar, showRightSidebar);
   const crearEncuentroItem = navigationItems.find(
-    (item) => item.label === "Crear Encuentro"
+    (item) => item.label === "Crear Encuentro" // Keep "Crear Encuentro" as it's a functional label
   );
 
   return (
@@ -25,14 +25,14 @@ export default function HomePage() {
         <section className="bg-white rounded-xl shadow-md p-8 relative">
           <div className="relative z-10">
             <h2 className="text-xl font-semibold text-gray-600">
-              Welcome back, Dr. {lastNmae}
+              Bienvenido de nuevo, Dr. {lastNmae}
             </h2>
             <h1 className="text-3xl md:text-4xl font-bold text-[#007A7A] mt-2 mb-4">
-              Focus on Patients, Not Paperwork
+              Concéntrese en los Pacientes, No en el Papeleo
             </h1>
             <p className="text-lg text-gray-600 max-w-2xl mb-8">
-              Record or upload patient encounters, get accurate transcripts, and
-              generate clinical notes in minutes.
+              Grabe o cargue encuentros con pacientes, obtenga transcripciones precisas y
+              genere notas clínicas en minutos.
             </p>
             <button
               onClick={(e) => {
@@ -56,7 +56,7 @@ export default function HomePage() {
                   clipRule="evenodd"
                 />
               </svg>
-              Start New Session
+              Iniciar Nueva Sesión
             </button>
           </div>
         </section>
@@ -64,7 +64,7 @@ export default function HomePage() {
         {/* Section 2: How It Works */}
         <section className="bg-white rounded-xl shadow-md p-8">
           <h2 className="text-2xl font-bold text-center mb-10 text-gray-800">
-            How It Works
+            Cómo Funciona
           </h2>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -87,11 +87,11 @@ export default function HomePage() {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold mb-2 text-gray-800">
-                Record or Upload
+                Grabar o Cargar
               </h3>
               <p className="text-gray-600">
-                Securely record audio directly within the app or upload an
-                existing audio file.
+                Grabe audio de forma segura directamente en la aplicación o cargue un
+                archivo de audio existente.
               </p>
             </div>
 
@@ -114,11 +114,11 @@ export default function HomePage() {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold mb-2 text-gray-800">
-                Transcribe & Review
+                Transcribir y Revisar
               </h3>
               <p className="text-gray-600">
-                Our AI accurately transcribes the conversation. Review and edit
-                the text as needed.
+                Nuestra IA transcribe con precisión la conversación. Revise y edite
+                el texto según sea necesario.
               </p>
             </div>
 
@@ -141,11 +141,11 @@ export default function HomePage() {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold mb-2 text-gray-800">
-                Generate Documentation
+                Generar Documentación
               </h3>
               <p className="text-gray-600">
-                Instantly generate SOAP notes, summaries, referral letters, or
-                custom document formats.
+                Genere instantáneamente notas SOAP, resúmenes, cartas de referencia o
+                formatos de documentos personalizados.
               </p>
             </div>
           </div>
@@ -154,7 +154,7 @@ export default function HomePage() {
         {/* Section 4: Tips & Resources */}
         <section className="bg-white rounded-xl shadow-md p-8">
           <h2 className="text-2xl font-bold mb-6 text-gray-800">
-            Helpful Tips
+            Consejos Útiles
           </h2>
 
           <div className="grid md:grid-cols-2 gap-6">
@@ -176,16 +176,16 @@ export default function HomePage() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-semibold text-lg mb-2">Custom Templates</h3>
+                <h3 className="font-semibold text-lg mb-2">Plantillas Personalizadas</h3>
                 <p className="text-gray-600">
-                  Did you know? You can create custom documentation templates
-                  with your desired structured to save even more time.
+                  ¿Sabía qué? Puede crear plantillas de documentación personalizadas
+                  con la estructura deseada para ahorrar aún más tiempo.
                 </p>
                 <Link
                   to="/plantillas"
                   className="text-[#007A7A] font-medium inline-flex items-center mt-2 hover:underline"
                 >
-                  Go to Templates
+                  Ir a Plantillas
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-4 w-4 ml-1"
@@ -220,16 +220,16 @@ export default function HomePage() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-semibold text-lg mb-2">Need Help?</h3>
+                <h3 className="font-semibold text-lg mb-2">¿Necesita Ayuda?</h3>
                 <p className="text-gray-600">
-                  Improve accuracy: Ensure minimal background noise during
-                  recordings for better results.
+                  Mejore la precisión: Asegúrese de que haya un mínimo de ruido de fondo durante
+                  las grabaciones para obtener mejores resultados.
                 </p>
                 <a
                   href="#"
                   className="text-[#007A7A] font-medium inline-flex items-center mt-2 hover:underline"
                 >
-                  Visit Help Center
+                  Visitar Centro de Ayuda
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-4 w-4 ml-1"
@@ -264,8 +264,7 @@ export default function HomePage() {
               />
             </svg>
             <span>
-              Your data is secured with end-to-end encryption. Built with HIPAA
-              compliance standards in mind.
+              Sus datos están protegidos con encriptación de extremo a extremo. Construido teniendo en cuenta los estándares de cumplimiento de HIPAA.
             </span>
           </div>
           <div className="mt-2">
@@ -273,13 +272,13 @@ export default function HomePage() {
               href="#"
               className="text-sm text-gray-500 hover:text-gray-700 mx-2"
             >
-              Privacy Policy
+              Política de Privacidad
             </a>
             <a
               href="#"
               className="text-sm text-gray-500 hover:text-gray-700 mx-2"
             >
-              Terms of Service
+              Términos de Servicio
             </a>
           </div>
         </section>

@@ -18,6 +18,7 @@ interface ModalProps {
   /** Whether the primary button should be destructive (red) */
   isPrimaryDestructive?: boolean;
   isPrimaryDisabled?: boolean;
+  primaryButtonVariant?: "default" | "purple";
 }
 
 /**
@@ -33,6 +34,7 @@ const Modal: React.FC<ModalProps> = ({
   secondaryButtonText = "Cancel",
   isPrimaryDestructive = false,
   isPrimaryDisabled = false,
+  primaryButtonVariant = "default",
 }) => {
   if (!isOpen) return null;
 
@@ -61,6 +63,8 @@ const Modal: React.FC<ModalProps> = ({
               className={`px-4 py-2 rounded ${
                 isPrimaryDestructive
                   ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : primaryButtonVariant === "purple"
+                  ? "bg-purple-600 text-white hover:bg-purple-700 font-medium"
                   : "bg-primary text-primary-foreground hover:bg-primary/90"
               }`}
               onClick={onPrimaryAction}

@@ -86,8 +86,8 @@ const Sidebar = () => {
                   }
                 }}
                 className={`flex items-center cursor-pointer h-8 md:h-10 w-10/12 mx-auto rounded-lg  ${
-                  item.label === "Crear Encuentro" ||
-                  item.label === "Creando..."
+                  item.label === "Create Encounter" ||
+                  item.label === "Creating..."
                     ? "bg-purple-600 hover:!bg-purple-700"
                     : "hover:bg-gray-100 "
                 }`}
@@ -107,8 +107,8 @@ const Sidebar = () => {
                         <Icon
                           src={item.icon}
                           className={`h-8 w-4 md:h-5 md:w-5 ${
-                            item.label === "Crear Encuentro" ||
-                            item.label === "Creando..."
+                            item.label === "Create Encounter" ||
+                            item.label === "Creating..."
                               ? "filter invert brightness-0 saturate-100" // Keep white icon for purple button
                               : "text-black"
                           }`}
@@ -118,8 +118,8 @@ const Sidebar = () => {
                       {isExpanded && (
                         <span
                           className={`pr-4 text-xs md:text-sm whitespace-nowrap ${
-                            item.label === "Crear Encuentro" ||
-                            item.label === "Creando..."
+                            item.label === "Create Encounter" ||
+                            item.label === "Creating..."
                               ? "text-white font-medium" // Keep white text for teal button
                               : "text-black"
                           }`}
@@ -165,12 +165,12 @@ const Sidebar = () => {
                           <span
                             className={`text-xs md:text-sm ${"text-black"}`}
                           >
-                            Últimos
+                            Recent
                           </span>
                           <span
                             className={`text-xs md:text-sm ${"text-black"}`}
                           >
-                            Encuentros
+                            Encounters
                           </span>
                         </div>
                       )}
@@ -194,23 +194,6 @@ const Sidebar = () => {
         {/* Bottom section with settings and logout */}
         <div className="mt-auto border-t border-gray-200">
           {/* Settings button */}
-          <div className="w-10/12 mx-auto my-1">
-            <Link
-              to="/configuracion"
-              className="flex items-center w-full py-2 hover:bg-gray-100"
-            >
-              <div className="w-10 md:w-12 lg:w-14 flex items-center justify-center">
-                <Icon
-                  src="/settings.svg"
-                  className="h-4 w-4 md:h-5 md:w-5 text-black"
-                  alt="Configuración"
-                />
-              </div>
-              {isExpanded && (
-                <span className="text-xs md:text-sm">Configuración</span>
-              )}
-            </Link>
-          </div>
 
           {/* Logout button - FIXED */}
           <div className="w-10/12 mx-auto my-1 mb-2">
@@ -226,7 +209,7 @@ const Sidebar = () => {
                 />
               </div>
               {isExpanded && (
-                <span className="text-xs md:text-sm">Cerrar Sesión</span>
+                <span className="text-xs md:text-sm">Log Out</span>
               )}
             </button>
           </div>

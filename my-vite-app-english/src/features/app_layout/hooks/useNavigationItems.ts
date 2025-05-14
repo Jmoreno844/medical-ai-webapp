@@ -32,7 +32,7 @@ export const useNavigationItems = (
     { icon: "/home_icon.svg", label: "Home", path: "/home" },
     {
       icon: "/plus.svg",
-      label: loading ? "Creating..." : "Create Encounter",
+      label: loading ? "Creando." : "Crear Encuentro",
       action: crearNuevoEncuentro,
     },
     {
@@ -43,7 +43,7 @@ export const useNavigationItems = (
       pattern: "/encuentro",
       pointerIcon: encountersOpen ? "/pointer_left.svg" : "/pointer_right.svg",
     },
-    { icon: "/template.svg", label: "Templates", path: "/plantillas" },
+    { icon: "/template.svg", label: "Plantillas", path: "/plantillas" },
   ];
 
   return navigationItems;

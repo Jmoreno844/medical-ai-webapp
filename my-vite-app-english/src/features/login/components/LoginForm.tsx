@@ -51,10 +51,10 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
       </div>
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-2xl font-bold text-main font-fun tracking-tight">
-          Welcome
+          Bienvenido
         </h1>
         <p className="text-balance text-sm text-neutral-600 dark:text-neutral-300">
-          Enter your credentials to access our services
+          Ingrese sus credenciales para acceder a nuestros servicios
         </p>
       </div>
       <div className="grid gap-7">
@@ -68,12 +68,12 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
             htmlFor="email"
             className="font-medium text-neutral-700 dark:text-neutral-200"
           >
-            Email
+            Correo Electrónico
           </Label>
           <Input
             id="email"
             type="email"
-            placeholder="m@example.com"
+            placeholder="m@ejemplo.com"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -86,13 +86,13 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
               htmlFor="password"
               className="font-medium text-neutral-700 dark:text-neutral-200"
             >
-              Password
+              Contraseña
             </Label>
             <Link
               to="/forgot-password"
               className="ml-auto text-sm text-main hover:text-main_dark underline-offset-4 hover:underline transition-colors"
             >
-              Forgot password?
+              ¿Olvidó su contraseña?
             </Link>
           </div>
           <Input
@@ -109,16 +109,16 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
           className="w-full bg-blue-500 hover:bg-main_dark text-white font-medium py-6 mt-2 transition-colors"
           disabled={loading}
         >
-          {loading ? "Signing in..." : "Sign In"}
+          {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
         </Button>
       </div>
       <div className="text-center text-sm mt-2">
-        Don't have an account?{" "}
+        ¿No tiene una cuenta?{" "}
         <Link
           to="/registro"
           className="font-medium text-main hover:text-main_dark underline underline-offset-4 transition-colors"
         >
-          Register
+          Regístrese
         </Link>
       </div>
     </form>

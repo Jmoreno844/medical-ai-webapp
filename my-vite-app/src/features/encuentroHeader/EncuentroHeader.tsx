@@ -1,41 +1,18 @@
-import React, { useState } from "react";
+import React from "react";
+import { useParams } from "react-router-dom";
 import PatientInfo from "./subcomponents/PatientInfo";
 import VoiceRecorder from "./subcomponents/VoiceRecorder";
 import PatientEditModal from "./PatientEditModal";
 import Modal from "@/commons/components/Modal";
-import { useEncuentroHeader } from "./hooks/useEncuentroHeader";
 import GenerateDocumentationButton from "./subcomponents/GenerateDocumentationButton";
 
-/**
- * Props for the EncuentroHeader component
- */
-interface EncuentroHeaderProps {
-  /** Formatted date of the encounter */
-  encounterDate?: string;
-  /** Name of the encounter */
-  encounterName?: string;
-  /** Function to update patient information */
-  onUpdatePatient?: (patientId: number, patientName: string) => void;
-  /** Function to update both patient and encounter information */
-  onUpdatePatientAndEncounter?: (
-    patientId: number,
-    patientName: string,
-    encounterName: string
-  ) => void;
-  /** Whether an update operation is in progress */
-  isUpdating?: boolean;
-  /** Whether a patient is connected to this encounter */
-  isPatientConnected?: boolean;
-  /** ID of the connected patient if any */
-  patientId?: number | null;
-  /** Name of the connected patient if any */
-  patientName?: string;
-  /** ID of the transcription document if available */
-  transcriptionDocId?: number;
-  onTranscriptionComplete?: () => void; // Add this prop
-  /** Function to handle document generation request */
-  onGenerateDocumentation?: () => void;
-}
+// Import context hooks
+import { useTranscriptionContext } from "../../contexts/TranscriptionContext";
+import { useGenerationContext } from "../../contexts/GenerationContext";
+import {
+  useEncuentroContext,
+  EncuentroProvider,
+} from "../../contexts/EncuentroContext";
 
 /**
  * EncuentroHeader component for the encounter page
@@ -43,26 +20,10 @@ interface EncuentroHeaderProps {
  * Displays patient information, recording controls, and handles
  * the modal for patient/encounter editing
  *
- * @param props - Component props
  * @returns React component
  */
-const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
-  onUpdatePatient = () => {},
-  onUpdatePatientAndEncounter = () => {},
-  //isUpdating = false,
-  transcriptionDocId,
-  onTranscriptionComplete,
-  onGenerateDocumentation,
-}) => {
-  // Add state for tracking transcription status
-  const [hasBeenTranscribed, setHasBeenTranscribed] = useState(false);
-
-  // Get the current URL to extract the encounter ID
-  const urlParts =
-    typeof window !== "undefined" ? window.location.pathname.split("/") : [];
-  const encounterIdFromUrl = parseInt(urlParts[urlParts.length - 1]) || 0;
-
-  // Use our custom hook with fixed parameter order
+const EncuentroHeaderContent: React.FC = () => {
+  // Use the encounter context instead of the hook
   const {
     // Modal states
     isModalOpen,
@@ -72,15 +33,24 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
     deleteSuccess,
     redirectInfo,
     progressPercentage,
-    encounterName,
-    encounterDate: encounterDateFromHook, // Extract date from hook
 
-    // Modal actions
+    // Current encounter data
+    encounterId, // <<< Get encounterId from context
+    encounterName,
+    encounterDate,
+    isPatientConnected,
+    patientId,
+    patientName,
+    originalEncounterDateString,
+
+    // Status
+    isEncounterUpdating,
+    isDateUpdating,
+
+    // Methods
     setIsModalOpen,
     setIsUnlinkModalOpen,
     setIsDeleteModalOpen,
-
-    // Event handlers
     handleEditClick,
     handleSelectPatient,
     handleCreatePatient,
@@ -90,22 +60,7 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
     handleDeleteClick,
     handleDeleteConfirm,
     updateEncounterDate,
-    originalEncounterDateString,
-
-    // Status
-    isEncounterUpdating,
-    isDateUpdating,
-
-    // Get these values from the hook
-    isPatientConnected,
-    patientId,
-    patientName,
-  } = useEncuentroHeader(
-    encounterIdFromUrl,
-    onUpdatePatient,
-    onUpdatePatientAndEncounter,
-    transcriptionDocId
-  );
+  } = useEncuentroContext();
 
   return (
     <>
@@ -117,9 +72,9 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
           <div className="flex items-center">
             <PatientInfo
               encounterName={encounterName}
-              encounterDate={encounterDateFromHook} // Use the date from hook instead
+              encounterDate={encounterDate}
               onEdit={handleEditClick}
-              onUpdateDate={updateEncounterDate} // Replace onEditDate with onUpdateDate
+              onUpdateDate={updateEncounterDate}
               isPatientConnected={isPatientConnected}
               onUnlink={handleUnlinkClick}
               onDelete={handleDeleteClick}
@@ -132,21 +87,13 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
           </div>
 
           <div className="flex items-center">
-            {/* Add Generate Documentation Button */}
-            {onGenerateDocumentation && (
-              <div className="mr-4">
-                <GenerateDocumentationButton
-                  onClick={onGenerateDocumentation}
-                  hasBeenTranscribed={hasBeenTranscribed}
-                />
-              </div>
-            )}
-            <VoiceRecorder
-              key={`recorder-${transcriptionDocId || encounterIdFromUrl}`}
-              transcriptionDocId={transcriptionDocId}
-              onTranscriptionComplete={onTranscriptionComplete}
-              onHasBeenTranscribed={(value) => setHasBeenTranscribed(value)}
-            />
+            {/* Generate Documentation Button - Now using context */}
+            <div className="mr-4">
+              <GenerateDocumentationButton />
+            </div>
+
+            {/* VoiceRecorder now uses context directly and gets a key */}
+            <VoiceRecorder key={encounterId} /> {/* <<< Add key prop */}
           </div>
         </div>
       </nav>
@@ -168,14 +115,14 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
       <Modal
         isOpen={isUnlinkModalOpen}
         onClose={() => setIsUnlinkModalOpen(false)}
-        title="Desconectar paciente"
-        primaryButtonText="Desconectar"
+        title="Unlink Patient"
+        primaryButtonText="Unlink"
         onPrimaryAction={handleUnlinkConfirm}
         isPrimaryDestructive={true}
       >
         <p>
-          ¿Estás seguro de que deseas desconectar el paciente de este encuentro?
-          Esta acción no puede deshacerse.
+          Are you sure you want to unlink the patient from this encounter? This
+          action cannot be undone.
         </p>
       </Modal>
 
@@ -186,18 +133,17 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
           if (!deleteSuccess) {
             setIsDeleteModalOpen(false);
           }
-          // Don't allow closing if delete was successful - must wait for redirect
         }}
-        title={deleteSuccess ? "Encuentro eliminado" : "Eliminar encuentro"}
-        primaryButtonText={deleteSuccess ? undefined : "Eliminar"}
+        title={deleteSuccess ? "Encounter deleted" : "Delete encounter"}
+        primaryButtonText={deleteSuccess ? undefined : "Delete"}
         onPrimaryAction={deleteSuccess ? undefined : handleDeleteConfirm}
         isPrimaryDestructive={!deleteSuccess}
       >
         <div>
           {!deleteSuccess && (
             <p className="mb-4">
-              ¿Estás seguro de que deseas eliminar este encuentro? Esta acción
-              no puede deshacerse y se perderán todos los datos asociados.
+              Are you sure you want to delete this encounter? This action cannot
+              be undone and all associated data will be lost.
             </p>
           )}
 
@@ -220,11 +166,15 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
                 </svg>
               </div>
               <p className="text-lg font-medium mb-2">
-                ¡Encuentro eliminado con éxito!
+                Encounter deleted successfully!
               </p>
               <p className="mb-4">
-                Redirigiendo a{" "}
-                <span className="font-medium">{redirectInfo.name}</span>
+                Redirecting to{" "}
+                <span className="font-medium">
+                  {redirectInfo.name === "Encuentro Nuevo"
+                    ? "New Encounter"
+                    : redirectInfo.name}
+                </span>
                 ...
               </p>
               <div className="bg-gray-200 h-1 rounded-full max-w-xs mx-auto">
@@ -248,6 +198,24 @@ const EncuentroHeader: React.FC<EncuentroHeaderProps> = ({
         </div>
       </Modal>
     </>
+  );
+};
+
+/**
+ * Wrapper component that provides the EncuentroContext to the EncuentroHeaderContent
+ */
+const EncuentroHeader: React.FC = () => {
+  // Get ID from URL
+  const { id } = useParams<{ id: string }>();
+  // Ensure encounterId is always a number, defaulting to 0 if id is undefined/invalid
+  const encounterId = id ? parseInt(id, 10) || 0 : 0;
+
+  // Add a key to EncuentroProvider as well, to ensure it fully resets if needed,
+  // although the internal logic should handle encounterId changes.
+  return (
+    <EncuentroProvider key={encounterId} encounterId={encounterId}>
+      <EncuentroHeaderContent />
+    </EncuentroProvider>
   );
 };
 

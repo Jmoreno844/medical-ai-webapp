@@ -39,9 +39,9 @@ export const EncountersSidebar = ({ onClose }: EncountersSidebarProps) => {
   };
 
   return (
-    <div className="h-screen w-64 bg-white shadow-lg z-40 p-4">
+    <div className="h-screen w-64 bg-white shadow-lg z-40 p-4 flex flex-col">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="font-semibold">Ver Encuentros</h2>
+        <h2 className="font-semibold">View Encounters</h2>
         <IconButton
           src="/close_sidebar.svg"
           alt="Close sidebar"
@@ -53,7 +53,7 @@ export const EncountersSidebar = ({ onClose }: EncountersSidebarProps) => {
 
       {loading && (
         <div className="text-center py-4">
-          <p>Cargando encuentros...</p>
+          <p>Loading encounters...</p>
         </div>
       )}
 
@@ -65,23 +65,29 @@ export const EncountersSidebar = ({ onClose }: EncountersSidebarProps) => {
 
       {!loading && !error && encuentros.length === 0 && (
         <div className="text-center py-4 text-gray-500">
-          <p>No hay encuentros disponibles</p>
+          <p>No encounters available</p>
         </div>
       )}
 
-      <div className="space-y-2">
-        {encuentros.map((encuentro) => (
-          <div
-            key={encuentro.id}
-            className="p-2 hover:bg-gray-100 cursor-pointer rounded border border-gray-200"
-            onClick={() => handleEncuentroClick(encuentro.id)}
-          >
-            <div className="font-medium">{encuentro.nombre_encuentro}</div>
-            <div className="text-sm text-gray-500">
-              {formatDateTime(encuentro.fecha)}
+      <div className="flex-1 overflow-y-auto pr-1">
+        <div className="space-y-2">
+          {encuentros.map((encuentro) => (
+            <div
+              key={encuentro.id}
+              className="p-2 hover:bg-gray-100 cursor-pointer rounded border border-gray-200"
+              onClick={() => handleEncuentroClick(encuentro.id)}
+            >
+              <div className="font-medium">
+                {encuentro.nombre_encuentro === "Encuentro Nuevo"
+                  ? "New Encounter"
+                  : encuentro.nombre_encuentro}
+              </div>
+              <div className="text-sm text-gray-500">
+                {formatDateTime(encuentro.fecha)}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );

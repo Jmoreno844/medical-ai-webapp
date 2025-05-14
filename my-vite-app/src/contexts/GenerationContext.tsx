@@ -1,9 +1,19 @@
-import { useState, useCallback, useEffect, useRef } from "react";
-import { DocumentoOut } from "@/types/documento";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import axiosInstance from "@/commons/utils/axiosInstance";
+import { useDocumentContext } from "./DocumentContext";
+import { useContentContext } from "./ContentContext";
+import { useTranscriptionContext } from "./TranscriptionContext"; // Add this import
+
 const API_URL = import.meta.env.VITE_API_URL;
 
-// Add types for generation status tracking
+// Types from useDocumentGeneration.tsx
 interface GenerationStatus {
   inProgress: boolean;
   processingId: string | null;
@@ -23,33 +33,68 @@ interface Plantilla {
   ultimo_uso: string | null;
 }
 
-interface UseDocumentGenerationProps {
-  documents: DocumentoOut[];
-  encounterId: number;
-  onDocumentCreated?: (newDocument: DocumentoOut) => void;
-  onContentUpdate?: (documentId: number, content: string) => Promise<void>;
-}
+// Define the context type
+type GenerationContextType = {
+  // Modal state
+  isModalOpen: boolean;
+  openGenerationModal: () => void;
+  closeGenerationModal: () => void;
 
-export function useDocumentGeneration({
-  documents,
+  // Generation state
+  isGenerating: boolean;
+  error: string | null;
+  generationStatus: GenerationStatus;
+
+  // Plantilla state
+  plantillas: Plantilla[];
+  isLoadingPlantillas: boolean;
+  plantillasError: string | null;
+  selectedPlantillaId: number | null;
+  setSelectedPlantillaId: (id: number | null) => void;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+
+  // Actions
+  generateDocumentation: () => Promise<any>;
+  fetchPlantillas: () => Promise<void>;
+};
+
+// Create the context
+const GenerationContext = createContext<GenerationContextType | undefined>(
+  undefined
+);
+
+// Create the provider
+export function GenerationProvider({
+  children,
   encounterId,
-  onDocumentCreated,
-  onContentUpdate,
-}: UseDocumentGenerationProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
+}: {
+  children: React.ReactNode;
+  encounterId: number;
+}) {
+  const { documents, addDocument, saveDocument, selectDocument } =
+    useDocumentContext();
+  const { updateDocumentContent } = useContentContext();
+  const { hasBeenTranscribed } = useTranscriptionContext(); // Add this line to get transcription status
+
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+
+  // Generation state
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Template related state
+  // Template state
   const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
-  const [isLoadingPlantillas, setIsLoadingPlantillas] = useState(false);
+  const [isLoadingPlantillas, setIsLoadingPlantillas] =
+    useState<boolean>(false);
   const [plantillasError, setPlantillasError] = useState<string | null>(null);
   const [selectedPlantillaId, setSelectedPlantillaId] = useState<number | null>(
     null
   );
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
-  // New state for generation status
+  // Generation status
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus>({
     inProgress: false,
     processingId: null,
@@ -119,8 +164,8 @@ export function useDocumentGeneration({
       console.log("📄 Documento nuevo creado:", response.data);
 
       // Call the callback with the new document
-      if (onDocumentCreated && response.data) {
-        onDocumentCreated(response.data);
+      if (addDocument && response.data) {
+        addDocument(response.data);
       }
 
       return response.data;
@@ -128,7 +173,7 @@ export function useDocumentGeneration({
       console.error("❌ Error al crear nuevo documento:", err);
       throw err;
     }
-  }, [encounterId, onDocumentCreated]);
+  }, [encounterId, addDocument]);
 
   // Connect to SSE with token
   const connectToSSE = useCallback(
@@ -170,14 +215,18 @@ export function useDocumentGeneration({
 
               case "generation_chunk":
                 const newChunk = data.chunk || "";
+                const targetDocumentIdForChunk = generationStatus.documentId; // Capture documentId for chunk saving
 
                 setGenerationStatus((prev) => {
                   const updatedContent = prev.content + newChunk;
 
                   // Save content to document
-                  if (onContentUpdate && documentId && newChunk) {
+                  if (saveDocument && targetDocumentIdForChunk && newChunk) {
                     // Use the full accumulated content for saving
-                    onContentUpdate(documentId, updatedContent).catch((err) =>
+                    saveDocument(
+                      targetDocumentIdForChunk,
+                      updatedContent
+                    ).catch((err) =>
                       console.error("Error saving document content:", err)
                     );
                   }
@@ -191,41 +240,71 @@ export function useDocumentGeneration({
                 break;
 
               case "generation_complete":
-                const finalContent = data.chunk || generationStatus.content;
+                // Use setGenerationStatus functional update to get the latest state reliably
+                setGenerationStatus((prevStatus) => {
+                  const finalContent = data.chunk || prevStatus.content;
+                  const targetDocumentId = prevStatus.documentId; // Get ID from the latest state
 
-                console.log(
-                  `✅ Generation complete - Final content length: ${finalContent.length} chars`
-                );
-
-                // CRITICAL: Update the document content cache directly to prevent race condition
-                if (window.documentContentCache && documentId) {
-                  window.documentContentCache.set(documentId, finalContent);
                   console.log(
-                    `💾 Manually updated cache for document ${documentId} with ${finalContent.length} chars`
+                    `✅ Generation complete - Target Doc ID: ${targetDocumentId}, Final content length: ${finalContent.length} chars`
                   );
-                }
 
-                // Save final content to database
-                if (onContentUpdate && documentId) {
-                  try {
-                    await onContentUpdate(documentId, finalContent);
-                    console.log(
-                      `📝 Final content saved to database (${finalContent.length} chars)`
+                  // Save final content to database using the correct targetDocumentId
+                  if (saveDocument && targetDocumentId) {
+                    saveDocument(targetDocumentId, finalContent)
+                      .then((saveSuccess) => {
+                        console.log(
+                          `📝 Final content saved to database (Doc ${targetDocumentId}, ${finalContent.length} chars), Success: ${saveSuccess}`
+                        );
+
+                        // IMPORTANT: Update ContentContext state AFTER successful save using the correct targetDocumentId
+                        if (saveSuccess && updateDocumentContent) {
+                          updateDocumentContent(targetDocumentId, finalContent); // Use correct targetDocumentId
+                          console.log(
+                            `🔄 Explicitly updated ContentContext state for document ${targetDocumentId}` // Log correct ID
+                          );
+                        }
+
+                        // Force editor refresh AFTER state updates, keep the correct document selected
+                        setTimeout(() => {
+                          // Ensure the correct document remains selected
+                          if (selectDocument && targetDocumentId) {
+                            selectDocument(targetDocumentId); // Use correct targetDocumentId
+                            console.log(
+                              `🔄 Ensured document ${targetDocumentId} is selected to refresh UI` // Log correct ID
+                            );
+                          }
+                          if (window.triggerEditorRefresh) {
+                            window.triggerEditorRefresh();
+                            console.log(`🔄 Triggered general editor refresh`);
+                          }
+                        }, 100); // Timeout allows state to propagate
+                      })
+                      .catch((err) => {
+                        console.error(
+                          `❌ Error saving final content for Doc ${targetDocumentId}:`,
+                          err
+                        );
+                      });
+                  } else {
+                    console.warn(
+                      `⚠️ Skipped final save/update for Doc ${targetDocumentId} (saveDocument or targetDocumentId missing)`
                     );
-                  } catch (err) {
-                    console.error("❌ Error saving final content:", err);
                   }
-                }
 
-                // Only after saving content, update the state
-                setGenerationStatus((prev) => ({
-                  ...prev,
-                  content: finalContent,
-                  isComplete: true,
-                  inProgress: false,
-                }));
+                  // Update local state after initiating save/update
+                  return {
+                    ...prevStatus,
+                    content: finalContent,
+                    isComplete: true,
+                    inProgress: false,
+                    error: null, // Clear error on success
+                  };
+                });
 
+                // Move setIsGenerating outside setGenerationStatus
                 setIsGenerating(false);
+                setError(null); // Clear any previous generation error
                 break;
 
               case "generation_error":
@@ -240,6 +319,14 @@ export function useDocumentGeneration({
             }
           } catch (err) {
             console.error("❌ Error processing SSE message:", err);
+            // Update status on error
+            setGenerationStatus((prev) => ({
+              ...prev,
+              error: "Error processing message",
+              inProgress: false,
+            }));
+            setIsGenerating(false);
+            setError("Error processing message");
           }
         };
 
@@ -258,7 +345,8 @@ export function useDocumentGeneration({
         return null;
       }
     },
-    [onContentUpdate, generationStatus.content]
+    // Update dependency array
+    [saveDocument, updateDocumentContent, selectDocument, API_URL]
   );
 
   const generateDocumentation = useCallback(async () => {
@@ -292,17 +380,15 @@ export function useDocumentGeneration({
         throw new Error("No se encontró el documento de contexto");
       }
 
-      // Check if transcription content is empty
-      if (
-        !transcriptionDoc.contenido ||
-        transcriptionDoc.contenido.trim() === ""
-      ) {
+      // Check if transcription has been completed using the hasBeenTranscribed flag
+      // instead of checking the document content
+      if (!hasBeenTranscribed) {
         throw new Error(
           "You must perform the transcription before generating a document"
         );
       }
 
-      console.log("📄 Documentos encontrados:", {
+      console.log("📄 Documents found:", {
         transcripcion: transcriptionDoc.id,
         contexto: contextDoc.id,
       });
@@ -350,6 +436,11 @@ export function useDocumentGeneration({
       // Close the modal as generation has started
       setIsModalOpen(false);
 
+      // Select the new document
+      if (selectDocument) {
+        selectDocument(newDocument.id);
+      }
+
       // Return the new document so it can be selected
       return newDocument;
     } catch (err) {
@@ -363,7 +454,14 @@ export function useDocumentGeneration({
       console.error("❌ Error generando documentación:", err);
       return null;
     }
-  }, [documents, createNewDocument, selectedPlantillaId, connectToSSE]);
+  }, [
+    documents,
+    createNewDocument,
+    selectedPlantillaId,
+    connectToSSE,
+    selectDocument,
+    hasBeenTranscribed, // Add hasBeenTranscribed to the dependencies
+  ]);
 
   // Filter plantillas based on search query
   const filteredPlantillas = searchQuery
@@ -372,13 +470,14 @@ export function useDocumentGeneration({
       )
     : plantillas;
 
-  return {
+  // Create the context value
+  const value: GenerationContextType = {
     isModalOpen,
-    isGenerating,
-    error,
     openGenerationModal,
     closeGenerationModal,
-    generateDocumentation,
+    isGenerating,
+    error,
+    generationStatus,
     plantillas: filteredPlantillas,
     isLoadingPlantillas,
     plantillasError,
@@ -386,7 +485,24 @@ export function useDocumentGeneration({
     setSelectedPlantillaId,
     searchQuery,
     setSearchQuery,
-    // New fields
-    generationStatus,
+    generateDocumentation,
+    fetchPlantillas,
   };
+
+  return (
+    <GenerationContext.Provider value={value}>
+      {children}
+    </GenerationContext.Provider>
+  );
+}
+
+// Custom hook
+export function useGenerationContext() {
+  const context = useContext(GenerationContext);
+  if (context === undefined) {
+    throw new Error(
+      "useGenerationContext must be used within a GenerationProvider"
+    );
+  }
+  return context;
 }

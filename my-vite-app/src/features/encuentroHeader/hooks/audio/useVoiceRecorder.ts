@@ -39,6 +39,7 @@ const checkAudioExists = async (encounterId: number) => {
  * @returns Object containing recording state and control functions
  */
 export const useVoiceRecorder = (
+  encounterId: number, // Add encounterId parameter
   transcriptionDocId?: number
 ): UseVoiceRecorderReturn => {
   // State for recording status
@@ -64,35 +65,94 @@ export const useVoiceRecorder = (
     transcriptionDocIdRef.current = transcriptionDocId;
   }, [transcriptionDocId]);
 
-  // Check if audio exists for this encounter when component mounts
+  // Effect to check audio and reset state when encounterId changes
   useEffect(() => {
+    // --- State Reset ---
+    console.log(
+      `[VOICE_RECORDER] Effect running for encounterId: ${encounterId}. Resetting state.`
+    );
+    setIsRecording(false);
+    setIsPaused(false);
+    setDuration(0);
+    setAudioBlob(null);
+    setAudioExists(false);
+    setHasBeenTranscribed(false);
+    chunksRef.current = [];
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
+
+    // Stop any active recorder
+    if (mediaRecorderRef.current?.state !== "inactive") {
+      try {
+        mediaRecorderRef.current?.stop();
+      } catch (e) {
+        console.warn("Error stopping previous recorder:", e);
+      }
+    }
+    mediaRecorderRef.current = null;
+
     const checkExistingAudio = async () => {
-      // Extract encounter ID from URL path
-      const urlParts =
-        typeof window !== "undefined"
-          ? window.location.pathname.split("/")
-          : [];
-      const encounterIdFromUrl = parseInt(urlParts[urlParts.length - 1]) || 0;
-
-      if (encounterIdFromUrl) {
+      if (encounterId > 0) {
         setIsCheckingAudio(true);
-        const {
-          exists,
-          duration: existingDuration,
-          has_been_transcribed,
-        } = await checkAudioExists(encounterIdFromUrl);
+        console.log(
+          `[VOICE_RECORDER] Checking audio for encounter ${encounterId}`
+        );
+        try {
+          const {
+            exists,
+            duration: existingDuration,
+            has_been_transcribed,
+          } = await checkAudioExists(encounterId);
 
-        setAudioExists(exists);
-        if (exists) {
-          setDuration(existingDuration);
-          setHasBeenTranscribed(has_been_transcribed); // Set transcription status
+          console.log(
+            `[VOICE_RECORDER] Audio check result for ${encounterId}:`,
+            { exists, existingDuration, has_been_transcribed }
+          );
+
+          setAudioExists(exists);
+          setDuration(exists ? existingDuration : 0);
+          setHasBeenTranscribed(exists ? has_been_transcribed : false);
+        } catch (error) {
+          console.error(
+            `[VOICE_RECORDER] Error checking audio for ${encounterId}:`,
+            error
+          );
+          setAudioExists(false);
+          setDuration(0);
+          setHasBeenTranscribed(false);
+        } finally {
+          setIsCheckingAudio(false);
+          console.log(
+            `[VOICE_RECORDER] Finished checking audio for ${encounterId}`
+          );
         }
+      } else {
+        console.log(
+          `[VOICE_RECORDER] Invalid encounterId (${encounterId}), skipping check.`
+        );
+        setAudioExists(false);
+        setDuration(0);
+        setHasBeenTranscribed(false);
         setIsCheckingAudio(false);
       }
     };
 
     checkExistingAudio();
-  }, []);
+
+    return () => {
+      console.log(
+        `[VOICE_RECORDER] Cleanup effect for encounter ${encounterId}`
+      );
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (mediaRecorderRef.current?.state !== "inactive") {
+        try {
+          mediaRecorderRef.current?.stop();
+        } catch (e) {
+          /* ignore */
+        }
+      }
+    };
+  }, [encounterId]);
 
   /**
    * Start recording audio
@@ -220,17 +280,15 @@ export const useVoiceRecorder = (
           // Generate upload URL if we have a transcription document ID
           if (transcriptionDocIdRef.current) {
             try {
-              // Extract encounter ID from URL path
-              const urlParts =
-                typeof window !== "undefined"
-                  ? window.location.pathname.split("/")
-                  : [];
-              const encounterIdFromUrl =
-                parseInt(urlParts[urlParts.length - 1]) || 0;
-
-              // Get upload URL - now passing duration
+              if (!encounterId || encounterId <= 0) {
+                console.error(
+                  "[VOICE_RECORDER] Invalid encounterId in stopRecording:",
+                  encounterId
+                );
+                return;
+              }
               const uploadUrl = await generateAudioUploadUrl(
-                encounterIdFromUrl,
+                encounterId,
                 duration
               );
 
@@ -313,29 +371,22 @@ export const useVoiceRecorder = (
     // Delete from server if audio exists
     if (audioExists) {
       try {
-        // Extract encounter ID from URL path
-        const urlParts =
-          typeof window !== "undefined"
-            ? window.location.pathname.split("/")
-            : [];
-        const encounterIdFromUrl = parseInt(urlParts[urlParts.length - 1]) || 0;
-
-        if (encounterIdFromUrl) {
-          const response = await axiosInstance.delete(
-            `/api/encuentros/delete_audio/${encounterIdFromUrl}`
+        if (encounterId && encounterId > 0) {
+          console.log(
+            `[VOICE_RECORDER] Attempting to delete audio for encounter ${encounterId}`
           );
-
-          const success = response.data?.success;
-
-          if (!success) {
-            console.error(
-              "[VOICE_RECORDER] Failed to delete audio from server"
-            );
-          } else {
-            console.log(
-              "[VOICE_RECORDER] Audio deleted successfully from server"
-            );
-          }
+          await axiosInstance.delete(
+            `/api/encuentros/delete_audio/${encounterId}`
+          );
+          console.log(
+            "[VOICE_RECORDER] Server delete request sent for encounter",
+            encounterId
+          );
+        } else {
+          console.warn(
+            "[VOICE_RECORDER] Invalid encounterId in deleteRecording:",
+            encounterId
+          );
         }
       } catch (error) {
         console.error(

@@ -20,7 +20,7 @@ const PauseResumeButton: React.FC<PauseResumeButtonProps> = ({
                 : "bg-blue-500 hover:bg-blue-600"
         }`}
     >
-        {isPaused ? "Resume" : "Pause"}
+        {isPaused ? "Reanudar" : "Pausar"}
     </button>
 );
 

@@ -39,22 +39,16 @@ const GenerateDocumentationButton: React.FC = () => {
 
   // Dynamic tooltip based on state
   const getTooltipContent = () => {
-    // if (isCheckingContent) { // Removed
-    //   return "Checking transcription content...";
-    // }
     if (isGenerating) {
-      return "Generation in progress...";
+      return "Generación en progreso...";
     }
     if (isRecording) {
-      return "Cannot generate while recording";
+      return "No se puede generar mientras se graba";
     }
     if (!hasBeenTranscribed) {
-      return "You must transcribe the audio first";
+      return "Debe transcribir el audio primero";
     }
-    // Optional: Could add a check here using checkTranscriptionContent if needed,
-    // but often just relying on hasBeenTranscribed is sufficient for enabling the button.
-    // The actual generation process will fail if content is missing.
-    return "Generate documentation from transcription";
+    return "Generar documentación desde la transcripción";
   };
 
   return (
@@ -95,7 +89,7 @@ const GenerateDocumentationButton: React.FC = () => {
               />
             </svg>
           )}
-          Generate
+          Generar
         </button>
       </span>
     </Tooltip>

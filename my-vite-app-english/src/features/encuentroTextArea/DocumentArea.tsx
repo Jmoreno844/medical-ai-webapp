@@ -89,7 +89,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
     return (
       <div className="flex flex-col h-full">
         <div className="bg-gray-100 p-2 border-b text-sm text-gray-500">
-          Loading documents...
+          Cargando documentos...
         </div>
         <div className="flex-1 flex items-center justify-center">
           <LoadingSpinner />
@@ -103,10 +103,10 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
     return (
       <div className="flex flex-col h-full">
         <div className="bg-gray-100 p-2 border-b text-sm text-gray-500">
-          Error loading documents
+          Error al cargar documentos
         </div>
         <div className="flex-1">
-          <ErrorDisplay message="Could not load documents" details={error} />
+          <ErrorDisplay message="No se pudieron cargar los documentos" details={error} />
         </div>
       </div>
     );
@@ -121,7 +121,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
           <TextArea />
         ) : (
           <div className="flex items-center justify-center h-full text-gray-500">
-            No documents available for this encounter
+            No hay documentos disponibles para este encuentro
           </div>
         )}
       </div>
@@ -148,7 +148,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
       {/* Saving indicator */}
       {isSaving && (
         <div className="bg-blue-50 text-blue-600 text-xs p-1 border-t text-center">
-          Saving changes...
+          Guardando cambios...
         </div>
       )}
 

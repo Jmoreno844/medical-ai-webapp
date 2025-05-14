@@ -115,14 +115,14 @@ const EncuentroHeaderContent: React.FC = () => {
       <Modal
         isOpen={isUnlinkModalOpen}
         onClose={() => setIsUnlinkModalOpen(false)}
-        title="Unlink Patient"
-        primaryButtonText="Unlink"
+        title="Desvincular Paciente"
+        primaryButtonText="Desvincular"
         onPrimaryAction={handleUnlinkConfirm}
         isPrimaryDestructive={true}
       >
         <p>
-          Are you sure you want to unlink the patient from this encounter? This
-          action cannot be undone.
+          ¿Está seguro de que desea desvincular el paciente de este encuentro? Esta
+          acción no se puede deshacer.
         </p>
       </Modal>
 
@@ -134,16 +134,16 @@ const EncuentroHeaderContent: React.FC = () => {
             setIsDeleteModalOpen(false);
           }
         }}
-        title={deleteSuccess ? "Encounter deleted" : "Delete encounter"}
-        primaryButtonText={deleteSuccess ? undefined : "Delete"}
+        title={deleteSuccess ? "Encuentro eliminado" : "Eliminar encuentro"}
+        primaryButtonText={deleteSuccess ? undefined : "Eliminar"}
         onPrimaryAction={deleteSuccess ? undefined : handleDeleteConfirm}
         isPrimaryDestructive={!deleteSuccess}
       >
         <div>
           {!deleteSuccess && (
             <p className="mb-4">
-              Are you sure you want to delete this encounter? This action cannot
-              be undone and all associated data will be lost.
+              ¿Está seguro de que desea eliminar este encuentro? Esta acción no se puede
+              deshacer y todos los datos asociados se perderán.
             </p>
           )}
 
@@ -166,13 +166,13 @@ const EncuentroHeaderContent: React.FC = () => {
                 </svg>
               </div>
               <p className="text-lg font-medium mb-2">
-                Encounter deleted successfully!
+                ¡Encuentro eliminado con éxito!
               </p>
               <p className="mb-4">
-                Redirecting to{" "}
+                Redirigiendo a{" "}
                 <span className="font-medium">
                   {redirectInfo.name === "Encuentro Nuevo"
-                    ? "New Encounter"
+                    ? "Encuentro Nuevo"
                     : redirectInfo.name}
                 </span>
                 ...

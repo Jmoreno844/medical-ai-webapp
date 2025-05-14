@@ -103,7 +103,7 @@ const TabBar: React.FC = () => {
   if (!sortedDocuments.length) {
     return (
       <div className="bg-gray-100 p-2 text-sm text-gray-500 border-b">
-        No documents available
+        No hay documentos disponibles
       </div>
     );
   }
@@ -182,7 +182,7 @@ const TabBar: React.FC = () => {
               }}
             >
               <Trash className="mr-2 h-4 w-4" />
-              <span>Delete Document</span>
+              <span>Eliminar Documento</span>
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
@@ -195,11 +195,11 @@ const TabBar: React.FC = () => {
       >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Delete document</DialogTitle>
+            <DialogTitle>Eliminar documento</DialogTitle>
           </DialogHeader>
 
           <div className="">
-            <p>Are you sure you want to delete this document?</p>
+            <p>¿Está seguro de que desea eliminar este documento?</p>
             <p className="font-medium mt-8 mb-4 text-center">
               {documentToDelete && getDocumentTitle(documentToDelete)}
             </p>
@@ -218,7 +218,7 @@ const TabBar: React.FC = () => {
               className="mr-2"
               disabled={isDeleting}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button
               variant="destructive"
@@ -226,7 +226,7 @@ const TabBar: React.FC = () => {
               disabled={isDeleting}
               className="bg-red-600 text-white hover:bg-red-700 border border-red-600 font-medium"
             >
-              {isDeleting ? "Deleting..." : "Delete"}
+              {isDeleting ? "Eliminando..." : "Eliminar"}
             </Button>
           </DialogFooter>
         </DialogContent>

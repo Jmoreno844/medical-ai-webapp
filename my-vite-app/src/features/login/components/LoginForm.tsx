@@ -51,10 +51,10 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
       </div>
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-2xl font-bold text-main font-fun tracking-tight">
-          Bienvenido
+          Welcome
         </h1>
         <p className="text-balance text-sm text-neutral-600 dark:text-neutral-300">
-          Ingresa con tus credenciales para acceder a los servicios médicos
+          Enter your credentials to access our services
         </p>
       </div>
       <div className="grid gap-7">
@@ -92,7 +92,7 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
               to="/forgot-password"
               className="ml-auto text-sm text-main hover:text-main_dark underline-offset-4 hover:underline transition-colors"
             >
-              ¿Olvidaste tu contraseña?
+              Forgot password?
             </Link>
           </div>
           <Input
@@ -109,16 +109,16 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
           className="w-full bg-blue-500 hover:bg-main_dark text-white font-medium py-6 mt-2 transition-colors"
           disabled={loading}
         >
-          {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
+          {loading ? "Signing in..." : "Sign In"}
         </Button>
       </div>
       <div className="text-center text-sm mt-2">
-        ¿No tienes una cuenta?{" "}
+        Don't have an account?{" "}
         <Link
           to="/registro"
           className="font-medium text-main hover:text-main_dark underline underline-offset-4 transition-colors"
         >
-          Regístrate
+          Register
         </Link>
       </div>
     </form>

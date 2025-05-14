@@ -145,7 +145,7 @@ const TextArea: React.FC = () => {
   if (!activeDocument) {
     return (
       <div className="flex items-center justify-center h-full text-gray-600 text-xl font-medium">
-        Select a document
+        Seleccione un documento
       </div>
     );
   }
@@ -256,7 +256,7 @@ const TextArea: React.FC = () => {
                 <div className="text-gray-400 absolute top-3 left-4 pointer-events-none">
                   {activeDocument.tipo === "transcripcion"
                     ? ""
-                    : "Start typing..."}
+                    : "Empieza a escribir..."}
                 </div>
               }
               ErrorBoundary={LexicalErrorBoundary}

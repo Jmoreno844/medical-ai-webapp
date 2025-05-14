@@ -79,7 +79,7 @@ const PatientInfo: React.FC<ExtendedPatientInfoProps> = ({
       <div className="flex items-center space-x-2">
         <span className="font-medium" data-testid="encounter-name">
           {encounterName === "Encuentro Nuevo"
-            ? "New Encounter"
+            ? "Encuentro Nuevo"
             : encounterName}
         </span>
         <button

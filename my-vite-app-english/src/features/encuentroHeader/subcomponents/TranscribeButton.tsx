@@ -94,7 +94,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
       return (
         <>
           <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-          <span>Transcribing...</span>
+          <span>Transcribiendo...</span>
         </>
       );
     }
@@ -114,7 +114,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
               clipRule="evenodd"
             ></path>
           </svg>
-          <span className="font-medium">Transcribed</span>
+          <span className="font-medium">Transcrito</span>
         </>
       );
     }
@@ -153,7 +153,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
             clipRule="evenodd"
           ></path>
         </svg>
-        <span className="text-base font-medium">Transcribe</span>
+        <span className="text-base font-medium">Transcribir</span>
       </>
     );
   };
@@ -163,15 +163,15 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
       <Tooltip
         content={
           isDisabled
-            ? "Record audio first"
-            : errorMessage || "Transcribe audio to text"
+            ? "Grabe audio primero"
+            : errorMessage || "Transcribir audio a texto"
         }
       >
         <button
           onClick={handleTranscribe}
           disabled={isDisabled}
           className={buttonClasses}
-          aria-label="Transcribe audio to text"
+          aria-label="Transcribir audio a texto"
         >
           {renderButtonContent()}
         </button>

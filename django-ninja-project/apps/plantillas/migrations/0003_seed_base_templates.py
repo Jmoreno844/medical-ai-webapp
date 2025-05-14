@@ -10,83 +10,84 @@ def create_base_templates(apps, schema_editor):
 
     # Create first template
     PlantillaBase.objects.create(
-        nombre="Medical History",
+        nombre="Historia Clínica",
         tipo_documento="documento",
         contenido="""
+# Historia Clínica
 
-**Patient Data**
-Name: [Patient's name] (skip if not in context)
-Age: [Patient's age] (skip if not in context)
-Sex: [Patient's sex] (skip if not in context)
-Date of Birth: [Date of birth] (skip if not in context)
-Medical Record Number: [Medical record number] (skip if not in context)
+## Datos del Paciente
+- Nombre: [Nombre del paciente] (saltar si no está en el contexto)
+- Edad: [Edad del paciente] (saltar si no está en el contexto)
+- Sexo: [Sexo del paciente] (saltar si no está en el contexto)
+- Fecha de Nacimiento: [Fecha de nacimiento] (saltar si no está en el contexto)
+- Número de Historia Clínica: [Número de historia clínica] (saltar si no está en el contexto)
 
-**Reason for Visit**
-[Description of the reason for visit] (skip if not in context)
+## Motivo de la Consulta
+- [Descripción del motivo de la consulta] (saltar si no está en el contexto)
 
-**Medical History**
-Previous Illnesses: [List of previous illnesses] (skip if not in context)
-Surgeries: [List of surgeries] (skip if not in context)
-Allergies: [List of allergies] (skip if not in context)
-Current Medications: [List of current  (drugs or similar)] (skip if not in context)
+## Antecedentes Médicos
+- Enfermedades Previas: [Lista de enfermedades previas] (saltar si no está en el contexto)
+- Cirugías: [Lista de cirugías] (saltar si no está en el contexto)
+- Alergias: [Lista de alergias] (saltar si no está en el contexto)
+- Medicamentos Actuales: [Lista de medicamentos actuales] (saltar si no está en el contexto)
 
-**Physical Examination**
-Vital Signs: [Vital signs] (skip if not in context)
-Examination Description: [Detailed description of physical examination] (skip if not in context)
+## Examen Físico
+- Signos Vitales: [Signos vitales] (saltar si no está en el contexto)
+- Descripción del Examen: [Descripción detallada del examen físico] (saltar si no está en el contexto)
 
-**Diagnosis**
-Primary Diagnosis: [Primary diagnosis] (skip if not in context)
-Secondary Diagnoses: [List of secondary diagnoses] (skip if not in context)
+## Diagnóstico
+- Diagnóstico Principal: [Diagnóstico principal] (saltar si no está en el contexto)
+- Diagnósticos Secundarios: [Lista de diagnósticos secundarios] (saltar si no está en el contexto)
 
-**Treatment**
-Prescribed Medications: [List of prescribed medications] (skip if not in context)
-Procedures: [List of procedures performed or recommended] (skip if not in context)
-Patient Instructions: [Detailed instructions for the patient] (skip if not in context)
+## Tratamiento
+- Medicamentos Prescritos: [Lista de medicamentos prescritos] (saltar si no está en el contexto)
+- Procedimientos: [Lista de procedimientos realizados o recomendados] (saltar si no está en el contexto)
+- Instrucciones para el Paciente: [Instrucciones detalladas para el paciente] (saltar si no está en el contexto)
 
-**Follow-up Plan**
-Next Appointment: [Date and time of next appointment] (skip if not in context)
-Requested Studies: [List of requested studies] (skip if not in context)
-    """,
+## Plan de Seguimiento
+- Próxima Cita: [Fecha y hora de la próxima cita] (saltar si no está en el contexto)
+- Estudios Solicitados: [Lista de estudios solicitados] (saltar si no está en el contexto)
+        """,
         created_at=timezone.now(),
     )
 
     # Create second template
     PlantillaBase.objects.create(
-        nombre="Discharge Report",
+        nombre="Informe de Alta",
         tipo_documento="documento",
         contenido="""
-**Discharge Report**
+# Informe de Alta
 
-**Patient Data**
-Name: [Patient's name] (skip if not in context)
-Age: [Patient's age] (skip if not in context)
-Sex: [Patient's sex] (skip if not in context)
-Admission Date: [Admission date] (skip if not in context)
-Discharge Date: [Discharge date] (skip if not in context)
+## Datos del Paciente
+- Nombre: [Nombre del paciente] (saltar si no está en el contexto)
+- Edad: [Edad del paciente] (saltar si no está en el contexto)
+- Sexo: [Sexo del paciente] (saltar si no está en el contexto)
+- Fecha de Ingreso: [Fecha de ingreso] (saltar si no está en el contexto)
+- Fecha de Alta: [Fecha de alta] (saltar si no está en el contexto)
 
-**Admission Diagnosis**
-[Diagnosis at the time of admission] (skip if not in context)
+## Diagnóstico de Ingreso
+- [Diagnóstico al momento del ingreso] (saltar si no está en el contexto)
 
-**Stay Summary**
-Procedures Performed: [List of procedures performed] (skip if not in context)
-Complications: [Description of complications, if any] (skip if not in context)
-Treatment Administered: [Description of treatment administered] (skip if not in context)
+## Resumen de la Estadía
+- Procedimientos Realizados: [Lista de procedimientos realizados] (saltar si no está en el contexto)
+- Complicaciones: [Descripción de complicaciones, si las hubo] (saltar si no está en el contexto)
+- Tratamiento Administrado: [Descripción del tratamiento administrado] (saltar si no está en el contexto)
 
-**Discharge Diagnosis**
-Primary Diagnosis: [Primary diagnosis at discharge] (skip if not in context)
-Secondary Diagnoses: [List of secondary diagnoses at discharge] (skip if not in context)
+## Diagnóstico de Alta
+- Diagnóstico Principal: [Diagnóstico principal al alta] (saltar si no está en el contexto)
+- Diagnósticos Secundarios: [Lista de diagnósticos secundarios al alta] (saltar si no está en el contexto)
 
-**Condition at Discharge**
-Patient Status: [Description of patient status at discharge] (skip if not in context)
-Vital Signs: [Vital signs at discharge] (skip if not in context)
+## Condición al Alta
+- Estado del Paciente: [Descripción del estado del paciente al alta] (saltar si no está en el contexto)
+- Signos Vitales: [Signos vitales al alta] (saltar si no está en el contexto)
 
-**Follow-up Instructions**
-Prescribed Medications: [List of medications prescribed to continue at home] (skip if not in context)
-Special Care: [Instructions on special care] (skip if not in context)
-Diet: [Dietary recommendations] (skip if not in context)
-Physical Activity: [Recommendations on physical activity] (skip if not in context)
-Next Appointment: [Date and time of next appointment] (skip if not in context)
-    """,
+## Instrucciones para el Seguimiento
+- Medicamentos Prescritos: [Lista de medicamentos prescritos para continuar en casa] (saltar si no está en el contexto)
+- Cuidados Especiales: [Instrucciones sobre cuidados especiales] (saltar si no está en el contexto)
+- Dieta: [Recomendaciones dietéticas] (saltar si no está en el contexto)
+- Actividad Física: [Recomendaciones sobre actividad física] (saltar si no está en el contexto)
+- Próxima Cita: [Fecha y hora de la próxima cita] (saltar si no está en el contexto)
+        """,
         created_at=timezone.now(),
     )
 
@@ -108,7 +109,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunPython(create_base_templates, delete_base_templates),
     ]
-
 
 spanish_content = """
 # Generated by Django 5.1.6 on 2025-03-21 22:46

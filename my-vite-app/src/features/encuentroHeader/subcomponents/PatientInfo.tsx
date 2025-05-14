@@ -78,7 +78,9 @@ const PatientInfo: React.FC<ExtendedPatientInfoProps> = ({
     <div className="flex flex-col">
       <div className="flex items-center space-x-2">
         <span className="font-medium" data-testid="encounter-name">
-          {encounterName}
+          {encounterName === "Encuentro Nuevo"
+            ? "New Encounter"
+            : encounterName}
         </span>
         <button
           onClick={onEdit}
@@ -152,7 +154,7 @@ const PatientInfo: React.FC<ExtendedPatientInfoProps> = ({
       {/* Use DateTimePicker with controlled open state */}
       <div className="mt-2">
         {onUpdateDate ? (
-          <div className="flex items-center">
+          <div className="flex items-center border-gray-400 border-2 rounded-lg">
             <DateTimePicker
               key={`date-picker-${originalDateString}`} // Force re-render when date changes
               value={datePickerValue}
