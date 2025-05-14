@@ -11,7 +11,7 @@ export default function EncuentroDetailPage() {
 
   // We only need a minimal state at this level now
   const [transcriptionDocId, setTranscriptionDocId] = useState<number | null>(
-    null
+    null //
   );
 
   // Handler for when a transcription document is found
