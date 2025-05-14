@@ -21,50 +21,50 @@ GENERATION_CONFIG = {
 
 # Define a single, fixed prompt that instructs the model to summarize text
 SUMMARY_PROMPT = """
-Please summarize the following medical text professionally, maintaining the
-important clinical information and organizing it clearly:
+Por favor, resume el siguiente texto médico de manera profesional, manteniendo
+la información clínica importante y organizándola claramente:
 
 {text}
 
-Summary:
+Resumen:
 """
 
 TRANSLATE_PROMPT = """
-Please translate the following medical text from Spanish to English, preserving all
-relevant clinical terminology:
+Por favor, traduce el siguiente texto médico del español al inglés, conservando toda
+la terminología clínica relevante:
 
 {text}
 
-English translation:
+Traducción al inglés:
 """
 
 DOCUMENT_GENERATION_PROMPT = """
-Your task is to generate a medical document based on the following components:
+Tu tarea es generar un documento médico basado en los siguientes componentes:
 
-1. TEMPLATE: 
+1. PLANTILLA:
 {template}
 
-2. DOCTOR CONTEXT:
+2. CONTEXTO DEL MÉDICO:
 {context}
 
-3. CONVERSATION TRANSCRIPT:
+3. TRANSCRIPCIÓN DE LA CONVERSACIÓN:
 {transcription}
 
-Instructions:
-- Use the structure provided in the TEMPLATE.
-- Complete each section with relevant information from the CONTEXT and TRANSCRIPT.
-- Maintain a professional and medical tone throughout.
-- Skip any sections in the template if information cannot be found in the context or transcript.
-- Do not write placeholders like "Information not available" - simply omit those sections.
-- Ensure the final document is coherent and follows medical conventions.
-- Include dates, times, and any specific data mentioned in the transcript.
-- Do not invent information that is not present in the provided data.
+Instrucciones:
+- Utiliza la estructura proporcionada en la PLANTILLA.
+- Completa cada sección con información relevante del CONTEXTO y la TRANSCRIPCIÓN.
+- Mantén un tono profesional y médico en todo momento.
+- Omite cualquier sección de la plantilla si no se puede encontrar información en el contexto o la transcripción.
+- No escribas marcadores de posición como "Información no disponible"; simplemente omite esas secciones.
+- Asegúrate de que el documento final sea coherente y siga las convenciones médicas.
+- Incluye fechas, horas y cualquier dato específico mencionado en la transcripción.
+- No inventes información que no esté presente en los datos proporcionados.
 
-Generate the document based on the template, excluding any sections where information is unavailable:
+Genera el documento basándote en la plantilla, excluyendo cualquier sección donde la información no esté disponible:
 """
 
 TRANSCRIPTION_PROMPT = """
-You are a professional medical transcriber. Please transcribe the following audio accurately, focusing on medical terminology and maintaining clarity.
+Eres un transcriptor médico profesional. Por favor, transcribe el siguiente audio con precisión, centrándote en la terminología médica y manteniendo la claridad.
 """
 
 # Define Django API connection defaults (will be overridden by environment variables)
