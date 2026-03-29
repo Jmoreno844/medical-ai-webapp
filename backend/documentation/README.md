@@ -14,6 +14,9 @@ las **instrucciones orientadas al asistente de IA** están en [`ai-instructions/
 | [`database.md`](database.md) | ERD, tablas reales con campos/tipos/restricciones, índices, migraciones, convenciones de naming. | Backend, DBA, revisiones de modelo. |
 | [`backend.md`](backend.md) | Normas de calidad, arquitectura objetivo, seguridad, HIPAA, testing, rendimiento. Checklist normativo. | Code review, onboarding, asistentes de IA. |
 | [`jwt_and_auth_contracts.md`](jwt_and_auth_contracts.md) | Contratos de JWT (sesión, usuario, callbacks CF, SSE) y variables relacionadas. | Backend e integración con Cloud Functions. |
+| [`secrets_and_environments.md`](secrets_and_environments.md) | Política de secretos por entorno (`DJANGO_SECRET_KEY`, `JWT_SECRET_KEY`, GCP) y módulos de settings explícitos. | Despliegue, seguridad, onboarding. |
+| [`docker.md`](docker.md) | Rol de `Dockerfile`, `Dockerfile.test`, Compose y scripts bajo `scripts/docker/`. | Dev local y CI. |
+| [`english_rename_map.md`](english_rename_map.md) | Tablas de correspondencia español/mixto → identificadores técnicos en inglés (apps, modelos, rutas, JWT). Texto explicativo en español. | Refactors y revisiones de contrato. |
 
 ---
 

@@ -1,16 +1,41 @@
 """
 Production settings for the medical web application.
+
+Set ``DJANGO_SECRET_KEY``, ``JWT_SECRET_KEY``, database ``DB_*``, GCS and Cloud
+Function URLs via environment or your platform’s secret injection (see
+``documentation/secrets_and_environments.md``).
 """
 
 import os
 from .base import *  # noqa: F403, F401
 
+ENVIRONMENT = "production"
+
 # Security settings
 DEBUG = False
 ALLOWED_HOSTS = ["*"]  # Update with your domain in production
 
-# Get the secret key from environment variable
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError("DJANGO_SECRET_KEY must be set in production")
+
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
+if not JWT_SECRET_KEY:
+    raise ValueError("JWT_SECRET_KEY must be set in production")
+
+GCS_BUCKET_NAME = os.environ.get("GCS_BUCKET_NAME", "")
+GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH = os.environ.get(
+    "GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH", ""
+)
+SERVICE_ACCOUNT_JSON = os.environ.get("SERVICE_ACCOUNT_JSON", "{}")
+
+TRANSCRIPTION_CLOUD_FUNCTION_URL = os.environ.get(
+    "TRANSCRIPTION_CLOUD_FUNCTION_URL", ""
+)
+GENERATE_DOCUMENT_CLOUD_FUNCTION_URL = os.environ.get(
+    "GENERATE_DOCUMENT_CLOUD_FUNCTION_URL",
+    os.environ.get("GENERATE_DOCUMENT_CLOUD_FUNCTION_BASE_URL", ""),
+)
 
 # Database settings
 DATABASES = {

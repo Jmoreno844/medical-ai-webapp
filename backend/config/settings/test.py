@@ -260,8 +260,12 @@ INSTALLED_APPS += ["django.contrib.staticfiles.testing"]  # noqa: F405
 # Add silk for profiling/debugging in tests if not already added
 if "silk" not in INSTALLED_APPS:  # noqa: F405
     INSTALLED_APPS += ["silk"]  # noqa: F405
-    cors_index = MIDDLEWARE.index("apps.core.middleware.DebugCorsMiddleware")  # noqa: F405
-    MIDDLEWARE.insert(cors_index + 2, "silk.middleware.SilkyMiddleware")  # noqa: F405
+    try:
+        anchor = "corsheaders.middleware.CorsMiddleware"
+        idx = MIDDLEWARE.index(anchor)  # noqa: F405
+        MIDDLEWARE.insert(idx + 1, "silk.middleware.SilkyMiddleware")  # noqa: F405
+    except ValueError:
+        MIDDLEWARE.append("silk.middleware.SilkyMiddleware")  # noqa: F405
     # Settings for silk in test environment
     SILKY_PYTHON_PROFILER = True
     SILKY_INTERCEPT_PERCENT = 100  # Intercept all requests in test environment

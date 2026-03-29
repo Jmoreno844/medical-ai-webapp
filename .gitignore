@@ -1,4 +1,5 @@
 backend/.venv
+backend/db.sqlite3
 django_ninja_project/.venv
 .env
 .env.local

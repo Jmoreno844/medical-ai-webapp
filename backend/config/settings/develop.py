@@ -11,8 +11,10 @@ load_dotenv()
 
 ENVIRONMENT = "dev"
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY", "django-insecure-development-key-change-this"
+SECRET_KEY = (
+    os.environ.get("DJANGO_SECRET_KEY")
+    or os.environ.get("SECRET_KEY")
+    or "django-insecure-development-key-change-this"
 )
 JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "not-loaded")
 
