@@ -10,6 +10,7 @@ import axiosInstance from "@/commons/utils/axiosInstance";
 import { useVoiceRecorder } from "../features/encuentroHeader/hooks/audio/useVoiceRecorder";
 import { useContentContext } from "./ContentContext"; // Add ContentContext import
 import { useEncuentroContext } from "./EncuentroContext"; // Add EncuentroContext import
+import { logger } from "@/lib/logger";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -80,7 +81,7 @@ export function TranscriptionProvider({
   try {
     contentContext.current = useContentContext();
   } catch (error) {
-    console.warn("[TRANSCRIPTION] ContentContext not yet available");
+    logger.warn("[TRANSCRIPTION] ContentContext not yet available");
   }
 
   // Track transcription document
@@ -96,14 +97,14 @@ export function TranscriptionProvider({
 
   // Move the initial log into a useEffect with empty dependency array to run only once on mount
   useEffect(() => {
-    console.log(
+    logger.debug(
       `[TRANSCRIPTION][INIT] hasBeenTranscribed initial value: ${hasBeenTranscribed}`
     );
   }, []);
 
   // Wrap setState to add logging
   const loggedSetHasBeenTranscribed = (value: boolean) => {
-    console.log(
+    logger.debug(
       `[TRANSCRIPTION][SET] Setting hasBeenTranscribed from ${hasBeenTranscribed} to ${value}, source: explicit call`
     );
     setHasBeenTranscribed(value);
@@ -130,14 +131,14 @@ export function TranscriptionProvider({
   // Enhanced handleTranscriptionComplete function
   const handleTranscriptionComplete = useCallback(() => {
     setTranscriptionCompleteTimestamp(Date.now());
-    console.log(
+    logger.debug(
       `[TRANSCRIPTION][COMPLETE] Setting hasBeenTranscribed from ${hasBeenTranscribed} to true, source: transcriptionComplete`
     );
     setHasBeenTranscribed(true);
 
     // Update the encuentro context and backend
     updateEncuentro({ has_been_transcribed: true }).catch((error) =>
-      console.error(
+      logger.error(
         "[TRANSCRIPTION] Error updating has_been_transcribed:",
         error
       )
@@ -145,13 +146,13 @@ export function TranscriptionProvider({
 
     // If transcription document exists
     if (transcriptionDocId) {
-      console.log(
+      logger.debug(
         `[TRANSCRIPTION] Transcription completed for document ${transcriptionDocId}`
       );
 
       // Clear the cache so we can get fresh content
       if (window.documentContentCache) {
-        console.log(
+        logger.debug(
           `[TRANSCRIPTION] Clearing cache for document ${transcriptionDocId}`
         );
         window.documentContentCache.delete(transcriptionDocId);
@@ -162,7 +163,7 @@ export function TranscriptionProvider({
         contentContext.current
           .fetchDocumentContent(transcriptionDocId, true)
           .then(() => {
-            console.log(
+            logger.debug(
               `[TRANSCRIPTION] Fetched fresh content for document ${transcriptionDocId}`
             );
 
@@ -170,7 +171,7 @@ export function TranscriptionProvider({
             contentContext.current?.triggerEditorRefresh();
           })
           .catch((error) => {
-            console.error(
+            logger.error(
               `[TRANSCRIPTION] Error fetching updated content:`,
               error
             );
@@ -197,7 +198,7 @@ export function TranscriptionProvider({
     // Prevent sync if the recorder is still checking audio for the potentially new encounter
     // or if the context's transcriptionDocId hasn't settled yet.
     if (voiceRecorder.isCheckingAudio) {
-      console.log(
+      logger.debug(
         `[TRANSCRIPTION][SYNC] Skipping sync: recorder is checking audio.`
       );
       return;
@@ -205,7 +206,7 @@ export function TranscriptionProvider({
 
     // It's also possible the transcriptionDocId passed to the hook hasn't updated yet,
     // though the reset effect *should* handle this. Add logging for clarity.
-    console.log(
+    logger.debug(
       `[TRANSCRIPTION][SYNC_CHECK] Recorder HBT: ${voiceRecorder.hasBeenTranscribed}, Context HBT: ${hasBeenTranscribed}, Context docId: ${transcriptionDocId}, Recorder Checking: ${voiceRecorder.isCheckingAudio}`
     );
 
@@ -217,12 +218,12 @@ export function TranscriptionProvider({
       hasBeenTranscribed === false &&
       !voiceRecorder.isCheckingAudio // Double check recorder is not checking
     ) {
-      console.log(
+      logger.debug(
         `[TRANSCRIPTION][SYNC_APPLY] Setting hasBeenTranscribed from false to true. Source: recorder sync (initial audio check likely)`
       );
       setHasBeenTranscribed(true);
     } else {
-      console.log(`[TRANSCRIPTION][SYNC] No sync action needed.`);
+      logger.debug(`[TRANSCRIPTION][SYNC] No sync action needed.`);
     }
 
     // DO NOT sync false from the recorder to the context, as other sources (SSE, stopRecording) manage that.
@@ -256,7 +257,7 @@ export function TranscriptionProvider({
 
   // Function to get a secure SSE token
   const getSSEToken = async (id_documento: number): Promise<string | null> => {
-    console.log(
+    logger.debug(
       `[USE_TRANSCRIPTION] Requesting SSE token for document ${id_documento}`
     );
     try {
@@ -264,19 +265,19 @@ export function TranscriptionProvider({
         `/api/generate-sse-token/${id_documento}`
       );
       if (response.data.success && response.data.token) {
-        console.log(
+        logger.debug(
           `[USE_TRANSCRIPTION] Received SSE token for document ${id_documento}`
         );
         return response.data.token;
       } else {
-        console.error(
+        logger.error(
           "[USE_TRANSCRIPTION] Failed to get SSE token:",
           response.data.error
         );
         return null;
       }
     } catch (error) {
-      console.error("[USE_TRANSCRIPTION] Error getting SSE token:", error);
+      logger.error("[USE_TRANSCRIPTION] Error getting SSE token:", error);
       return null;
     }
   };
@@ -285,12 +286,12 @@ export function TranscriptionProvider({
   const subscribeToTranscriptionUpdates = async (
     id_documento: number
   ): Promise<boolean> => {
-    console.log(
+    logger.debug(
       `[USE_TRANSCRIPTION] Subscribing to transcription updates for document ${id_documento}`
     );
     // First close any existing connections
     if (eventSourceRef.current) {
-      console.log("[USE_TRANSCRIPTION] Closing existing SSE connection");
+      logger.debug("[USE_TRANSCRIPTION] Closing existing SSE connection");
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
@@ -299,14 +300,16 @@ export function TranscriptionProvider({
       // Get secure token for SSE connection
       const token = await getSSEToken(id_documento);
       if (!token) {
-        setErrorMessage("Failed to authenticate for real-time updates");
+        setErrorMessage(
+          "No se pudo autenticar para las actualizaciones en tiempo real"
+        );
         return false;
       }
 
       // Create full URL to the SSE endpoint with secure token using API URL from env
       const apiBaseUrl = API_URL.endsWith("/") ? API_URL.slice(0, -1) : API_URL;
-      const sseUrl = `${apiBaseUrl}/api/sse/documento/${id_documento}/${token}`;
-      console.log(`[USE_TRANSCRIPTION] Connecting to SSE endpoint: ${sseUrl}`);
+      const sseUrl = `${apiBaseUrl}/api/sse/document/${id_documento}/${token}`;
+      logger.debug(`[USE_TRANSCRIPTION] Connecting to SSE endpoint: ${sseUrl}`);
 
       // Create a new EventSource connection
       const eventSource = new EventSource(sseUrl);
@@ -314,31 +317,31 @@ export function TranscriptionProvider({
 
       // Connection opened
       eventSource.onopen = () => {
-        console.log(
+        logger.debug(
           `[USE_TRANSCRIPTION] SSE connection established for document ${id_documento}`
         );
       };
 
       // Message received - enhanced with content updates
       eventSource.onmessage = (event) => {
-        console.log("[USE_TRANSCRIPTION] SSE message received", event.data);
+        logger.debug("[USE_TRANSCRIPTION] SSE message received", event.data);
         try {
           const data = JSON.parse(event.data);
-          console.log("[USE_TRANSCRIPTION] Parsed SSE data:", data);
+          logger.debug("[USE_TRANSCRIPTION] Parsed SSE data:", data);
 
           if (data.event === "transcription_complete") {
-            console.log(
+            logger.debug(
               `[USE_TRANSCRIPTION] Transcription completed for document ${id_documento}`
             );
             setTranscriptionStatus("success");
 
-            console.log(
+            logger.debug(
               `[TRANSCRIPTION][SSE] Setting hasBeenTranscribed from ${hasBeenTranscribed} to true, source: SSE transcription_complete`
             );
             setHasBeenTranscribed(true);
 
             // Call the callback when transcription completes
-            console.log(
+            logger.debug(
               "[USE_TRANSCRIPTION] Calling onTranscriptionComplete callback"
             );
             handleTranscriptionComplete();
@@ -350,7 +353,7 @@ export function TranscriptionProvider({
 
           // If we receive content updates during transcription
           if (data.event === "transcription_update" && data.content) {
-            console.log(
+            logger.debug(
               `[USE_TRANSCRIPTION] Received content update for document ${id_documento}`
             );
 
@@ -369,7 +372,7 @@ export function TranscriptionProvider({
             }
           }
         } catch (error) {
-          console.error(
+          logger.error(
             "[USE_TRANSCRIPTION] Error parsing SSE message:",
             error
           );
@@ -378,8 +381,8 @@ export function TranscriptionProvider({
 
       // Error handling
       eventSource.onerror = (error) => {
-        console.error("[USE_TRANSCRIPTION] SSE connection error:", error);
-        setErrorMessage("Error in real-time updates connection");
+        logger.error("[USE_TRANSCRIPTION] SSE connection error:", error);
+        setErrorMessage("Error en la conexión de actualizaciones en tiempo real");
 
         // Close the connection on error
         eventSource.close();
@@ -388,11 +391,11 @@ export function TranscriptionProvider({
 
       return true;
     } catch (error) {
-      console.error(
+      logger.error(
         "[USE_TRANSCRIPTION] Error creating SSE connection:",
         error
       );
-      setErrorMessage("Failed to establish real-time updates");
+      setErrorMessage("No se pudieron establecer las actualizaciones en tiempo real");
       return false;
     }
   };
@@ -402,7 +405,9 @@ export function TranscriptionProvider({
     id_encuentro: number
   ) => {
     if (!id_documento_transcripcion || !id_encuentro) {
-      setErrorMessage("Missing transcription document ID or encounter ID");
+      setErrorMessage(
+        "Falta el ID del documento de transcripción o del encuentro"
+      );
       setTranscriptionStatus("error");
       return;
     }
@@ -418,21 +423,21 @@ export function TranscriptionProvider({
 
       // Make API call to the simplified transcription endpoint
       const response = await axiosInstance.post(
-        `api/iniciar_transcripcion`,
+        `/api/transcription/start`,
         {
-          id_documento: id_documento_transcripcion,
-          id_encuentro: id_encuentro,
+          document_id: id_documento_transcripcion,
+          encounter_id: id_encuentro,
         },
-        { timeout: 60000 } // 60 seconds timeout for long transcription
+        { timeout: 60000 }
       );
 
       // Note: We don't immediately set success here anymore
       // The status will be updated via SSE when transcription completes
-      console.log("Transcription initiated:", response.data);
+      logger.debug("Transcription initiated:", response.data);
 
       return response.data;
     } catch (error: any) {
-      console.error("Transcription error:", error);
+      logger.error("Transcription error:", error);
       setTranscriptionStatus("error");
       setErrorMessage(
         error.response?.data?.message ||
@@ -462,7 +467,7 @@ export function TranscriptionProvider({
   const checkTranscriptionContent = useCallback(async (): Promise<boolean> => {
     if (!transcriptionDocId) return false;
 
-    console.log(
+    logger.debug(
       `[TRANSCRIPTION] Checking content for document ${transcriptionDocId}`
     );
 
@@ -470,7 +475,7 @@ export function TranscriptionProvider({
     if (window.documentContentCache?.has(transcriptionDocId)) {
       const content = window.documentContentCache.get(transcriptionDocId);
       const hasContent = !!content && content.trim().length > 0;
-      console.log(
+      logger.debug(
         `[TRANSCRIPTION] Content found in cache: ${
           hasContent ? "Not empty" : "Empty"
         }`
@@ -478,25 +483,25 @@ export function TranscriptionProvider({
       return hasContent;
     }
 
-    console.log(`[TRANSCRIPTION] Content not in cache, fetching from server`);
+    logger.debug(`[TRANSCRIPTION] Content not in cache, fetching from server`);
 
     // If ContentContext is available, try using it
     if (contentContext.current) {
       try {
-        console.log(`[TRANSCRIPTION] Using ContentContext to fetch content`);
+        logger.debug(`[TRANSCRIPTION] Using ContentContext to fetch content`);
         const content = await contentContext.current.fetchDocumentContent(
           transcriptionDocId,
           true
         );
         const hasContent = !!content && content.trim().length > 0;
-        console.log(
+        logger.debug(
           `[TRANSCRIPTION] Content fetched via context: ${
             hasContent ? "Not empty" : "Empty"
           }`
         );
         return hasContent;
       } catch (error) {
-        console.error(
+        logger.error(
           `[TRANSCRIPTION] Error fetching via ContentContext:`,
           error
         );
@@ -505,15 +510,15 @@ export function TranscriptionProvider({
 
     // Fallback to direct API call
     try {
-      console.log(`[TRANSCRIPTION] Fallback: Direct API call`);
+      logger.debug(`[TRANSCRIPTION] Fallback: Direct API call`);
       const response = await axiosInstance.get(
-        `/api/documento/${transcriptionDocId}`
+        `/api/documents/${transcriptionDocId}`
       );
-      const content = response.data?.contenido || "";
+      const content = response.data?.content || "";
 
       // Save to cache
       if (content) {
-        console.log(`[TRANSCRIPTION] Saving fetched content to cache`);
+        logger.debug(`[TRANSCRIPTION] Saving fetched content to cache`);
 
         // Update window cache for compatibility
         if (window.documentContentCache) {
@@ -530,14 +535,14 @@ export function TranscriptionProvider({
       }
 
       const hasContent = !!content && content.trim().length > 0;
-      console.log(
+      logger.debug(
         `[TRANSCRIPTION] Content from API: ${
           hasContent ? "Not empty" : "Empty"
         }`
       );
       return hasContent;
     } catch (error) {
-      console.error(`[TRANSCRIPTION] Error in direct API fetch:`, error);
+      logger.error(`[TRANSCRIPTION] Error in direct API fetch:`, error);
       return false;
     }
   }, [transcriptionDocId]);
@@ -551,15 +556,15 @@ export function TranscriptionProvider({
   // Wrap stopRecording to handle EncuentroContext updates
   const stopRecording = useCallback(() => {
     voiceRecorder.stopRecording();
-    console.log("SETTING HAS_BEEN_TRANSCRIBED TO FALSE");
+    logger.debug("SETTING HAS_BEEN_TRANSCRIBED TO FALSE");
     // Now set has_been_transcribed to false once new audio finishes uploading
     updateEncuentro({ has_been_transcribed: false }).catch((error) =>
-      console.error(
+      logger.error(
         "[TRANSCRIPTION] Error updating has_been_transcribed:",
         error
       )
     );
-    console.log(
+    logger.debug(
       `[TRANSCRIPTION][STOP] Setting hasBeenTranscribed from ${hasBeenTranscribed} to false, source: stopRecording`
     );
     setHasBeenTranscribed(false);
@@ -575,7 +580,7 @@ export function TranscriptionProvider({
 
   // Effect to Reset Context State on encounterId Change - KEEP THIS
   useEffect(() => {
-    console.log(
+    logger.debug(
       `[TRANSCRIPTION_CTX] Provider Effect for encounterId: ${encounterId}. Initial mount: ${isInitialMount.current}`
     );
 
@@ -584,7 +589,7 @@ export function TranscriptionProvider({
       return;
     }
 
-    console.log(
+    logger.debug(
       `[TRANSCRIPTION_CTX] Resetting context state for new encounter ${encounterId}.`
     );
 
@@ -636,11 +641,11 @@ export function TranscriptionProvider({
   };
 
   useEffect(() => {
-    console.log(
+    logger.debug(
       `[TRANSCRIPTION][EFFECT] hasBeenTranscribed changed to: ${hasBeenTranscribed}`
     );
     return () => {
-      console.log(
+      logger.debug(
         `[TRANSCRIPTION][CLEANUP] Last value of hasBeenTranscribed before cleanup: ${hasBeenTranscribed}`
       );
     };
@@ -652,7 +657,7 @@ export function TranscriptionProvider({
     if (encuentro && encuentro.has_been_transcribed !== undefined) {
       // Only update if the value is different to avoid loops
       if (!!encuentro.has_been_transcribed !== hasBeenTranscribed) {
-        console.log(
+        logger.debug(
           `[TRANSCRIPTION][INIT] Setting hasBeenTranscribed from ${hasBeenTranscribed} to ${!!encuentro.has_been_transcribed}, source: encuentro data`
         );
         setHasBeenTranscribed(!!encuentro.has_been_transcribed);
@@ -662,18 +667,18 @@ export function TranscriptionProvider({
 
   // --- Effect to Reset State on encounterId Change ---
   useEffect(() => {
-    console.log(
+    logger.debug(
       `[TRANSCRIPTION][EFFECT_ENCOUNTER] Encounter ID changed to: ${encounterId}. Initial mount: ${isInitialMount.current}`
     );
 
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      console.log(
+      logger.debug(
         `[TRANSCRIPTION][EFFECT_ENCOUNTER] Initial mount for ${encounterId}. Skipping reset.`
       );
       // Ensure initial doc ID is set if provided
       if (initialTranscriptionDocId !== transcriptionDocId) {
-        console.log(
+        logger.debug(
           `[TRANSCRIPTION][EFFECT_ENCOUNTER] Setting initial doc ID: ${initialTranscriptionDocId}`
         );
         setTranscriptionDocId(initialTranscriptionDocId);
@@ -682,13 +687,13 @@ export function TranscriptionProvider({
     }
 
     // Reset logic for subsequent encounter changes
-    console.log(
+    logger.debug(
       `[TRANSCRIPTION][EFFECT_ENCOUNTER] Resetting state due to encounter change to ${encounterId}.`
     );
 
     // 1. Close existing SSE connection
     if (eventSourceRef.current) {
-      console.log("[TRANSCRIPTION][RESET] Closing existing SSE connection.");
+      logger.debug("[TRANSCRIPTION][RESET] Closing existing SSE connection.");
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
@@ -701,19 +706,19 @@ export function TranscriptionProvider({
 
     // 3. Reset transcriptionDocId based on new initial prop from AppProviders
     const newDocId = initialTranscriptionDocId ?? null;
-    console.log(
+    logger.debug(
       `[TRANSCRIPTION][RESET] Setting transcriptionDocId to: ${newDocId}`
     );
     setTranscriptionDocId(newDocId);
 
     // 4. Reset hasBeenTranscribed (the effect syncing with `encuentro` should handle the final value)
-    console.log(
+    logger.debug(
       `[TRANSCRIPTION][RESET] Setting hasBeenTranscribed to false temporarily.`
     );
     setHasBeenTranscribed(false); // Reset to false, let the encuentro sync correct it
 
     // 5. Reset voice recorder state implicitly via dependency change
-    console.log(
+    logger.debug(
       `[TRANSCRIPTION][RESET] Relying on useVoiceRecorder hook internal effects to reset based on new transcriptionDocId: ${newDocId}`
     );
   }, [encounterId, initialTranscriptionDocId]);

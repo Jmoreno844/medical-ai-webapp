@@ -5,6 +5,7 @@ Development settings for the medical web application.
 import os
 import warnings
 from .base import *  # noqa: F403, F401
+from .logging_utils import build_console_logging
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -194,3 +195,5 @@ LOGGING = {
 }
 
 """
+
+LOGGING = build_console_logging("DEBUG")

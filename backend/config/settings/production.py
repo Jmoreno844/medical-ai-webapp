@@ -8,6 +8,7 @@ Function URLs via environment or your platform’s secret injection (see
 
 import os
 from .base import *  # noqa: F403, F401
+from .logging_utils import build_console_logging
 
 ENVIRONMENT = "production"
 
@@ -80,3 +81,5 @@ EMAIL_HOST_USER = os.environ.get("EMAIL_USER")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_PASSWORD")
 EMAIL_USE_TLS = True
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL")
+
+LOGGING = build_console_logging("INFO")

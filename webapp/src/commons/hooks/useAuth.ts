@@ -2,6 +2,7 @@ import { useState, useContext } from "react";
 import axiosInstance from "../utils/axiosInstance";
 import { AuthContext } from "../contexts/AuthContext";
 
+import { logger } from "@/lib/logger";
 interface SignupCredentials {
   email: string;
   password: string;
@@ -13,9 +14,9 @@ interface SignupCredentials {
 const logAuth = (type: "info" | "error", message: string, data?: any) => {
   const prefix = "[useAuth]";
   if (type === "info") {
-    console.log(`${prefix} ${message}`, data || "");
+    logger.debug(`${prefix} ${message}`, data || "");
   } else {
-    console.error(`${prefix} ${message}`, data || "");
+    logger.error(`${prefix} ${message}`, data || "");
   }
 };
 
@@ -35,9 +36,9 @@ export const useAuth = () => {
     setError(null);
     try {
       logAuth("info", "Delegating login to AuthContext");
-      console.log("📱 USEAUTH: About to call contextLogin with email:", email);
+      logger.debug("📱 USEAUTH: About to call contextLogin with email:", email);
       await contextLogin(email, password);
-      console.log("📱 USEAUTH: contextLogin call completed");
+      logger.debug("📱 USEAUTH: contextLogin call completed");
       logAuth("info", "Login completed successfully");
       return { success: true };
     } catch (err: any) {
@@ -104,10 +105,10 @@ export const useAuth = () => {
     setError(null);
     try {
       logAuth("info", "Attempting signup");
-      const response = await axiosInstance.post("api/auth/registro", {
+      const response = await axiosInstance.post("/api/auth/register", {
         email,
         name,
-        lastName,
+        last_name: lastName,
         password,
       });
       logAuth("info", "Signup successful");

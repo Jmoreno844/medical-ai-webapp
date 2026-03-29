@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { Encuentro } from "@/types/encuentroList";
+import { logger } from "@/lib/logger";
 
 export const useEncuentroList = () => {
   const [encuentros, setEncuentros] = useState<Encuentro[]>([]);
@@ -12,10 +13,10 @@ export const useEncuentroList = () => {
     setError(null);
 
     try {
-      const response = await axiosInstance.get("/api/encuentros");
+      const response = await axiosInstance.get("/api/encounters");
       setEncuentros(response.data);
     } catch (err) {
-      console.error("Error fetching encuentros:", err);
+      logger.error("Error fetching encuentros:", err);
       setError("Error al cargar los encuentros");
     } finally {
       setLoading(false);

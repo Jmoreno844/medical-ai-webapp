@@ -3,6 +3,7 @@ import { UseVoiceRecorderReturn } from "./types";
 import { getBestSupportedAudioType } from "./utils";
 import { uploadAudioToCloud, generateAudioUploadUrl } from "./uploadService";
 import axiosInstance from "@/commons/utils/axiosInstance";
+import { logger } from "@/lib/logger";
 /**
  * Checks if audio exists for an encounter
  *
@@ -12,7 +13,7 @@ import axiosInstance from "@/commons/utils/axiosInstance";
 const checkAudioExists = async (encounterId: number) => {
   try {
     const response = await axiosInstance.get(
-      `/api/encuentros/audio_exists/${encounterId}`
+      `/api/encounters/${encounterId}/audio/exists`
     );
 
     // With axiosInstance, the data is already parsed as JSON
@@ -25,7 +26,7 @@ const checkAudioExists = async (encounterId: number) => {
         typeof data === "object" && data.has_been_transcribed === true,
     };
   } catch (error) {
-    console.error("[VOICE_RECORDER] Error checking audio existence:", error);
+    logger.error("[VOICE_RECORDER] Error checking audio existence:", error);
     return { exists: false, duration: 0, has_been_transcribed: false };
   }
 };
@@ -68,7 +69,7 @@ export const useVoiceRecorder = (
   // Effect to check audio and reset state when encounterId changes
   useEffect(() => {
     // --- State Reset ---
-    console.log(
+    logger.debug(
       `[VOICE_RECORDER] Effect running for encounterId: ${encounterId}. Resetting state.`
     );
     setIsRecording(false);
@@ -86,7 +87,7 @@ export const useVoiceRecorder = (
       try {
         mediaRecorderRef.current?.stop();
       } catch (e) {
-        console.warn("Error stopping previous recorder:", e);
+        logger.warn("Error stopping previous recorder:", e);
       }
     }
     mediaRecorderRef.current = null;
@@ -94,7 +95,7 @@ export const useVoiceRecorder = (
     const checkExistingAudio = async () => {
       if (encounterId > 0) {
         setIsCheckingAudio(true);
-        console.log(
+        logger.debug(
           `[VOICE_RECORDER] Checking audio for encounter ${encounterId}`
         );
         try {
@@ -104,7 +105,7 @@ export const useVoiceRecorder = (
             has_been_transcribed,
           } = await checkAudioExists(encounterId);
 
-          console.log(
+          logger.debug(
             `[VOICE_RECORDER] Audio check result for ${encounterId}:`,
             { exists, existingDuration, has_been_transcribed }
           );
@@ -113,7 +114,7 @@ export const useVoiceRecorder = (
           setDuration(exists ? existingDuration : 0);
           setHasBeenTranscribed(exists ? has_been_transcribed : false);
         } catch (error) {
-          console.error(
+          logger.error(
             `[VOICE_RECORDER] Error checking audio for ${encounterId}:`,
             error
           );
@@ -122,12 +123,12 @@ export const useVoiceRecorder = (
           setHasBeenTranscribed(false);
         } finally {
           setIsCheckingAudio(false);
-          console.log(
+          logger.debug(
             `[VOICE_RECORDER] Finished checking audio for ${encounterId}`
           );
         }
       } else {
-        console.log(
+        logger.debug(
           `[VOICE_RECORDER] Invalid encounterId (${encounterId}), skipping check.`
         );
         setAudioExists(false);
@@ -140,7 +141,7 @@ export const useVoiceRecorder = (
     checkExistingAudio();
 
     return () => {
-      console.log(
+      logger.debug(
         `[VOICE_RECORDER] Cleanup effect for encounter ${encounterId}`
       );
       if (timerRef.current) clearInterval(timerRef.current);
@@ -197,7 +198,7 @@ export const useVoiceRecorder = (
 
         // Log file size information
         const fileSizeKB = audioBlob.size / 1024;
-        console.log(
+        logger.debug(
           `[VOICE_RECORDER] Recording complete: ${fileSizeKB.toFixed(
             2
           )} KB, ${duration} seconds`
@@ -220,7 +221,7 @@ export const useVoiceRecorder = (
         setDuration((prev) => prev + 1);
       }, 1000);
     } catch (error) {
-      console.error("Error starting recording:", error);
+      logger.error("Error starting recording:", error);
       setIsRecording(false);
     }
   };
@@ -251,7 +252,7 @@ export const useVoiceRecorder = (
         setIsPaused(true);
       }
     } catch (error) {
-      console.error("Error pausing/resuming recording:", error);
+      logger.error("Error pausing/resuming recording:", error);
     }
   };
 
@@ -267,7 +268,7 @@ export const useVoiceRecorder = (
         try {
           mediaRecorderRef.current.resume();
         } catch (error) {
-          console.error("Error resuming recording before stop:", error);
+          logger.error("Error resuming recording before stop:", error);
         }
       }
 
@@ -281,7 +282,7 @@ export const useVoiceRecorder = (
           if (transcriptionDocIdRef.current) {
             try {
               if (!encounterId || encounterId <= 0) {
-                console.error(
+                logger.error(
                   "[VOICE_RECORDER] Invalid encounterId in stopRecording:",
                   encounterId
                 );
@@ -293,7 +294,7 @@ export const useVoiceRecorder = (
               );
 
               if (!uploadUrl) {
-                console.error("[VOICE_RECORDER] Failed to get upload URL");
+                logger.error("[VOICE_RECORDER] Failed to get upload URL");
                 return;
               }
 
@@ -314,29 +315,29 @@ export const useVoiceRecorder = (
                 );
 
                 if (!uploadSuccess) {
-                  console.error(
+                  logger.error(
                     "[VOICE_RECORDER] Failed to upload audio recording"
                   );
                 }
               } else {
-                console.error(
+                logger.error(
                   "[VOICE_RECORDER] No audio data available to upload"
                 );
               }
             } catch (error) {
-              console.error(
+              logger.error(
                 "[VOICE_RECORDER] Error during upload process:",
                 error
               );
             }
           } else {
-            console.log(
+            logger.debug(
               "[VOICE_RECORDER] No transcription document ID provided, skipping upload"
             );
           }
         }, 300); // Small delay to ensure onstop has executed
       } catch (error) {
-        console.error("Error stopping recording:", error);
+        logger.error("Error stopping recording:", error);
       }
 
       // Update states
@@ -364,7 +365,7 @@ export const useVoiceRecorder = (
       try {
         mediaRecorderRef.current?.stop();
       } catch (error) {
-        console.error("Error stopping recorder during deletion:", error);
+        logger.error("Error stopping recorder during deletion:", error);
       }
     }
 
@@ -372,24 +373,22 @@ export const useVoiceRecorder = (
     if (audioExists) {
       try {
         if (encounterId && encounterId > 0) {
-          console.log(
+          logger.debug(
             `[VOICE_RECORDER] Attempting to delete audio for encounter ${encounterId}`
           );
-          await axiosInstance.delete(
-            `/api/encuentros/delete_audio/${encounterId}`
-          );
-          console.log(
+          await axiosInstance.delete(`/api/encounters/${encounterId}/audio`);
+          logger.debug(
             "[VOICE_RECORDER] Server delete request sent for encounter",
             encounterId
           );
         } else {
-          console.warn(
+          logger.warn(
             "[VOICE_RECORDER] Invalid encounterId in deleteRecording:",
             encounterId
           );
         }
       } catch (error) {
-        console.error(
+        logger.error(
           "[VOICE_RECORDER] Error deleting audio from server:",
           error
         );

@@ -8,13 +8,13 @@ import { Link } from "react-router-dom";
 // Mock data for recent transcript s
 export default function HomePage() {
   const { userData } = useContext(AuthContext);
-  const lastNmae = userData?.lastName || "";
+  const lastName = userData?.last_name || "";
 
   // Initialize hooks to get the "Crear Encuentro" functionality
   const { showRightSidebar, toggleSidebar } = useEncountersSidebar();
   const navigationItems = useNavigationItems(toggleSidebar, showRightSidebar);
   const crearEncuentroItem = navigationItems.find(
-    (item) => item.label === "Crear Encuentro"
+    (item) => item.icon === "/plus.svg" && item.action
   );
 
   return (
@@ -25,14 +25,14 @@ export default function HomePage() {
         <section className="bg-white rounded-xl shadow-md p-8 relative">
           <div className="relative z-10">
             <h2 className="text-xl font-semibold text-gray-600">
-              Welcome back, Dr. {lastNmae}
+              Bienvenido/a, Dr./Dra. {lastName}
             </h2>
             <h1 className="text-3xl md:text-4xl font-bold text-[#007A7A] mt-2 mb-4">
-              Focus on Patients, Not Paperwork
+              Concéntrese en los pacientes, no en el papeleo
             </h1>
             <p className="text-lg text-gray-600 max-w-2xl mb-8">
-              Record or upload patient encounters, get accurate transcripts, and
-              generate clinical notes in minutes.
+              Registre o suba consultas, obtenga transcripciones precisas y genere
+              notas clínicas en minutos.
             </p>
             <button
               onClick={(e) => {
@@ -56,7 +56,7 @@ export default function HomePage() {
                   clipRule="evenodd"
                 />
               </svg>
-              Start New Session
+              Iniciar nueva consulta
             </button>
           </div>
         </section>
@@ -64,7 +64,7 @@ export default function HomePage() {
         {/* Section 2: How It Works */}
         <section className="bg-white rounded-xl shadow-md p-8">
           <h2 className="text-2xl font-bold text-center mb-10 text-gray-800">
-            How It Works
+            Cómo funciona
           </h2>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -87,11 +87,11 @@ export default function HomePage() {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold mb-2 text-gray-800">
-                Record or Upload
+                Grabar o subir audio
               </h3>
               <p className="text-gray-600">
-                Securely record audio directly within the app or upload an
-                existing audio file.
+                Grabe audio de forma segura desde la app o suba un archivo de audio
+                existente.
               </p>
             </div>
 
@@ -114,11 +114,11 @@ export default function HomePage() {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold mb-2 text-gray-800">
-                Transcribe & Review
+                Transcribir y revisar
               </h3>
               <p className="text-gray-600">
-                Our AI accurately transcribes the conversation. Review and edit
-                the text as needed.
+                La IA transcribe la conversación con precisión. Revise y edite el
+                texto cuando lo necesite.
               </p>
             </div>
 
@@ -141,11 +141,11 @@ export default function HomePage() {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold mb-2 text-gray-800">
-                Generate Documentation
+                Generar documentación
               </h3>
               <p className="text-gray-600">
-                Instantly generate SOAP notes, summaries, referral letters, or
-                custom document formats.
+                Genere al instante notas SOAP, resúmenes, interconsultas u otros
+                formatos con plantillas personalizadas.
               </p>
             </div>
           </div>
@@ -154,7 +154,7 @@ export default function HomePage() {
         {/* Section 4: Tips & Resources */}
         <section className="bg-white rounded-xl shadow-md p-8">
           <h2 className="text-2xl font-bold mb-6 text-gray-800">
-            Helpful Tips
+            Consejos útiles
           </h2>
 
           <div className="grid md:grid-cols-2 gap-6">
@@ -176,16 +176,16 @@ export default function HomePage() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-semibold text-lg mb-2">Custom Templates</h3>
+                <h3 className="font-semibold text-lg mb-2">Plantillas propias</h3>
                 <p className="text-gray-600">
-                  Did you know? You can create custom documentation templates
-                  with your desired structured to save even more time.
+                  Puede crear plantillas de documentación con la estructura que
+                  prefiera para ahorrar aún más tiempo.
                 </p>
                 <Link
                   to="/plantillas"
                   className="text-[#007A7A] font-medium inline-flex items-center mt-2 hover:underline"
                 >
-                  Go to Templates
+                  Ir a plantillas
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-4 w-4 ml-1"
@@ -220,16 +220,16 @@ export default function HomePage() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-semibold text-lg mb-2">Need Help?</h3>
+                <h3 className="font-semibold text-lg mb-2">¿Necesita ayuda?</h3>
                 <p className="text-gray-600">
-                  Improve accuracy: Ensure minimal background noise during
-                  recordings for better results.
+                  Para mayor precisión, reduzca el ruido de fondo durante las
+                  grabaciones.
                 </p>
                 <a
                   href="#"
                   className="text-[#007A7A] font-medium inline-flex items-center mt-2 hover:underline"
                 >
-                  Visit Help Center
+                  Centro de ayuda
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-4 w-4 ml-1"
@@ -264,8 +264,8 @@ export default function HomePage() {
               />
             </svg>
             <span>
-              Your data is secured with end-to-end encryption. Built with HIPAA
-              compliance standards in mind.
+              Sus datos se protegen con cifrado. Diseñado pensando en estándares
+              de cumplimiento clínico (p. ej. HIPAA).
             </span>
           </div>
           <div className="mt-2">
@@ -273,13 +273,13 @@ export default function HomePage() {
               href="#"
               className="text-sm text-gray-500 hover:text-gray-700 mx-2"
             >
-              Privacy Policy
+              Política de privacidad
             </a>
             <a
               href="#"
               className="text-sm text-gray-500 hover:text-gray-700 mx-2"
             >
-              Terms of Service
+              Términos del servicio
             </a>
           </div>
         </section>

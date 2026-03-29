@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 /**
  * Formats seconds to mm:ss time format
  *
@@ -28,7 +29,7 @@ export const getBestSupportedAudioType = (): string => {
         MediaRecorder.isTypeSupported(type)
     );
 
-    console.log(
+    logger.debug(
         `[VOICE_RECORDER] Using audio format: ${supportedType || "default"}`
     );
 

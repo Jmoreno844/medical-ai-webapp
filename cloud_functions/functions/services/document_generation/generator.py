@@ -44,8 +44,11 @@ def summarize_text(text: str, model_name: Optional[str] = None) -> Dict[str, Any
         # Use gemini client to generate content
         result = generate_content(prompt, model_name)
 
-        # Log the raw result in case of issues
-        logger.debug(f"Raw generate_content result: {result}")
+        logger.debug(
+            "generate_content finished: success=%s keys=%s",
+            result.get("success"),
+            list(result.keys()) if isinstance(result, dict) else type(result).__name__,
+        )
 
         # Rename the response field from "text" to "summary" if successful
         if result.get("success", False) and "text" in result:
@@ -62,8 +65,8 @@ def generate_content_streaming(
     content: str,
     generation_type: str = "summarize",
     custom_prompt: Optional[str] = None,
-    id_documento: Optional[int] = None,
-    id_proceso: Optional[str] = None,
+    document_id: Optional[int] = None,
+    process_id: Optional[str] = None,
     token_auth: Optional[str] = None,
     model_name: Optional[str] = None,
     chunk_size: int = 50,  # Characters per chunk
@@ -93,10 +96,10 @@ def generate_content_streaming(
             logger.warning(error_msg)
 
             # Send error notification if id_documento is provided
-            if id_documento and id_proceso and token_auth:
+            if document_id and process_id and token_auth:
                 send_generation_chunk(
-                    id_documento=id_documento,
-                    id_proceso=id_proceso,
+                    document_id=document_id,
+                    process_id=process_id,
                     chunk=None,
                     is_complete=False,
                     is_error=True,
@@ -133,10 +136,10 @@ def generate_content_streaming(
                 or (current_time - last_sent_time) >= max_delay
             ):
                 # Send chunk if notifications are enabled
-                if id_documento and id_proceso and token_auth:
+                if document_id and process_id and token_auth:
                     send_generation_chunk(
-                        id_documento=id_documento,
-                        id_proceso=id_proceso,
+                        document_id=document_id,
+                        process_id=process_id,
                         chunk=buffer,
                         is_complete=False,
                         is_error=False,
@@ -148,7 +151,7 @@ def generate_content_streaming(
                 last_sent_time = current_time
 
                 # Log progress
-                logger.debug(f"Sent chunk ({len(chunk)} chars) for job {id_proceso}")
+                logger.debug(f"Sent chunk ({len(chunk)} chars) for job {process_id}")
 
             return True  # Continue streaming
 
@@ -161,10 +164,10 @@ def generate_content_streaming(
             logger.error(f"Streaming generation failed: {error_msg}")
 
             # Send error notification
-            if id_documento and id_proceso and token_auth:
+            if document_id and process_id and token_auth:
                 send_generation_chunk(
-                    id_documento=id_documento,
-                    id_proceso=id_proceso,
+                    document_id=document_id,
+                    process_id=process_id,
                     chunk=None,
                     is_complete=False,
                     is_error=True,
@@ -175,10 +178,10 @@ def generate_content_streaming(
             return result
 
         # Send any remaining buffered content
-        if buffer and id_documento and id_proceso and token_auth:
+        if buffer and document_id and process_id and token_auth:
             send_generation_chunk(
-                id_documento=id_documento,
-                id_proceso=id_proceso,
+                document_id=document_id,
+                process_id=process_id,
                 chunk=buffer,
                 is_complete=False,
                 is_error=False,
@@ -186,10 +189,10 @@ def generate_content_streaming(
             )
 
         # Send final completion notification with full text
-        if id_documento and id_proceso and token_auth:
+        if document_id and process_id and token_auth:
             send_generation_chunk(
-                id_documento=id_documento,
-                id_proceso=id_proceso,
+                document_id=document_id,
+                process_id=process_id,
                 chunk=complete_text,
                 is_complete=True,
                 is_error=False,
@@ -208,10 +211,10 @@ def generate_content_streaming(
         logger.error(error_msg, exc_info=True)
 
         # Send error notification
-        if id_documento and id_proceso and token_auth:
+        if document_id and process_id and token_auth:
             send_generation_chunk(
-                id_documento=id_documento,
-                id_proceso=id_proceso,
+                document_id=document_id,
+                process_id=process_id,
                 chunk=None,
                 is_complete=False,
                 is_error=True,
@@ -226,8 +229,8 @@ def generate_document_from_components(
     template_content: str,
     context_content: str,
     transcription_content: str,
-    id_documento_nuevo: int,
-    id_proceso: str,
+    new_document_id: int,
+    process_id: str,
     auth_token: str,
     model_name: str = None,
 ) -> Dict[str, Any]:
@@ -238,8 +241,8 @@ def generate_document_from_components(
         template_content: The template structure to use
         context_content: Context information about the patient/encounter (can be empty)
         transcription_content: Transcription of the doctor-patient conversation
-        id_documento_nuevo: ID of the document to update
-        id_proceso: ID of the processing job
+        new_document_id: ID of the document to update
+        process_id: ID of the processing job
         auth_token: Auth token for Django API
         model_name: Optional model name override
 
@@ -256,8 +259,8 @@ def generate_document_from_components(
 
             # Notify clients of the error
             send_generation_chunk(
-                id_documento=id_documento_nuevo,
-                id_proceso=id_proceso,
+                document_id=new_document_id,
+                process_id=process_id,
                 chunk=None,
                 is_complete=False,
                 is_error=True,
@@ -277,8 +280,8 @@ def generate_document_from_components(
 
             # Notify clients of the error
             send_generation_chunk(
-                id_documento=id_documento_nuevo,
-                id_proceso=id_proceso,
+                document_id=new_document_id,
+                process_id=process_id,
                 chunk=None,
                 is_complete=False,
                 is_error=True,
@@ -324,8 +327,8 @@ def generate_document_from_components(
             ):
                 # Send chunk
                 send_generation_chunk(
-                    id_documento=id_documento_nuevo,
-                    id_proceso=id_proceso,
+                    document_id=new_document_id,
+                    process_id=process_id,
                     chunk=buffer,
                     is_complete=False,
                     is_error=False,
@@ -338,7 +341,7 @@ def generate_document_from_components(
 
                 # Log progress
                 logger.debug(
-                    f"Sent document chunk ({len(chunk)} chars) for job {id_proceso}"
+                    f"Sent document chunk ({len(chunk)} chars) for job {process_id}"
                 )
 
             return True  # Continue streaming
@@ -358,8 +361,8 @@ def generate_document_from_components(
         # Send any remaining buffered content
         if buffer:
             send_generation_chunk(
-                id_documento=id_documento_nuevo,
-                id_proceso=id_proceso,
+                document_id=new_document_id,
+                process_id=process_id,
                 chunk=buffer,
                 is_complete=False,
                 is_error=False,
@@ -368,8 +371,8 @@ def generate_document_from_components(
 
         # Send final completion notification with full text
         send_generation_chunk(
-            id_documento=id_documento_nuevo,
-            id_proceso=id_proceso,
+            document_id=new_document_id,
+            process_id=process_id,
             chunk=complete_text,
             is_complete=True,
             is_error=False,

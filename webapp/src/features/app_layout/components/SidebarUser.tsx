@@ -8,7 +8,7 @@ const SidebarUser = () => {
 
   // Use first letters of name and last name for avatar placeholder if no image
   const initials = userData
-    ? `${userData.name?.charAt(0) || ""}${userData.lastName?.charAt(0) || ""}`
+    ? `${userData.name?.charAt(0) || ""}${userData.last_name?.charAt(0) || ""}`
     : "";
 
   return (
@@ -26,7 +26,7 @@ const SidebarUser = () => {
       {isExpanded && userData && (
         <div className="ml-2 max-w-[calc(100%-40px)]">
           <p className="text-sm font-medium truncate">
-            {userData.name} {userData.lastName}
+            {userData.name} {userData.last_name}
           </p>
           <p className="text-xs text-gray-500 truncate">{userData.email}</p>
         </div>

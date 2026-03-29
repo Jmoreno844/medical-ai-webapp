@@ -1,7 +1,4 @@
-import sys
-import traceback
-import json
-import logging  # already imported
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -9,8 +6,7 @@ logger = logging.getLogger(__name__)
 class DebugCorsMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
-        print("!!!!!!!!!! Debug CORS Middleware initialized !!!!!!!!!!", flush=True)
-        sys.stdout.flush()
+        logger.info("DebugCorsMiddleware initialized")
 
     def __call__(self, request):
         origin = request.headers.get("Origin", "No Origin")

@@ -6,7 +6,7 @@ import React from "react";
 const SettingsIcon: React.FC = () => (
   <img
     src="/settings.svg"
-    alt="Settings"
+    alt="Ajustes"
     width={24}
     height={24}
     className="text-gray-500 hover:text-gray-700 cursor-pointer"

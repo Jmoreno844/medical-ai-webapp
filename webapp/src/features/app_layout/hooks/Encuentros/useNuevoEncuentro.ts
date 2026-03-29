@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { AxiosError } from "axios";
+import { logger } from "@/lib/logger";
 
 /**
  * Hook to handle the creation of a new medical encounter
@@ -21,20 +22,20 @@ export const useNuevoEncuentro = () => {
 
     try {
       setLoading(true);
-      console.log("Creating new encounter: Initiating API call");
+      logger.debug("Creating new encounter: Initiating API call");
 
-      const response = await axiosInstance.post("/api/encuentros");
+      const response = await axiosInstance.post("/api/encounters");
       const data = response.data;
 
-      console.log(`New encounter created successfully with ID: ${data.id}`);
+      logger.debug(`New encounter created successfully with ID: ${data.id}`);
 
       // Navigate to the new encounter page
-      console.log(`Navigating to encounter: /encuentro/${data.id}`);
+      logger.debug(`Navigating to encounter: /encuentro/${data.id}`);
       navigate(`/encuentro/${data.id}`);
     } catch (error) {
       // Handle different types of errors
       if (error instanceof AxiosError) {
-        console.error(
+        logger.error(
           `API Error (${error.response?.status}): ${error.message}`
         );
         setError(
@@ -42,21 +43,21 @@ export const useNuevoEncuentro = () => {
         );
       } else if (error instanceof TypeError) {
         // Network errors, like CORS or offline issues
-        console.error(`Network Error: ${error.message}`);
+        logger.error(`Network Error: ${error.message}`);
         setError(
           new Error(
             "Error de red. Por favor, verifica tu conexión e inténtalo de nuevo."
           )
         );
       } else {
-        console.error("Unexpected error creating encounter:", error);
+        logger.error("Unexpected error creating encounter:", error);
         setError(
           error instanceof Error ? error : new Error("Error desconocido")
         );
       }
     } finally {
       setLoading(false);
-      console.log("Encounter creation process completed");
+      logger.debug("Encounter creation process completed");
     }
   };
 

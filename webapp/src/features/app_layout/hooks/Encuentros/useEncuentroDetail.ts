@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import * as encountersApi from "@/api/encounters";
+import { logger } from "@/lib/logger";
 
-/** Single encounter from GET /api/encuentros/:id (matches EncuentroContext shape). */
+/** Single encounter from GET /api/encounters/:id (matches EncuentroContext shape). */
 export interface EncuentroDetail {
   id: number;
-  nombre_encuentro: string;
-  fecha: string;
-  id_paciente?: number;
-  nombre_paciente?: string;
-  paciente_conectado?: boolean;
+  encounter_name: string;
+  occurred_at: string;
+  patient_id?: number;
+  patient_name?: string;
+  patient_connected?: boolean;
   has_been_transcribed?: boolean;
 }
 
@@ -32,7 +33,7 @@ export function useEncuentroDetail(encounterId: number) {
       const { data } = await encountersApi.getEncounter(encounterId);
       setEncuentro(data as EncuentroDetail);
     } catch (e) {
-      console.error("[useEncuentroDetail] fetch error:", e);
+      logger.error("[useEncuentroDetail] fetch error:", e);
       setError("Error al cargar el encuentro");
       setEncuentro(null);
     } finally {

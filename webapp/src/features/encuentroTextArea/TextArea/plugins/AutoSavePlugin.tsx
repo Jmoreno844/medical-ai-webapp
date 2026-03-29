@@ -2,6 +2,7 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { useEffect, useRef, useState } from "react";
 import { $convertToMarkdownString, TRANSFORMERS } from "@lexical/markdown";
 
+import { logger } from "@/lib/logger";
 interface AutoSavePluginProps {
   documentId: number;
   onSave: (docId: number, content: string) => Promise<void>;
@@ -62,7 +63,7 @@ export function AutoSavePlugin({
         lastSavedContentRef.current = currentContent;
       }
     } catch (error) {
-      console.error(
+      logger.error(
         `[AUTO_SAVE] Failed to save document ${documentId}:`,
         error
       );

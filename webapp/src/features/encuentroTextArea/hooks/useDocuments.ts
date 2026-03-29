@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { DocumentoOut } from "@/types/documento";
 import axiosInstance from "@/commons/utils/axiosInstance";
+import { logger } from "@/lib/logger";
 
 /**
  * Custom hook for managing medical documents
@@ -38,7 +39,7 @@ export const useDocuments = (encounterId: number) => {
     try {
       setLoading(true);
       const response = await axiosInstance.get(
-        `/api/documento/encuentro/${encounterId}`
+        `/api/documents/encounter/${encounterId}`
       );
 
       const data = response.data;
@@ -48,8 +49,8 @@ export const useDocuments = (encounterId: number) => {
       if (data.length > 0 && !activeDocumentId) {
         // Sort documents by date and ID before selecting the first one
         const sortedDocs = [...data].sort((a, b) => {
-          const dateA = new Date(a.fecha_creacion).getTime();
-          const dateB = new Date(b.fecha_creacion).getTime();
+          const dateA = new Date(a.created_on).getTime();
+          const dateB = new Date(b.created_on).getTime();
 
           // If dates are different, sort by date
           if (dateA !== dateB) {
@@ -64,7 +65,7 @@ export const useDocuments = (encounterId: number) => {
         setActiveDocumentId(sortedDocs[0].id);
       }
     } catch (err: any) {
-      console.error("Failed to fetch documents:", err);
+      logger.error("Failed to fetch documents:", err);
       setError(
         err.response?.data?.detail ||
           err.message ||
@@ -82,10 +83,10 @@ export const useDocuments = (encounterId: number) => {
    */
   const fetchDocumentContent = useCallback(
     async (docId: number, forceRefresh = false) => {
-      console.log(
+      logger.debug(
         `[DOC_FETCH] Request for document ${docId}, forceRefresh: ${forceRefresh}`
       );
-      console.log(
+      logger.debug(
         `[CACHE_STATUS] Size: ${
           documentContentCache.size
         } documents, Loaded docs: ${Array.from(loadedDocumentsRef.current).join(
@@ -100,11 +101,11 @@ export const useDocuments = (encounterId: number) => {
       const shouldForceRefresh = isFirstLoad && forceRefresh;
 
       if (isFirstLoad) {
-        console.log(
+        logger.debug(
           `[DOC_LOAD ⚠️] Document ${docId}: First time loading this document`
         );
       } else {
-        console.log(
+        logger.debug(
           `[DOC_LOAD ℹ️] Document ${docId}: Document was previously loaded`
         );
       }
@@ -113,41 +114,41 @@ export const useDocuments = (encounterId: number) => {
       if (!shouldForceRefresh && documentContentCache.has(docId)) {
         const cachedContent = documentContentCache.get(docId);
         if (cachedContent && cachedContent.trim().length > 0) {
-          console.log(
+          logger.debug(
             `[CACHE_HIT ✅] Document ${docId}: Using cached content (${cachedContent.length} chars)`
           );
           // Mark document as loaded even when using cache
           loadedDocumentsRef.current.add(docId);
           return cachedContent;
         }
-        console.log(
+        logger.debug(
           `[CACHE_INVALID ⚠️] Document ${docId}: Cache entry exists but is empty, fetching from database`
         );
         // If cached content is empty, proceed with fetching
       } else {
         if (shouldForceRefresh) {
-          console.log(
+          logger.debug(
             `[CACHE_BYPASS ⏭️] Document ${docId}: Force refresh requested (first load)`
           );
         } else if (forceRefresh) {
-          console.log(
+          logger.debug(
             `[CACHE_IGNORE ℹ️] Document ${docId}: Force refresh requested but document already loaded, using cache`
           );
         } else {
-          console.log(`[CACHE_MISS ❌] Document ${docId}: Not in cache`);
+          logger.debug(`[CACHE_MISS ❌] Document ${docId}: Not in cache`);
         }
       }
 
       try {
         setIsLoadingContent(true);
-        console.log(`[DB_FETCH 🔍] Document ${docId}: Fetching from database`);
+        logger.debug(`[DB_FETCH 🔍] Document ${docId}: Fetching from database`);
 
-        const response = await axiosInstance.get(`/api/documento/${docId}`);
+        const response = await axiosInstance.get(`/api/documents/${docId}`);
 
         const documentData = response.data;
-        const content = documentData.contenido || "";
+        const content = documentData.content || "";
 
-        console.log(
+        logger.debug(
           `[DB_FETCH ✅] Document ${docId}: Received ${content.length} chars from database`
         );
 
@@ -156,26 +157,26 @@ export const useDocuments = (encounterId: number) => {
 
         // Only cache non-empty content
         if (content.trim().length > 0) {
-          console.log(
+          logger.debug(
             `[CACHE_UPDATE 📝] Document ${docId}: Storing content in cache`
           );
           setDocumentContentCache((prev) => {
             const newCache = new Map(prev);
             newCache.set(docId, content);
-            console.log(
+            logger.debug(
               `[CACHE_STATUS] Updated size: ${newCache.size} documents`
             );
             return newCache;
           });
         } else {
-          console.log(
+          logger.debug(
             `[CACHE_SKIP ⚠️] Document ${docId}: Not caching empty content`
           );
         }
 
         return content;
       } catch (err: any) {
-        console.error(`[DB_FETCH ❌] Document ${docId}: Failed to fetch:`, err);
+        logger.error(`[DB_FETCH ❌] Document ${docId}: Failed to fetch:`, err);
         setError(
           err.response?.data?.detail ||
             err.message ||
@@ -228,14 +229,14 @@ export const useDocuments = (encounterId: number) => {
           cachedContent &&
           normalizeBreaks(cachedContent) === normalizeBreaks(content)
         ) {
-          console.log(
+          logger.debug(
             `[DOC_SAVE] Document ${docId}: Content unchanged from cache, skipping API call`
           );
           return true; // Return success without API call
         }
 
         setIsSaving(true);
-        console.log(
+        logger.debug(
           `[DOC_SAVE] Document ${docId}: Saving content (${content.length} chars)`
         );
 
@@ -249,47 +250,47 @@ export const useDocuments = (encounterId: number) => {
             const tempDiv = document.createElement("div");
             tempDiv.innerHTML = content;
             finalContent = tempDiv.textContent || "";
-            console.log(`[DOC_SAVE] Document ${docId}: Stripped HTML tags`);
+            logger.debug(`[DOC_SAVE] Document ${docId}: Stripped HTML tags`);
           } catch (e) {
             // Fallback: Use regex to strip HTML tags
             finalContent = content.replace(/<[^>]*>/g, "");
-            console.log(
+            logger.debug(
               `[DOC_SAVE] Document ${docId}: Stripped HTML tags (regex fallback)`
             );
           }
         }
 
-        console.log(
+        logger.debug(
           `[DOC_SAVE] Document ${docId}: Final content length: ${finalContent.length} chars`
         );
 
         // Send the update
-        await axiosInstance.patch(`/api/documento_by_editor/${docId}`, {
-          contenido: finalContent,
+        await axiosInstance.patch(`/api/documents/by-editor/${docId}`, {
+          content: finalContent,
         });
 
         // Update local document data
         setDocuments((docs) =>
           docs.map((doc) =>
-            doc.id === docId ? { ...doc, contenido: finalContent } : doc
+            doc.id === docId ? { ...doc, content: finalContent } : doc
           )
         );
 
         // Update the cache
-        console.log(`[CACHE_UPDATE 📝] Document ${docId}: Updating after save`);
+        logger.debug(`[CACHE_UPDATE 📝] Document ${docId}: Updating after save`);
         setDocumentContentCache((prev) => {
           const newCache = new Map(prev);
           newCache.set(docId, finalContent);
-          console.log(
+          logger.debug(
             `[CACHE_STATUS] Size after save: ${newCache.size} documents`
           );
           return newCache;
         });
 
-        console.log(`[DOC_SAVE ✅] Document ${docId}: Saved successfully`);
+        logger.debug(`[DOC_SAVE ✅] Document ${docId}: Saved successfully`);
         return true;
       } catch (err: any) {
-        console.error(`[DOC_SAVE ❌] Document ${docId}: Error saving:`, err);
+        logger.error(`[DOC_SAVE ❌] Document ${docId}: Error saving:`, err);
         // Store failed save for retry
         setPendingSave({ id: docId, content });
         throw err; // Re-throw to allow handling in components
@@ -311,10 +312,10 @@ export const useDocuments = (encounterId: number) => {
     async (documentType: string, content: string = "") => {
       try {
         setLoading(true);
-        const response = await axiosInstance.post("/api/documento/", {
-          id_encuentro: encounterId,
-          tipo: documentType,
-          contenido: content,
+        const response = await axiosInstance.post("/api/documents", {
+          encounter_id: encounterId,
+          kind: documentType,
+          content,
         });
 
         const newDocument = response.data;
@@ -334,7 +335,7 @@ export const useDocuments = (encounterId: number) => {
 
         return newDocument;
       } catch (err: any) {
-        console.error("Failed to create document:", err);
+        logger.error("Failed to create document:", err);
         setError(
           err.response?.data?.detail ||
             err.message ||
@@ -358,7 +359,7 @@ export const useDocuments = (encounterId: number) => {
     async (docId: number) => {
       try {
         setLoading(true);
-        await axiosInstance.delete(`/api/documento/${docId}`);
+        await axiosInstance.delete(`/api/documents/${docId}`);
 
         // Remove document from local state
         setDocuments((docs) => docs.filter((doc) => doc.id !== docId));
@@ -380,7 +381,7 @@ export const useDocuments = (encounterId: number) => {
 
         return true;
       } catch (err: any) {
-        console.error("Failed to delete document:", err);
+        logger.error("Failed to delete document:", err);
         setError(
           err.response?.data?.detail ||
             err.message ||
@@ -407,14 +408,14 @@ export const useDocuments = (encounterId: number) => {
     if (encounterId) {
       if (isInitialMount.current) {
         // Clear the content cache and loaded documents on initial mount or when encounter changes
-        console.log(
+        logger.debug(
           `[CACHE_CLEAR 🧹] Encounter ${encounterId}: Clearing cache on initial load`
         );
         setDocumentContentCache(new Map());
         loadedDocumentsRef.current.clear();
         isInitialMount.current = false;
       } else {
-        console.log(
+        logger.debug(
           `[CACHE_MAINTAIN] Encounter ${encounterId}: Keeping cache for encounter`
         );
       }
@@ -426,7 +427,7 @@ export const useDocuments = (encounterId: number) => {
     return () => {
       // Only clear cache if encounter ID changes, not on simple re-renders
       if (encounterId) {
-        console.log(
+        logger.debug(
           `[CACHE_NOTE] Cleanup function called for encounter ${encounterId}`
         );
 
@@ -439,7 +440,7 @@ export const useDocuments = (encounterId: number) => {
   // Additional effect to clear cache when component fully unmounts
   useEffect(() => {
     return () => {
-      console.log(
+      logger.debug(
         `[CACHE_CLEAR 🧹] Component fully unmounting, clearing cache`
       );
       setDocumentContentCache(new Map());

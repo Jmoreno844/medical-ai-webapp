@@ -1,14 +1,15 @@
 import { useState } from "react";
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { AxiosError } from "axios";
+import { logger } from "@/lib/logger";
 
 /**
  * Interface for encounter update data
  */
 interface EncounterUpdateData {
-  id_paciente?: number | null;
-  nombre_encuentro?: string;
-  paciente_conectado?: boolean;
+  patient_id?: number | null;
+  encounter_name?: string;
+  patient_connected?: boolean;
 }
 
 /**
@@ -67,34 +68,30 @@ export const useEncounter = (encounterId?: number) => {
 
     try {
       // Create a payload that only includes non-undefined values
-      const payload: Record<string, any> = {};
+      const payload: Record<string, unknown> = {};
 
-      // Only add fields that have values
-      if (updateData.id_paciente !== undefined) {
-        payload.id_paciente = updateData.id_paciente;
+      if (updateData.patient_id !== undefined) {
+        payload.patient_id = updateData.patient_id;
       }
 
-      if (updateData.nombre_encuentro !== undefined) {
-        payload.nombre_encuentro = updateData.nombre_encuentro;
-      } else {
-        // Either provide a default value
-        payload.nombre_encuentro = "Encuentro sin nombre";
-        // Or don't include the field at all (remove this line)
+      if (updateData.encounter_name !== undefined) {
+        payload.encounter_name = updateData.encounter_name;
       }
 
-      // Always include paciente_conectado with a boolean value
-      payload.paciente_conectado = Boolean(updateData.paciente_conectado);
+      if (updateData.patient_connected !== undefined) {
+        payload.patient_connected = updateData.patient_connected;
+      }
 
-      console.log(
+      logger.debug(
         `Updating encounter ${encounterIdToUpdate} with:`,
         JSON.stringify(payload)
       );
 
       // Log the exact payload being sent for debugging
-      console.log("Raw payload:", payload);
+      logger.debug("Raw payload:", payload);
 
       const response = await axiosInstance.patch(
-        `/api/encuentros/${encounterIdToUpdate}`,
+        `/api/encounters/${encounterIdToUpdate}`,
         payload,
         {
           headers: {
@@ -103,7 +100,7 @@ export const useEncounter = (encounterId?: number) => {
         }
       );
 
-      console.log("Update response:", response.data);
+      logger.debug("Update response:", response.data);
       return true;
     } catch (err) {
       const errorMessage = getErrorMessage(err);
@@ -111,14 +108,14 @@ export const useEncounter = (encounterId?: number) => {
 
       // More detailed error logging
       if (err instanceof AxiosError) {
-        console.error("Error updating encounter:", {
+        logger.error("Error updating encounter:", {
           status: err.response?.status,
           statusText: err.response?.statusText,
           data: err.response?.data,
           message: errorMessage,
         });
       } else {
-        console.error("Error updating encounter:", errorMessage, err);
+        logger.error("Error updating encounter:", errorMessage, err);
       }
 
       return false;
@@ -145,13 +142,13 @@ export const useEncounter = (encounterId?: number) => {
     setError(null);
 
     try {
-      console.log(`Deleting encounter ${encounterIdToDelete}`);
+      logger.debug(`Deleting encounter ${encounterIdToDelete}`);
 
       const response = await axiosInstance.delete(
-        `/api/encuentros/${encounterIdToDelete}`
+        `/api/encounters/${encounterIdToDelete}`
       );
 
-      console.log("Delete response:", response.data);
+      logger.debug("Delete response:", response.data);
 
       // Check if the response contains a success indicator
       const success = response.data?.success === true;
@@ -166,14 +163,14 @@ export const useEncounter = (encounterId?: number) => {
 
       // More detailed error logging
       if (err instanceof AxiosError) {
-        console.error("Error deleting encounter:", {
+        logger.error("Error deleting encounter:", {
           status: err.response?.status,
           statusText: err.response?.statusText,
           data: err.response?.data,
           message: errorMessage,
         });
       } else {
-        console.error("Error deleting encounter:", errorMessage, err);
+        logger.error("Error deleting encounter:", errorMessage, err);
       }
 
       return { success: false };

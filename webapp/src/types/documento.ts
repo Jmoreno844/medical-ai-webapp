@@ -1,31 +1,25 @@
+/** API shape for clinical documents (English wire format). */
 export interface DocumentoOut {
   id: number;
-  id_encuentro: number;
-  tipo: string;
-  id_plantilla_doctor?: number;
-  contenido: string;
-  fecha_creacion: string; // ISO date string
-  id_medico: number;
+  encounter_id: number;
+  kind: string;
+  doctor_template_id?: number | null;
+  content: string;
+  created_on: string;
+  doctor_id: number;
 }
 
-// Document type labels for tab display
+/** Spanish labels for document `kind` values from the API. */
 export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
-  nota: "Clinical Note",
-  receta: "Receta Médica",
-  laboratorio: "Órden Laboratorio",
-  imagen: "Órden Imagen",
-  certificado: "Certificado",
-  contexto: "Context",
-  transcripcion: "Transcription",
+  context: "Contexto",
+  transcription: "Transcripción",
+  template: "Plantilla",
+  note: "Nota clínica",
 };
 
-// Longer document type labels for full display
 export const DOCUMENT_TYPE_LABELS_LONG: Record<string, string> = {
-  nota: "Clinical Note",
-  receta: "Receta Médica",
-  laboratorio: "Órden de Laboratorio",
-  imagen: "Órden de Imagen",
-  certificado: "Certificado Médico",
-  contexto: "Context",
-  transcripcion: "Transcription",
+  context: "Contexto",
+  transcription: "Transcripción",
+  template: "Documento desde plantilla",
+  note: "Nota clínica",
 };

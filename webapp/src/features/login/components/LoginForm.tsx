@@ -7,12 +7,13 @@ import { Input } from "@/commons/components/ui/input";
 import { Label } from "@/commons/components/ui/label";
 
 // Logger utility for consistent logging
+import { logger } from "@/lib/logger";
 const logForm = (type: "info" | "error", message: string, data?: any) => {
   const prefix = "[LoginForm]";
   if (type === "info") {
-    console.log(`${prefix} ${message}`, data || "");
+    logger.debug(`${prefix} ${message}`, data || "");
   } else {
-    console.error(`${prefix} ${message}`, data || "");
+    logger.error(`${prefix} ${message}`, data || "");
   }
 };
 
@@ -44,17 +45,17 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
         <div className="relative w-full max-w-[280px] aspect-square">
           <img
             src="/brand_logo_no_text.png"
-            alt="Brand Logo"
+            alt="Logotipo"
             className="object-contain w-full h-full"
           />
         </div>
       </div>
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-2xl font-bold text-main font-fun tracking-tight">
-          Welcome
+          Bienvenido/a
         </h1>
         <p className="text-balance text-sm text-neutral-600 dark:text-neutral-300">
-          Enter your credentials to access our services
+          Introduzca sus credenciales para acceder
         </p>
       </div>
       <div className="grid gap-7">
@@ -68,12 +69,12 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
             htmlFor="email"
             className="font-medium text-neutral-700 dark:text-neutral-200"
           >
-            Email
+            Correo electrónico
           </Label>
           <Input
             id="email"
             type="email"
-            placeholder="m@example.com"
+            placeholder="correo@ejemplo.com"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -86,13 +87,13 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
               htmlFor="password"
               className="font-medium text-neutral-700 dark:text-neutral-200"
             >
-              Password
+              Contraseña
             </Label>
             <Link
               to="/forgot-password"
               className="ml-auto text-sm text-main hover:text-main_dark underline-offset-4 hover:underline transition-colors"
             >
-              Forgot password?
+              ¿Olvidó su contraseña?
             </Link>
           </div>
           <Input
@@ -109,16 +110,16 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
           className="w-full bg-blue-500 hover:bg-main_dark text-white font-medium py-6 mt-2 transition-colors"
           disabled={loading}
         >
-          {loading ? "Signing in..." : "Sign In"}
+          {loading ? "Entrando…" : "Iniciar sesión"}
         </Button>
       </div>
       <div className="text-center text-sm mt-2">
-        Don't have an account?{" "}
+        ¿No tiene cuenta?{" "}
         <Link
           to="/registro"
           className="font-medium text-main hover:text-main_dark underline underline-offset-4 transition-colors"
         >
-          Register
+          Registrarse
         </Link>
       </div>
     </form>

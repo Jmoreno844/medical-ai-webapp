@@ -43,18 +43,18 @@ const GenerateDocumentationButton: React.FC = () => {
     //   return "Checking transcription content...";
     // }
     if (isGenerating) {
-      return "Generation in progress...";
+      return "Generación en curso…";
     }
     if (isRecording) {
-      return "Cannot generate while recording";
+      return "No puede generar mientras graba";
     }
     if (!hasBeenTranscribed) {
-      return "You must transcribe the audio first";
+      return "Debe transcribir el audio primero";
     }
     // Optional: Could add a check here using checkTranscriptionContent if needed,
     // but often just relying on hasBeenTranscribed is sufficient for enabling the button.
     // The actual generation process will fail if content is missing.
-    return "Generate documentation from transcription";
+    return "Generar documentación a partir de la transcripción";
   };
 
   return (
@@ -70,8 +70,7 @@ const GenerateDocumentationButton: React.FC = () => {
                       ? "bg-gray-200 text-gray-500 cursor-not-allowed"
                       : "bg-purple-500 text-white hover:bg-purple-700 rounded-md"
                   }`}
-          aria-label="Generate medical documentation" // Use aria-label for accessibility
-          // title="Generate medical documentation" // Replaced by aria-label and Tooltip
+          aria-label="Generar documentación clínica"
         >
           {/* {isCheckingContent ? ( // Removed
             <div className="w-4 h-4 mr-2 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
@@ -95,7 +94,7 @@ const GenerateDocumentationButton: React.FC = () => {
               />
             </svg>
           )}
-          Generate
+          Generar
         </button>
       </span>
     </Tooltip>

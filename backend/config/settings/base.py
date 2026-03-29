@@ -6,6 +6,8 @@ import logging
 import os
 from pathlib import Path
 
+from .logging_utils import build_console_logging
+
 logger = logging.getLogger(__name__)
 _settings_module = os.environ.get("DJANGO_SETTINGS_MODULE")
 if _settings_module:
@@ -111,3 +113,5 @@ X_FRAME_OPTIONS = "DENY"
 
 LOGIN_URL = "/admin/login/"  # Redirect to the admin login page instead
 CSRF_COOKIE_NAME = "_xsrf"
+
+LOGGING = build_console_logging("INFO")

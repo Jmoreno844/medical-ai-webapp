@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { DocumentoOut } from "@/types/documento";
 
+import { logger } from "@/lib/logger";
 interface UseDocumentContentProps {
   document: DocumentoOut;
   fetchDocumentContent?: (
@@ -49,19 +50,19 @@ export const useDocumentContent = ({
     if (
       documentIdRef.current === document.id &&
       contentHasBeenSet &&
-      document?.contenido &&
-      document?.contenido.length !== (documentContent?.length || 0)
+      document?.content &&
+      document?.content.length !== (documentContent?.length || 0)
     ) {
-      console.log(
+      logger.debug(
         `[DOC_CONTENT] Detected different content length for document ${
           document.id
-        } (${document?.contenido.length} vs ${
+        } (${document?.content.length} vs ${
           documentContent?.length || 0
         }), forcing reload`
       );
       // No return here to allow reload
     } else if (documentIdRef.current === document.id && contentHasBeenSet) {
-      console.log(
+      logger.debug(
         `[DOC_CONTENT] Document ${document.id}: Already loaded same document, skipping reload`
       );
       return;
@@ -72,13 +73,13 @@ export const useDocumentContent = ({
 
     async function loadDocumentContent() {
       setIsLoading(true);
-      console.log(`[DOC_CONTENT] Document ${document.id}: Loading content`);
+      logger.debug(`[DOC_CONTENT] Document ${document.id}: Loading content`);
 
       // Get content from cache if available
       if (documentContentCache?.has(document.id)) {
         const cached = documentContentCache.get(document.id);
         if (cached && cached.trim().length > 0) {
-          console.log(
+          logger.debug(
             `[CACHE_USE ✅] Document ${document.id}: Using cached content directly`
           );
           setDocumentContent(cached);
@@ -101,9 +102,9 @@ export const useDocumentContent = ({
             }
           })
           .catch((err) => {
-            console.error("[DOC_CONTENT] Error loading document:", err);
+            logger.error("[DOC_CONTENT] Error loading document:", err);
             setFetchError(
-              `Error loading document: ${err.message || "Unknown error"}`
+              `Error al cargar el documento: ${err.message || "error desconocido"}`
             );
           })
           .finally(() => {
@@ -127,23 +128,23 @@ export const useDocumentContent = ({
       return documentContentCache.get(document.id) || "";
     }
 
-    // Fall back to document's contenido property
-    return document?.contenido || "";
+    // Fall back to document.content from list payload
+    return document?.content || "";
   }, [
     document?.id,
     documentContent,
     documentContentCache,
-    document?.contenido,
+    document?.content,
   ]);
 
   const reloadContent = useCallback(async () => {
-    console.log(
+    logger.debug(
       `[USE_DOC_CONTENT] Reloading content for document ${document.id}`
     );
 
     // Clear from cache if it exists
     if (documentContentCache) {
-      console.log(
+      logger.debug(
         `[USE_DOC_CONTENT] Removing document ${document.id} from cache`
       );
       documentContentCache.delete(document.id);
@@ -151,11 +152,11 @@ export const useDocumentContent = ({
 
     // Force refetch from API
     if (fetchDocumentContent) {
-      console.log(
+      logger.debug(
         `[USE_DOC_CONTENT] Fetching fresh content for document ${document.id} from API`
       );
       const freshContent = await fetchDocumentContent(document.id);
-      console.log(
+      logger.debug(
         `[USE_DOC_CONTENT] Fresh content received: ${freshContent?.substring(
           0,
           20

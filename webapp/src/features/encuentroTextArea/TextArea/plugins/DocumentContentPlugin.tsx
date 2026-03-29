@@ -3,6 +3,7 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { $getRoot, $createParagraphNode, $createTextNode } from "lexical";
 import { $convertFromMarkdownString, TRANSFORMERS } from "@lexical/markdown";
 
+import { logger } from "@/lib/logger";
 interface DocumentContentPluginProps {
   documentId: number;
   content: string;
@@ -49,7 +50,7 @@ export function DocumentContentPlugin({
         if (isDocumentChanged || isLoading) {
           const currentEditorContent = root.getTextContent();
           if (currentEditorContent !== "" || isDocumentChanged) {
-            console.log(
+            logger.debug(
               `📄 Clearing editor: Doc changed (${isDocumentChanged}), isLoading (${isLoading})`
             );
             root.clear();
@@ -64,7 +65,7 @@ export function DocumentContentPlugin({
           const newContent = streamingContent ?? content;
 
           if (newContent !== lastAppliedContentRef.current) {
-            console.log(
+            logger.debug(
               `📄 Applying content: Doc ${documentId}, content length: ${
                 newContent?.length ?? 0
               }`
@@ -76,7 +77,7 @@ export function DocumentContentPlugin({
               try {
                 $convertFromMarkdownString(newContent, TRANSFORMERS);
               } catch (error) {
-                console.error(`Error converting Markdown for Doc ${documentId}:`, error);
+                logger.error(`Error converting Markdown for Doc ${documentId}:`, error);
                 const paragraph = $createParagraphNode();
                 paragraph.append($createTextNode(newContent));
                 root.append(paragraph);

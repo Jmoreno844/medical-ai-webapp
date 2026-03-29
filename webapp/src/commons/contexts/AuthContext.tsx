@@ -9,15 +9,15 @@ import { useNavigate, useLocation } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
 import LoadingCircle from "../components/LoadingCircle";
 import { getCookie } from "../utils/cookieUtils";
+import { logger } from "@/lib/logger";
 
 // Define the shape of our user data
 export interface UserProfile {
   id: number;
   email: string;
   name: string;
-  lastName: string;
+  last_name: string;
   role: string;
-  // Add other user fields as needed
 }
 
 // Define the shape of our authentication context
@@ -46,9 +46,9 @@ export const AuthContext = createContext<AuthContextType>({
 const logAuth = (type: "info" | "error", message: string, data?: any) => {
   const prefix = "[AuthContext]";
   if (type === "info") {
-    console.log(`${prefix} ${message}`, data || "");
+    logger.debug(`${prefix} ${message}`, data || "");
   } else {
-    console.error(`${prefix} ${message}`, data || "");
+    logger.error(`${prefix} ${message}`, data || "");
   }
 };
 
@@ -96,15 +96,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = useCallback(
     async (email: string, password: string) => {
       // Add immediate synchronous log to confirm function entry
-      console.log("🔐 AUTH-CONTEXT LOGIN FUNCTION CALLED with email:", email);
+      logger.debug("🔐 AUTH-CONTEXT LOGIN FUNCTION CALLED with email:", email);
       try {
         logAuth("info", "Attempting login with email", { email });
-        console.log("🔐 AUTH-CONTEXT: Before API call");
+        logger.debug("🔐 AUTH-CONTEXT: Before API call");
         const response = await axiosInstance.post("/api/auth/login", {
           email,
           password,
         });
-        console.log(
+        logger.debug(
           "🔐 AUTH-CONTEXT: API call completed with status:",
           response.status
         );
@@ -117,7 +117,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         logAuth("info", "Redirecting to home page");
         navigate("/home"); // Using navigate instead of router.push
       } catch (error: any) {
-        console.error("🔴 AUTH-CONTEXT LOGIN ERROR:", error);
+        logger.error("🔴 AUTH-CONTEXT LOGIN ERROR:", error);
         logAuth("error", "Login failed", {
           status: error.response?.status,
           data: error.response?.data,

@@ -32,7 +32,7 @@ export default function PlantillasPage() {
     isEditModalOpen,
     isDeleteModalOpen,
     currentPlantilla,
-    currentPlantillaDetails,
+    currentPlantillaDetails, // used for base_template_id when copying a base-linked template
     loadingPlantillaDetails,
     plantillaDetailsError,
     openCreateModal,
@@ -61,18 +61,16 @@ export default function PlantillasPage() {
     setIsSubmitting(true);
 
     if (isBaseCopy) {
-      // Create a copy of the base template
       const newTemplateData: NewPlantilla = {
-        nombre: data.nombre || "", // Ensure it's not undefined
-        tipo_documento: data.tipo_documento || "documento", // Ensure it's not undefined
-        contenido: data.contenido,
-        contenido_base: false,
-        id_plantilla_base: currentPlantilla.id,
+        name: data.name || "",
+        document_kind: data.document_kind || "document",
+        content: data.content,
+        base_template_id:
+          currentPlantillaDetails?.base_template_id ?? undefined,
       };
 
       await createPlantilla(newTemplateData);
     } else {
-      // Normal update for non-base templates
       await updatePlantilla(currentPlantilla.id, data);
     }
 
@@ -87,21 +85,21 @@ export default function PlantillasPage() {
   };
 
   const formatDate = (dateString: string | null) => {
-    if (!dateString) return "Never";
+    if (!dateString) return "Nunca";
 
     try {
       return format(new Date(dateString), "dd/MM/yyyy HH:mm", {
         locale: es,
       });
     } catch (e) {
-      return "Date format error";
+      return "Error de formato de fecha";
     }
   };
 
   return (
     <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Templates</h1>
+        <h1 className="text-2xl font-bold">Plantillas</h1>
         <Button
           onClick={openCreateModal}
           variant="outline"
@@ -109,7 +107,7 @@ export default function PlantillasPage() {
           text-base hover:bg-purple-500 transition-colors hover:text-white"
         >
           <PlusCircle className="h-4 w-4" />
-          Create Template
+          Nueva plantilla
         </Button>
       </div>
 
@@ -117,7 +115,7 @@ export default function PlantillasPage() {
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
         <Input
           className="pl-10"
-          placeholder="Search templates by name..."
+          placeholder="Buscar plantillas por nombre…"
           value={searchQuery}
           onChange={(e) => handleSearch(e.target.value)}
         />
@@ -132,8 +130,8 @@ export default function PlantillasPage() {
       ) : plantillas.length === 0 ? (
         <div className="bg-slate-50 p-8 text-center rounded-md">
           {searchQuery
-            ? "No templates found with that name."
-            : "No templates available."}
+            ? "No hay plantillas con ese nombre."
+            : "No hay plantillas disponibles."}
         </div>
       ) : (
         <div className="space-y-4">
@@ -142,11 +140,11 @@ export default function PlantillasPage() {
               <CardContent className="p-0">
                 <div className="flex justify-between items-center p-4">
                   <div className="flex-1">
-                    <h3 className="font-medium">{plantilla.nombre}</h3>
+                    <h3 className="font-medium">{plantilla.name}</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2 text-sm text-gray-600">
-                      <div>Times used: {plantilla.veces_usada}</div>
-                      <div>Last use: {formatDate(plantilla.ultimo_uso)}</div>
-                      <div>Type: {plantilla.es_base ? "Base" : "Custom"}</div>
+                      <div>Veces usada: {plantilla.use_count}</div>
+                      <div>Último uso: {formatDate(plantilla.last_used_at)}</div>
+                      <div>Tipo: {plantilla.is_base ? "Base" : "Personalizada"}</div>
                     </div>
                   </div>
                   <DropdownMenu>
@@ -161,14 +159,14 @@ export default function PlantillasPage() {
                         className="flex items-center gap-2 cursor-pointer"
                       >
                         <Edit className="h-4 w-4" />
-                        Edit
+                        Editar
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => openDeleteModal(plantilla)}
                         className="flex items-center gap-2 cursor-pointer text-red-600"
                       >
                         <Trash2 className="h-4 w-4" />
-                        Delete
+                        Eliminar
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -214,7 +212,7 @@ export default function PlantillasPage() {
         currentPlantillaDetails={null}
         loadingPlantillaDetails={false}
         plantillaDetailsError={null}
-        onSubmit={handleDeleteConfirm}
+        onDeleteConfirm={handleDeleteConfirm}
         isSubmitting={isSubmitting}
       />
     </div>

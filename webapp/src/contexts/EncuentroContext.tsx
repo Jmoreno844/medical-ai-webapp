@@ -11,17 +11,17 @@ import { useNavigate } from "react-router-dom";
 import { useVoiceRecorder } from "../features/encuentroHeader/hooks/audio/useVoiceRecorder";
 import { useEncounter } from "../features/encuentro/hooks/useEncounter";
 import useEncuentroList from "../features/app_layout/hooks/Encuentros/useEncuentroList";
+import { logger } from "@/lib/logger";
 
 // Define the Encuentro interface if it's not imported
 export interface Encuentro {
   id: number;
-  nombre_encuentro: string;
-  fecha: string;
-  id_paciente?: number;
-  nombre_paciente?: string;
-  paciente_conectado?: boolean;
+  encounter_name: string;
+  occurred_at: string;
+  patient_id?: number;
+  patient_name?: string;
+  patient_connected?: boolean;
   has_been_transcribed?: boolean;
-  // Add other fields as needed
 }
 
 // Add this date formatting helper function
@@ -36,7 +36,7 @@ const formatDate = (dateString: string): string => {
       minute: "2-digit",
     }).format(date);
   } catch (error) {
-    console.error("Error formatting date:", error);
+    logger.error("Error formatting date:", error);
     return "Sin fecha";
   }
 };
@@ -172,30 +172,30 @@ export function EncuentroProvider({
 
     setIsLoading(true);
     setError(null);
-    console.log(`Fetching encounter data for ID: ${encounterId}`);
+    logger.debug(`Fetching encounter data for ID: ${encounterId}`);
 
     try {
       const response = await encountersApi.getEncounter(encounterId);
-      console.log("Encounter data received:", response.data);
+      logger.debug("Encounter data received:", response.data);
       setEncuentro(response.data);
 
       // Update local state with fetched data
       if (response.data) {
         const data = response.data;
-        if (data.nombre_encuentro) {
-          setEncounterName(data.nombre_encuentro);
+        if (data.encounter_name) {
+          setEncounterName(data.encounter_name);
         }
 
-        if (data.fecha) {
-          setEncounterDate(formatDate(data.fecha));
-          setOriginalEncounterDateString(data.fecha);
+        if (data.occurred_at) {
+          setEncounterDate(formatDate(data.occurred_at));
+          setOriginalEncounterDateString(data.occurred_at);
         }
 
-        setIsPatientConnected(!!data.paciente_conectado);
+        setIsPatientConnected(!!data.patient_connected);
 
-        if (data.paciente_conectado) {
-          setPatientId(data.id_paciente || null);
-          setPatientName(data.nombre_paciente || "");
+        if (data.patient_connected) {
+          setPatientId(data.patient_id || null);
+          setPatientName(data.patient_name || "");
         } else {
           setPatientId(null);
           setPatientName("");
@@ -205,7 +205,7 @@ export function EncuentroProvider({
       const errorMsg =
         err.response?.data?.message || err.message || "Error desconocido";
       setError(errorMsg);
-      console.error("Error fetching encounter:", errorMsg, err);
+      logger.error("Error fetching encounter:", errorMsg, err);
     } finally {
       setIsLoading(false);
     }
@@ -227,19 +227,19 @@ export function EncuentroProvider({
           setRedirectCountdown(0);
         }, 500);
       } else {
-        console.log(`Attempting navigation to: ${redirectInfo.path}`);
+        logger.debug(`Attempting navigation to: ${redirectInfo.path}`);
         try {
           navigate(redirectInfo.path, { replace: true });
           setTimeout(() => {
             if (
               window.location.pathname.includes(`/encuentro/${encounterId}`)
             ) {
-              console.log(`Using fallback navigation to: ${redirectInfo.path}`);
+              logger.debug(`Using fallback navigation to: ${redirectInfo.path}`);
               window.location.href = redirectInfo.path;
             }
           }, 200);
         } catch (err) {
-          console.error("Navigation error:", err);
+          logger.error("Navigation error:", err);
           window.location.href = redirectInfo.path;
         }
       }
@@ -272,12 +272,12 @@ export function EncuentroProvider({
       if (!encounterId) return false;
 
       try {
-        console.log(
+        logger.debug(
           `[ENCUENTRO] Updating encounter ${encounterId} with:`,
           data
         );
         const response = await axiosInstance.patch(
-          `/api/encuentros/${encounterId}`,
+          `/api/encounters/${encounterId}`,
           data
         );
 
@@ -287,7 +287,7 @@ export function EncuentroProvider({
         }
         return false;
       } catch (error) {
-        console.error(`[ENCUENTRO] Error updating encounter:`, error);
+        logger.error(`[ENCUENTRO] Error updating encounter:`, error);
         return false;
       }
     },
@@ -311,26 +311,26 @@ export function EncuentroProvider({
       try {
         setIsDateUpdating(true);
         const isoDate = newDate.toISOString();
-        console.log(`Updating encounter date to: ${isoDate}`);
+        logger.debug(`Updating encounter date to: ${isoDate}`);
 
         const response = await axiosInstance.patch(
-          `/api/encuentros/${encounterId}`,
+          `/api/encounters/${encounterId}`,
           {
-            fecha: isoDate,
+            occurred_at: isoDate,
           }
         );
 
         if (response.status === 200) {
           setEncounterDate(formatDate(isoDate));
           setOriginalEncounterDateString(isoDate);
-          console.log("Encounter date updated successfully");
+          logger.debug("Encounter date updated successfully");
           return true;
         } else {
-          console.error("Failed to update encounter date:", response);
+          logger.error("Failed to update encounter date:", response);
           return false;
         }
       } catch (error) {
-        console.error("Error updating encounter date:", error);
+        logger.error("Error updating encounter date:", error);
         return false;
       } finally {
         setIsDateUpdating(false);
@@ -344,12 +344,12 @@ export function EncuentroProvider({
    */
   const handleSelectPatient = useCallback(
     async (patientId: number, patientName: string) => {
-      console.log(`Selected patient: ID=${patientId}, Name=${patientName}`);
+      logger.debug(`Selected patient: ID=${patientId}, Name=${patientName}`);
 
       const success = await updateEncounter(encounterId, {
-        id_paciente: patientId,
-        paciente_conectado: true,
-        nombre_encuentro: patientName,
+        patient_id: patientId,
+        patient_connected: true,
+        encounter_name: patientName,
       });
 
       if (success) {
@@ -359,7 +359,7 @@ export function EncuentroProvider({
         setPatientName(patientName);
         setIsModalOpen(false);
       } else {
-        console.error("Failed to update patient connection");
+        logger.error("Failed to update patient connection");
       }
     },
     [encounterId, updateEncounter]
@@ -369,7 +369,7 @@ export function EncuentroProvider({
    * Handle patient creation from modal
    */
   const handleCreatePatient = useCallback((patientName: string) => {
-    console.log(`New patient created: ${patientName}`);
+    logger.debug(`New patient created: ${patientName}`);
     // The actual update is handled in handleSelectPatient which is called after creation
   }, []);
 
@@ -378,14 +378,14 @@ export function EncuentroProvider({
    */
   const handleUpdatePatientAndEncounter = useCallback(
     async (patientId: number, patientName: string, encounterName: string) => {
-      console.log(
+      logger.debug(
         `Updating both patient and encounter: PatientID=${patientId}, PatientName=${patientName}, EncounterName=${encounterName}`
       );
 
       const success = await updateEncounter(encounterId, {
-        id_paciente: patientId,
-        paciente_conectado: true,
-        nombre_encuentro: encounterName,
+        patient_id: patientId,
+        patient_connected: true,
+        encounter_name: encounterName,
       });
 
       if (success) {
@@ -394,7 +394,7 @@ export function EncuentroProvider({
         setPatientId(patientId);
         setPatientName(patientName);
       } else {
-        console.error("Failed to update patient and encounter information");
+        logger.error("Failed to update patient and encounter information");
       }
     },
     [encounterId, updateEncounter]
@@ -412,13 +412,13 @@ export function EncuentroProvider({
    */
   const handleUnlinkConfirm = useCallback(async () => {
     const success = await updateEncounter(encounterId, {
-      paciente_conectado: false,
-      id_paciente: null,
-      nombre_encuentro: "Encuentro Nuevo",
+      patient_connected: false,
+      patient_id: null,
+      encounter_name: "Encuentro Nuevo",
     });
 
     if (success) {
-      console.log("Patient unlinked successfully");
+      logger.debug("Patient unlinked successfully");
       window.location.reload();
     }
 
@@ -440,7 +440,7 @@ export function EncuentroProvider({
     const result = await deleteEncounter();
 
     if (result.success) {
-      console.log("Encounter deleted successfully");
+      logger.debug("Encounter deleted successfully");
       setDeleteSuccess(true);
       setProgressPercentage(0);
 
@@ -450,7 +450,7 @@ export function EncuentroProvider({
         if (nextEncounter) {
           setRedirectInfo({
             path: `/encuentro/${nextEncounter.id}`,
-            name: nextEncounter.nombre_encuentro,
+            name: nextEncounter.encounter_name,
           });
         } else {
           setRedirectInfo({
@@ -468,7 +468,7 @@ export function EncuentroProvider({
       setDeleteErrorMessage(
         "Error al eliminar el encuentro. Por favor intente nuevamente."
       );
-      console.error("Error deleting encounter:", result);
+      logger.error("Error deleting encounter:", result);
     }
   }, [deleteEncounter, encuentros, encounterId]);
 

@@ -24,6 +24,7 @@ import { Trash } from "lucide-react";
 import { useDocumentContext } from "@/contexts/DocumentContext";
 import { useGenerationContext } from "@/contexts/GenerationContext";
 import { useTranscriptionContext } from "@/contexts/TranscriptionContext"; // Updated import
+import { logger } from "@/lib/logger";
 
 const TabBar: React.FC = () => {
   // Get state from context
@@ -47,8 +48,8 @@ const TabBar: React.FC = () => {
   // Sort documents (same code as before)
   const sortedDocuments = useMemo(() => {
     return [...documents].sort((a, b) => {
-      const dateA = new Date(a.fecha_creacion).getTime();
-      const dateB = new Date(b.fecha_creacion).getTime();
+      const dateA = new Date(a.created_on).getTime();
+      const dateB = new Date(b.created_on).getTime();
 
       if (dateA !== dateB) {
         return dateA - dateB;
@@ -60,8 +61,8 @@ const TabBar: React.FC = () => {
 
   // Check if a document can show context menu
   const canShowContextMenu = (doc: DocumentoOut) => {
-    const tipo = doc.tipo.toLowerCase();
-    return tipo !== "contexto" && tipo !== "transcripcion";
+    const kind = doc.kind.toLowerCase();
+    return kind !== "context" && kind !== "transcription";
   };
 
   // Handle right-click on tabs
@@ -95,13 +96,13 @@ const TabBar: React.FC = () => {
     try {
       const success = await deleteDocument(documentToDelete.id);
       if (!success) {
-        setDeleteError("Error deleting document");
+        setDeleteError("No se pudo eliminar el documento");
       } else {
         setDocumentToDelete(null);
       }
     } catch (error) {
-      console.error("Error deleting document:", error);
-      setDeleteError("Error deleting document");
+      logger.error("Error deleting document:", error);
+      setDeleteError("No se pudo eliminar el documento");
     } finally {
       setIsDeleting(false);
     }
@@ -110,7 +111,7 @@ const TabBar: React.FC = () => {
   if (!sortedDocuments.length) {
     return (
       <div className="bg-gray-100 p-2 text-sm text-gray-500 border-b">
-        No documents available
+        No hay documentos disponibles
       </div>
     );
   }
@@ -130,10 +131,10 @@ const TabBar: React.FC = () => {
                     ? "bg-white text-blue-600 border-t-2 border-blue-600"
                     : "text-gray-600 hover:bg-gray-200"
                 }`}
-              aria-label={`Select ${getTabLabel(doc)}`}
-              data-document-type={doc.tipo}
+              aria-label={`Seleccionar ${getTabLabel(doc)}`}
+              data-document-type={doc.kind}
             >
-              {DOCUMENT_TYPE_LABELS[doc.tipo.toLowerCase()] || doc.tipo}
+              {DOCUMENT_TYPE_LABELS[doc.kind.toLowerCase()] || doc.kind}
             </button>
           ))}
 
@@ -148,10 +149,10 @@ const TabBar: React.FC = () => {
             } rounded-full transition-colors self-center mx-2`}
             title={
               hasBeenTranscribed
-                ? "Generate documentation"
-                : "Transcribe audio first to generate documentation"
+                ? "Generar documentación"
+                : "Transcriba el audio primero para generar documentación"
             }
-            aria-label="Generate documentation"
+            aria-label="Generar documentación"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -189,7 +190,7 @@ const TabBar: React.FC = () => {
               }}
             >
               <Trash className="mr-2 h-4 w-4" />
-              <span>Delete Document</span>
+              <span>Eliminar documento</span>
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
@@ -202,11 +203,11 @@ const TabBar: React.FC = () => {
       >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Delete document</DialogTitle>
+            <DialogTitle>Eliminar documento</DialogTitle>
           </DialogHeader>
 
           <div className="">
-            <p>Are you sure you want to delete this document?</p>
+            <p>¿Seguro que desea eliminar este documento?</p>
             <p className="font-medium mt-8 mb-4 text-center">
               {documentToDelete && getDocumentTitle(documentToDelete)}
             </p>
@@ -225,7 +226,7 @@ const TabBar: React.FC = () => {
               className="mr-2"
               disabled={isDeleting}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button
               variant="destructive"
@@ -233,7 +234,7 @@ const TabBar: React.FC = () => {
               disabled={isDeleting}
               className="bg-red-600 text-white hover:bg-red-700 border border-red-600 font-medium"
             >
-              {isDeleting ? "Deleting..." : "Delete"}
+              {isDeleting ? "Eliminando…" : "Eliminar"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -246,8 +247,8 @@ const TabBar: React.FC = () => {
 function getDocumentTitle(doc: DocumentoOut | null) {
   if (!doc) return "";
 
-  const docType = DOCUMENT_TYPE_LABELS_LONG[doc.tipo.toLowerCase()] || doc.tipo;
-  const date = new Date(doc.fecha_creacion).toLocaleDateString("en-EN", {
+  const docType = DOCUMENT_TYPE_LABELS_LONG[doc.kind.toLowerCase()] || doc.kind;
+  const date = new Date(doc.created_on).toLocaleDateString("es-ES", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -257,7 +258,7 @@ function getDocumentTitle(doc: DocumentoOut | null) {
 }
 
 function getTabLabel(doc: DocumentoOut) {
-  return DOCUMENT_TYPE_LABELS[doc.tipo.toLowerCase()] || doc.tipo;
+  return DOCUMENT_TYPE_LABELS[doc.kind.toLowerCase()] || doc.kind;
 }
 
 export default TabBar;

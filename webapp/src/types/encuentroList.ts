@@ -1,7 +1,7 @@
 export interface Encuentro {
   id: number;
-  id_medico: number;
-  id_paciente?: number;
-  nombre_encuentro: string;
-  fecha: string; // date will come as string from API
+  doctor_id: number;
+  patient_id?: number;
+  encounter_name: string;
+  occurred_at: string;
 }

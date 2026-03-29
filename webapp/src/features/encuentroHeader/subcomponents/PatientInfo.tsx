@@ -79,13 +79,13 @@ const PatientInfo: React.FC<ExtendedPatientInfoProps> = ({
       <div className="flex items-center space-x-2">
         <span className="font-medium" data-testid="encounter-name">
           {encounterName === "Encuentro Nuevo"
-            ? "New Encounter"
+            ? "Nuevo encuentro"
             : encounterName}
         </span>
         <button
           onClick={onEdit}
           className="p-1 rounded-full hover:bg-gray-200 transition-colors"
-          aria-label="Edit patient"
+          aria-label="Editar paciente o encuentro"
           title="Editar paciente o encuentro"
           data-testid="edit-patient-button"
         >
@@ -110,13 +110,13 @@ const PatientInfo: React.FC<ExtendedPatientInfoProps> = ({
           <button
             onClick={onUnlink}
             className="p-1 rounded-full hover:bg-gray-200 transition-colors"
-            aria-label="Unlink patient"
+            aria-label="Desvincular paciente"
             title="Desconectar paciente"
             data-testid="unlink-patient-button"
           >
             <img
               src="/chain.svg"
-              alt="Unlink patient"
+              alt="Desvincular paciente"
               width={16}
               height={16}
               className="w-4 h-4"
@@ -129,7 +129,7 @@ const PatientInfo: React.FC<ExtendedPatientInfoProps> = ({
           <button
             onClick={onDelete}
             className="p-1 rounded-full hover:bg-gray-200 transition-colors"
-            aria-label="Delete encounter"
+            aria-label="Eliminar encuentro"
             title="Eliminar encuentro"
             data-testid="delete-encounter-button"
           >

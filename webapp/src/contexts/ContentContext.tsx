@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { useDocumentContext } from "./DocumentContext";
+import { logger } from "@/lib/logger";
 
 // Define the context type
 type ContentContextType = {
@@ -68,10 +69,10 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
   // Fetch document content function
   const fetchDocumentContent = useCallback(
     async (docId: number, forceRefresh = false): Promise<string | null> => {
-      console.log(
+      logger.debug(
         `[DOC_FETCH] Request for document ${docId}, forceRefresh: ${forceRefresh}`
       );
-      console.log(
+      logger.debug(
         `[CACHE_STATUS] Size: ${
           documentContentCache.size
         } documents, Loaded docs: ${Array.from(loadedDocumentsRef.current).join(
@@ -86,11 +87,11 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
       const shouldForceRefresh = isFirstLoad && forceRefresh;
 
       if (isFirstLoad) {
-        console.log(
+        logger.debug(
           `[DOC_LOAD ⚠️] Document ${docId}: First time loading this document`
         );
       } else {
-        console.log(
+        logger.debug(
           `[DOC_LOAD ℹ️] Document ${docId}: Document was previously loaded`
         );
       }
@@ -101,7 +102,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
 
         // Check for undefined instead of truthy to properly handle empty strings
         if (cachedContent !== undefined) {
-          console.log(
+          logger.debug(
             `[CACHE_HIT ✅] Document ${docId}: Using cached content (${
               cachedContent?.length ?? 0
             } chars)`
@@ -119,34 +120,34 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
 
           return cachedContent;
         }
-        console.log(
+        logger.debug(
           `[CACHE_INVALID ⚠️] Document ${docId}: Cache entry exists but is undefined, fetching from database`
         );
       } else {
         if (shouldForceRefresh) {
-          console.log(
+          logger.debug(
             `[CACHE_BYPASS ⏭️] Document ${docId}: Force refresh requested (first load)`
           );
         } else if (forceRefresh) {
-          console.log(
+          logger.debug(
             `[CACHE_IGNORE ℹ️] Document ${docId}: Force refresh requested but document already loaded, using cache`
           );
         } else {
-          console.log(`[CACHE_MISS ❌] Document ${docId}: Not in cache`);
+          logger.debug(`[CACHE_MISS ❌] Document ${docId}: Not in cache`);
         }
       }
 
       try {
         setIsLoadingContent(true);
         setFetchError(null);
-        console.log(`[DB_FETCH 🔍] Document ${docId}: Fetching from database`);
+        logger.debug(`[DB_FETCH 🔍] Document ${docId}: Fetching from database`);
 
-        const response = await axiosInstance.get(`/api/documento/${docId}`);
+        const response = await axiosInstance.get(`/api/documents/${docId}`);
 
         const documentData = response.data;
-        const content = documentData.contenido || "";
+        const content = documentData.content || "";
 
-        console.log(
+        logger.debug(
           `[DB_FETCH ✅] Document ${docId}: Received ${content.length} chars from database`
         );
 
@@ -154,13 +155,13 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
         loadedDocumentsRef.current.add(docId);
 
         // Always cache the content, even if it's empty
-        console.log(
+        logger.debug(
           `[CACHE_UPDATE 📝] Document ${docId}: Storing content in cache (${content.length} chars)`
         );
         setDocumentContentCache((prev) => {
           const newCache = new Map(prev);
           newCache.set(docId, content); // Always cache, even empty content
-          console.log(
+          logger.debug(
             `[CACHE_STATUS] Updated size: ${newCache.size} documents`
           );
           return newCache;
@@ -174,7 +175,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
 
         return content;
       } catch (err: any) {
-        console.error(`[DB_FETCH ❌] Document ${docId}: Failed to fetch:`, err);
+        logger.error(`[DB_FETCH ❌] Document ${docId}: Failed to fetch:`, err);
         setFetchError(
           err.response?.data?.detail ||
             err.message ||
@@ -208,7 +209,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
           cachedContent &&
           normalizeBreaks(cachedContent) === normalizeBreaks(content)
         ) {
-          console.log(
+          logger.debug(
             `[DOC_SAVE] Document ${docId}: Content unchanged from cache, skipping save`
           );
           return true; // Return success without API call
@@ -228,7 +229,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
 
         return success;
       } catch (error) {
-        console.error("Error in saveContent:", error);
+        logger.error("Error in saveContent:", error);
         return false;
       }
     },
@@ -239,7 +240,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
   const reloadContent = useCallback(
     async (forceRefresh: boolean = false): Promise<void> => {
       if (activeDocumentId) {
-        console.log(
+        logger.debug(
           `[RELOAD_CONTENT] Document ${activeDocumentId}, forceRefresh: ${forceRefresh}`
         );
         await fetchDocumentContent(activeDocumentId, forceRefresh);
@@ -261,7 +262,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
   // Clear cache when component unmounts
   useEffect(() => {
     return () => {
-      console.log(`[CACHE_CLEAR 🧹] ContentContext unmounting, clearing cache`);
+      logger.debug(`[CACHE_CLEAR 🧹] ContentContext unmounting, clearing cache`);
     };
   }, []);
 
@@ -270,7 +271,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
     (docId: number, content: string) => {
       // Only update if it's the active document
       if (docId === activeDocumentId) {
-        console.log(
+        logger.debug(
           `[CONTENT_UPDATE] Directly updating content for document ${docId}`
         );
         setDocumentContent(content);

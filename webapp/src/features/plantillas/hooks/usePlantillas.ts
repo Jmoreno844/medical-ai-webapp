@@ -1,30 +1,30 @@
 import { useState, useEffect, useCallback } from "react";
 import axiosInstance from "@/commons/utils/axiosInstance";
+import { logger } from "@/lib/logger";
 
 export interface Plantilla {
   id: number;
-  nombre: string;
-  tipo_documento: string;
-  veces_usada: number;
-  ultimo_uso: string | null;
-  es_base: boolean;
+  name: string;
+  document_kind: string;
+  use_count: number;
+  last_used_at: string | null;
+  is_base: boolean;
 }
 
 export interface NewPlantilla {
-  nombre: string;
-  tipo_documento: string;
-  contenido?: string;
-  contenido_base?: boolean;
-  id_plantilla_base?: number | null;
+  name: string;
+  document_kind: string;
+  content?: string;
+  base_template_id?: number | null;
 }
 
 export interface PlantillaDetalle {
   id: number;
-  nombre: string;
-  tipo_documento: string;
-  contenido: string | null;
-  contenido_base: boolean;
-  id_plantilla_base: number | null;
+  name: string;
+  document_kind: string;
+  content: string | null;
+  uses_base_content: boolean;
+  base_template_id: number | null;
 }
 
 export function usePlantillas() {
@@ -34,7 +34,6 @@ export function usePlantillas() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -42,7 +41,6 @@ export function usePlantillas() {
     null
   );
 
-  // Plantilla details states
   const [currentPlantillaDetails, setCurrentPlantillaDetails] =
     useState<PlantillaDetalle | null>(null);
   const [loadingPlantillaDetails, setLoadingPlantillaDetails] = useState(false);
@@ -53,13 +51,13 @@ export function usePlantillas() {
   const fetchPlantillas = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axiosInstance.get("/api/plantillas_short");
+      const response = await axiosInstance.get("/api/doctor-templates/short");
       setPlantillas(response.data);
       setFilteredPlantillas(response.data);
       setError(null);
     } catch (err) {
       setError("Error al cargar las plantillas");
-      console.error(err);
+      logger.error(err);
     } finally {
       setLoading(false);
     }
@@ -74,7 +72,7 @@ export function usePlantillas() {
       setFilteredPlantillas(plantillas);
     } else {
       const filtered = plantillas.filter((plantilla) =>
-        plantilla.nombre.toLowerCase().includes(searchQuery.toLowerCase())
+        plantilla.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredPlantillas(filtered);
     }
@@ -88,18 +86,18 @@ export function usePlantillas() {
     setIsCreateModalOpen(true);
   };
 
-  const fetchPlantillaDetails = useCallback(async (id_plantilla: number) => {
+  const fetchPlantillaDetails = useCallback(async (templateId: number) => {
     setLoadingPlantillaDetails(true);
     setPlantillaDetailsError(null);
 
     try {
       const response = await axiosInstance.get(
-        `/api/plantilla_doctor/${id_plantilla}`
+        `/api/doctor-templates/${templateId}`
       );
       setCurrentPlantillaDetails(response.data);
       return response.data;
     } catch (error) {
-      console.error("Error fetching plantilla details:", error);
+      logger.error("Error fetching plantilla details:", error);
       setPlantillaDetailsError(
         "No se pudo cargar el contenido de la plantilla"
       );
@@ -111,7 +109,6 @@ export function usePlantillas() {
 
   const openEditModal = async (plantilla: Plantilla) => {
     setCurrentPlantilla(plantilla);
-    // Fetch details when opening edit modal
     await fetchPlantillaDetails(plantilla.id);
     setIsEditModalOpen(true);
   };
@@ -131,43 +128,51 @@ export function usePlantillas() {
 
   const createPlantilla = async (newPlantilla: NewPlantilla) => {
     try {
-      // This endpoint should accept all the fields we're sending
-      await axiosInstance.post("/api/plantilla_doctor", newPlantilla);
+      const body: Record<string, unknown> = {
+        name: newPlantilla.name,
+        document_kind: newPlantilla.document_kind,
+        content: newPlantilla.content ?? "",
+      };
+      if (newPlantilla.base_template_id != null) {
+        body.base_template_id = newPlantilla.base_template_id;
+      }
+      await axiosInstance.post("/api/doctor-templates", body);
       await fetchPlantillas();
       closeModals();
       return true;
     } catch (err) {
-      console.error("Error creating plantilla:", err);
+      logger.error("Error creating plantilla:", err);
       return false;
     }
   };
 
   const updatePlantilla = async (
-    id_plantilla: number,
+    templateId: number,
     updatedData: Partial<NewPlantilla>
   ) => {
     try {
-      await axiosInstance.patch(
-        `/api/plantilla_doctor/${id_plantilla}`,
-        updatedData
-      );
+      await axiosInstance.patch(`/api/doctor-templates/${templateId}`, {
+        name: updatedData.name,
+        document_kind: updatedData.document_kind,
+        content: updatedData.content ?? "",
+      });
       await fetchPlantillas();
       closeModals();
       return true;
     } catch (err) {
-      console.error("Error updating plantilla:", err);
+      logger.error("Error updating plantilla:", err);
       return false;
     }
   };
 
-  const deletePlantilla = async (id_plantilla: number) => {
+  const deletePlantilla = async (templateId: number) => {
     try {
-      await axiosInstance.delete(`/api/plantillas/${id_plantilla}`);
+      await axiosInstance.delete(`/api/doctor-templates/${templateId}`);
       await fetchPlantillas();
       closeModals();
       return true;
     } catch (err) {
-      console.error("Error deleting plantilla:", err);
+      logger.error("Error deleting plantilla:", err);
       return false;
     }
   };

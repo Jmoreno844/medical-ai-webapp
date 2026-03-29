@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { DocumentoOut } from "@/types/documento";
 import axiosInstance from "@/commons/utils/axiosInstance";
+import { logger } from "@/lib/logger";
 const API_URL = import.meta.env.VITE_API_URL;
 
 // Add types for generation status tracking
@@ -15,12 +16,12 @@ interface GenerationStatus {
 
 interface Plantilla {
   id: number;
-  nombre: string;
-  tipo_documento: string;
-  fecha_creacion: string;
-  es_base: boolean;
-  veces_usada: number;
-  ultimo_uso: string | null;
+  name: string;
+  document_kind: string;
+  created_at: string;
+  is_base: boolean;
+  use_count: number;
+  last_used_at: string | null;
 }
 
 interface UseDocumentGenerationProps {
@@ -83,7 +84,7 @@ export function useDocumentGeneration({
       setIsLoadingPlantillas(true);
       setPlantillasError(null);
 
-      const response = await axiosInstance.get("/api/plantillas_short");
+      const response = await axiosInstance.get("/api/doctor-templates/short");
       setPlantillas(response.data || []);
 
       // Select first template by default if available
@@ -91,7 +92,7 @@ export function useDocumentGeneration({
         setSelectedPlantillaId(response.data[0].id);
       }
     } catch (err) {
-      console.error("❌ Error al cargar plantillas:", err);
+      logger.error("❌ Error al cargar plantillas:", err);
       setPlantillasError("No se pudieron cargar las plantillas");
     } finally {
       setIsLoadingPlantillas(false);
@@ -111,12 +112,12 @@ export function useDocumentGeneration({
   const createNewDocument = useCallback(async () => {
     try {
       // Call API to create new empty document of type "nota"
-      const response = await axiosInstance.post("/api/documento", {
-        id_encuentro: encounterId,
-        tipo: "nota",
+      const response = await axiosInstance.post("/api/documents", {
+        encounter_id: encounterId,
+        kind: "note",
       });
 
-      console.log("📄 Documento nuevo creado:", response.data);
+      logger.debug("📄 Documento nuevo creado:", response.data);
 
       // Call the callback with the new document
       if (onDocumentCreated && response.data) {
@@ -125,7 +126,7 @@ export function useDocumentGeneration({
 
       return response.data;
     } catch (err) {
-      console.error("❌ Error al crear nuevo documento:", err);
+      logger.error("❌ Error al crear nuevo documento:", err);
       throw err;
     }
   }, [encounterId, onDocumentCreated]);
@@ -141,16 +142,16 @@ export function useDocumentGeneration({
 
       // Create full URL to the SSE endpoint with secure token using API URL from env
       const apiBaseUrl = API_URL.endsWith("/") ? API_URL.slice(0, -1) : API_URL;
-      const sseUrl = `${apiBaseUrl}/api/sse/documento/${documentId}/${sseToken}`;
+      const sseUrl = `${apiBaseUrl}/api/sse/document/${documentId}/${sseToken}`;
 
-      console.log(`🔌 Connecting to SSE endpoint: ${sseUrl}`);
+      logger.debug(`🔌 Connecting to SSE endpoint: ${sseUrl}`);
 
       try {
         const eventSource = new EventSource(sseUrl);
         eventSourceRef.current = eventSource;
 
         eventSource.onopen = () => {
-          console.log(
+          logger.debug(
             `✅ SSE connection established for document ${documentId}`
           );
         };
@@ -158,13 +159,13 @@ export function useDocumentGeneration({
         eventSource.onmessage = async (event) => {
           try {
             const data = JSON.parse(event.data);
-            console.log(`📩 SSE message received: ${data.event}`);
+            logger.debug(`📩 SSE message received: ${data.event}`);
 
             switch (data.event) {
               case "connected":
-                console.log(
+                logger.debug(
                   "✅ Connected to SSE for document",
-                  data.id_documento
+                  data.document_id
                 );
                 break;
 
@@ -178,7 +179,7 @@ export function useDocumentGeneration({
                   if (onContentUpdate && documentId && newChunk) {
                     // Use the full accumulated content for saving
                     onContentUpdate(documentId, updatedContent).catch((err) =>
-                      console.error("Error saving document content:", err)
+                      logger.error("Error saving document content:", err)
                     );
                   }
 
@@ -191,39 +192,42 @@ export function useDocumentGeneration({
                 break;
 
               case "generation_complete":
-                const finalContent = data.chunk || generationStatus.content;
+                setGenerationStatus((prev) => {
+                  const finalContent =
+                    data.chunk != null && String(data.chunk).length > 0
+                      ? data.chunk
+                      : prev.content;
 
-                console.log(
-                  `✅ Generation complete - Final content length: ${finalContent.length} chars`
-                );
-
-                // CRITICAL: Update the document content cache directly to prevent race condition
-                if (window.documentContentCache && documentId) {
-                  window.documentContentCache.set(documentId, finalContent);
-                  console.log(
-                    `💾 Manually updated cache for document ${documentId} with ${finalContent.length} chars`
+                  logger.debug(
+                    `✅ Generation complete - Final content length: ${finalContent.length} chars`
                   );
-                }
 
-                // Save final content to database
-                if (onContentUpdate && documentId) {
-                  try {
-                    await onContentUpdate(documentId, finalContent);
-                    console.log(
-                      `📝 Final content saved to database (${finalContent.length} chars)`
+                  if (window.documentContentCache && documentId) {
+                    window.documentContentCache.set(documentId, finalContent);
+                    logger.debug(
+                      `💾 Manually updated cache for document ${documentId} with ${finalContent.length} chars`
                     );
-                  } catch (err) {
-                    console.error("❌ Error saving final content:", err);
                   }
-                }
 
-                // Only after saving content, update the state
-                setGenerationStatus((prev) => ({
-                  ...prev,
-                  content: finalContent,
-                  isComplete: true,
-                  inProgress: false,
-                }));
+                  if (onContentUpdate && documentId) {
+                    void onContentUpdate(documentId, finalContent)
+                      .then(() =>
+                        logger.debug(
+                          `📝 Final content saved to database (${finalContent.length} chars)`
+                        )
+                      )
+                      .catch((err) =>
+                        logger.error("❌ Error saving final content:", err)
+                      );
+                  }
+
+                  return {
+                    ...prev,
+                    content: finalContent,
+                    isComplete: true,
+                    inProgress: false,
+                  };
+                });
 
                 setIsGenerating(false);
                 break;
@@ -239,12 +243,12 @@ export function useDocumentGeneration({
                 break;
             }
           } catch (err) {
-            console.error("❌ Error processing SSE message:", err);
+            logger.error("❌ Error processing SSE message:", err);
           }
         };
 
         eventSource.onerror = (err) => {
-          console.error("❌ SSE connection error:", err);
+          logger.error("❌ SSE connection error:", err);
           setError("Error en la conexión con el servidor");
 
           // Close and cleanup on error
@@ -254,11 +258,11 @@ export function useDocumentGeneration({
 
         return eventSource;
       } catch (error) {
-        console.error("Error creating SSE connection:", error);
+        logger.error("Error creating SSE connection:", error);
         return null;
       }
     },
-    [onContentUpdate, generationStatus.content]
+    [onContentUpdate]
   );
 
   const generateDocumentation = useCallback(async () => {
@@ -280,9 +284,9 @@ export function useDocumentGeneration({
 
       // Find transcription and context documents
       const transcriptionDoc = documents.find(
-        (doc) => doc.tipo === "transcripcion"
+        (doc) => doc.kind === "transcription"
       );
-      const contextDoc = documents.find((doc) => doc.tipo === "contexto");
+      const contextDoc = documents.find((doc) => doc.kind === "context");
 
       if (!transcriptionDoc) {
         throw new Error("No se encontró el documento de transcripción");
@@ -294,15 +298,15 @@ export function useDocumentGeneration({
 
       // Check if transcription content is empty
       if (
-        !transcriptionDoc.contenido ||
-        transcriptionDoc.contenido.trim() === ""
+        !transcriptionDoc.content ||
+        transcriptionDoc.content.trim() === ""
       ) {
         throw new Error(
-          "You must perform the transcription before generating a document"
+          "Debe transcribir el audio antes de generar un documento"
         );
       }
 
-      console.log("📄 Documentos encontrados:", {
+      logger.debug("📄 Documentos encontrados:", {
         transcripcion: transcriptionDoc.id,
         contexto: contextDoc.id,
       });
@@ -315,11 +319,11 @@ export function useDocumentGeneration({
       }
 
       // Request document generation workflow
-      const response = await axiosInstance.post("/api/generate-document", {
-        id_documento_contexto: contextDoc.id,
-        id_documento_transcripcion: transcriptionDoc.id,
-        id_plantilla_doctor: selectedPlantillaId,
-        id_documento_nuevo: newDocument.id,
+      const response = await axiosInstance.post("/api/documents/generate", {
+        context_document_id: contextDoc.id,
+        transcription_document_id: transcriptionDoc.id,
+        doctor_template_id: selectedPlantillaId,
+        new_document_id: newDocument.id,
       });
 
       if (!response.data.success) {
@@ -329,19 +333,19 @@ export function useDocumentGeneration({
       // Track template usage after successful generation request
       try {
         const usageResponse = await axiosInstance.post(
-          `/api/plantilla_doctor/uso/${selectedPlantillaId}`
+          `/api/doctor-templates/${selectedPlantillaId}/usage`
         );
-        console.log("📊 Uso de plantilla registrado:", usageResponse.data);
+        logger.debug("📊 Uso de plantilla registrado:", usageResponse.data);
       } catch (usageErr) {
         // Log error but don't interrupt the main flow
-        console.error("❌ Error al registrar uso de plantilla:", usageErr);
+        logger.error("❌ Error al registrar uso de plantilla:", usageErr);
       }
 
       // Update generation status with info from response
       setGenerationStatus((prev) => ({
         ...prev,
-        processingId: response.data.id_proceso,
-        documentId: newDocument.id, // Use the document ID from newDocument
+        processingId: response.data.process_id,
+        documentId: newDocument.id,
       }));
 
       // Connect to SSE for real-time updates
@@ -360,7 +364,7 @@ export function useDocumentGeneration({
         inProgress: false,
         error: err instanceof Error ? err.message : "Error desconocido",
       }));
-      console.error("❌ Error generando documentación:", err);
+      logger.error("❌ Error generando documentación:", err);
       return null;
     }
   }, [documents, createNewDocument, selectedPlantillaId, connectToSSE]);
@@ -368,7 +372,7 @@ export function useDocumentGeneration({
   // Filter plantillas based on search query
   const filteredPlantillas = searchQuery
     ? plantillas.filter((p) =>
-        p.nombre.toLowerCase().includes(searchQuery.toLowerCase())
+        p.name.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : plantillas;
 

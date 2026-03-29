@@ -1,6 +1,7 @@
 import { useNuevoEncuentro } from "./Encuentros/useNuevoEncuentro";
 import { useEffect } from "react";
 
+import { logger } from "@/lib/logger";
 type NavigationItem = {
   icon: string;
   label: string;
@@ -20,7 +21,7 @@ export const useNavigationItems = (
   // Log any errors that occur during encounter creation
   useEffect(() => {
     if (error) {
-      console.error(
+      logger.error(
         "Error in navigation while creating encounter:",
         error.message
       );
@@ -29,21 +30,21 @@ export const useNavigationItems = (
   }, [error]);
 
   const navigationItems: NavigationItem[] = [
-    { icon: "/home_icon.svg", label: "Home", path: "/home" },
+    { icon: "/home_icon.svg", label: "Inicio", path: "/home" },
     {
       icon: "/plus.svg",
-      label: loading ? "Creating..." : "Create Encounter",
+      label: loading ? "Creando…" : "Crear encuentro",
       action: crearNuevoEncuentro,
     },
     {
       icon: "/people.svg",
-      label: "Recent Encounters",
+      label: "Encuentros recientes",
       action: toggleEncounters,
       isToggle: true,
       pattern: "/encuentro",
       pointerIcon: encountersOpen ? "/pointer_left.svg" : "/pointer_right.svg",
     },
-    { icon: "/template.svg", label: "Templates", path: "/plantillas" },
+    { icon: "/template.svg", label: "Plantillas", path: "/plantillas" },
   ];
 
   return navigationItems;

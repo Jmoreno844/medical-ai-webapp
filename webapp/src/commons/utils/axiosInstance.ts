@@ -1,9 +1,10 @@
 import axios from "axios";
+import { logger } from "@/lib/logger";
 import { getCookie } from "./cookieUtils";
 
 // Use VITE_API_URL prefix for client-side environment variables
 const API_URL = import.meta.env.VITE_API_URL || "";
-console.log("API URL:", API_URL); // Helps with debugging
+logger.debug("API URL:", API_URL); // Helps with debugging
 
 // Function to get CSRF token from cookiess
 const getCsrfToken = (): string | null => {
@@ -28,30 +29,30 @@ axiosInstance.interceptors.request.use(
     // Only fetch CSRF token if not already available
     if (!csrfToken) {
       try {
-        console.log("🔄 No CSRF token found. Fetching from /api/csrf...");
+        logger.debug("🔄 No CSRF token found. Fetching from /api/csrf...");
         await axios.get(`${API_URL}/api/csrf`, {
           withCredentials: true,
         });
-        //   console.log("📥 CSRF Response:", csrfResponse.data);
+        //   logger.debug("📥 CSRF Response:", csrfResponse.data);
         // Get the token after the API call
         csrfToken = getCsrfToken();
       } catch (error) {
-        console.error("❌ Error fetching CSRF token:", error);
+        logger.error("❌ Error fetching CSRF token:", error);
       }
     } else {
-      // console.log("✅ Using existing CSRF token from cookies");
+      // logger.debug("✅ Using existing CSRF token from cookies");
     }
 
     // Add logging for CSRF token and request details
-    console.log(`🔒 Request: ${config.method?.toUpperCase()} ${config.url}`);
-    // console.log(`🔑 CSRF Token: ${csrfToken || "NOT SET"}`);
-    //  console.log(`🍪 All Cookies: ${document.cookie}`);
+    logger.debug(`🔒 Request: ${config.method?.toUpperCase()} ${config.url}`);
+    // logger.debug(`🔑 CSRF Token: ${csrfToken || "NOT SET"}`);
+    //  logger.debug(`🍪 All Cookies: ${document.cookie}`);
 
     if (csrfToken) {
       config.headers["X-CSRFToken"] = csrfToken;
-      //   console.log(   `✅ Added X-CSRFToken header: ${csrfToken.substring(0, 10)}...`);
+      //   logger.debug(   `✅ Added X-CSRFToken header: ${csrfToken.substring(0, 10)}...`);
     } else {
-      //  console.warn(`⚠️ No CSRF token available for request to ${config.url}`);
+      //  logger.warn(`⚠️ No CSRF token available for request to ${config.url}`);
     }
 
     return config;
@@ -68,20 +69,21 @@ axiosInstance.interceptors.response.use(
     const setCookieHeader = response.headers["set-cookie"];
     if (setCookieHeader && typeof document !== "undefined") {
       // The browser will automatically handle the cookie update
-      //  console.debug("New cookies received from server");
+      //  logger.debug("New cookies received from server");
     }
     return response;
   },
   (error) => {
     // Enhanced error handling with specific CORS error detection
     if (error.message === "Network Error" || error.code === "ERR_NETWORK") {
-      //   console.error("CORS or network error detected. Check your CORS configuration.");
+      //   logger.error("CORS or network error detected. Check your CORS configuration.");
     }
 
-    console.error("API Error:", {
+    logger.error("API Error:", {
       status: error.response?.status,
+      method: error.config?.method,
+      url: error.config?.url,
       data: error.response?.data,
-      config: error.config,
     });
     return Promise.reject(error);
   }

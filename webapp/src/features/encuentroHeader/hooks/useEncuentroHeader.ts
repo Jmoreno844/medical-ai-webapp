@@ -8,6 +8,7 @@ import { useEncuentroDetail } from "../../app_layout/hooks/Encuentros/useEncuent
 import axiosInstance from "@/commons/utils/axiosInstance";
 
 // Add this date formatting helper function at the top of the file
+import { logger } from "@/lib/logger";
 const formatDate = (dateString: string): string => {
   try {
     const date = new Date(dateString);
@@ -21,7 +22,7 @@ const formatDate = (dateString: string): string => {
       minute: "2-digit",
     }).format(date);
   } catch (error) {
-    console.error("Error formatting date:", error);
+    logger.error("Error formatting date:", error);
     return "Sin fecha";
   }
 };
@@ -146,23 +147,23 @@ export function useEncuentroHeader(
   useEffect(() => {
     if (encuentro) {
       // Set encounter name
-      if (encuentro.nombre_encuentro) {
-        setEncounterName(encuentro.nombre_encuentro);
+      if (encuentro.encounter_name) {
+        setEncounterName(encuentro.encounter_name);
       }
 
       // Set encounter date with formatting
-      if (encuentro.fecha) {
-        setEncounterDate(formatDate(encuentro.fecha));
-        setOriginalEncounterDateString(encuentro.fecha);
+      if (encuentro.occurred_at) {
+        setEncounterDate(formatDate(encuentro.occurred_at));
+        setOriginalEncounterDateString(encuentro.occurred_at);
       }
 
       // Set patient connection state
-      setIsPatientConnected(!!encuentro.paciente_conectado);
+      setIsPatientConnected(!!encuentro.patient_connected);
 
       // Set patient data if connected
-      if (encuentro.paciente_conectado) {
-        setPatientId(encuentro.id_paciente || null);
-        setPatientName(encuentro.nombre_paciente || "");
+      if (encuentro.patient_connected) {
+        setPatientId(encuentro.patient_id || null);
+        setPatientName(encuentro.patient_name || "");
       } else {
         setPatientId(null);
         setPatientName("");
@@ -195,7 +196,7 @@ export function useEncuentroHeader(
           setRedirectCountdown(0);
         }, 500);
       } else {
-        console.log(`Attempting navigation to: ${redirectInfo.path}`);
+        logger.debug(`Attempting navigation to: ${redirectInfo.path}`);
         try {
           navigate(redirectInfo.path, { replace: true });
           setTimeout(() => {
@@ -204,12 +205,12 @@ export function useEncuentroHeader(
                 `/encuentro/${encounterIdFromUrl}`
               )
             ) {
-              console.log(`Using fallback navigation to: ${redirectInfo.path}`);
+              logger.debug(`Using fallback navigation to: ${redirectInfo.path}`);
               window.location.href = redirectInfo.path;
             }
           }, 200);
         } catch (err) {
-          console.error("Navigation error:", err);
+          logger.error("Navigation error:", err);
           window.location.href = redirectInfo.path;
         }
       }
@@ -251,12 +252,12 @@ export function useEncuentroHeader(
       // Format date for the API
       const isoDate = newDate.toISOString();
 
-      console.log(`Updating encounter date to: ${isoDate}`);
+      logger.debug(`Updating encounter date to: ${isoDate}`);
 
       const response = await axiosInstance.patch(
-        `/api/encuentros/${encounterIdFromUrl}`,
+        `/api/encounters/${encounterIdFromUrl}`,
         {
-          fecha: isoDate,
+          occurred_at: isoDate,
         }
       );
 
@@ -264,14 +265,14 @@ export function useEncuentroHeader(
         // Update local state with formatted date
         setEncounterDate(formatDate(isoDate));
         setOriginalEncounterDateString(isoDate);
-        console.log("Encounter date updated successfully");
+        logger.debug("Encounter date updated successfully");
         return true;
       } else {
-        console.error("Failed to update encounter date:", response);
+        logger.error("Failed to update encounter date:", response);
         return false;
       }
     } catch (error) {
-      console.error("Error updating encounter date:", error);
+      logger.error("Error updating encounter date:", error);
       return false;
     } finally {
       setIsDateUpdating(false);
@@ -285,14 +286,14 @@ export function useEncuentroHeader(
     patientId: number,
     patientName: string
   ) => {
-    console.log(`Selected patient: ID=${patientId}, Name=${patientName}`);
+    logger.debug(`Selected patient: ID=${patientId}, Name=${patientName}`);
 
     // Use updateEncounter to update the patient connection in the database
     // Also set the encounter name to match the patient name
     const success = await updateEncounter(encounterIdFromUrl, {
-      id_paciente: patientId,
-      paciente_conectado: true,
-      nombre_encuentro: patientName, // Add this line to update encounter name
+      patient_id: patientId,
+      patient_connected: true,
+      encounter_name: patientName,
     });
 
     if (success) {
@@ -308,7 +309,7 @@ export function useEncuentroHeader(
       // Call the callback function to update UI state
       onUpdatePatient(patientId, patientName);
     } else {
-      console.error("Failed to update patient connection");
+      logger.error("Failed to update patient connection");
     }
   };
 
@@ -316,7 +317,7 @@ export function useEncuentroHeader(
    * Handle patient creation from modal
    */
   const handleCreatePatient = (patientName: string) => {
-    console.log(`New patient created: ${patientName}`);
+    logger.debug(`New patient created: ${patientName}`);
     // The actual update is handled in handleSelectPatient which is also called
   };
 
@@ -328,15 +329,15 @@ export function useEncuentroHeader(
     patientName: string,
     encounterName: string
   ) => {
-    console.log(
+    logger.debug(
       `Updating both patient and encounter: PatientID=${patientId}, PatientName=${patientName}, EncounterName=${encounterName}`
     );
 
     // Use updateEncounter to update both the patient and encounter name in the database
     const success = await updateEncounter(encounterIdFromUrl, {
-      id_paciente: patientId,
-      paciente_conectado: true,
-      nombre_encuentro: encounterName,
+      patient_id: patientId,
+      patient_connected: true,
+      encounter_name: encounterName,
     });
 
     if (success) {
@@ -351,7 +352,7 @@ export function useEncuentroHeader(
       // Call the callback function to update UI state
       onUpdatePatientAndEncounter(patientId, patientName, encounterName);
     } else {
-      console.error("Failed to update patient and encounter information");
+      logger.error("Failed to update patient and encounter information");
     }
   };
 
@@ -368,13 +369,13 @@ export function useEncuentroHeader(
    */
   const handleUnlinkConfirm = async () => {
     const success = await updateEncounter(encounterIdFromUrl, {
-      paciente_conectado: false,
-      id_paciente: null,
-      nombre_encuentro: "Encuentro Nuevo", // Reset encounter name
+      patient_connected: false,
+      patient_id: null,
+      encounter_name: "Encuentro Nuevo",
     });
 
     if (success) {
-      console.log("Patient unlinked successfully");
+      logger.debug("Patient unlinked successfully");
       // Here you would update local state or refresh the page
       window.location.reload(); // Simple reload for now
     }
@@ -397,7 +398,7 @@ export function useEncuentroHeader(
     const result = await deleteEncounter();
 
     if (result.success) {
-      console.log("Encounter deleted successfully");
+      logger.debug("Encounter deleted successfully");
       setDeleteSuccess(true);
       setProgressPercentage(0); // Reset progress percentage
 
@@ -411,7 +412,7 @@ export function useEncuentroHeader(
         if (nextEncounter) {
           setRedirectInfo({
             path: `/encuentro/${nextEncounter.id}`,
-            name: nextEncounter.nombre_encuentro,
+            name: nextEncounter.encounter_name,
           });
         } else {
           setRedirectInfo({
@@ -430,7 +431,7 @@ export function useEncuentroHeader(
       setDeleteErrorMessage(
         "Error al eliminar el encuentro. Por favor intente nuevamente."
       );
-      console.error("Error deleting encounter:", result);
+      logger.error("Error deleting encounter:", result);
     }
   };
 

@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { DocumentoOut } from "@/types/documento";
 import axiosInstance from "@/commons/utils/axiosInstance";
+import { logger } from "@/lib/logger";
 
 // Define the context type
 type DocumentContextType = {
@@ -63,13 +64,13 @@ export function DocumentProvider({
    */
   const fetchDocuments = useCallback(async () => {
     if (!encounterId || loading) {
-      console.log(
+      logger.debug(
         `[DOC_CONTEXT] fetchDocuments skipped (encounterId: ${encounterId}, loading: ${loading})`
       );
       return;
     }
 
-    console.log(
+    logger.debug(
       `[DOC_CONTEXT] Attempting to fetch documents for encounter ${encounterId}`
     );
     setLoading(true);
@@ -77,11 +78,11 @@ export function DocumentProvider({
 
     try {
       const response = await axiosInstance.get(
-        `/api/documento/encuentro/${encounterId}`
+        `/api/documents/encounter/${encounterId}`
       );
       const data = response.data;
 
-      console.log(
+      logger.debug(
         `[DOC_CONTEXT] Successfully fetched ${data.length} documents for encounter ${encounterId}`
       );
       setDocuments(data);
@@ -90,8 +91,8 @@ export function DocumentProvider({
       setActiveDocumentId((prevActiveId) => {
         if (data.length > 0 && !prevActiveId) {
           const sortedDocs = [...data].sort((a, b) => {
-            const dateA = new Date(a.fecha_creacion).getTime();
-            const dateB = new Date(b.fecha_creacion).getTime();
+            const dateA = new Date(a.created_on).getTime();
+            const dateB = new Date(b.created_on).getTime();
             if (dateA !== dateB) return dateA - dateB;
             return a.id - b.id;
           });
@@ -102,7 +103,7 @@ export function DocumentProvider({
 
       setError(null);
     } catch (err: any) {
-      console.error(
+      logger.error(
         `[DOC_CONTEXT] Failed to fetch documents for encounter ${encounterId}:`,
         err
       );
@@ -137,7 +138,7 @@ export function DocumentProvider({
   const saveDocument = useCallback(async (docId: number, content: string) => {
     try {
       setIsSaving(true);
-      console.log(
+      logger.debug(
         `[DOC_SAVE] Document ${docId}: Saving content (${content.length} chars)`
       );
 
@@ -151,36 +152,36 @@ export function DocumentProvider({
           const tempDiv = document.createElement("div");
           tempDiv.innerHTML = content;
           finalContent = tempDiv.textContent || "";
-          console.log(`[DOC_SAVE] Document ${docId}: Stripped HTML tags`);
+          logger.debug(`[DOC_SAVE] Document ${docId}: Stripped HTML tags`);
         } catch (e) {
           // Fallback: Use regex to strip HTML tags
           finalContent = content.replace(/<[^>]*>/g, "");
-          console.log(
+          logger.debug(
             `[DOC_SAVE] Document ${docId}: Stripped HTML tags (regex fallback)`
           );
         }
       }
 
-      console.log(
+      logger.debug(
         `[DOC_SAVE] Document ${docId}: Final content length: ${finalContent.length} chars`
       );
 
       // Send the update
-      await axiosInstance.patch(`/api/documento_by_editor/${docId}`, {
-        contenido: finalContent,
+      await axiosInstance.patch(`/api/documents/by-editor/${docId}`, {
+        content: finalContent,
       });
 
       // Update local document data
       setDocuments((docs) =>
         docs.map((doc) =>
-          doc.id === docId ? { ...doc, contenido: finalContent } : doc
+          doc.id === docId ? { ...doc, content: finalContent } : doc
         )
       );
 
-      console.log(`[DOC_SAVE ✅] Document ${docId}: Saved successfully`);
+      logger.debug(`[DOC_SAVE ✅] Document ${docId}: Saved successfully`);
       return true;
     } catch (err: any) {
-      console.error(`[DOC_SAVE ❌] Document ${docId}: Error saving:`, err);
+      logger.error(`[DOC_SAVE ❌] Document ${docId}: Error saving:`, err);
       // Store failed save for retry
       setPendingSave({ id: docId, content });
       throw err; // Re-throw to allow handling in components
@@ -200,10 +201,10 @@ export function DocumentProvider({
     async (documentType: string, content: string = "") => {
       try {
         setLoading(true);
-        const response = await axiosInstance.post("/api/documento/", {
-          id_encuentro: encounterId,
-          tipo: documentType,
-          contenido: content,
+        const response = await axiosInstance.post("/api/documents", {
+          encounter_id: encounterId,
+          kind: documentType,
+          content,
         });
 
         const newDocument = response.data;
@@ -216,7 +217,7 @@ export function DocumentProvider({
 
         return newDocument;
       } catch (err: any) {
-        console.error("Failed to create document:", err);
+        logger.error("Failed to create document:", err);
         setError(
           err.response?.data?.detail ||
             err.message ||
@@ -240,7 +241,7 @@ export function DocumentProvider({
     async (docId: number) => {
       try {
         setLoading(true);
-        await axiosInstance.delete(`/api/documento/${docId}`);
+        await axiosInstance.delete(`/api/documents/${docId}`);
 
         // Remove document from local state
         setDocuments((docs) => docs.filter((doc) => doc.id !== docId));
@@ -255,7 +256,7 @@ export function DocumentProvider({
 
         return true;
       } catch (err: any) {
-        console.error("Failed to delete document:", err);
+        logger.error("Failed to delete document:", err);
         setError(
           err.response?.data?.detail ||
             err.message ||
@@ -278,12 +279,12 @@ export function DocumentProvider({
   useEffect(() => {
     if (encounterId) {
       if (encounterId !== loadedEncounterIdRef.current) {
-        console.log(
+        logger.debug(
           `[DOC_CONTEXT] Encounter changed to ${encounterId} (previously loaded: ${loadedEncounterIdRef.current}). Fetching documents.`
         );
         fetchDocuments(); // Initiate fetch
       } else {
-        console.log(
+        logger.debug(
           `[DOC_CONTEXT] Encounter ${encounterId} documents already loaded. Skipping fetch.`
         );
         // Ensure loading state is correct if we skipped fetch but it might have been true
@@ -291,7 +292,7 @@ export function DocumentProvider({
       }
     } else {
       // Handle encounterId becoming null/invalid
-      console.log(
+      logger.debug(
         `[DOC_CONTEXT] encounterId is null or invalid. Resetting state.`
       );
       setDocuments([]);
@@ -303,7 +304,7 @@ export function DocumentProvider({
 
     // Cleanup function (optional) - no changes needed here
     return () => {
-      // console.log(`[DOC_CONTEXT] Cleanup for encounter effect (current encounterId: ${encounterId})`);
+      // logger.debug(`[DOC_CONTEXT] Cleanup for encounter effect (current encounterId: ${encounterId})`);
     };
   }, [encounterId, fetchDocuments]); // NEW - Corrected dependency array
 

@@ -10,6 +10,7 @@ import sys
 import json
 from .base import *  # noqa: F403, F401
 
+globals().pop("LOGGING", None)
 
 # Initialize logging configuration first to capture any startup errors
 def configure_json_logging():
@@ -333,7 +334,7 @@ CORS_PREFLIGHT_MAX_AGE = 86400  # 24 hours
 CSRF_TRUSTED_ORIGINS = ["https://medapp.sebastianmoreno.lat"]
 
 # Make sure logging is configured to capture CORS-related messages
-logging.getLogger("apps.core.cors_skip_middleware").setLevel(logging.DEBUG)
+logging.getLogger("apps.core.middleware").setLevel(logging.DEBUG)
 
 # Log successful initialization
 logging.info("Test settings loaded successfully")

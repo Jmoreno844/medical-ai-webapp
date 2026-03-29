@@ -3,12 +3,12 @@ import Modal from "@/commons/components/Modal";
 
 interface Plantilla {
   id: number;
-  nombre: string;
-  tipo_documento: string;
-  fecha_creacion: string;
-  es_base: boolean;
-  veces_usada: number;
-  ultimo_uso: string | null;
+  name: string;
+  document_kind: string;
+  created_at: string;
+  is_base: boolean;
+  use_count: number;
+  last_used_at: string | null;
 }
 
 interface DocumentGenerationModalProps {
@@ -50,8 +50,8 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Generate Medical Documentation"
-      primaryButtonText="Generate"
+      title="Generar documentación clínica"
+      primaryButtonText="Generar"
       onPrimaryAction={onGenerate}
       isPrimaryDisabled={isGenerating || !selectedPlantillaId}
       primaryButtonVariant="purple"
@@ -74,7 +74,7 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
             htmlFor="search-plantillas"
             className="block text-sm font-medium text-gray-700 mb-1"
           >
-            Search Templates
+            Buscar plantillas
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
@@ -97,7 +97,7 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
               id="search-plantillas"
               type="search"
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Search by name..."
+              placeholder="Buscar por nombre…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -107,14 +107,14 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
         {/* Plantillas selection */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Select a Template
+            Elija una plantilla
           </label>
           <div className="border border-gray-300 rounded-md overflow-hidden max-h-64 overflow-y-auto">
             {isLoadingPlantillas ? (
               <div className="flex items-center justify-center p-4">
                 <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-600 mr-2"></div>
                 <span className="text-sm text-gray-600">
-                  Loading templates...
+                  Cargando plantillas…
                 </span>
               </div>
             ) : plantillasError ? (
@@ -124,8 +124,8 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
             ) : plantillas.length === 0 ? (
               <div className="p-4 text-sm text-gray-500 text-center">
                 {searchQuery
-                  ? "No templates found with that name"
-                  : "No templates available"}
+                  ? "No hay plantillas con ese nombre"
+                  : "No hay plantillas disponibles"}
               </div>
             ) : (
               <div className="divide-y divide-gray-200">
@@ -150,15 +150,15 @@ const DocumentGenerationModal: React.FC<DocumentGenerationModalProps> = ({
                             isSelected ? "text-blue-700" : "text-gray-700"
                           }`}
                         >
-                          {plantilla.nombre}
+                          {plantilla.name}
                         </span>
                       </div>
                       <div className="mt-1 text-xs text-gray-500">
-                        <span className="mr-3">{plantilla.tipo_documento}</span>
+                        <span className="mr-3">{plantilla.document_kind}</span>
                         <span>
-                          {plantilla.es_base
-                            ? "Base Template"
-                            : `Used ${plantilla.veces_usada} times`}
+                          {plantilla.is_base
+                            ? "Plantilla base"
+                            : `Usada ${plantilla.use_count} veces`}
                         </span>
                       </div>
                     </div>

@@ -1,4 +1,5 @@
 import { EditorState, $getRoot } from "lexical";
+import { logger } from "@/lib/logger";
 
 /**
  * Extracts plain text content from an editor state
@@ -48,7 +49,7 @@ export const cleanHtml = (html: string, removeParagraphTags = true): string => {
     // Fallback: Use regex to extract text content
     return html.replace(/<[^>]*>/g, "");
   } catch (error) {
-    console.error("HTML cleaning failed:", error);
+    logger.error("HTML cleaning failed:", error);
     // Fallback - use regex to extract text content
     return html.replace(/<[^>]*>/g, "");
   }

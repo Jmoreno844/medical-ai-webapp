@@ -17,6 +17,7 @@ las **instrucciones orientadas al asistente de IA** están en [`ai-instructions/
 | [`secrets_and_environments.md`](secrets_and_environments.md) | Política de secretos por entorno (`DJANGO_SECRET_KEY`, `JWT_SECRET_KEY`, GCP) y módulos de settings explícitos. | Despliegue, seguridad, onboarding. |
 | [`docker.md`](docker.md) | Rol de `Dockerfile`, `Dockerfile.test`, Compose y scripts bajo `scripts/docker/`. | Dev local y CI. |
 | [`english_rename_map.md`](english_rename_map.md) | Tablas de correspondencia español/mixto → identificadores técnicos en inglés (apps, modelos, rutas, JWT). Texto explicativo en español. | Refactors y revisiones de contrato. |
+| [`logging_and_observability.md`](logging_and_observability.md) | Niveles de log Django (`DJANGO_LOG_LEVEL`), política en Cloud Functions y enlace a docs del frontend. | Operación, seguridad, debugging. |
 
 ---
 

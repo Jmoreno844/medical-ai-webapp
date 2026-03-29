@@ -71,7 +71,7 @@ const VoiceRecorder: React.FC = () => {
         {" "}
         {/* Added padding */}
         <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-gray-500"></div>
-        <span className="text-gray-500">Checking audio...</span>
+        <span className="text-gray-500">Comprobando audio…</span>
       </div>
     );
   }

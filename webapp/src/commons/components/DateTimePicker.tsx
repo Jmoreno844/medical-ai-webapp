@@ -1,6 +1,7 @@
 import * as React from "react";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/commons/components/ui/button";
@@ -176,7 +177,7 @@ export function DateTimePicker({
           {currentDate instanceof Date ? (
             format(currentDate, "dd/MM/yyyy HH:mm")
           ) : (
-            <span>DD/MM/YYYY HH:MM</span>
+            <span>dd/mm/aaaa hh:mm</span>
           )}
         </Button>
       </PopoverTrigger>
@@ -193,6 +194,7 @@ export function DateTimePicker({
             selected={currentDate}
             onSelect={handleDateSelect}
             initialFocus
+            locale={es}
             className="bg-white"
             classNames={{
               day_selected:

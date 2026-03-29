@@ -23,6 +23,7 @@ import { useTranscriptionContext } from "../../../contexts/TranscriptionContext"
 
 // Import utilities
 import { createEditorConfig } from "./utils/editorConfig";
+import { logger } from "@/lib/logger";
 
 const TextArea: React.FC = () => {
   // Get state from contexts instead of props
@@ -53,21 +54,21 @@ const TextArea: React.FC = () => {
       activeDocument &&
       editorRefreshTrigger !== previousRefreshTriggerRef.current
     ) {
-      console.log(
+      logger.debug(
         `[TEXT_AREA] Refresh trigger changed to ${editorRefreshTrigger} for document ${activeDocument.id}`
       );
       previousRefreshTriggerRef.current = editorRefreshTrigger;
 
       // Check if the document is already in the cache
       if (documentContentCache.has(activeDocument.id)) {
-        console.log(
+        logger.debug(
           `[TEXT_AREA] Document ${activeDocument.id} already in cache, skipping reloadContent`
         );
         return; // Skip reloadContent if already cached
       }
 
       if (typeof reloadContent === "function") {
-        console.log(
+        logger.debug(
           `[TEXT_AREA] Calling reloadContent for document ${activeDocument.id}`
         );
         const forceRefresh = false;
@@ -85,10 +86,10 @@ const TextArea: React.FC = () => {
   useEffect(() => {
     if (
       transcriptionCompleteTimestamp &&
-      activeDocument?.tipo === "transcripcion" &&
+      activeDocument?.kind === "transcription" &&
       activeDocument.id === previousDocIdRef.current
     ) {
-      console.log(
+      logger.debug(
         `[TEXT_AREA] Transcription completed at ${new Date(
           transcriptionCompleteTimestamp
         ).toISOString()}`
@@ -103,7 +104,7 @@ const TextArea: React.FC = () => {
     async (docId: number, content: string) => {
       // Prevent saving empty content for documents that previously had content
       if (contentLoadedSuccessfully && content.trim() === "") {
-        console.error(
+        logger.error(
           "Prevented saving empty content for a document that previously had content"
         );
         return;
@@ -119,7 +120,7 @@ const TextArea: React.FC = () => {
     if (!activeDocument) return;
 
     if (activeDocument.id !== previousDocIdRef.current) {
-      console.log(
+      logger.debug(
         `[DOC_SWITCH] Changed from document ${previousDocIdRef.current} to ${activeDocument.id}`
       );
       previousDocIdRef.current = activeDocument.id;
@@ -145,14 +146,14 @@ const TextArea: React.FC = () => {
   if (!activeDocument) {
     return (
       <div className="flex items-center justify-center h-full text-gray-600 text-xl font-medium">
-        Select a document
+        Seleccione un documento
       </div>
     );
   }
 
   // Error handler for Lexical
   function onError(error: Error) {
-    console.error("Lexical Editor error:", error);
+    logger.error("Lexical Editor error:", error);
   }
 
   // Create editor configuration
@@ -171,7 +172,7 @@ const TextArea: React.FC = () => {
       {/* Loading indicator */}
       {isLoadingContent && (
         <div className="bg-gray-100 p-2 text-center text-gray-600 text-sm">
-          Loading content...
+          Cargando contenido…
         </div>
       )}
 
@@ -183,11 +184,11 @@ const TextArea: React.FC = () => {
             <div className="flex items-center">
               <div className="animate-pulse h-3 w-3 rounded-full bg-purple-500 mr-2"></div>
               <span className="text-purple-800 font-medium">
-                Generating document...
+                Generando documento…
               </span>
             </div>
             <div className="text-purple-600 text-sm w-24 text-right">
-              {streamingContent.length} characters
+              {streamingContent.length} caracteres
             </div>
           </div>
 
@@ -229,7 +230,7 @@ const TextArea: React.FC = () => {
                 clipRule="evenodd"
               />
             </svg>
-            <span className="font-medium">Document generated successfully</span>
+            <span className="font-medium">Documento generado correctamente</span>
           </div>
         </div>
       )}
@@ -254,7 +255,7 @@ const TextArea: React.FC = () => {
               }
               placeholder={
                 <div className="text-gray-400 absolute top-3 left-4 pointer-events-none">
-                  {activeDocument.tipo === "transcripcion"
+                  {activeDocument.kind === "transcription"
                     ? ""
                     : "Start typing..."}
                 </div>
@@ -272,14 +273,14 @@ const TextArea: React.FC = () => {
               refreshTrigger={editorRefreshTrigger}
               forceRefresh={false}
               streamingContent={streamingContent}
-              documentType={activeDocument.tipo}
+              documentType={activeDocument.kind}
             />
             <ReadOnlyPlugin
-              isReadOnly={activeDocument.tipo === "transcripcion"}
+              isReadOnly={activeDocument.kind === "transcription"}
             />
 
             {/* Conditional plugins for edit mode */}
-            {activeDocument.tipo !== "transcripcion" && (
+            {activeDocument.kind !== "transcription" && (
               <>
                 <AutoFocusPlugin />
                 <AutoSavePlugin

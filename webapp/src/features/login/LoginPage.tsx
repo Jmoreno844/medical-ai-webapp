@@ -13,7 +13,7 @@ export default function LoginPage() {
       <div className="relative hidden bg-neutral-100 lg:block dark:bg-neutral-800 rounded-xl overflow-hidden h-full">
         <img
           src="/hero_image.jpeg"
-          alt="Medical Services"
+          alt="Servicios médicos"
           className="object-cover w-full h-full dark:brightness-[0.3] dark:grayscale"
         />
         <div className="absolute inset-0 bg-main/10 dark:bg-main_dark/20"></div>

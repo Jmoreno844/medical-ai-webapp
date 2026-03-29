@@ -16,7 +16,7 @@ const StartStopButton: React.FC<StartStopButtonProps> = ({
                 : "bg-purple-500 hover:bg-purple-600"
         }`}
     >
-        {isRecording ? "Stop" : "Start"} Recording
+        {isRecording ? "Detener" : "Iniciar"} grabación
     </button>
 );
 

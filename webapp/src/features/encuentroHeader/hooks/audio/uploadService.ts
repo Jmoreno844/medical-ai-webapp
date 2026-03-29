@@ -1,4 +1,5 @@
 import axiosInstance from "@/commons/utils/axiosInstance";
+import { logger } from "@/lib/logger";
 
 /**
  * Upload audio to cloud storage
@@ -14,34 +15,31 @@ export const uploadAudioToCloud = async (
   contentType: string = "audio/webm"
 ): Promise<boolean> => {
   try {
-    console.log(`[VOICE_RECORDER] Starting audio upload to GCS`);
-    console.log(
+    logger.debug(`[VOICE_RECORDER] Starting audio upload to GCS`);
+    logger.debug(
       `[VOICE_RECORDER] Uploading audio with content type: ${contentType}`
     );
 
-    // Use native fetch API instead of axiosInstance
     const uploadResponse = await fetch(uploadUrl, {
       method: "PUT",
       body: blob,
       headers: {
         "Content-Type": contentType,
       },
-      // Important! Don't send credentials or CSRF tokens
       credentials: "omit",
       mode: "cors",
     });
 
     if (uploadResponse.ok) {
-      console.log("[VOICE_RECORDER] Audio upload successful");
+      logger.debug("[VOICE_RECORDER] Audio upload successful");
       return true;
-    } else {
-      console.error(
-        `[VOICE_RECORDER] Upload failed with status: ${uploadResponse.status} ${uploadResponse.statusText}`
-      );
-      return false;
     }
+    logger.error(
+      `[VOICE_RECORDER] Upload failed with status: ${uploadResponse.status} ${uploadResponse.statusText}`
+    );
+    return false;
   } catch (error) {
-    console.error("[VOICE_RECORDER] Exception during GCS upload:", error);
+    logger.error("[VOICE_RECORDER] Exception during GCS upload:", error);
     return false;
   }
 };
@@ -58,21 +56,22 @@ export const generateAudioUploadUrl = async (
   audioDurationSeconds: number
 ): Promise<string | null> => {
   try {
-    console.log(
+    logger.debug(
       `[VOICE_RECORDER] Generating upload URL for encounter ${encounterId} with duration ${audioDurationSeconds}s`
     );
 
     const response = await axiosInstance.post(
-      `/api/generar_url_audio/${encounterId}`,
+      `/api/encounters/${encounterId}/audio/upload-url`,
       { audio_duration_seconds: audioDurationSeconds }
     );
 
-    console.log(`[VOICE_RECORDER] Upload URL generated successfully`);
-    console.log(`[VOICE_RECORDER] API response:`, response.data);
-    console.log(`[VOICE_RECORDER] Upload URL:`, response.data.upload_url);
+    logger.debug(
+      "[VOICE_RECORDER] Upload URL generated (has_url=%s)",
+      Boolean(response.data?.upload_url)
+    );
     return response.data.upload_url;
   } catch (error) {
-    console.error("[VOICE_RECORDER] Failed to generate upload URL:", error);
+    logger.error("[VOICE_RECORDER] Failed to generate upload URL:", error);
     return null;
   }
 };

@@ -19,7 +19,7 @@ const MicrophoneIcon: React.FC<MicrophoneIconProps> = ({
   return (
     <img
       src={iconSrc}
-      alt="Microphone status"
+      alt="Estado del micrófono"
       width={24}
       height={24}
       className={iconClass}

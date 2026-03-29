@@ -9,7 +9,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({ duration }) => (
   <div className="flex items-center space-x-2">
     <img
       src="/clock.svg"
-      alt="Timer"
+      alt="Cronómetro"
       width={24}
       height={24}
       className="text-gray-500"

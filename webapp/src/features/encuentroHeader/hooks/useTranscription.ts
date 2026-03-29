@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import axiosInstance from "@/commons/utils/axiosInstance";
+import { logger } from "@/lib/logger";
 const API_URL = import.meta.env.VITE_API_URL;
 
 type TranscriptionStatus = "idle" | "pending" | "success" | "error";
@@ -26,7 +27,7 @@ export const useTranscription = (onTranscriptionComplete?: () => void) => {
 
   // Function to get a secure SSE token
   const getSSEToken = async (id_documento: number): Promise<string | null> => {
-    console.log(
+    logger.debug(
       `[USE_TRANSCRIPTION] Requesting SSE token for document ${id_documento}`
     );
     try {
@@ -34,19 +35,19 @@ export const useTranscription = (onTranscriptionComplete?: () => void) => {
         `/api/generate-sse-token/${id_documento}`
       );
       if (response.data.success && response.data.token) {
-        console.log(
+        logger.debug(
           `[USE_TRANSCRIPTION] Received SSE token for document ${id_documento}`
         );
         return response.data.token;
       } else {
-        console.error(
+        logger.error(
           "[USE_TRANSCRIPTION] Failed to get SSE token:",
           response.data.error
         );
         return null;
       }
     } catch (error) {
-      console.error("[USE_TRANSCRIPTION] Error getting SSE token:", error);
+      logger.error("[USE_TRANSCRIPTION] Error getting SSE token:", error);
       return null;
     }
   };
@@ -55,12 +56,12 @@ export const useTranscription = (onTranscriptionComplete?: () => void) => {
   const subscribeToTranscriptionUpdates = async (
     id_documento: number
   ): Promise<boolean> => {
-    console.log(
+    logger.debug(
       `[USE_TRANSCRIPTION] Subscribing to transcription updates for document ${id_documento}`
     );
     // First close any existing connections
     if (eventSourceRef.current) {
-      console.log("[USE_TRANSCRIPTION] Closing existing SSE connection");
+      logger.debug("[USE_TRANSCRIPTION] Closing existing SSE connection");
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
@@ -75,8 +76,8 @@ export const useTranscription = (onTranscriptionComplete?: () => void) => {
 
       // Create full URL to the SSE endpoint with secure token using API URL from env
       const apiBaseUrl = API_URL.endsWith("/") ? API_URL.slice(0, -1) : API_URL;
-      const sseUrl = `${apiBaseUrl}/api/sse/documento/${id_documento}/${token}`;
-      console.log(`[USE_TRANSCRIPTION] Connecting to SSE endpoint: ${sseUrl}`);
+      const sseUrl = `${apiBaseUrl}/api/sse/document/${id_documento}/${token}`;
+      logger.debug(`[USE_TRANSCRIPTION] Connecting to SSE endpoint: ${sseUrl}`);
 
       // Create a new EventSource connection
       const eventSource = new EventSource(sseUrl);
@@ -84,27 +85,27 @@ export const useTranscription = (onTranscriptionComplete?: () => void) => {
 
       // Connection opened
       eventSource.onopen = () => {
-        console.log(
+        logger.debug(
           `[USE_TRANSCRIPTION] SSE connection established for document ${id_documento}`
         );
       };
 
       // Message received
       eventSource.onmessage = (event) => {
-        console.log("[USE_TRANSCRIPTION] SSE message received", event.data);
+        logger.debug("[USE_TRANSCRIPTION] SSE message received", event.data);
         try {
           const data = JSON.parse(event.data);
-          console.log("[USE_TRANSCRIPTION] Parsed SSE data:", data);
+          logger.debug("[USE_TRANSCRIPTION] Parsed SSE data:", data);
 
           if (data.event === "transcription_complete") {
-            console.log(
+            logger.debug(
               `[USE_TRANSCRIPTION] Transcription completed for document ${id_documento}`
             );
             setTranscriptionStatus("success");
 
             // Call the callback when transcription completes
             if (onTranscriptionComplete) {
-              console.log(
+              logger.debug(
                 "[USE_TRANSCRIPTION] Calling onTranscriptionComplete callback"
               );
               onTranscriptionComplete();
@@ -115,7 +116,7 @@ export const useTranscription = (onTranscriptionComplete?: () => void) => {
             eventSourceRef.current = null;
           }
         } catch (error) {
-          console.error(
+          logger.error(
             "[USE_TRANSCRIPTION] Error parsing SSE message:",
             error
           );
@@ -124,7 +125,7 @@ export const useTranscription = (onTranscriptionComplete?: () => void) => {
 
       // Error handling
       eventSource.onerror = (error) => {
-        console.error("[USE_TRANSCRIPTION] SSE connection error:", error);
+        logger.error("[USE_TRANSCRIPTION] SSE connection error:", error);
         setErrorMessage("Error in real-time updates connection");
 
         // Close the connection on error
@@ -134,7 +135,7 @@ export const useTranscription = (onTranscriptionComplete?: () => void) => {
 
       return true;
     } catch (error) {
-      console.error(
+      logger.error(
         "[USE_TRANSCRIPTION] Error creating SSE connection:",
         error
       );
@@ -163,21 +164,21 @@ export const useTranscription = (onTranscriptionComplete?: () => void) => {
 
       // Make API call to the simplified transcription endpoint
       const response = await axiosInstance.post(
-        `api/iniciar_transcripcion`,
+        `/api/transcription/start`,
         {
-          id_documento: id_documento_transcripcion,
-          id_encuentro: id_encuentro,
+          document_id: id_documento_transcripcion,
+          encounter_id: id_encuentro,
         },
-        { timeout: 60000 } // 60 seconds timeout for long transcription
+        { timeout: 60000 }
       );
 
       // Note: We don't immediately set success here anymore
       // The status will be updated via SSE when transcription completes
-      console.log("Transcription initiated:", response.data);
+      logger.debug("Transcription initiated:", response.data);
 
       return response.data;
     } catch (error: any) {
-      console.error("Transcription error:", error);
+      logger.error("Transcription error:", error);
       setTranscriptionStatus("error");
       setErrorMessage(
         error.response?.data?.message ||

@@ -107,10 +107,10 @@ def login_user(request, data: UserLoginIn):
 
     Creates a server-side session and sets session cookie.
     """
-    logger.info(f"Login attempt for email: {data.email}")
+    logger.info("Login attempt")
     user = authenticate(request, email=data.email, password=data.password)
     if user is None:
-        logger.warning(f"Failed login attempt for email: {data.email}")
+        logger.warning("Failed login attempt (invalid credentials)")
         return 401, {"message": "Invalid credentials"}
 
     login(request, user)
@@ -207,9 +207,11 @@ def me(request):
         401: Error message if session is invalid or expired
     """
     logger.debug(
-        f"Session check: authenticated={request.user.is_authenticated if hasattr(request, 'user') else 'No user'}"
+        "Session check: authenticated=%s",
+        getattr(request.user, "is_authenticated", False)
+        if hasattr(request, "user")
+        else False,
     )
-    logger.debug(f"Session ID: {request.session.session_key}")
 
     if not request.user or not request.user.is_authenticated:
         return 401, {"message": "Session not validated"}

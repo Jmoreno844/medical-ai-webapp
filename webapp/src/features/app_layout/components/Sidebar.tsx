@@ -61,7 +61,7 @@ const Sidebar = () => {
             <div className="absolute right-0 pr-2">
               <IconButton
                 src="/close_sidebar.svg"
-                alt="Close"
+                alt="Cerrar barra lateral"
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsExpanded(false);
@@ -86,8 +86,7 @@ const Sidebar = () => {
                   }
                 }}
                 className={`flex items-center cursor-pointer h-8 md:h-10 w-10/12 mx-auto rounded-lg  ${
-                  item.label === "Create Encounter" ||
-                  item.label === "Creating..."
+                  item.icon === "/plus.svg"
                     ? "bg-purple-600 hover:!bg-purple-700"
                     : "hover:bg-gray-100 "
                 }`}
@@ -107,8 +106,7 @@ const Sidebar = () => {
                         <Icon
                           src={item.icon}
                           className={`h-8 w-4 md:h-5 md:w-5 ${
-                            item.label === "Create Encounter" ||
-                            item.label === "Creating..."
+                            item.icon === "/plus.svg"
                               ? "filter invert brightness-0 saturate-100" // Keep white icon for purple button
                               : "text-black"
                           }`}
@@ -118,9 +116,8 @@ const Sidebar = () => {
                       {isExpanded && (
                         <span
                           className={`pr-4 text-xs md:text-sm whitespace-nowrap ${
-                            item.label === "Create Encounter" ||
-                            item.label === "Creating..."
-                              ? "text-white font-medium" // Keep white text for teal button
+                            item.icon === "/plus.svg"
+                              ? "text-white font-medium" // Keep white text for purple button
                               : "text-black"
                           }`}
                         >
@@ -161,25 +158,18 @@ const Sidebar = () => {
                         />
                       </div>
                       {isExpanded && (
-                        <div className="flex flex-col leading-none">
-                          <span
-                            className={`text-xs md:text-sm ${"text-black"}`}
-                          >
-                            Recent
-                          </span>
-                          <span
-                            className={`text-xs md:text-sm ${"text-black"}`}
-                          >
-                            Encounters
-                          </span>
-                        </div>
+                        <span
+                          className={`pr-4 text-xs md:text-sm whitespace-nowrap text-black`}
+                        >
+                          {item.label}
+                        </span>
                       )}
                     </div>
                     {isExpanded && item.pointerIcon && (
                       <div className="flex items-center pr-2">
                         <Icon
                           src={item.pointerIcon}
-                          alt="Pointer icon"
+                          alt="Indicador"
                           className={`w-3 h-3 md:w-4 md:h-4 ${"text-black"}`}
                         />
                       </div>
@@ -209,7 +199,7 @@ const Sidebar = () => {
                 />
               </div>
               {isExpanded && (
-                <span className="text-xs md:text-sm">Log Out</span>
+                <span className="text-xs md:text-sm">Cerrar sesión</span>
               )}
             </button>
           </div>

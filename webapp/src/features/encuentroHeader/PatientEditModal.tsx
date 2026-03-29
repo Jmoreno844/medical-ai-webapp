@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { PatientEditModalProps } from "./utils/EncuentroHeaderInterface";
 import { usePatients, Patient } from "./hooks/usePatients";
+import { logger } from "@/lib/logger";
 
 /**
  * Component to render a single patient search result
@@ -12,13 +13,13 @@ const PatientSearchResult: React.FC<{
   <li
     key={patient.id}
     className="p-2 hover:bg-gray-100 cursor-pointer"
-    onClick={() => onSelect(patient.id, patient.nombre)}
+    onClick={() => onSelect(patient.id, patient.name)}
     role="option"
   >
     <div>
-      <span className="font-medium">{patient.nombre}</span>
-      {patient.resumen && (
-        <p className="text-xs text-gray-500 truncate mt-1">{patient.resumen}</p>
+      <span className="font-medium">{patient.name}</span>
+      {patient.summary && (
+        <p className="text-xs text-gray-500 truncate mt-1">{patient.summary}</p>
       )}
     </div>
   </li>
@@ -156,7 +157,7 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
       // Update our cache of known patients
       const updatedCache = new Map(foundPatientsCache);
       results.forEach((patient) => {
-        updatedCache.set(patient.nombre.toLowerCase(), patient.id);
+        updatedCache.set(patient.name.toLowerCase(), patient.id);
       });
       setFoundPatientsCache(updatedCache);
     }
@@ -194,12 +195,12 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
       const newPatient = await createPatient(patientName.trim());
 
       if (newPatient) {
-        console.log("Patient created successfully:", newPatient);
-        onCreatePatient(newPatient.nombre);
-        onSelectPatient(newPatient.id, newPatient.nombre);
+        logger.debug("Patient created successfully:", newPatient);
+        onCreatePatient(newPatient.name);
+        onSelectPatient(newPatient.id, newPatient.name);
         onClose();
       } else {
-        console.error("Failed to create patient");
+        logger.error("Failed to create patient");
       }
     }
   };
@@ -240,7 +241,9 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
         {/* Modal header */}
         <h2 className="text-xl font-semibold mb-4">
-          {isPatientConnected ? "Edit Patient Name" : "Link Patient"}
+          {isPatientConnected
+            ? "Editar nombre del paciente"
+            : "Vincular paciente"}
         </h2>
 
         {/* Modal content based on mode */}
@@ -251,7 +254,7 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
               htmlFor="connectedName"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              Patient or Encounter Name
+              Nombre del paciente o del encuentro
             </label>
             <input
               type="text"
@@ -259,7 +262,7 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
               value={connectedName}
               onChange={(e) => setConnectedName(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="Patient or Encounter Name"
+              placeholder="Nombre del paciente o del encuentro"
               data-testid="connected-name-input"
             />
           </div>
@@ -270,7 +273,7 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
               htmlFor="patientName"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              Patient Name
+              Nombre del paciente
             </label>
             <input
               type="text"
@@ -278,7 +281,7 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
               value={patientName}
               onChange={handlePatientNameChange}
               className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="Search existing patient or enter new"
+              placeholder="Buscar paciente existente o escribir uno nuevo"
               data-testid="patient-name-input"
             />
           </div>
@@ -298,7 +301,7 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
         {!isPatientConnected && isLoading ? (
           <div className="mb-4 p-2 text-center">
             <div className="inline-block animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-purple-500"></div>
-            <span className="ml-2">Searching...</span>
+            <span className="ml-2">Buscando…</span>
           </div>
         ) : (
           !isPatientConnected &&
@@ -327,7 +330,7 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
             className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
             onClick={onClose}
           >
-            Cancel
+            Cancelar
           </button>
 
           {isPatientConnected ? (
@@ -338,7 +341,7 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
               disabled={!connectedName.trim() || isLoading}
               data-testid="update-button"
             >
-              Update
+              Guardar
             </button>
           ) : (
             // Buttons for selecting or creating new patient
@@ -349,7 +352,7 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
                 disabled={!selectedPatientId || isLoading}
                 data-testid="select-patient-button"
               >
-                Select Patient
+                Seleccionar paciente
               </button>
               <button
                 className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-blue-300"
@@ -359,7 +362,7 @@ const PatientEditModal: React.FC<PatientEditModalProps> = ({
                 }
                 data-testid="create-patient-button"
               >
-                {isLoading ? "Creating..." : "Create Patient"}
+                {isLoading ? "Creando…" : "Crear paciente"}
               </button>
             </>
           )}
