@@ -177,14 +177,17 @@ export function useEncuentroHeader(
   const navigate = useNavigate();
 
   // Voice recorder integration
-  const voiceRecorder = useVoiceRecorder(transcriptionDocId);
+  const voiceRecorder = useVoiceRecorder(
+    encounterIdFromUrl,
+    transcriptionDocId
+  );
 
   /**
    * Effect for countdown and redirect after successful deletion
    */
   useEffect(() => {
-    let countdownTimer: number;
-    let progressTimer: number;
+    let countdownTimer: ReturnType<typeof setTimeout> | undefined;
+    let progressTimer: ReturnType<typeof setTimeout> | undefined;
 
     if (deleteSuccess && redirectInfo) {
       if (redirectCountdown > 0) {
@@ -219,8 +222,8 @@ export function useEncuentroHeader(
     }
 
     return () => {
-      if (countdownTimer) clearTimeout(countdownTimer);
-      if (progressTimer) clearTimeout(progressTimer);
+      if (countdownTimer !== undefined) clearTimeout(countdownTimer);
+      if (progressTimer !== undefined) clearTimeout(progressTimer);
     };
   }, [
     deleteSuccess,

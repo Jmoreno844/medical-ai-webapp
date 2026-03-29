@@ -1,3 +1,6 @@
+from datetime import datetime
+
+
 class SecurityHeadersMiddleware:
     """
     Middleware to add security headers to HTTP responses.

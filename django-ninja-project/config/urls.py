@@ -12,8 +12,9 @@ from django.conf import settings
 # Replace the single router import with imports from the package
 from apps.documentos.api import (
     base_router as documentos_base_router,
+    documentos_callbacks_router,
+    documentos_generation_router,
     sse_router,
-    ai_router,
 )
 from apps.generative_ai.api import router as generative_ai_router
 
@@ -35,7 +36,8 @@ def get_csrf_token(request):
 # Replace the single router with the three separate routers
 api.add_router("/", documentos_base_router)
 api.add_router("/", sse_router)
-api.add_router("/", ai_router)
+api.add_router("/", documentos_callbacks_router)
+api.add_router("/", documentos_generation_router)
 api.add_router("/auth/", accounts_router)
 api.add_router("/", encuentro_router)
 api.add_router("/", pacientes_router)

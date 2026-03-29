@@ -16,27 +16,10 @@ from .schemas import (
 )
 from datetime import date, datetime, timedelta
 from apps.documentos.models import Documento  # Import the Documento model
-from google.cloud import storage
 from django.conf import settings
 import uuid
-from google.oauth2 import service_account
-import json
 
-
-# Helper function to get GCS client based on environment
-def get_storage_client():
-    if getattr(settings, "ENVIRONMENT", "dev") == "dev":
-        # For development, use the service account credentials file
-        credentials = service_account.Credentials.from_service_account_file(
-            settings.GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH
-        )
-        return storage.Client(credentials=credentials)
-    else:
-        service_account_info = json.loads(settings.SERVICE_ACCOUNT_JSON)
-        credentials = service_account.Credentials.from_service_account_info(
-            service_account_info
-        )
-        return storage.Client(credentials=credentials)
+from apps.encuentro.services.storage import get_storage_client
 
 
 router = Router(tags=["encuentros"])

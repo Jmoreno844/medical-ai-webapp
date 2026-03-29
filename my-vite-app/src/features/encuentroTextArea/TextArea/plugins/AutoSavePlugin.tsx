@@ -1,7 +1,6 @@
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { useEffect, useRef, useState } from "react";
 import { $convertToMarkdownString, TRANSFORMERS } from "@lexical/markdown";
-import { $getRoot } from "lexical";
 
 interface AutoSavePluginProps {
   documentId: number;
@@ -19,10 +18,9 @@ export function AutoSavePlugin({
   saveInterval = 2000,
 }: AutoSavePluginProps) {
   const [editor] = useLexicalComposerContext();
-  const [isSaving, setIsSaving] = useState(false);
+  const [, setIsSaving] = useState(false);
   const lastSavedContentRef = useRef<string>("");
   const savingRef = useRef(false);
-  const contentBeforeSaveRef = useRef("");
 
   // Convert editor state to Markdown (retaining ** markers) instead of just plain text
   const getDocumentContent = (): string => {

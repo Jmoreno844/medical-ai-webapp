@@ -27,7 +27,10 @@ export function AppProviders({
 }: AppProvidersProps) {
   // The order is important for dependency resolution
   return (
-    <EncuentroProvider encounterId={encounterId}>
+    <EncuentroProvider
+      encounterId={encounterId}
+      transcriptionDocId={initialTranscriptionDocId ?? undefined}
+    >
       <DocumentProvider encounterId={encounterId}>
         <ContentProvider>
           <TranscriptionProvider

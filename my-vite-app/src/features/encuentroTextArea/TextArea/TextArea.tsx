@@ -44,7 +44,7 @@ const TextArea: React.FC = () => {
 
   // Local state & refs
   const [showGenerationSuccess, setShowGenerationSuccess] = useState(false);
-  const previousDocIdRef = useRef(null);
+  const previousDocIdRef = useRef<number | null>(null);
   const previousRefreshTriggerRef = useRef(editorRefreshTrigger);
 
   // Update refresh trigger when needed

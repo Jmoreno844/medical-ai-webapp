@@ -6,6 +6,7 @@ import React, {
   useCallback,
 } from "react";
 import axiosInstance from "@/commons/utils/axiosInstance";
+import * as encountersApi from "@/api/encounters";
 import { useNavigate } from "react-router-dom";
 import { useVoiceRecorder } from "../features/encuentroHeader/hooks/audio/useVoiceRecorder";
 import { useEncounter } from "../features/encuentro/hooks/useEncounter";
@@ -44,6 +45,9 @@ const formatDate = (dateString: string): string => {
  * EncuentroContext provides data and functionality for managing medical encounters
  */
 type EncuentroContextType = {
+  /** Current encounter id from the provider (for keys, recorder, etc.) */
+  encounterId: number;
+
   // ---- Base encounter state ----
   encuentro: Encuentro | null;
   isLoading: boolean;
@@ -156,7 +160,7 @@ export function EncuentroProvider({
     deleteEncounter,
     isLoading: isEncounterUpdating,
   } = useEncounter(encounterId);
-  const voiceRecorder = useVoiceRecorder(transcriptionDocId);
+  const voiceRecorder = useVoiceRecorder(encounterId, transcriptionDocId);
 
   // Fetch data function
   const fetchData = useCallback(async () => {
@@ -171,9 +175,7 @@ export function EncuentroProvider({
     console.log(`Fetching encounter data for ID: ${encounterId}`);
 
     try {
-      const response = await axiosInstance.get(
-        `/api/encuentros/${encounterId}`
-      );
+      const response = await encountersApi.getEncounter(encounterId);
       console.log("Encounter data received:", response.data);
       setEncuentro(response.data);
 
@@ -216,8 +218,8 @@ export function EncuentroProvider({
 
   // Effect for countdown and redirect after successful deletion
   useEffect(() => {
-    let countdownTimer: number;
-    let progressTimer: number;
+    let countdownTimer: ReturnType<typeof setTimeout> | undefined;
+    let progressTimer: ReturnType<typeof setTimeout> | undefined;
 
     if (deleteSuccess && redirectInfo) {
       if (redirectCountdown > 0) {
@@ -250,8 +252,8 @@ export function EncuentroProvider({
     }
 
     return () => {
-      if (countdownTimer) clearTimeout(countdownTimer);
-      if (progressTimer) clearTimeout(progressTimer);
+      if (countdownTimer !== undefined) clearTimeout(countdownTimer);
+      if (progressTimer !== undefined) clearTimeout(progressTimer);
     };
   }, [
     deleteSuccess,
@@ -472,6 +474,8 @@ export function EncuentroProvider({
 
   // Context value
   const value: EncuentroContextType = {
+    encounterId,
+
     // Base encounter state and actions
     encuentro,
     isLoading,

@@ -4,56 +4,46 @@ from django.conf import settings
 from typing import Optional
 import logging
 
+from utils.jwt_settings import get_jwt_signing_key
+
 logger = logging.getLogger(__name__)
 
 
 class JWTAuth(HttpBearer):
+    """
+    Bearer JWT for Cloud Function callbacks and internal service tokens.
+
+    Returns the decoded claims dict. Does not use jti blacklist (that applies
+    only to user API tokens in apps/users/api.py).
+    """
+
     def authenticate(self, request, token: str) -> Optional[dict]:
-        """
-        Authenticate the request using JWT token.
-
-        Args:
-            request: The HTTP request
-            token: The JWT token (without 'Bearer' prefix)
-
-        Returns:
-            dict: The decoded token payload if valid, None otherwise
-        """
-        logger.info(f"JWTAuth.authenticate called with token: {token[:10]}...")
-        logger.info(f"JWT_SECRET_KEY length: {len(settings.JWT_SECRET_KEY)}")
-        logger.info(f"Headers: {dict(request.headers)}")
-
         if not token:
-            logger.error("No token provided")
+            logger.warning("JWTAuth: missing token")
             return None
 
         try:
-            # Decode and verify the token
-            logger.info(
-                f"Attempting to decode token with SECRET_KEY: {settings.JWT_SECRET_KEY[:3]}..."
+            payload = jwt.decode(
+                token, get_jwt_signing_key(), algorithms=["HS256"]
             )
-            payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
-
-            # Log detailed info about the decoded token
-            logger.info(
-                f"Token decoded successfully with payload keys: {list(payload.keys())}"
+            logger.debug(
+                "JWTAuth: decoded token purpose=%s keys=%s",
+                payload.get("purpose"),
+                list(payload.keys()),
             )
 
-            # Check for expected fields in token payload
-            expected_fields = ["id_documento", "id_usuario", "id_proceso"]
-            missing_fields = [
-                field for field in expected_fields if field not in payload
-            ]
-            if missing_fields:
-                logger.warning(f"Token missing expected fields: {missing_fields}")
-
+            # Optional sanity: generation flow should include id_proceso
+            purpose = payload.get("purpose")
+            if purpose == "sse_connection":
+                if "id_documento" not in payload or "id_usuario" not in payload:
+                    logger.warning("JWTAuth: SSE token missing id_documento or id_usuario")
             return payload
         except jwt.ExpiredSignatureError:
-            logger.error("Authentication failed: Token has expired")
+            logger.warning("JWTAuth: token expired")
             return None
         except jwt.InvalidTokenError as e:
-            logger.error(f"Authentication failed: Invalid token. Error: {str(e)}")
+            logger.warning("JWTAuth: invalid token (%s)", type(e).__name__)
             return None
         except Exception as e:
-            logger.error(f"Authentication error: {str(e)}")
+            logger.exception("JWTAuth: unexpected error: %s", e)
             return None

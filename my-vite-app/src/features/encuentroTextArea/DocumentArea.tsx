@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useEffect } from "react";
+import React, { useCallback, useEffect } from "react";
 import TabBar from "./TabBar/TabBar";
 import TextArea from "./TextArea/TextArea";
 import LoadingSpinner from "@/commons/components/LoadingSpinner";
@@ -9,8 +9,6 @@ import { DocumentGenerationProgress } from "./components/DocumentGenerationProgr
 // Import the context hooks
 import { useDocumentContext } from "../../contexts/DocumentContext";
 import { useGenerationContext } from "../../contexts/GenerationContext";
-import { useTranscriptionContext } from "../../contexts/TranscriptionContext";
-
 interface DocumentAreaProps {
   onTranscriptionDocumentFound?: (documentId: number) => void;
 }
@@ -21,13 +19,11 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
   // Get state from contexts instead of props
   const {
     documents,
-    activeDocument,
     activeDocumentId,
     loading,
     error,
     isSaving,
     selectDocument,
-    deleteDocument,
   } = useDocumentContext();
 
   const {
@@ -36,7 +32,6 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
     isGenerating,
     error: generationError,
     generationStatus,
-    openGenerationModal,
     generateDocumentation,
     plantillas,
     isLoadingPlantillas,
@@ -46,9 +41,6 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
     searchQuery,
     setSearchQuery,
   } = useGenerationContext();
-
-  // Reference for storing the document generation handler
-  const generateDocumentationRef = useRef<(() => void) | null>(null);
 
   // Find and emit transcription document ID when documents load
   useEffect(() => {

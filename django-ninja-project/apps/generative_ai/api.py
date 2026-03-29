@@ -8,11 +8,14 @@ from django.shortcuts import get_object_or_404
 from django.http import Http404
 from apps.encuentro.models import Encuentro
 from apps.documentos.models import Documento
-import jwt
 import logging
 import requests
-from datetime import datetime, timedelta
 from typing import Dict, Any
+
+from utils.service_jwt import (
+    build_transcription_callback_payload,
+    encode_service_jwt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,15 +86,10 @@ def authorize_transcription(request, documento_id: int):
                 "error": "No tienes permiso para acceder a este documento",
             }
 
-        # Generate JWT token
-        payload = {
-            "user_id": request.user.id,
-            "document_id": documento_id,
-            "exp": datetime.utcnow() + timedelta(minutes=15),
-            "purpose": "transcription",
-        }
-
-        token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
+        # Same claims as iniciar_transcripcion / Cloud Function callbacks
+        token = encode_service_jwt(
+            build_transcription_callback_payload(request.user.id, documento_id)
+        )
         logger.info(
             f"Token generated for user {request.user.id}, documento {documento_id}"
         )
@@ -153,16 +151,8 @@ def iniciar_transcripcion(request, payload: TranscriptionRequest):
                 success=False, error="No tienes permiso para acceder a este documento"
             )
 
-        # Generate JWT token
-        token_payload = {
-            "id_usuario": request.user.id,
-            "id_documento": documento_id,
-            "exp": datetime.utcnow() + timedelta(minutes=15),
-            "purpose": "transcription",
-        }
-
-        auth_token = jwt.encode(
-            token_payload, settings.JWT_SECRET_KEY, algorithm="HS256"
+        auth_token = encode_service_jwt(
+            build_transcription_callback_payload(request.user.id, documento_id)
         )
 
         # Prepare cloud function request payload

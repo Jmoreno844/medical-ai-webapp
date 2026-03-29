@@ -55,9 +55,6 @@ export function DocumentProvider({
     content: string;
   } | null>(null);
 
-  // Track if this is the initial mount of the component
-  const isInitialMount = useRef(true);
-
   // Add ref to track loaded encounter
   const loadedEncounterIdRef = useRef<number | null>(null);
 
@@ -169,12 +166,9 @@ export function DocumentProvider({
       );
 
       // Send the update
-      const response = await axiosInstance.patch(
-        `/api/documento_by_editor/${docId}`,
-        {
-          contenido: finalContent,
-        }
-      );
+      await axiosInstance.patch(`/api/documento_by_editor/${docId}`, {
+        contenido: finalContent,
+      });
 
       // Update local document data
       setDocuments((docs) =>

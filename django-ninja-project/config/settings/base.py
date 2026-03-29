@@ -2,14 +2,14 @@
 Base Django settings for the medical web application.
 """
 
+import logging
 import os
 from pathlib import Path
 
-# At the top of config/settings/test.py
-
-print(
-    f"Loading settings with DJANGO_SETTINGS_MODULE={os.environ.get('DJANGO_SETTINGS_MODULE')}"
-)
+logger = logging.getLogger(__name__)
+_settings_module = os.environ.get("DJANGO_SETTINGS_MODULE")
+if _settings_module:
+    logger.debug("Loading Django settings module: %s", _settings_module)
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -41,6 +41,7 @@ AUTH_USER_MODEL = "users.User"
 
 MIDDLEWARE = [
     # "apps.core.middleware.DebugCorsMiddleware",  # Debug CORS middleware comes first
+    "middlewares.SecurityHeadersMiddleware",
     "corsheaders.middleware.CorsMiddleware",  # CORS middleware comes second
     "django.middleware.common.CommonMiddleware",
     "django.middleware.security.SecurityMiddleware",

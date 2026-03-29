@@ -29,7 +29,7 @@ axiosInstance.interceptors.request.use(
     if (!csrfToken) {
       try {
         console.log("🔄 No CSRF token found. Fetching from /api/csrf...");
-        const csrfResponse = await axios.get(`${API_URL}/api/csrf`, {
+        await axios.get(`${API_URL}/api/csrf`, {
           withCredentials: true,
         });
         //   console.log("📥 CSRF Response:", csrfResponse.data);

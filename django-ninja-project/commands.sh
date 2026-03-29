@@ -1,36 +1,27 @@
 
-# -- Poetry commands --
-# Install all dependencies
-poetry install
-poetry check
+# -- uv (Python env) --
+# Install all dependencies (creates/updates .venv from uv.lock)
+uv sync
 
-# Add a package (example: django)
-# poetry add django
+# Add a package (example)
+# uv add django
 
-# -- Docker Compose commands --
-# Rebuild Docker images (use --no-cache if needed)
+# -- Docker Compose --
 docker compose build
-
-# Bring up only the web and db services (excluding tests)
 docker compose up web db
 
 ./scripts/clear_db.sh
 
 docker compose exec web python manage.py migrate
-# Bring up all services (if needed)
-docker compose web env
-# docker-compose up
 
-poetry run python manage.py makemigrations
+# docker compose web env
 
-poetry run python manage.py migrate
+uv run python manage.py makemigrations
 
-# Create a superuser (for admin access)
-poetry run python manage.py createsuperuser
+uv run python manage.py migrate
 
-# Run the development server
-poetry run python manage.py runserver 0.0.0.0:8000
+uv run python manage.py createsuperuser
 
-# Run Django tests
-poetry run python manage.py test
+uv run python manage.py runserver 0.0.0.0:8000
 
+uv run python manage.py test

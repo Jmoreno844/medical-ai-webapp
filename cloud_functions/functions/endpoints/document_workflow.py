@@ -4,7 +4,6 @@ Cloud Function endpoint for complete document generation workflow.
 
 import logging
 import json
-import functions_framework
 from services.document_generation.generator import generate_document_from_components
 from services.django_api import send_generation_chunk
 
@@ -13,7 +12,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-@functions_framework.http
 def generate_document_workflow(request) -> tuple:
     """
     Cloud Function to generate a document by combining:

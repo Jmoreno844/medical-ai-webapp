@@ -161,7 +161,7 @@ export function TranscriptionProvider({
       if (contentContext.current) {
         contentContext.current
           .fetchDocumentContent(transcriptionDocId, true)
-          .then((content) => {
+          .then(() => {
             console.log(
               `[TRANSCRIPTION] Fetched fresh content for document ${transcriptionDocId}`
             );
@@ -180,7 +180,10 @@ export function TranscriptionProvider({
   }, [transcriptionDocId, updateEncuentro, hasBeenTranscribed]);
 
   // Use the voice recorder hook with encounterId
-  const voiceRecorder = useVoiceRecorder(encounterId, transcriptionDocId);
+  const voiceRecorder = useVoiceRecorder(
+    encounterId,
+    transcriptionDocId ?? undefined
+  );
 
   // Add a function to reset the transcription state
   const resetTranscriptionState = () => {

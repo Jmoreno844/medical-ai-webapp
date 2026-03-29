@@ -6,7 +6,6 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { DocumentoOut } from "@/types/documento";
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { useDocumentContext } from "./DocumentContext";
 
@@ -37,8 +36,7 @@ const ContentContext = createContext<ContentContextType | undefined>(undefined);
 
 // Create the provider
 export function ContentProvider({ children }: { children: React.ReactNode }) {
-  const { activeDocument, activeDocumentId, saveDocument } =
-    useDocumentContext();
+  const { activeDocumentId, saveDocument } = useDocumentContext();
 
   const [documentContent, setDocumentContent] = useState<string>("");
   const [isLoadingContent, setIsLoadingContent] = useState<boolean>(false);

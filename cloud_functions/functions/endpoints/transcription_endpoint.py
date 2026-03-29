@@ -4,7 +4,6 @@ Cloud Function endpoint for audio transcription.
 
 import logging
 import json
-import functions_framework
 from services.transcription.audio_processor import transcribe_audio
 from services.django_api import update_document_content
 
@@ -27,7 +26,6 @@ def validate_id_documento(id_documento) -> tuple:
         return False, "id_documento must be an integer"
 
 
-@functions_framework.http
 def transcription_endpoint(request) -> tuple:
     """
     Cloud Function to transcribe audio from a signed URL and update a document.
@@ -67,6 +65,15 @@ def transcription_endpoint(request) -> tuple:
         if not audio_uri:
             return (
                 json.dumps({"success": False, "error": "Missing audio_uri parameter"}),
+                400,
+                {"Content-Type": "application/json"},
+            )
+
+        if not token_auth or not str(token_auth).strip():
+            return (
+                json.dumps(
+                    {"success": False, "error": "Missing auth_token parameter"}
+                ),
                 400,
                 {"Content-Type": "application/json"},
             )

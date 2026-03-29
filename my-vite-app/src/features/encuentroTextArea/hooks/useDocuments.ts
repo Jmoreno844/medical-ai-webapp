@@ -264,12 +264,9 @@ export const useDocuments = (encounterId: number) => {
         );
 
         // Send the update
-        const response = await axiosInstance.patch(
-          `/api/documento_by_editor/${docId}`,
-          {
-            contenido: finalContent,
-          }
-        );
+        await axiosInstance.patch(`/api/documento_by_editor/${docId}`, {
+          contenido: finalContent,
+        });
 
         // Update local document data
         setDocuments((docs) =>

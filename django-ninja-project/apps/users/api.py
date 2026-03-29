@@ -25,6 +25,7 @@ from .schemas import (
 import uuid
 from django.core.cache import cache
 from ninja.throttling import AnonRateThrottle  # Import AnonRateThrottle
+from utils.jwt_settings import get_jwt_signing_key
 
 logger = logging.getLogger(__name__)
 # Initialize the router
@@ -33,7 +34,7 @@ router = Router()
 
 def create_token(user):
     expiration = datetime.utcnow() + timedelta(hours=1)
-    secret_key = os.getenv("JWT_SECRET_KEY", settings.SECRET_KEY)
+    secret_key = get_jwt_signing_key()
     token_id = str(uuid.uuid4())
 
     payload = {
@@ -155,7 +156,7 @@ def create_jwt_token(request, data: UserLoginIn):
 def revoke_token(request, token: str):
     """Revoke a specific JWT token"""
     try:
-        secret_key = os.getenv("JWT_SECRET_KEY", settings.SECRET_KEY)
+        secret_key = get_jwt_signing_key()
         payload = jwt.decode(token, secret_key, algorithms=["HS256"])
         token_id = payload.get("jti")
 

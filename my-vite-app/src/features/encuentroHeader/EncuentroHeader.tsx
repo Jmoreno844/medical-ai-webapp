@@ -1,18 +1,11 @@
 import React from "react";
-import { useParams } from "react-router-dom";
 import PatientInfo from "./subcomponents/PatientInfo";
 import VoiceRecorder from "./subcomponents/VoiceRecorder";
 import PatientEditModal from "./PatientEditModal";
 import Modal from "@/commons/components/Modal";
 import GenerateDocumentationButton from "./subcomponents/GenerateDocumentationButton";
 
-// Import context hooks
-import { useTranscriptionContext } from "../../contexts/TranscriptionContext";
-import { useGenerationContext } from "../../contexts/GenerationContext";
-import {
-  useEncuentroContext,
-  EncuentroProvider,
-} from "../../contexts/EncuentroContext";
+import { useEncuentroContext } from "../../contexts/EncuentroContext";
 
 /**
  * EncuentroHeader component for the encounter page
@@ -202,21 +195,8 @@ const EncuentroHeaderContent: React.FC = () => {
 };
 
 /**
- * Wrapper component that provides the EncuentroContext to the EncuentroHeaderContent
+ * Header uses EncuentroProvider from AppProviders (single source of truth).
  */
-const EncuentroHeader: React.FC = () => {
-  // Get ID from URL
-  const { id } = useParams<{ id: string }>();
-  // Ensure encounterId is always a number, defaulting to 0 if id is undefined/invalid
-  const encounterId = id ? parseInt(id, 10) || 0 : 0;
-
-  // Add a key to EncuentroProvider as well, to ensure it fully resets if needed,
-  // although the internal logic should handle encounterId changes.
-  return (
-    <EncuentroProvider key={encounterId} encounterId={encounterId}>
-      <EncuentroHeaderContent />
-    </EncuentroProvider>
-  );
-};
+const EncuentroHeader: React.FC = () => <EncuentroHeaderContent />;
 
 export default EncuentroHeader;

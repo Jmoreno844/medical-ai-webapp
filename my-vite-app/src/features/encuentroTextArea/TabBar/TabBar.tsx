@@ -2,6 +2,7 @@ import React, { useMemo, useState, useRef } from "react";
 import {
   DOCUMENT_TYPE_LABELS,
   DOCUMENT_TYPE_LABELS_LONG,
+  type DocumentoOut,
 } from "@/types/documento";
 import {
   Dialog,
@@ -33,11 +34,14 @@ const TabBar: React.FC = () => {
   const { hasBeenTranscribed } = useTranscriptionContext(); // Use hasBeenTranscribed directly
 
   // Local state for UI
-  const [documentToDelete, setDocumentToDelete] = useState(null);
+  const [documentToDelete, setDocumentToDelete] = useState<DocumentoOut | null>(
+    null
+  );
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const dropdownTriggerRef = useRef<HTMLButtonElement>(null);
-  const [activeDropdownDoc, setActiveDropdownDoc] = useState(null);
+  const [activeDropdownDoc, setActiveDropdownDoc] =
+    useState<DocumentoOut | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   // Sort documents (same code as before)
@@ -55,13 +59,16 @@ const TabBar: React.FC = () => {
   }, [documents]);
 
   // Check if a document can show context menu
-  const canShowContextMenu = (doc) => {
+  const canShowContextMenu = (doc: DocumentoOut) => {
     const tipo = doc.tipo.toLowerCase();
     return tipo !== "contexto" && tipo !== "transcripcion";
   };
 
   // Handle right-click on tabs
-  const handleContextMenu = (e, doc) => {
+  const handleContextMenu = (
+    e: React.MouseEvent,
+    doc: DocumentoOut
+  ) => {
     if (canShowContextMenu(doc)) {
       e.preventDefault();
       setActiveDropdownDoc(doc);
@@ -236,7 +243,7 @@ const TabBar: React.FC = () => {
 };
 
 // Helper functions (same as before)
-function getDocumentTitle(doc) {
+function getDocumentTitle(doc: DocumentoOut | null) {
   if (!doc) return "";
 
   const docType = DOCUMENT_TYPE_LABELS_LONG[doc.tipo.toLowerCase()] || doc.tipo;
@@ -249,7 +256,7 @@ function getDocumentTitle(doc) {
   return `${docType} - ${date}`;
 }
 
-function getTabLabel(doc) {
+function getTabLabel(doc: DocumentoOut) {
   return DOCUMENT_TYPE_LABELS[doc.tipo.toLowerCase()] || doc.tipo;
 }
 

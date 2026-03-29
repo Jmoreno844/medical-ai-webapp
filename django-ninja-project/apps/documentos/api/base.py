@@ -1,6 +1,7 @@
 from typing import List
 from ninja import Router
 from ninja.errors import HttpError
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.http import Http404
 from ninja.security import django_auth
@@ -160,6 +161,9 @@ def update_documento_by_user(request, documento_id: int, payload: DocumentoUpdat
 
 @router.get("/debug-auth")
 def debug_auth(request):
+    """Only available when DEBUG=True (never expose headers in production)."""
+    if not settings.DEBUG:
+        raise HttpError(404, "Not found")
     headers = {key: value for key, value in request.headers.items()}
     return {"headers": headers}
 

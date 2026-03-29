@@ -2,7 +2,6 @@ import React, { useEffect, useRef } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $getRoot, $createParagraphNode, $createTextNode } from "lexical";
 import { $convertFromMarkdownString, TRANSFORMERS } from "@lexical/markdown";
-import { useContentContext } from "@/contexts/ContentContext";
 
 interface DocumentContentPluginProps {
   documentId: number;
@@ -19,7 +18,7 @@ export function DocumentContentPlugin({
   content,
   isLoading,
   refreshTrigger,
-  forceRefresh = false,
+  forceRefresh: _forceRefresh = false,
   streamingContent,
   documentType,
 }: DocumentContentPluginProps): React.ReactElement | null {

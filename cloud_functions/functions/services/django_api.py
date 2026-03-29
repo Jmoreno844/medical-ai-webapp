@@ -13,6 +13,28 @@ import time
 logger = logging.getLogger(__name__)
 
 
+def build_django_request_headers(
+    token_auth: Optional[str] = None, json_body: bool = True
+) -> Dict[str, str]:
+    """
+    Build HTTP headers for Django API calls.
+    JWTs (three dot-separated segments) get Authorization: Bearer <token>.
+    """
+    headers: Dict[str, str] = {}
+    if json_body:
+        headers["Content-Type"] = "application/json"
+    if not token_auth:
+        return headers
+    raw = str(token_auth).strip()
+    if raw.startswith("Bearer "):
+        headers["Authorization"] = raw
+    elif "." in raw and len(raw.split(".")) == 3:
+        headers["Authorization"] = f"Bearer {raw}"
+    else:
+        headers["Authorization"] = raw
+    return headers
+
+
 def get_api_base_url():
     """Get the Django API base URL from environment variables."""
     api_base_url = os.environ.get("DJANGO_API_BASE_URL")
@@ -50,20 +72,7 @@ def notify_transcription_complete(
     if not token_auth:
         logger.debug("No authentication token provided")
 
-    # Prepare headers with token
-    headers = {
-        "Content-Type": "application/json",
-    }
-
-    if token_auth:
-        if (
-            "." in token_auth
-            and len(token_auth.split(".")) == 3
-            and not token_auth.startswith("Bearer ")
-        ):
-            headers["Authorization"] = f"Bearer {token_auth}"
-        else:
-            headers["Authorization"] = token_auth
+    headers = build_django_request_headers(token_auth)
 
     # Prepare payload
     payload = {
@@ -121,46 +130,9 @@ def update_document_content(
     base_url = get_api_base_url()
     api_url = f"{base_url}/documento_by_function/{id_documento}"
 
-    # More detailed debugging for auth token
-    if token_auth:
-        logger.info(
-            f"Received auth token in update_document_content (length: {len(token_auth)})"
-        )
-        # Check if token looks like JWT (format: xxx.yyy.zzz)
-        if "." in token_auth and len(token_auth.split(".")) == 3:
-            logger.info("Token appears to be in JWT format")
-        else:
-            logger.warning(
-                "Token doesn't appear to be in standard JWT format (xxx.yyy.zzz)"
-            )
-    else:
-        logger.warning("No auth token provided to update_document_content function")
-
-    # Prepare headers with improved token handling
-    headers = {
-        "Content-Type": "application/json",
-    }
-
-    # Improved token handling logic
-    if token_auth:
-        # For JWT tokens, always use Bearer format
-        if "." in token_auth and len(token_auth.split(".")) == 3:
-            if not token_auth.startswith("Bearer "):
-                headers["Authorization"] = f"Bearer {token_auth}"
-                logger.info("Added 'Bearer' prefix to JWT token")
-            else:
-                headers["Authorization"] = token_auth
-                logger.info("Using JWT token with existing Bearer prefix")
-        else:
-            # For non-JWT tokens, use as-is
-            headers["Authorization"] = token_auth
-            logger.info("Using non-JWT token as-is")
-
-        logger.info(
-            f"Final Authorization header: {headers.get('Authorization', '')[:15]}..."
-        )
-    else:
-        logger.error("⚠️ No authorization header will be sent - expect 401 Unauthorized")
+    headers = build_django_request_headers(token_auth)
+    if "Authorization" not in headers:
+        logger.error("No authorization header for update_document_content")
 
     # Prepare payload
     payload = {"contenido": content}
@@ -231,10 +203,8 @@ def update_document_content(
         # Provide more helpful error info for authentication errors
         if status_code == 401:
             logger.error(
-                "🔐 Authentication failed (401 Unauthorized) - Check your token!"
+                "Authentication failed (401 Unauthorized) - invalid or expired token"
             )
-            if token_auth:
-                logger.error(f"Token used (first 10 chars): {token_auth[:10]}...")
             if response_text:
                 logger.error(f"Response from server: {response_text}")
 
@@ -286,16 +256,7 @@ def send_generation_chunk(
     if not token_auth:
         return {"success": False, "error": "No authentication token available"}
 
-    # Prepare headers with token - keep improved token handling
-    headers = {"Content-Type": "application/json"}
-
-    # Set Authorization header - Always ensure proper JWT format
-    if token_auth:
-        # Always use Bearer format, and ensure it's only added once
-        if not token_auth.startswith("Bearer "):
-            headers["Authorization"] = f"Bearer {token_auth}"
-        else:
-            headers["Authorization"] = token_auth
+    headers = build_django_request_headers(token_auth)
 
     # Modified payload creation - ensure all fields are present and have correct types
     payload = {

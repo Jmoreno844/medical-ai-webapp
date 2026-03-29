@@ -1,5 +1,31 @@
-Code Structure & Best Practices
-Architecture
+# Backend — Normas de calidad y arquitectura objetivo
+
+> Este documento contiene las **normas y estándares** que el proyecto debe cumplir.
+> No describe el estado actual del sistema; para eso consulta los siguientes documentos:
+>
+> | Documento | Contenido |
+> |-----------|-----------|
+> | [`system_map.md`](system_map.md) | Mapa de servicios, inventario de endpoints, variables de entorno |
+> | [`flows.md`](flows.md) | Flujos de transcripción, autenticación y generación de documentos |
+> | [`database.md`](database.md) | Esquema real de BD, ERD, índices, migraciones |
+> | [`jwt_and_auth_contracts.md`](jwt_and_auth_contracts.md) | Contratos JWT y variables de entorno de auth |
+
+---
+
+## Dependencias Python (`uv`)
+
+El backend usa **[uv](https://docs.astral.sh/uv/)** (no Poetry): `pyproject.toml` + `uv.lock`.
+
+- Instalar dependencias: `uv sync` (incluye el grupo `dev` por defecto).
+- Solo producción (equivalente a Docker): `uv sync --no-dev`.
+- Comandos Django: `uv run python manage.py …`
+- Añadir paquete: `uv add <nombre>` · dependencias de desarrollo: `uv add --group dev <nombre>`.
+
+---
+
+## Code Structure & Best Practices
+
+### Architecture
 
 Follow Django's app-based structure for modularity
 Implement service-layer pattern to separate business logic from views
