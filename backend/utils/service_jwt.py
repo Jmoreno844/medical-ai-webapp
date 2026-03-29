@@ -21,16 +21,12 @@ def encode_service_jwt(payload: Dict[str, Any], algorithm: str = "HS256") -> str
 
 
 def build_transcription_callback_payload(
-    user_id: int, documento_id: int, minutes_ttl: int = 15
+    user_id: int, document_id: int, minutes_ttl: int = 15
 ) -> Dict[str, Any]:
-    """
-    Claims for PATCH documento_by_function / notify/transcription-complete.
-
-    Must match what documentos/api/ai.py expects: id_usuario, id_documento.
-    """
+    """Claims for PATCH documents/by-function / transcription notify."""
     return {
-        "id_usuario": user_id,
-        "id_documento": documento_id,
+        "user_id": user_id,
+        "document_id": document_id,
         "exp": datetime.utcnow() + timedelta(minutes=minutes_ttl),
         "purpose": "transcription",
     }
@@ -38,15 +34,15 @@ def build_transcription_callback_payload(
 
 def build_generation_callback_payload(
     user_id: int,
-    documento_id: int,
-    id_proceso: str,
+    document_id: int,
+    process_id: str,
     minutes_ttl: int = 30,
 ) -> Dict[str, Any]:
-    """Claims for POST document/generation-chunk."""
+    """Claims for POST documents/generation-chunk."""
     return {
-        "id_usuario": user_id,
-        "id_documento": documento_id,
-        "id_proceso": id_proceso,
+        "user_id": user_id,
+        "document_id": document_id,
+        "process_id": process_id,
         "exp": datetime.utcnow() + timedelta(minutes=minutes_ttl),
         "purpose": "document_generation",
     }
@@ -54,17 +50,17 @@ def build_generation_callback_payload(
 
 def build_sse_token_payload(
     user_id: int,
-    documento_id: int,
+    document_id: int,
     minutes_ttl: int = 5,
-    id_proceso: Optional[str] = None,
+    process_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Claims for SSE stream handshake (with optional id_proceso for generation UI)."""
+    """Claims for SSE stream handshake (optional process_id for generation UI)."""
     payload: Dict[str, Any] = {
-        "id_documento": documento_id,
-        "id_usuario": user_id,
+        "document_id": document_id,
+        "user_id": user_id,
         "exp": datetime.utcnow() + timedelta(minutes=minutes_ttl),
         "purpose": "sse_connection",
     }
-    if id_proceso is not None:
-        payload["id_proceso"] = id_proceso
+    if process_id is not None:
+        payload["process_id"] = process_id
     return payload

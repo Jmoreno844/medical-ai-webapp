@@ -10,8 +10,8 @@ class AudioDownloadResponse(Schema):
 
 
 class TranscriptionRequest(Schema):
-    id_encuentro: int
-    id_documento: int
+    encounter_id: int
+    document_id: int
 
 
 class TranscriptionResponse(Schema):

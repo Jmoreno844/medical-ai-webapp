@@ -6,14 +6,14 @@ class UserRegistrationIn(Schema):
     email: str
     password: str
     name: str
-    lastName: str
+    last_name: str
 
 
 class UserRegistrationOut(Schema):
     id: int
     email: str
     name: str
-    lastName: str
+    last_name: str
     role: str
 
     class Config:
@@ -30,16 +30,16 @@ class AuthTokenOut(Schema):
 
 
 class UserUpdateIn(Schema):
-    name: Optional[str]
-    lastName: Optional[str]
-    role: Optional[str]
+    name: Optional[str] = None
+    last_name: Optional[str] = None
+    role: Optional[str] = None
 
 
 class UserProfileOut(Schema):
     id: int
     email: str
     name: str
-    lastName: str
+    last_name: str
     role: str
 
     class Config:

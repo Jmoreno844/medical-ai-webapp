@@ -1,4 +1,4 @@
-# Database Architecture Documentation
+# Documentación de base de datos
 
 > Documento de Fase 1. Refleja el esquema implementado en el código hoy.
 > Motor: **PostgreSQL** (Cloud SQL) en develop/production; SQLite como fallback en tests.
@@ -293,7 +293,7 @@ Restricciones:
 
 ---
 
-## Connection pooling
+## Pool de conexiones
 
 No está configurado `CONN_MAX_AGE` en ningún entorno (`develop.py`, `production.py`).
 Django usa el comportamiento por defecto: cierra la conexión al final de cada request

@@ -27,10 +27,10 @@ INSTALLED_APPS = [
     # Local apps
     "apps.core.apps.CoreConfig",  # Using proper AppConfig class
     "apps.users.apps.UsersConfig",
-    "apps.encuentro.apps.EncuentroConfig",
-    "apps.pacientes.apps.PacientesConfig",
-    "apps.plantillas.apps.PlantillasConfig",
-    "apps.documentos.apps.DocumentosConfig",
+    "apps.encounters.apps.EncountersConfig",
+    "apps.patients.apps.PatientsConfig",
+    "apps.templates.apps.TemplatesConfig",
+    "apps.documents.apps.DocumentsConfig",
     "apps.generative_ai.apps.GenerativeAIConfig",
 ]
 

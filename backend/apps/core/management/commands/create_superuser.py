@@ -36,7 +36,7 @@ class Command(BaseCommand):
 
             superuser_name = "juan"
 
-            superuser_lastname = "moreno"
+            superuser_last_name = "moreno"
 
             # Check if superuser already exists
             exists = User.objects.filter(email=superuser_email).exists()
@@ -53,7 +53,7 @@ class Command(BaseCommand):
             User.objects.create_superuser(
                 email=superuser_email,
                 name=superuser_name,
-                lastName=superuser_lastname,
+                last_name=superuser_last_name,
                 password=superuser_password,
             )
 

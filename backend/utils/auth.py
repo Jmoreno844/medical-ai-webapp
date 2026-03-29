@@ -32,11 +32,12 @@ class JWTAuth(HttpBearer):
                 list(payload.keys()),
             )
 
-            # Optional sanity: generation flow should include id_proceso
             purpose = payload.get("purpose")
             if purpose == "sse_connection":
-                if "id_documento" not in payload or "id_usuario" not in payload:
-                    logger.warning("JWTAuth: SSE token missing id_documento or id_usuario")
+                if "document_id" not in payload or "user_id" not in payload:
+                    logger.warning(
+                        "JWTAuth: SSE token missing document_id or user_id"
+                    )
             return payload
         except jwt.ExpiredSignatureError:
             logger.warning("JWTAuth: token expired")

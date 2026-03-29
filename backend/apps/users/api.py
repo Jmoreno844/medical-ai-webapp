@@ -12,7 +12,7 @@ import os
 from django.conf import settings
 from django.middleware.csrf import get_token
 import logging
-from apps.plantillas.models import PlantillaBase, PlantillaDoctor, UsoPlantilla
+from apps.templates.models import BaseTemplate, DoctorTemplate, TemplateUsage
 from .models import User, UserRole
 from .schemas import (
     UserRegistrationIn,
@@ -53,7 +53,7 @@ def create_token(user):
     return jwt.encode(payload, secret_key, algorithm="HS256")
 
 
-@router.post("/registro", response={201: UserRegistrationOut, 400: dict})
+@router.post("/register", response={201: UserRegistrationOut, 400: dict})
 def register_user(request, data: UserRegistrationIn):
     """Register a new user"""
     if User.objects.filter(email=data.email).exists():
@@ -72,29 +72,24 @@ def register_user(request, data: UserRegistrationIn):
         email=data.email,
         password=make_password(data.password),
         name=data.name,
-        lastName=data.lastName,
-        role=UserRole.MEDICO,
+        last_name=data.last_name,
+        role=UserRole.DOCTOR,
     )
 
-    # Create PlantillaDoctor for every PlantillaBase for the new user
-    plantillas_base = PlantillaBase.objects.all()
-    for plantilla_base in plantillas_base:
-        # Create doctor-specific template based on the base template
-        nueva_plantilla = PlantillaDoctor.objects.create(
-            nombre=plantilla_base.nombre,
-            tipo_documento=plantilla_base.tipo_documento,
-            contenido_base=True,
-            id_plantilla_base=plantilla_base,
-            contenido=None,  # null as specified
-            id_medico=user,
+    for base in BaseTemplate.objects.all():
+        dt = DoctorTemplate.objects.create(
+            name=base.name,
+            document_kind=base.document_kind,
+            uses_base_content=True,
+            base_template=base,
+            content=None,
+            doctor=user,
         )
-
-        # Create usage statistics record for the new template
-        UsoPlantilla.objects.create(
-            id_plantilla=nueva_plantilla,
-            veces_usada=0,
-            ultimo_uso=None,  # null as specified
-            id_medico=user,
+        TemplateUsage.objects.create(
+            doctor_template=dt,
+            use_count=0,
+            last_used_at=None,
+            doctor=user,
         )
 
     return 201, user
