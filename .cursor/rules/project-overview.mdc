@@ -1,0 +1,81 @@
+---
+description: Descripción general del proyecto médico AI (arquitectura, dominio, terminología)
+alwaysApply: true
+---
+
+# Proyecto AI Médico — Visión General
+
+## Arquitectura
+
+Este es un sistema fullstack de documentación médica asistida por IA con tres partes:
+
+- `backend/` — API REST principal (Django Ninja + PostgreSQL; dependencias con **uv**)
+- `cloud_functions/` — Funciones Google Cloud para generación de documentos con IA y transcripción de audio
+- `webapp/` — Frontend React + TypeScript (Vite)
+
+## Dominio y terminología
+
+| Término | Significado |
+|---|---|
+| `Encuentro` | Consulta médica / sesión con paciente |
+| `Documento` | Documento clínico generado (SOAP, nota de evolución, etc.) |
+| `Plantilla` | Template de documento que usa el médico |
+| `PlantillaDoctor` | Plantilla personalizada de un médico específico |
+| `Transcripción` | Documento tipo transcripción del audio del encuentro |
+| `Médico` | Usuario autenticado (es el `request.user` en el backend) |
+| `Paciente` | Paciente del encuentro, no tiene cuenta en el sistema |
+
+## Flujo principal
+
+1. El médico crea un `Encuentro` y graba el audio
+2. El audio se transcribe via Cloud Function → crea `Documento` tipo transcripción
+3. El médico solicita generación de documentación → Cloud Function con IA genera el contenido
+4. Los documentos generados se envían al frontend via SSE (Server-Sent Events)
+
+## Comunicación entre servicios
+
+- Django → Cloud Functions: JWT de servicio (`backend/utils/service_jwt.py`)
+- Cloud Functions → Django API: token auth en headers
+- Frontend → Django: sesión Django (`django_auth`) o JWT para SSE
+- SSE hub en Django: `backend/apps/documentos/services/sse_hub.py`
+
+## Documentación técnica de referencia
+
+Antes de proponer cambios en auth, flujos o arquitectura, consultar:
+
+| Documento | Contenido |
+|---|---|
+| `backend/documentation/jwt_and_auth_contracts.md` | Contratos de todos los JWT (sesión, callbacks, SSE) y sus claims |
+| `backend/documentation/system_map.md` | Mapa de servicios, endpoints, variables de entorno |
+| `backend/documentation/flows.md` | Diagramas de secuencia de todos los flujos principales |
+| `backend/documentation/database.md` | Modelo de datos y ERD |
+
+## Deployment
+
+- **Backend**: Google Cloud Run + PostgreSQL (Cloud SQL)
+- **Cloud Functions**: Google Cloud Functions (HTTP trigger)
+- **Frontend**: Vite build, estático
+- Diseñar para escalabilidad horizontal en Cloud Run — sin estado en memoria entre requests
+
+## Git — Conventional Commits
+
+Formato: `<tipo>: <descripción concisa>`
+
+| Tipo | Uso |
+|---|---|
+| `feat` | nueva funcionalidad |
+| `fix` | corrección de bug |
+| `refactor` | refactor sin cambio de comportamiento |
+| `docs` | solo documentación |
+| `test` | tests |
+| `chore` | tareas de mantenimiento |
+
+Ejemplos: `feat: add SSE token endpoint`, `fix: patch encounter ownership check`
+
+## Reglas generales
+
+- No agregar comentarios que solo narren el código, solo los que explican intención no obvia
+- Código en inglés (variables, funciones); terminología médica del dominio puede quedar en español
+- Nunca usar `print()` — siempre `logger = logging.getLogger(__name__)` en Python
+- Funciones pequeñas y enfocadas — más fáciles de auditar en contexto médico
+- Validar **todos** los inputs del usuario; los datos médicos son sensibles

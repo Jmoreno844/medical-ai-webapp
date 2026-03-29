@@ -12,7 +12,7 @@ PY := $(UV) run python
 
 .PHONY: help sync sync-frozen sync-dev sync-dev-frozen install run runserver migrate \
 	makemigrations test pytest shell createsuperuser lint format check pre-commit \
-	pre-commit-all clear-db
+	pre-commit-all clear-db db-up db-down up-db down-db
 
 help: ## Show available targets
 	@echo "Backend (uv) — run from backend/"
@@ -74,3 +74,13 @@ pre-commit-all: ## pre-commit on entire tree (slow)
 
 clear-db: ## drop public schema (needs .env + local Postgres)
 	bash scripts/dev/clear_db.sh
+
+db-up: ## docker compose: start Postgres (`db` service) in background
+	docker compose up -d db
+
+up-db: db-up ## alias for db-up
+
+db-down: ## docker compose: stop Postgres (volume kept)
+	docker compose stop db
+
+down-db: db-down ## alias for db-down

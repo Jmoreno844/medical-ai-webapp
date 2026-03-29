@@ -1,0 +1,129 @@
+---
+description: Convenciones para el frontend React + TypeScript (Vite, hooks, contextos, API calls, seguridad)
+globs: webapp/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# React + TypeScript — Convenciones del Frontend
+
+## Estructura de directorios
+
+```
+src/
+  apps/           ← features por dominio (encuentro, plantillas, login, etc.)
+    encuentro/
+      EncuentroPage.tsx
+      hooks/        ← hooks específicos de esta feature
+  commons/        ← componentes, hooks y utils reutilizables
+    utils/
+      axiosInstance.ts
+  contexts/       ← contextos globales (DocumentContext, etc.)
+  services/       ← llamadas a API organizadas por dominio
+  types/          ← tipos TypeScript compartidos
+  pages/          ← páginas/rutas top-level
+  router.tsx
+```
+
+## Calidad de código
+
+- **TypeScript strict** — nunca usar `any`, preferir tipos explícitos o `unknown`
+- Funciones pequeñas y enfocadas; extraer lógica a hooks o utils antes de que un componente crezca
+- Nombres descriptivos: `useEncounterDocuments`, `handleTranscriptionComplete`, no abreviaciones
+- JSDoc en hooks y funciones de servicio no triviales
+
+```typescript
+/**
+ * Fetches and manages documents for a given encounter.
+ * Handles loading, error state and optimistic updates.
+ */
+export const useEncounterDocuments = (encounterId: number) => { ... };
+```
+
+## Componentes
+
+- Siempre funcionales, nunca clases
+- Un componente por archivo, nombre PascalCase = nombre del archivo
+- Tailwind CSS para estilos — no CSS modules ni styled-components
+- Props tipadas con `interface`, no `type` para objetos (consistencia)
+
+```tsx
+interface EncuentroCardProps {
+  encounter: EncuentroOut;
+  onSelect: (id: number) => void;
+}
+
+export default function EncuentroCard({ encounter, onSelect }: EncuentroCardProps) { ... }
+```
+
+## Custom Hooks
+
+- Extraer toda lógica de estado y API calls a hooks en `hooks/` de cada feature
+- Nombre con prefijo `use`, retornar objeto con estado + acciones claramente nombrados
+- Manejar `isLoading` y `error` siempre que haya async
+
+```typescript
+export const useEncounter = (encounterId?: number) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const updateEncounter = async (data: EncounterUpdateData): Promise<boolean> => { ... };
+
+  return { isLoading, error, updateEncounter };
+};
+```
+
+## Llamadas a la API
+
+- Siempre usar `axiosInstance` de `@/commons/utils/axiosInstance` — nunca `fetch` crudo
+- Validar y sanitizar datos antes de enviar al backend
+- Manejar errores con `AxiosError`, nunca swallow silencioso
+
+```typescript
+import { AxiosError } from "axios";
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof AxiosError) {
+    return error.response?.data?.message || error.response?.data?.error || error.message;
+  }
+  return "An unexpected error occurred";
+};
+```
+
+## Contextos
+
+- Contextos globales en `src/contexts/`
+- Siempre crear hook de acceso que valide el contexto: `export function useDocument()`
+- Tipar el contexto explícitamente
+
+```typescript
+const DocumentContext = createContext<DocumentContextType | undefined>(undefined);
+
+export function useDocument() {
+  const context = useContext(DocumentContext);
+  if (!context) throw new Error("useDocument must be used within DocumentProvider");
+  return context;
+}
+```
+
+## Path aliases
+
+```typescript
+// ✅ Alias configurado en Vite
+import axiosInstance from "@/commons/utils/axiosInstance";
+import { DocumentoOut } from "@/types/documento";
+
+// ❌ Evitar paths relativos largos
+import axiosInstance from "../../../commons/utils/axiosInstance";
+```
+
+## Seguridad
+
+- No almacenar datos sensibles del paciente en `localStorage` — usar memoria o contexto de sesión
+- Validar inputs del usuario en el frontend antes de enviar (primera línea de defensa)
+- No exponer tokens o credenciales en logs de consola
+
+## SSE (Server-Sent Events)
+
+1. Obtener token corto via `POST /generate-sse-token/{id}`
+2. Conectar con `new EventSource(url?token=...)` 
+3. Siempre cerrar la conexión en el cleanup del `useEffect` con `eventSource.close()`
