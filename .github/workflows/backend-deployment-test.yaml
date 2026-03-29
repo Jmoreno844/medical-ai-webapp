@@ -5,13 +5,13 @@ on:
     branches:
       - main
     paths:
-      - "django-ninja-project/**"
+      - "backend/**"
       - ".github/workflows/backend-deployment-test.yaml"
   pull_request:
     branches:
       - main
     paths:
-      - "django-ninja-project/**"
+      - "backend/**"
   workflow_dispatch:
 
 # Add concurrency to cancel redundant builds
@@ -60,13 +60,13 @@ jobs:
   #       uses: actions/cache@v4
   #       with:
   #         path: ~/.cache/uv
-  #         key: ${{ runner.os }}-uv-${{ hashFiles('django-ninja-project/uv.lock') }}
+  #         key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock') }}
   #         restore-keys: |
   #           ${{ runner.os }}-uv-
 
   #     - name: Install dependencies
   #       run: |
-  #         cd django-ninja-project
+  #         cd backend
   #         uv sync --frozen
 
   #     - name: Authenticate to Google Cloud
@@ -75,7 +75,7 @@ jobs:
   #         credentials_json: ${{ secrets.GCP_SA_KEY }}
 
   #     # - name: Run tests
-  #     #   working-directory: django-ninja-project
+  #     #   working-directory: backend
   #     #   run: |
   #     #     uv run python manage.py test
 
@@ -99,21 +99,21 @@ jobs:
 
   #     - name: Install dependencies
   #       run: |
-  #         cd django-ninja-project
+  #         cd backend
   #         uv sync --frozen
 
   #     # - name: Run black
-  #     #   working-directory: django-ninja-project
+  #     #   working-directory: backend
   #     #   run: |
   #     #     uv run black --check .
 
   #     - name: Run isort
-  #       working-directory: django-ninja-project
+  #       working-directory: backend
   #       run: |
   #         uv run isort --check-only --profile black .
 
   #     - name: Run flake8
-  #       working-directory: django-ninja-project
+  #       working-directory: backend
   #       run: |
   #         uv run flake8
 
@@ -162,7 +162,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
-          context: ./django-ninja-project
+          context: ./backend
           push: true
           tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: |

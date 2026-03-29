@@ -1,4 +1,4 @@
-django-ninja-project/.venv
+backend/.venv
 django_ninja_project/.venv
 .env
 .env.local

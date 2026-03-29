@@ -21,7 +21,7 @@ jobs:
         with:
           fetch-depth: 2 # Needed to check for changes between commits
 
-      - name: Check for changes in my-vite-app-english directory or workflow file
+      - name: Check for changes in webapp directory or workflow file
         id: check_changes
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
@@ -29,15 +29,15 @@ jobs:
             echo "changes=true" >> $GITHUB_OUTPUT
           else
             CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
-            APP_CHANGES=$(echo "$CHANGED_FILES" | grep "^my-vite-app-english/" || echo "")
+            APP_CHANGES=$(echo "$CHANGED_FILES" | grep "^webapp/" || echo "")
             WORKFLOW_CHANGED=$(echo "$CHANGED_FILES" | grep "^.github/workflows/frontend-deployment-test.yaml$" || echo "")
             
             if [ -z "$APP_CHANGES" ] && [ -z "$WORKFLOW_CHANGED" ]; then
-              echo "No changes in my-vite-app-english directory or workflow file"
+              echo "No changes in webapp directory or workflow file"
               echo "changes=false" >> $GITHUB_OUTPUT
             else
               if [ -n "$APP_CHANGES" ]; then
-                echo "Changes detected in my-vite-app-english directory"
+                echo "Changes detected in webapp directory"
               fi
               if [ -n "$WORKFLOW_CHANGED" ]; then
                 echo "Changes detected in workflow file"
@@ -52,16 +52,16 @@ jobs:
         with:
           node-version: "18"
           cache: "npm"
-          cache-dependency-path: my-vite-app-english/package-lock.json
+          cache-dependency-path: webapp/package-lock.json
 
       - name: Install dependencies
         if: steps.check_changes.outputs.changes == 'true'
-        working-directory: ./my-vite-app-english
+        working-directory: ./webapp
         run: npm ci
 
       - name: Build Vite.js static site
         if: steps.check_changes.outputs.changes == 'true'
-        working-directory: ./my-vite-app-english
+        working-directory: ./webapp
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
         run: npm run build:skip-ts
@@ -80,7 +80,7 @@ jobs:
 
       - name: Deploy to GCS bucket
         if: steps.check_changes.outputs.changes == 'true'
-        working-directory: ./my-vite-app-english
+        working-directory: ./webapp
         run: |
           echo "Syncing the dist directory to GCS bucket gs://${{ env.BUCKET_NAME }}"
           gsutil -m rsync -r -d dist/ gs://${{ env.BUCKET_NAME }}/
