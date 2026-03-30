@@ -45,10 +45,9 @@ Antes de proponer cambios en auth, flujos o arquitectura, consultar:
 
 | Documento | Contenido |
 |---|---|
-| `backend/documentation/jwt_and_auth_contracts.md` | Contratos de todos los JWT (sesión, callbacks, SSE) y sus claims |
-| `backend/documentation/system_map.md` | Mapa de servicios, endpoints, variables de entorno |
-| `backend/documentation/flows.md` | Diagramas de secuencia de todos los flujos principales |
-| `backend/documentation/database.md` | Modelo de datos y ERD |
+| `docs/architecture/auth-and-jwt.md` | Contratos de todos los JWT (sesión, callbacks, SSE) y sus claims |
+| `docs/architecture/system-overview.md` | Mapa de servicios, endpoints, variables de entorno y diagramas de secuencia |
+| `docs/architecture/database.md` | Modelo de datos y ERD |
 
 ## Deployment
 
