@@ -148,13 +148,19 @@ def access_secret(project_id, secret_id, version_id="latest", default=None):
         client = secretmanager.SecretManagerServiceClient()
         name = f"projects/{project_id}/secrets/{secret_id}/versions/{version_id}"
         response = client.access_secret_version(name=name)
-        return response.payload.data.decode("UTF-8")
+        raw = response.payload.data.decode("UTF-8")
+        return raw.strip() if isinstance(raw, str) else default
     except ImportError:
         logging.warning("Google Secret Manager not available, using default values")
         return default
     except Exception as e:
         logging.warning(f"Failed to access secret {secret_id}: {str(e)}")
         return default
+
+
+def _env_strip(key: str) -> str | None:
+    value = os.getenv(key)
+    return value.strip() if value else None
 
 
 ENVIRONMENT = "test"
@@ -170,10 +176,10 @@ FALLBACK_SECRET_KEY = os.environ.get(
     "django-insecure-test-key-do-not-use-in-production-environments",
 )
 # Cloud Run (Terraform) maps secrets to SECRET_KEY / JWT_SECRET; IDs must match Secret Manager.
-SECRET_KEY = os.environ.get("SECRET_KEY") or access_secret(
+SECRET_KEY = _env_strip("SECRET_KEY") or access_secret(
     GCP_PROJECT_ID, "django-secret-key", default=FALLBACK_SECRET_KEY
 )
-JWT_SECRET_KEY = os.environ.get("JWT_SECRET") or access_secret(
+JWT_SECRET_KEY = _env_strip("JWT_SECRET") or access_secret(
     GCP_PROJECT_ID, "jwt-secret-key", default="not-loaded"
 )
 SERVICE_ACCOUNT_JSON = access_secret(
@@ -200,10 +206,10 @@ def _postgres_options_for_host(host: str) -> dict:
 
 
 def _resolve_db_host() -> str | None:
-    explicit = os.getenv("DB_HOST")
+    explicit = _env_strip("DB_HOST")
     if explicit:
         return explicit
-    conn = os.getenv("INSTANCE_CONNECTION_NAME")
+    conn = _env_strip("INSTANCE_CONNECTION_NAME")
     if conn:
         return f"/cloudsql/{conn}"
     return None
@@ -214,18 +220,16 @@ def _resolve_db_host() -> str | None:
 # If not available, fetch from Google Secret Manager with SQLite fallback
 try:
     db_host = _resolve_db_host()
-    if (
-        os.getenv("DB_NAME")
-        and os.getenv("DB_USER")
-        and os.getenv("DB_PASSWORD")
-        and db_host
-    ):
+    db_name_env = _env_strip("DB_NAME")
+    db_user_env = _env_strip("DB_USER")
+    db_password_env = _env_strip("DB_PASSWORD")
+    if db_name_env and db_user_env and db_password_env and db_host:
         DATABASES = {
             "default": {
                 "ENGINE": "django.db.backends.postgresql",
-                "NAME": os.getenv("DB_NAME"),
-                "USER": os.getenv("DB_USER"),
-                "PASSWORD": os.getenv("DB_PASSWORD"),
+                "NAME": db_name_env,
+                "USER": db_user_env,
+                "PASSWORD": db_password_env,
                 "HOST": db_host,
                 "PORT": (
                     ""
