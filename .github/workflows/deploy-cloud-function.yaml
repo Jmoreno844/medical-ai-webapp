@@ -62,13 +62,16 @@ jobs:
 
           TMP_ZIP="$(mktemp /tmp/cf-source-XXXXXX.zip)"
           cd cloud_functions/functions
+          # Avoid ** globs: infozip on Ubuntu often writes a corrupt archive with them.
           zip -r "${TMP_ZIP}" . \
-            -x "**/__pycache__/*" \
-            -x "**/*.pyc" \
-            -x "**/.venv/*" \
-            -x "**/.pytest_cache/*" \
-            -x "**/.mypy_cache/*"
+            -x "*.pyc" \
+            -x "*__pycache__*" \
+            -x "*.venv*" \
+            -x ".env.local" \
+            -x ".pytest_cache/*" \
+            -x ".mypy_cache/*"
           cd ../..
+          unzip -t "${TMP_ZIP}" >/dev/null
 
           gcloud storage cp "${TMP_ZIP}" "gs://${BUCKET}/${OBJECT}" --project="${GCP_PROJECT}"
           rm -f "${TMP_ZIP}"
