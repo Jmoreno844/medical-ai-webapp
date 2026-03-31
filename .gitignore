@@ -13,3 +13,10 @@ django_ninja_project/commands.sh
 **/credentials/**/*.json
 /credentials/*.json
 **/credentials/*.json
+
+# Terraform
+infra/**/.terraform/
+infra/**/*.tfstate
+infra/**/*.tfstate.*
+infra/**/.terraform.lock.hcl
+infra/bootstrap/.secrets/

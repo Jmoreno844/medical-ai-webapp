@@ -7,6 +7,7 @@ import threading
 from typing import Any, Dict
 
 import requests
+from opentelemetry import context as otel_context
 
 from apps.documents.services.sse_hub import notify_generation_progress
 
@@ -21,7 +22,10 @@ def start_document_generation_thread(
 ) -> None:
     """Fire-and-forget POST to start generation; errors reported via SSE."""
 
+    parent_ctx = otel_context.get_current()
+
     def worker() -> None:
+        token = otel_context.attach(parent_ctx)
         try:
             respuesta = requests.post(
                 url,
@@ -64,6 +68,8 @@ def start_document_generation_thread(
                 process_id,
                 error=f"Error al iniciar generación: {e}",
             )
+        finally:
+            otel_context.detach(token)
 
     thread = threading.Thread(target=worker, daemon=True)
     thread.start()

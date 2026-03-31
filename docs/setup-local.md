@@ -106,9 +106,39 @@ Luego, actualiza `DJANGO_API_BASE_URL` en el `.env` de `cloud_functions/` con la
 
 ---
 
+## 6. Trazas distribuidas (opcional, Jaeger)
+
+Para ver un solo trace de **webapp → Django → Cloud Functions → Django**:
+
+1. Levanta Jaeger en la raíz del repo:
+   ```bash
+   docker compose -f docker-compose.tracing.yml up -d
+   ```
+2. **Backend** (en la misma shell donde corres Django), por ejemplo:
+   ```bash
+   export OTEL_TRACES_EXPORTER=otlp
+   export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces
+   export OTEL_SERVICE_NAME=vexthealth-backend
+   # Si tienes GOOGLE_CLOUD_PROJECT en el entorno:
+   export OTEL_FORCE_OTLP=1
+   ```
+3. **Webapp** — en `webapp/.env.local`:
+   ```env
+   VITE_OTEL_EXPORTER_OTLP_TRACES_URL=/otel/v1/traces
+   VITE_OTEL_SERVICE_NAME=vexthealth-webapp
+   ```
+   El proxy de Vite reenvía `/otel/v1/traces` a Jaeger (ver `webapp/vite.config.ts`).
+4. **Cloud Functions** (contenedor local): apunta OTLP al host, p. ej. `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://host.docker.internal:4318/v1/traces` y `OTEL_SERVICE_NAME=vexthealth-cloud-functions`.
+
+Interfaz Jaeger: `http://localhost:16686`. Detalle en [backend/tracing.md](backend/tracing.md).
+
+---
+
 ## Resumen de Puertos Locales
 
 - **`5173`**: Frontend (Vite)
 - **`8000`**: Backend (Django API)
 - **`5432`**: Base de Datos (PostgreSQL en Docker)
 - **`8080`**: Cloud Functions (Emulador local)
+- **`16686`**: Jaeger UI (si usas `docker-compose.tracing.yml`)
+- **`4318`**: OTLP HTTP para Jaeger (collector)

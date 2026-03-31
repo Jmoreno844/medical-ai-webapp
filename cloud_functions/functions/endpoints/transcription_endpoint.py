@@ -34,6 +34,15 @@ def transcription_endpoint(request) -> tuple:
         - audio_uri: gs:// URI to the audio file
         - auth_token: JWT for Django API
     """
+    from tracing import configure_tracing, run_with_request_span
+
+    configure_tracing()
+    return run_with_request_span(
+        request, "cloud_functions.transcription", _transcription_endpoint_impl
+    )
+
+
+def _transcription_endpoint_impl(request) -> tuple:
     logger.info(f"Received transcription request: {request.method}")
 
     if request.method != "POST":
@@ -56,6 +65,15 @@ def transcription_endpoint(request) -> tuple:
                 400,
                 {"Content-Type": "application/json"},
             )
+
+        try:
+            from opentelemetry import trace
+
+            span = trace.get_current_span()
+            if span.is_recording():
+                span.set_attribute("document_id", int(document_id))
+        except Exception:
+            pass
 
         if not audio_uri:
             return (

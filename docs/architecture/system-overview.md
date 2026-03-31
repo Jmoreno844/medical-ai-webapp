@@ -169,3 +169,9 @@ sequenceDiagram
 - **Llamada síncrona a CF de transcripción**: Django espera respuesta de la Cloud Function. Si Gemini tarda demasiado, el request del frontend puede agotar el timeout.
 - **Audio no se borra al transcribir**: `audio_expires_at` controla el acceso vía API, pero el blob en GCS solo se elimina si el médico lo solicita explícitamente.
 - **Cloud Functions `--allow-unauthenticated`**: La seguridad se delega enteramente en la validez del JWT del body. El `JWT_SECRET_KEY` no debe filtrarse.
+
+---
+
+## 6. Observabilidad y trazas
+
+OpenTelemetry enlaza las peticiones **navegador (XHR/axios) → Django → Cloud Functions → callbacks Django** cuando el export está configurado (OTLP/Jaeger en local, Cloud Trace en GCP con `GOOGLE_CLOUD_PROJECT`). Los logs del backend incluyen `trace_id` / `span_id` para correlación. Detalle y variables: [`../backend/tracing.md`](../backend/tracing.md). Limitaciones: SSE (`EventSource` sin cabeceras W3C) y subida directa a GCS con signed URL no continúan el mismo trace de extremo a extremo.

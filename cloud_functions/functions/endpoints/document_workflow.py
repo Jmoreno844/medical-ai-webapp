@@ -24,6 +24,17 @@ def generate_document_workflow(request) -> tuple:
         - auth_token: Bearer JWT for Django callbacks
         - validate_only: bool
     """
+    from tracing import configure_tracing, run_with_request_span
+
+    configure_tracing()
+    return run_with_request_span(
+        request,
+        "cloud_functions.document_generation",
+        _generate_document_workflow_impl,
+    )
+
+
+def _generate_document_workflow_impl(request) -> tuple:
     logger.info(f"Received document generation workflow request: {request.method}")
 
     try:
@@ -86,6 +97,16 @@ def generate_document_workflow(request) -> tuple:
                 400,
                 {"Content-Type": "application/json"},
             )
+
+        try:
+            from opentelemetry import trace
+
+            span = trace.get_current_span()
+            if span.is_recording():
+                span.set_attribute("document_id", new_document_id)
+                span.set_attribute("validate_only", bool(validate_only))
+        except Exception:
+            pass
 
         if not process_id:
             return (

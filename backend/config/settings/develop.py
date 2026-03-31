@@ -11,6 +11,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 ENVIRONMENT = "dev"
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = (
     os.environ.get("DJANGO_SECRET_KEY")
@@ -33,7 +40,7 @@ GENERATE_DOCUMENT_CLOUD_FUNCTION_URL = os.environ.get(
     os.environ.get("GENERATE_DOCUMENT_CLOUD_FUNCTION_BASE_URL", "not-loaded"),
 )
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = _env_bool("DEBUG", default=True)
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 CSRF_TRUSTED_ORIGINS = [
@@ -65,6 +72,8 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
     "cookie",  # Add cookie to allowed headers
+    "traceparent",
+    "tracestate",
 ]
 
 CORS_ALLOWED_ORIGINS = [
@@ -196,4 +205,4 @@ LOGGING = {
 
 """
 
-LOGGING = build_console_logging("DEBUG")
+LOGGING = build_console_logging("DEBUG" if DEBUG else "INFO")

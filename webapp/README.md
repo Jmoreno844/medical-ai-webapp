@@ -1,6 +1,6 @@
 # React + TypeScript + Vite
 
-Documentación del proyecto: [Ver documentación central en `../docs/`](../docs/README.md).
+Documentación del frontend: [Ver `../docs/frontend/README.md`](../docs/frontend/README.md).
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

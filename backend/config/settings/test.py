@@ -3,6 +3,8 @@ Testing settings for the medical web application.
 """
 
 import os
+
+os.environ.setdefault("OTEL_SDK_DISABLED", "1")
 import logging
 import datetime
 import socket
@@ -322,6 +324,8 @@ CORS_ALLOW_HEADERS = [
     "x-csrftoken",
     "x-requested-with",
     "cookie",  # Added this!
+    "traceparent",
+    "tracestate",
 ]
 
 # Expose headers that the frontend might need

@@ -2,6 +2,10 @@
 Main entry point for Cloud Functions.
 """
 
+import tracing
+
+tracing.configure_tracing()
+
 import functions_framework
 from endpoints.transcription_endpoint import transcription_endpoint
 from endpoints.document_workflow import generate_document_workflow

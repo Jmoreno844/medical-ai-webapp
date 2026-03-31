@@ -7,9 +7,13 @@ on:
   workflow_dispatch:
 
 env:
-  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  BUCKET_NAME: test_medwebai_vite_spa_bucket
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  BUCKET_NAME: ${{ vars.FRONTEND_BUCKET_NAME }}
   NODE_ENV: test
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   build-and-deploy:
@@ -17,9 +21,9 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 2 # Needed to check for changes between commits
+          fetch-depth: 2
 
       - name: Check for changes in webapp directory or workflow file
         id: check_changes
@@ -48,7 +52,7 @@ jobs:
 
       - name: Set up Node.js
         if: steps.check_changes.outputs.changes == 'true'
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: "18"
           cache: "npm"
@@ -66,15 +70,16 @@ jobs:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
         run: npm run build:skip-ts
 
-      - name: Set up Google Cloud SDK
+      - name: Authenticate to Google Cloud
         if: steps.check_changes.outputs.changes == 'true'
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.GH_DEPLOYER_SA }}
 
       - name: Set up gcloud CLI
         if: steps.check_changes.outputs.changes == 'true'
-        uses: google-github-actions/setup-gcloud@v1
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
@@ -85,8 +90,6 @@ jobs:
           echo "Syncing the dist directory to GCS bucket gs://${{ env.BUCKET_NAME }}"
           gsutil -m rsync -r -d dist/ gs://${{ env.BUCKET_NAME }}/
 
-          # Set long cache control for static assets
           gsutil -m setmeta -h "Cache-Control:public, max-age=31536000" gs://${{ env.BUCKET_NAME }}/assets/**
 
-          # Set shorter cache control for HTML files
           gsutil -m setmeta -h "Cache-Control:public, max-age=0, must-revalidate" gs://${{ env.BUCKET_NAME }}/*.html

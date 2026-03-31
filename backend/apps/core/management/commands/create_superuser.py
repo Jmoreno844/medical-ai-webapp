@@ -16,7 +16,7 @@ class Command(BaseCommand):
             client = secretmanager.SecretManagerServiceClient()
 
             # Get the project ID from environment
-            project_id = os.environ.get("GCP_PROJECT_ID", "medical-ai-web-app")
+            project_id = os.environ.get("GCP_PROJECT_ID", "vex-stg")
 
             # Access superuser email secret
             email_secret_name = (

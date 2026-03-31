@@ -23,6 +23,19 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
+def _trace_id_for_log() -> str:
+    try:
+        from opentelemetry import trace
+        from opentelemetry.trace import format_trace_id
+
+        sc = trace.get_current_span().get_span_context()
+        if sc.is_valid:
+            return format_trace_id(sc.trace_id)
+    except Exception:
+        pass
+    return ""
+
+
 @router.post(
     "/generate-sse-token/{document_id}", response=SSETokenResponse, auth=django_auth
 )
@@ -43,7 +56,10 @@ def generate_sse_token(request, document_id: int):
         )
 
         logger.info(
-            f"Generated SSE token for user {doctor.id}, document {document_id}"
+            "Generated SSE token for user %s, document %s trace_id=%s",
+            doctor.id,
+            document_id,
+            _trace_id_for_log(),
         )
         return {"success": True, "token": token}
     except Http404:
@@ -105,7 +121,9 @@ def subscribe_to_document_updates_with_token(request, document_id: int, token: s
                 event_queues[doc_id_str].append(client_queue)
 
             logger.info(
-                f"Client connected to SSE for document {document_id} (token auth)"
+                "Client connected to SSE for document %s (token auth) trace_id=%s",
+                document_id,
+                _trace_id_for_log(),
             )
 
             yield f"data: {json.dumps({'event': 'connected', 'document_id': document_id})}\n\n"
@@ -165,7 +183,11 @@ def subscribe_to_document_updates(request, document_id: int):
                     event_queues[doc_id_str] = []
                 event_queues[doc_id_str].append(client_queue)
 
-            logger.info(f"Client connected to SSE for document {document_id}")
+            logger.info(
+                "Client connected to SSE for document %s trace_id=%s",
+                document_id,
+                _trace_id_for_log(),
+            )
 
             yield f"data: {json.dumps({'event': 'connected', 'document_id': document_id})}\n\n"
 

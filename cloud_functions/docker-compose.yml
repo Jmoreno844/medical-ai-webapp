@@ -10,7 +10,7 @@ services:
     environment:
       - ENVIRONMENT=local
       - GEMINI_MODEL=gemini-2.0-flash
-      - GCP_PROJECT=medical-ai-web-app # Added GCP project ID
+      - GCP_PROJECT=vex-stg # Added GCP project ID
       - GCP_REGION=us-east1 # Added GCP region
       - FUNCTION_TARGET=transcription_endpoint
       - PORT=8082 # Explicitly set port
@@ -29,7 +29,7 @@ services:
     environment:
       - ENVIRONMENT=local
       - GEMINI_MODEL=gemini-2.0-flash # Added missing GEMINI_MODEL
-      - GCP_PROJECT=medical-ai-web-app # Added GCP project ID
+      - GCP_PROJECT=vex-stg # Added GCP project ID
       - GCP_REGION=us-east1 # Added GCP region
       - FUNCTION_TARGET=generate_document_workflow
       - PORT=8083 # Different port here

@@ -2,8 +2,8 @@
 
 > Documento de Fase 1. Refleja el esquema implementado en el código hoy.
 > Motor: **PostgreSQL** (Cloud SQL) en develop/production; SQLite como fallback en tests.
-> Para normas de diseño, indexación y rendimiento ver [`backend.md`](backend.md).
-> Para flujos que leen/escriben datos ver [`flows.md`](flows.md).
+> Para una vista global del sistema ver [`../architecture/system-overview.md`](../architecture/system-overview.md).
+> Para tokens y seguridad entre servicios ver [`auth-and-jwt.md`](auth-and-jwt.md).
 
 ---
 
@@ -300,7 +300,7 @@ Django usa el comportamiento por defecto: cierra la conexión al final de cada r
 (excepto si el worker WSGI mantiene el proceso entre requests, donde reutiliza la conexión del mismo hilo).
 
 Para Cloud Run con múltiples instancias y ráfagas de tráfico, se recomienda configurar
-`CONN_MAX_AGE = 60` y revisar el límite de conexiones de Cloud SQL según `backend.md`.
+`CONN_MAX_AGE = 60` y revisar el límite de conexiones de Cloud SQL junto con la arquitectura descrita en `docs/architecture/system-overview.md`.
 
 ---
 

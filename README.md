@@ -19,4 +19,7 @@ Toda la documentación técnica, guías de arquitectura, configuración y despli
 ### Enlaces Rápidos
 - [Guía de Inicio Local](docs/setup-local.md)
 - [Visión General del Sistema](docs/architecture/system-overview.md)
+- [Backend](docs/backend/README.md)
+- [Frontend](docs/frontend/README.md)
+- [Cloud Functions](docs/cloud-functions/README.md)
 - [Registro de Decisiones (ADRs)](docs/decisions/README.md)

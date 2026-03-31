@@ -9,8 +9,12 @@ on:
   workflow_dispatch:
 
 env:
-  GCP_PROJECT: medical-ai-web-app
+  GCP_PROJECT: ${{ vars.GCP_PROJECT_ID }}
   GCP_REGION: us-east1
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   deploy-functions:
@@ -18,32 +22,33 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Authenticate to GCP
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.GH_DEPLOYER_SA }}
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
+        uses: google-github-actions/setup-gcloud@v2
 
       - name: Deploy Transcription Function
         run: |
           cd cloud_functions/functions
           gcloud functions deploy transcription-endpoint \
             --gen2 \
-            --runtime=python39 \
+            --runtime=python312 \
             --region=${{ env.GCP_REGION }} \
             --source=. \
             --entry-point=transcription_endpoint \
             --trigger-http \
-            --allow-unauthenticated \
+            --no-allow-unauthenticated \
             --min-instances=0 \
             --max-instances=10 \
             --memory=1024MB \
             --timeout=300s \
-            --service-account=cloud-functions-runtime@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com \
+            --service-account=cloud-functions-runner@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com \
             --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=gemini-2.0-flash,ENVIRONMENT=test,DJANGO_API_BASE_URL=${{ vars.VITE_API_URL }}
 
       - name: Deploy Document Workflow Function
@@ -51,15 +56,15 @@ jobs:
           cd cloud_functions/functions
           gcloud functions deploy document-workflow \
             --gen2 \
-            --runtime=python39 \
+            --runtime=python312 \
             --region=${{ env.GCP_REGION }} \
             --source=. \
             --entry-point=generate_document_workflow \
             --trigger-http \
-            --allow-unauthenticated \
+            --no-allow-unauthenticated \
             --min-instances=0 \
             --max-instances=10 \
             --memory=1024MB \
             --timeout=300s \
-            --service-account=cloud-functions-runtime@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com \
+            --service-account=cloud-functions-runner@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com \
             --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=gemini-2.0-flash,ENVIRONMENT=test,DJANGO_API_BASE_URL=${{ vars.VITE_API_URL }}

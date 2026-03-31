@@ -1,5 +1,8 @@
+import { SpanKind, trace } from "@opentelemetry/api";
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { logger } from "@/lib/logger";
+
+const tracer = trace.getTracer("vexthealth-webapp");
 
 /**
  * Upload audio to cloud storage
@@ -14,6 +17,11 @@ export const uploadAudioToCloud = async (
   uploadUrl: string,
   contentType: string = "audio/webm"
 ): Promise<boolean> => {
+  const span = tracer.startSpan("gcs.signed_url_upload", {
+    kind: SpanKind.CLIENT,
+  });
+  span.setAttribute("gcs.upload.content_type", contentType);
+
   try {
     logger.debug(`[VOICE_RECORDER] Starting audio upload to GCS`);
     logger.debug(
@@ -30,6 +38,8 @@ export const uploadAudioToCloud = async (
       mode: "cors",
     });
 
+    span.setAttribute("http.response.status_code", uploadResponse.status);
+
     if (uploadResponse.ok) {
       logger.debug("[VOICE_RECORDER] Audio upload successful");
       return true;
@@ -39,8 +49,15 @@ export const uploadAudioToCloud = async (
     );
     return false;
   } catch (error) {
+    if (error instanceof Error) {
+      span.recordException(error);
+    } else {
+      span.recordException(new Error(String(error)));
+    }
     logger.error("[VOICE_RECORDER] Exception during GCS upload:", error);
     return false;
+  } finally {
+    span.end();
   }
 };
 
