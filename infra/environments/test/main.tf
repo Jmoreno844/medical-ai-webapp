@@ -108,13 +108,13 @@ module "artifact_registry" {
 # ---------------------------------------------------------------------------
 
 module "cloud_sql" {
-  source        = "../../modules/cloud_sql"
-  project_id    = var.project_id
-  region        = var.region
-  instance_name = var.db_instance_name
-  tier          = var.db_tier
-  database_name = var.db_name
-  database_user = var.db_user
+  source            = "../../modules/cloud_sql"
+  project_id        = var.project_id
+  region            = var.region
+  instance_name     = var.db_instance_name
+  tier              = var.db_tier
+  database_name     = var.db_name
+  database_user     = var.db_user
   database_password = var.db_password
 
   deletion_protection = true
@@ -127,14 +127,15 @@ module "cloud_sql" {
 # ---------------------------------------------------------------------------
 
 module "storage_buckets" {
-  source               = "../../modules/storage_buckets"
-  project_id           = var.project_id
-  region               = var.region
-  audio_bucket_name    = var.audio_bucket_name
-  frontend_bucket_name = var.frontend_bucket_name
-  audio_retention_days = 7
-  force_destroy        = true
-  labels               = local.labels
+  source                       = "../../modules/storage_buckets"
+  project_id                   = var.project_id
+  region                       = var.region
+  audio_bucket_name            = var.audio_bucket_name
+  frontend_bucket_name         = var.frontend_bucket_name
+  frontend_public_read_enabled = var.frontend_public_read_enabled
+  audio_retention_days         = 7
+  force_destroy                = true
+  labels                       = local.labels
 
   depends_on = [module.project_services]
 }
@@ -148,10 +149,10 @@ module "cloud_tasks" {
   project_id = var.project_id
   region     = var.region
 
-  queue_name            = "audio-transcription-queue"
-  max_attempts          = 3
-  min_backoff_seconds   = 10
-  max_backoff_seconds   = 300
+  queue_name          = "audio-transcription-queue"
+  max_attempts        = 3
+  min_backoff_seconds = 10
+  max_backoff_seconds = 300
 
   depends_on = [module.project_services]
 }
@@ -165,14 +166,14 @@ module "cloud_run" {
   project_id = var.project_id
   region     = var.region
 
-  service_name          = var.cloud_run_service_name
-  image                 = var.cloud_run_image
-  service_account_email = module.service_accounts.backend_runner_email
+  service_name              = var.cloud_run_service_name
+  image                     = var.cloud_run_image
+  service_account_email     = module.service_accounts.backend_runner_email
   cloud_sql_connection_name = module.cloud_sql.connection_name
 
-  min_instances   = 0
-  max_instances   = var.cloud_run_max_instances
-  max_concurrency = var.cloud_run_max_concurrency
+  min_instances    = 0
+  max_instances    = var.cloud_run_max_instances
+  max_concurrency  = var.cloud_run_max_concurrency
   session_affinity = true
 
   env_vars = {
@@ -183,15 +184,15 @@ module "cloud_run" {
     ENABLE_SILK            = "true"
   }
 
-  secret_env_vars = [
-    { name = "SECRET_KEY",  secret_id = "django-secret-key" },
-    { name = "JWT_SECRET",  secret_id = "jwt-secret-key" },
+  secret_env_vars = var.cloud_run_use_secret_manager ? [
+    { name = "SECRET_KEY", secret_id = "django-secret-key" },
+    { name = "JWT_SECRET", secret_id = "jwt-secret-key" },
     { name = "DB_PASSWORD", secret_id = "db-password" },
-    { name = "DB_USER",     secret_id = "db-user" },
-    { name = "DB_NAME",     secret_id = "db-name" },
-  ]
+    { name = "DB_USER", secret_id = "db-user" },
+    { name = "DB_NAME", secret_id = "db-name" },
+  ] : []
 
-  allow_unauthenticated = true
+  allow_unauthenticated = var.cloud_run_allow_unauthenticated
   labels                = local.labels
 
   depends_on = [
@@ -215,38 +216,38 @@ module "cloud_functions" {
 
   functions = [
     {
-      name          = "transcription-endpoint"
-      description   = "Transcribe audio from GCS and update document"
-      entry_point   = "transcription_endpoint"
-      source_bucket = var.cf_source_bucket
-      source_object = var.cf_source_object
-      max_instances = 10
-      memory        = "1Gi"
+      name            = "transcription-endpoint"
+      description     = "Transcribe audio from GCS and update document"
+      entry_point     = "transcription_endpoint"
+      source_bucket   = var.cf_source_bucket
+      source_object   = var.cf_source_object
+      max_instances   = 10
+      memory          = "1Gi"
       timeout_seconds = 300
       env_vars = {
-        GCP_PROJECT           = var.project_id
-        GCP_REGION            = var.region
-        GEMINI_MODEL          = "gemini-2.0-flash"
-        ENVIRONMENT           = var.environment
+        GCP_PROJECT  = var.project_id
+        GCP_REGION   = var.region
+        GEMINI_MODEL = "gemini-2.0-flash"
+        ENVIRONMENT  = var.environment
       }
       invoker_members = [
         "serviceAccount:${module.service_accounts.cloud_tasks_invoker_email}",
       ]
     },
     {
-      name          = "document-workflow"
-      description   = "Generate clinical documents with AI"
-      entry_point   = "generate_document_workflow"
-      source_bucket = var.cf_source_bucket
-      source_object = var.cf_source_object
-      max_instances = 10
-      memory        = "1Gi"
+      name            = "document-workflow"
+      description     = "Generate clinical documents with AI"
+      entry_point     = "generate_document_workflow"
+      source_bucket   = var.cf_source_bucket
+      source_object   = var.cf_source_object
+      max_instances   = 10
+      memory          = "1Gi"
       timeout_seconds = 300
       env_vars = {
-        GCP_PROJECT           = var.project_id
-        GCP_REGION            = var.region
-        GEMINI_MODEL          = "gemini-2.0-flash"
-        ENVIRONMENT           = var.environment
+        GCP_PROJECT  = var.project_id
+        GCP_REGION   = var.region
+        GEMINI_MODEL = "gemini-2.0-flash"
+        ENVIRONMENT  = var.environment
       }
       invoker_members = [
         "serviceAccount:${module.service_accounts.backend_runner_email}",

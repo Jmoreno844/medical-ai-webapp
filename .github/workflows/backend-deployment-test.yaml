@@ -18,12 +18,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-  SERVICE_NAME: vexthealth-backend
-  REGION: us-east1
-  REPOSITORY: vexthealth-containers
-  IMAGE_NAME: django-backend
+# Variables de GCP viven en el GitHub Environment "stg" (no en repo-level vars).
+# Cada job que despliega debe declarar environment: stg para que vars.* se resuelva.
 
 permissions:
   contents: read
@@ -118,8 +114,14 @@ jobs:
     # needs: [test, lint]
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
+    environment: stg
     env:
       DJANGO_SETTINGS_MODULE: config.settings.test
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      SERVICE_NAME: vexthealth-backend
+      REGION: us-east1
+      REPOSITORY: vexthealth-containers
+      IMAGE_NAME: django-backend
 
     steps:
       - name: Checkout code
@@ -174,6 +176,13 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    environment: stg
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      SERVICE_NAME: vexthealth-backend
+      REGION: us-east1
+      REPOSITORY: vexthealth-containers
+      IMAGE_NAME: django-backend
 
     steps:
       - name: Authenticate to Google Cloud

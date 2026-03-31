@@ -53,6 +53,7 @@ resource "google_storage_bucket" "frontend" {
 }
 
 resource "google_storage_bucket_iam_member" "frontend_public_read" {
+  count  = var.frontend_public_read_enabled ? 1 : 0
   bucket = google_storage_bucket.frontend.name
   role   = "roles/storage.objectViewer"
   member = "allUsers"

@@ -36,8 +36,12 @@ infra/
 2. **Terraform** (como tu usuario o con clave temporal de `terraform-admin`):
    - `cd environments/test && terraform init && terraform plan -var="db_password=..."`.
    - Si el plan falla en Cloud Functions por falta de zip: o bien subes `cloud-functions.zip` al bucket `{project}-cf-source` (p. ej. dejando correr una vez el workflow [Deploy Cloud Functions](../.github/workflows/deploy-cloud-function.yaml)), o aplicas por fases comentando temporalmente el módulo `cloud_functions` en `main.tf`.
+   - En `test`, `cloud_run_image` arranca con una imagen publica de bootstrap para permitir el primer `apply`; el workflow de backend la reemplaza luego por la imagen real.
+   - En `test`, `cloud_run_use_secret_manager = false` evita que el primer `apply` falle mientras los secrets existen pero todavía no tienen versiones; vuelve a `true` cuando cargues esas versiones.
+   - En `test`, `cloud_run_allow_unauthenticated = false` evita fallos si la organizacion bloquea `allUsers`; luego defines otra estrategia de acceso publico si la necesitas.
+   - Si tu organizacion bloquea `allUsers`, deja `frontend_public_read_enabled = false` y no esperes un bucket web publico hasta definir otra estrategia de hosting/CDN.
 3. **Secret Manager**: cargar versiones de todos los secrets (ver más abajo); el valor de `db-password` debe coincidir con el que usaste en `TF_VAR_db_password` si Cloud Run lo lee desde Secret Manager.
-4. **GitHub**: variables del repo según `docs/architecture/gcp-infrastructure.md` (WIF, buckets, URLs). Sin `WIF_PROVIDER` / `GH_DEPLOYER_SA` los workflows no autentican.
+4. **GitHub**: variables del environment **`stg`** (o del repo) según `docs/architecture/gcp-infrastructure.md`. Los workflows de deploy usan `environment: stg`. Sin `WIF_PROVIDER` / `GH_DEPLOYER_SA` los workflows no autentican.
 5. **CI**: push a `main` para backend / frontend / functions, o `workflow_dispatch`.
 
 **Autenticación local de Terraform:** con usuario humano basta `gcloud auth application-default login` en muchos casos; si usas la SA `terraform-admin`, exporta `GOOGLE_APPLICATION_CREDENTIALS` a la clave JSON (solo transitoria; revócala tras validar WIF).
@@ -110,7 +114,7 @@ Repetir para cada secret: `jwt-secret-key`, `db-password`, `db-user`, `db-name`,
 
 ## Configurar GitHub después de terraform apply
 
-Después del primer apply exitoso, copiar los outputs de Terraform a **repository variables** en GitHub Settings:
+Después del primer apply exitoso, copiar los outputs de Terraform a las variables del environment **`stg`** (Settings → Environments → stg) o a **repository variables** si no usas environments:
 
 - `GCP_PROJECT_ID`
 - `WIF_PROVIDER` (output `workload_identity_provider`)

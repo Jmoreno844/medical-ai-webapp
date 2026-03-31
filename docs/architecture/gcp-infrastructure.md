@@ -131,7 +131,7 @@ Elimina la necesidad de claves JSON (`GCP_SA_KEY`) en GitHub Actions.
 
 ### Variables requeridas en GitHub
 
-Después de `terraform apply`, configurar estas **repository variables** en GitHub:
+Después de `terraform apply`, configurar las mismas claves como **variables del environment `stg`** (recomendado) o como **repository variables**. Los workflows de deploy declaran `environment: stg` en los jobs que hablan con GCP, porque el contexto `vars.*` del workflow **no** incluye variables solo definidas en un environment.
 
 | Variable | Valor (output de Terraform) |
 |---|---|
@@ -176,6 +176,13 @@ Así el artefacto en GCS queda alineado con lo que espera el módulo Terraform `
 | Backend no conecta a Cloud SQL | Secret `db-user` / `db-name` / `db-password` en Secret Manager; que la contraseña coincida con el usuario creado por Terraform (`TF_VAR_db_password` en el apply). |
 | `403` al crear bucket / APIs | Facturación del proyecto activa; APIs habilitadas (`terraform` o bootstrap). |
 | Terraform falla en Cloud Functions | Que exista `gs://{proyecto}-cf-source/cloud-functions.zip` (p. ej. tras un run del workflow Deploy Cloud Functions) o comenta el módulo hasta tener el zip. |
+| Cloud Functions falla con `missing permission on the build service account` | Dar `roles/storage.objectViewer` al service account de build (`PROJECT_NUMBER-compute@developer.gserviceaccount.com`) sobre el bucket interno `gcf-v2-sources-*`; el módulo `service_accounts` ya contempla este binding para nuevos applies. |
+| Cloud Functions falla porque la build SA no puede escribir logs | Dar `roles/logging.logWriter` a `PROJECT_NUMBER-compute@developer.gserviceaccount.com`; el módulo `service_accounts` ya contempla este binding para nuevos applies. |
+| Cloud Functions falla con `artifactregistry.repositories.downloadArtifacts denied` | Dar `roles/artifactregistry.reader` y `roles/artifactregistry.writer` al service account de build `PROJECT_NUMBER-compute@developer.gserviceaccount.com`; el módulo `service_accounts` ya contempla estos bindings para nuevos applies. |
+| Cloud Run falla con `Image ... not found` | Usar una imagen bootstrap publica en `cloud_run_image` para el primer `apply`, o publicar primero `django-backend:latest` en Artifact Registry. |
+| Cloud Run falla porque `Secret ... versions/latest was not found` | En bootstrap, usar `cloud_run_use_secret_manager = false`; después de cargar versiones en Secret Manager, volver a `true` para que el backend lea secretos reales. |
+| Cloud Run falla al aplicar IAM con `allUsers ... do not belong to a permitted customer` | La organizacion bloquea acceso publico; poner `cloud_run_allow_unauthenticated = false` y exponer el servicio luego mediante una estrategia compatible con tu tenant. |
+| Bucket frontend falla con `allUsers ... do not belong to a permitted customer` | La organizacion bloquea buckets publicos; poner `frontend_public_read_enabled = false` y definir luego hosting/CDN alternativo si necesitas SPA publica. |
 
 ## Fuera de este documento (aún no en IaC)
 

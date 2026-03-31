@@ -10,11 +10,7 @@ on:
   workflow_dispatch:
 
 # Bucket/object must match Terraform: infra/environments/test/terraform.tfvars (cf_source_bucket, cf_source_object)
-env:
-  GCP_PROJECT: ${{ vars.GCP_PROJECT_ID }}
-  GCP_REGION: us-east1
-  CF_SOURCE_BUCKET: ${{ vars.CF_SOURCE_BUCKET }}
-  CF_SOURCE_OBJECT: ${{ vars.CF_SOURCE_OBJECT }}
+# Variables de GCP en GitHub Environment "stg" (ver job deploy-functions).
 
 permissions:
   contents: read
@@ -23,6 +19,12 @@ permissions:
 jobs:
   deploy-functions:
     runs-on: ubuntu-latest
+    environment: stg
+    env:
+      GCP_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: us-east1
+      CF_SOURCE_BUCKET: ${{ vars.CF_SOURCE_BUCKET }}
+      CF_SOURCE_OBJECT: ${{ vars.CF_SOURCE_OBJECT }}
 
     steps:
       - name: Checkout code

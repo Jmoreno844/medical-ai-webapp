@@ -30,6 +30,12 @@ variable "frontend_cors_origins" {
   default     = ["*"]
 }
 
+variable "frontend_public_read_enabled" {
+  description = "Whether to grant allUsers read access to the frontend bucket"
+  type        = bool
+  default     = true
+}
+
 variable "force_destroy" {
   description = "Allow Terraform to destroy buckets even if they contain objects"
   type        = bool

@@ -73,6 +73,18 @@ variable "cloud_run_max_concurrency" {
   default     = 250
 }
 
+variable "cloud_run_use_secret_manager" {
+  description = "Whether Cloud Run should load env vars from Secret Manager"
+  type        = bool
+  default     = true
+}
+
+variable "cloud_run_allow_unauthenticated" {
+  description = "Whether Cloud Run should allow unauthenticated invocations"
+  type        = bool
+  default     = true
+}
+
 # --- Cloud Functions source ---
 
 variable "cf_source_bucket" {
@@ -95,6 +107,12 @@ variable "audio_bucket_name" {
 variable "frontend_bucket_name" {
   description = "GCS bucket for frontend SPA"
   type        = string
+}
+
+variable "frontend_public_read_enabled" {
+  description = "Whether to grant allUsers read access to the frontend bucket"
+  type        = bool
+  default     = true
 }
 
 # --- Artifact Registry ---
