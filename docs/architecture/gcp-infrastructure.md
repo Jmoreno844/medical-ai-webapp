@@ -151,6 +151,8 @@ Después de `terraform apply`, configurar las mismas claves como **variables del
 
 El secret `GCP_SA_KEY` puede eliminarse una vez confirmado que WIF funciona.
 
+**`service-account-json` (opcional en Cloud Run):** el backend puede usar **Application Default Credentials** del service account del servicio (`backend-runner`), que ya tiene acceso a GCS. Si el secreto está vacío o no tiene versión, `get_storage_client()` usa ADC. En local, con `config.settings.develop`, se usa `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH` apuntando a un JSON (o `GOOGLE_APPLICATION_CREDENTIALS`).
+
 ### Zip del código de Cloud Functions en CI
 
 El workflow [`.github/workflows/deploy-cloud-function.yaml`](../../.github/workflows/deploy-cloud-function.yaml) hace, en cada push a `main` que toque `cloud_functions/functions/`:
