@@ -6,11 +6,15 @@ on:
       - main
     paths:
       - "cloud_functions/functions/**"
+      - ".github/workflows/deploy-cloud-function.yaml"
   workflow_dispatch:
 
+# Bucket/object must match Terraform: infra/environments/test/terraform.tfvars (cf_source_bucket, cf_source_object)
 env:
   GCP_PROJECT: ${{ vars.GCP_PROJECT_ID }}
   GCP_REGION: us-east1
+  CF_SOURCE_BUCKET: ${{ vars.CF_SOURCE_BUCKET }}
+  CF_SOURCE_OBJECT: ${{ vars.CF_SOURCE_OBJECT }}
 
 permissions:
   contents: read
@@ -32,6 +36,41 @@ jobs:
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+
+      - name: Zip source and upload to GCS (for Terraform / reproducible artifact)
+        run: |
+          set -euo pipefail
+          if [ -z "${GCP_PROJECT:-}" ]; then
+            echo "::error::Set repository variable GCP_PROJECT_ID (e.g. vex-stg)"
+            exit 1
+          fi
+          BUCKET="${CF_SOURCE_BUCKET:-${GCP_PROJECT}-cf-source}"
+          OBJECT="${CF_SOURCE_OBJECT:-cloud-functions.zip}"
+          echo "Using gs://${BUCKET}/${OBJECT}"
+
+          if ! gcloud storage buckets describe "gs://${BUCKET}" --project="${GCP_PROJECT}" >/dev/null 2>&1; then
+            echo "Creating bucket gs://${BUCKET}"
+            gcloud storage buckets create "gs://${BUCKET}" \
+              --location="${GCP_REGION}" \
+              --uniform-bucket-level-access \
+              --project="${GCP_PROJECT}"
+          fi
+
+          TMP_ZIP="$(mktemp /tmp/cf-source-XXXXXX.zip)"
+          cd cloud_functions/functions
+          zip -r "${TMP_ZIP}" . \
+            -x "**/__pycache__/*" \
+            -x "**/*.pyc" \
+            -x "**/.venv/*" \
+            -x "**/.pytest_cache/*" \
+            -x "**/.mypy_cache/*"
+          cd ../..
+
+          gcloud storage cp "${TMP_ZIP}" "gs://${BUCKET}/${OBJECT}" --project="${GCP_PROJECT}"
+          rm -f "${TMP_ZIP}"
+          echo "Uploaded Terraform source archive to gs://${BUCKET}/${OBJECT}"
 
       - name: Deploy Transcription Function
         run: |

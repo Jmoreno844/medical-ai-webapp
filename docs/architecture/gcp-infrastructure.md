@@ -144,8 +144,44 @@ Después de `terraform apply`, configurar estas **repository variables** en GitH
 | `VITE_API_URL` | URL de Cloud Run (output) |
 | `GENERATE_DOCUMENT_CLOUD_FUNCTION_URL` | URL de la CF `document-workflow` (output) |
 | `TRANSCRIPTION_CLOUD_FUNCTION_URL` | URL de la CF `transcription-endpoint` (output) |
+| `CF_SOURCE_BUCKET` | *(opcional)* Bucket del zip para Terraform; por defecto en CI: `{GCP_PROJECT_ID}-cf-source` (debe coincidir con `cf_source_bucket` en `terraform.tfvars`) |
+| `CF_SOURCE_OBJECT` | *(opcional)* Objeto del zip; por defecto `cloud-functions.zip` (igual que `cf_source_object` en Terraform) |
 
 El secret `GCP_SA_KEY` puede eliminarse una vez confirmado que WIF funciona.
+
+### Zip del código de Cloud Functions en CI
+
+El workflow [`.github/workflows/deploy-cloud-function.yaml`](../../.github/workflows/deploy-cloud-function.yaml) hace, en cada push a `main` que toque `cloud_functions/functions/`:
+
+1. Crea `gs://{proyecto}-cf-source` si no existe (misma convención que `terraform.tfvars`).
+2. Genera un zip del directorio `cloud_functions/functions/` (excluye `__pycache__`, `.venv`, etc.) y lo sube a `cloud-functions.zip`.
+3. Despliega las dos funciones con `gcloud functions deploy` (origen local, igual que antes).
+
+Así el artefacto en GCS queda alineado con lo que espera el módulo Terraform `cloud_functions` cuando ejecutes `terraform apply`. El deploy sigue siendo el de `gcloud` para no depender de un segundo pipeline solo de Terraform.
+
+### Checklist: que los workflows no fallen
+
+| Requisito | Workflows afectados |
+|---|---|
+| Variables `GCP_PROJECT_ID`, `WIF_PROVIDER`, `GH_DEPLOYER_SA` definidas y WIF creado en GCP | Backend, Cloud Functions, Frontend |
+| `BACKEND_SERVICE_ACCOUNT`, `GCS_BUCKET_NAME`, URLs de CF, `VITE_API_URL` | Backend deploy |
+| `FRONTEND_BUCKET_NAME` | Frontend deploy |
+| SA `github-actions-deployer` con los roles del módulo Terraform (p. ej. `storage.admin`, `cloudfunctions.developer`) | Todos los despliegues |
+
+## Problemas frecuentes
+
+| Síntoma | Qué revisar |
+|---|---|
+| `Failed to generate Google Cloud access token` en Actions | Variables `WIF_PROVIDER` y `GH_DEPLOYER_SA`; en GCP, que el pool/provider existan y el binding `workloadIdentityUser` apunte al repo correcto (`terraform.tfvars` → `github_repo`). |
+| Backend no conecta a Cloud SQL | Secret `db-user` / `db-name` / `db-password` en Secret Manager; que la contraseña coincida con el usuario creado por Terraform (`TF_VAR_db_password` en el apply). |
+| `403` al crear bucket / APIs | Facturación del proyecto activa; APIs habilitadas (`terraform` o bootstrap). |
+| Terraform falla en Cloud Functions | Que exista `gs://{proyecto}-cf-source/cloud-functions.zip` (p. ej. tras un run del workflow Deploy Cloud Functions) o comenta el módulo hasta tener el zip. |
+
+## Fuera de este documento (aún no en IaC)
+
+- Dominio, certificado y load balancer para `app.vexthealth.com` (decisión explícita: fuera de alcance del Terraform actual).
+- Reglas de firewall/VPC avanzadas si Cloud SQL pasa a solo IP privada sin acceso público.
+- Alertas, SLOs y presupuestos en GCP (recomendable añadir en consola o Terraform más adelante).
 
 ## Cómo agregar el entorno de producción
 
