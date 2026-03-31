@@ -44,6 +44,8 @@ Ajusta `functions/.env.local` para **no** sobrescribir `GOOGLE_APPLICATION_CREDE
 
 Tu usuario de GCP debe tener permisos suficientes en el proyecto (p. ej. Vertex AI User, acceso a secrets que la función lea, etc.).
 
+Si el archivo de ADC no existe aún, ejecuta en el host: `gcloud auth application-default login`. Si `docker compose up` falla al montar `/app/adc.json`, comprueba que exista `~/.config/gcloud/application_default_credentials.json`.
+
 ## Contrato con Django
 
 - Django invoca las funciones con payload JSON y JWT de vida corta.

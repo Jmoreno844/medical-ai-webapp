@@ -10,14 +10,13 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Create directory for service account credentials
+# Optional mount point for legacy service account JSON (see docker-compose)
 RUN mkdir -p /app/credentials
 
 # Copy the rest of the application code
 COPY . .
 
-# Environment variable for service account (will be overridden at runtime)
-ENV GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/service-account-key.json
+# GOOGLE_APPLICATION_CREDENTIALS is set at runtime (docker-compose: /app/adc.json for ADC)
 
 # The target function will be specified via environment variable
 ENV PORT=8082

@@ -1,5 +1,9 @@
 version: "3.8"
 
+# Local GCP auth: mount Application Default Credentials from the host
+# (`gcloud auth application-default login`). Overrides any GOOGLE_APPLICATION_CREDENTIALS
+# in env_file. Optional: ./credentials for a service account JSON if your org allows keys.
+
 services:
   transcription_service: # Renamed service
     build:
@@ -14,9 +18,11 @@ services:
       - GCP_REGION=us-east1 # Added GCP region
       - FUNCTION_TARGET=transcription_endpoint
       - PORT=8082 # Explicitly set port
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/adc.json
     env_file:
       - ./functions/.env.local
     volumes:
+      - ${HOME}/.config/gcloud/application_default_credentials.json:/app/adc.json:ro
       - ./credentials:/app/credentials:ro
     network_mode: "host"
 
@@ -33,8 +39,10 @@ services:
       - GCP_REGION=us-east1 # Added GCP region
       - FUNCTION_TARGET=generate_document_workflow
       - PORT=8083 # Different port here
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/adc.json
     env_file:
       - ./functions/.env.local
     volumes:
+      - ${HOME}/.config/gcloud/application_default_credentials.json:/app/adc.json:ro
       - ./credentials:/app/credentials:ro
     network_mode: "host"
