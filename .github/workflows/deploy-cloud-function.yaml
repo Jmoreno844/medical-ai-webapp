@@ -60,9 +60,11 @@ jobs:
               --project="${GCP_PROJECT}"
           fi
 
-          TMP_ZIP="$(mktemp /tmp/cf-source-XXXXXX.zip)"
+          # mktemp creates an empty file; zip fails when the destination already exists
+          # and is not a valid zip. Use a unique path without pre-creating the file.
+          TMP_ZIP="/tmp/cf-source-$$.zip"
+          rm -f "${TMP_ZIP}"
           cd cloud_functions/functions
-          # Avoid ** globs: infozip on Ubuntu often writes a corrupt archive with them.
           zip -r "${TMP_ZIP}" . \
             -x "*.pyc" \
             -x "*__pycache__*" \
