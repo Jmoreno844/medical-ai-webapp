@@ -19,6 +19,30 @@ El directorio `cloud_functions/` contiene las funciones serverless que hacen el 
 | `GCP_PROJECT` | Proyecto usado para inicializar Vertex AI. |
 | `GCP_REGION` | Región de Vertex AI. |
 | `GEMINI_MODEL` | Modelo de Gemini a usar. |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Ruta **dentro del contenedor** al JSON de credenciales (ver abajo). |
+
+## Local con Docker: credenciales GCP (Vertex / Secret Manager / GCS)
+
+El contenedor **no** usa automáticamente el ADC del host. Tras `gcloud auth application-default login` en tu máquina, el archivo de ADC suele estar en:
+
+- Linux/macOS: `~/.config/gcloud/application_default_credentials.json`
+
+**Recomendado (sin service account keys):** monta ese archivo en el contenedor y apunta `GOOGLE_APPLICATION_CREDENTIALS` a esa ruta interna.
+
+En `cloud_functions/docker-compose.yml`, por servicio:
+
+```yaml
+environment:
+  - GOOGLE_APPLICATION_CREDENTIALS=/app/adc.json
+volumes:
+  - ${HOME}/.config/gcloud/application_default_credentials.json:/app/adc.json:ro
+```
+
+Ajusta `functions/.env.local` para **no** sobrescribir `GOOGLE_APPLICATION_CREDENTIALS` a otra ruta, o comenta esa línea si usas el montaje anterior.
+
+**Alternativa:** montar un JSON de service account en `./credentials/` (solo si tu organización permite crear keys). El compose ya monta `cloud_functions/credentials` en `/app/credentials`.
+
+Tu usuario de GCP debe tener permisos suficientes en el proyecto (p. ej. Vertex AI User, acceso a secrets que la función lea, etc.).
 
 ## Contrato con Django
 
