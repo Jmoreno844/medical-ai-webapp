@@ -16,6 +16,8 @@ django_ninja_project/commands.sh
 
 # Terraform
 infra/**/.terraform/
+infra/**/tfplan
+*.tfplan
 infra/**/*.tfstate
 infra/**/*.tfstate.*
 infra/**/.terraform.lock.hcl
