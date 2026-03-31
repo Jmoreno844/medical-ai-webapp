@@ -70,6 +70,8 @@ jobs:
         working-directory: ./webapp
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
+          # storage.googleapis.com/<bucket>/ — assets must not be rooted at /assets on the host
+          VITE_BASE_URL: ${{ format('/{0}/', vars.FRONTEND_BUCKET_NAME) }}
         run: npm run build:skip-ts
 
       - name: Authenticate to Google Cloud

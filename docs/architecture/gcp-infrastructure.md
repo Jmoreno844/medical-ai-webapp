@@ -142,6 +142,7 @@ Después de `terraform apply`, configurar las mismas claves como **variables del
 | `GCS_BUCKET_NAME` | `vex-stg-audio` |
 | `FRONTEND_BUCKET_NAME` | `vex-stg-frontend-spa` |
 | `VITE_API_URL` | URL de Cloud Run (output) |
+| *(build)* `VITE_BASE_URL` | El workflow de frontend la deriva de `FRONTEND_BUCKET_NAME` (`/{bucket}/`) para que los assets carguen bajo `storage.googleapis.com/{bucket}/`. |
 | `GENERATE_DOCUMENT_CLOUD_FUNCTION_URL` | URL de la CF `document-workflow` (output) |
 | `TRANSCRIPTION_CLOUD_FUNCTION_URL` | URL de la CF `transcription-endpoint` (output) |
 | `CF_SOURCE_BUCKET` | *(opcional)* Bucket del zip para Terraform; por defecto en CI: `{GCP_PROJECT_ID}-cf-source` (debe coincidir con `cf_source_bucket` en `terraform.tfvars`) |
