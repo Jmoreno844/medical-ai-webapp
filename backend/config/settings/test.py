@@ -169,11 +169,16 @@ FALLBACK_SECRET_KEY = os.environ.get(
     "DJANGO_FALLBACK_SECRET_KEY",
     "django-insecure-test-key-do-not-use-in-production-environments",
 )
-SECRET_KEY = access_secret(
-    GCP_PROJECT_ID, "django_secret_key", default=FALLBACK_SECRET_KEY
+# Cloud Run (Terraform) maps secrets to SECRET_KEY / JWT_SECRET; IDs must match Secret Manager.
+SECRET_KEY = os.environ.get("SECRET_KEY") or access_secret(
+    GCP_PROJECT_ID, "django-secret-key", default=FALLBACK_SECRET_KEY
 )
-JWT_SECRET_KEY = access_secret(GCP_PROJECT_ID, "JWT_SECRET_KEY", default="not-loaded")
-SERVICE_ACCOUNT_JSON = access_secret(GCP_PROJECT_ID, "serviceaccountkey", default="{}")
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET") or access_secret(
+    GCP_PROJECT_ID, "jwt-secret-key", default="not-loaded"
+)
+SERVICE_ACCOUNT_JSON = access_secret(
+    GCP_PROJECT_ID, "service-account-json", default="{}"
+)
 
 TRANSCRIPTION_CLOUD_FUNCTION_URL = os.environ.get(
     "TRANSCRIPTION_CLOUD_FUNCTION_URL", "not-loaded"
@@ -187,45 +192,66 @@ DEBUG = True
 # In your Django settings
 ALLOWED_HOSTS = ["*"]
 
+def _postgres_options_for_host(host: str) -> dict:
+    """Cloud SQL Unix socket under /cloudsql/ does not use TLS like a public IP."""
+    if host.startswith("/cloudsql/"):
+        return {}
+    return {"sslmode": "require"}
+
+
+def _resolve_db_host() -> str | None:
+    explicit = os.getenv("DB_HOST")
+    if explicit:
+        return explicit
+    conn = os.getenv("INSTANCE_CONNECTION_NAME")
+    if conn:
+        return f"/cloudsql/{conn}"
+    return None
+
+
 # Database settings - Use PostgreSQL for tests
 # First try to get credentials from environment variables (for CI/CD)
 # If not available, fetch from Google Secret Manager with SQLite fallback
 try:
-    # Check if environment variables are available
+    db_host = _resolve_db_host()
     if (
         os.getenv("DB_NAME")
         and os.getenv("DB_USER")
         and os.getenv("DB_PASSWORD")
-        and os.getenv("DB_HOST")
+        and db_host
     ):
-        # Use environment variables (CI/CD environment)
         DATABASES = {
             "default": {
                 "ENGINE": "django.db.backends.postgresql",
                 "NAME": os.getenv("DB_NAME"),
                 "USER": os.getenv("DB_USER"),
                 "PASSWORD": os.getenv("DB_PASSWORD"),
-                "HOST": os.getenv("DB_HOST"),
-                "PORT": os.getenv("DB_PORT", "5432"),
+                "HOST": db_host,
+                "PORT": (
+                    ""
+                    if db_host.startswith("/cloudsql/")
+                    else os.getenv("DB_PORT", "5432")
+                ),
+                "OPTIONS": _postgres_options_for_host(db_host),
             }
         }
         logging.info("Using database configuration from environment variables")
     else:
-        # If environment variables aren't available, use Google Secret Manager with fallbacks
         db_name = access_secret(
-            GCP_PROJECT_ID, "db_name", default=os.getenv("DB_NAME", "test_db")
+            GCP_PROJECT_ID, "db-name", default=os.getenv("DB_NAME", "test_db")
         )
         db_user = access_secret(
-            GCP_PROJECT_ID, "db_user", default=os.getenv("DB_USER", "test_user")
+            GCP_PROJECT_ID, "db-user", default=os.getenv("DB_USER", "test_user")
         )
         db_password = access_secret(
-            GCP_PROJECT_ID, "db_password", default=os.getenv("DB_PASSWORD", "")
+            GCP_PROJECT_ID, "db-password", default=os.getenv("DB_PASSWORD", "")
         )
-        db_host = access_secret(
-            GCP_PROJECT_ID, "db_host", default=os.getenv("DB_HOST", "localhost")
+        db_host = _resolve_db_host() or access_secret(
+            GCP_PROJECT_ID,
+            "db-host",
+            default=os.getenv("DB_HOST", "localhost"),
         )
 
-        # Only use PostgreSQL if we have valid credentials
         if db_name and db_user and db_password and db_host:
             DATABASES = {
                 "default": {
@@ -234,10 +260,10 @@ try:
                     "USER": db_user,
                     "PASSWORD": db_password,
                     "HOST": db_host,
-                    "PORT": "5432",
-                    "OPTIONS": {
-                        "sslmode": "require",
-                    },
+                    "PORT": (
+                        "" if db_host.startswith("/cloudsql/") else "5432"
+                    ),
+                    "OPTIONS": _postgres_options_for_host(db_host),
                 }
             }
             logging.info("Using database configuration from Google Secret Manager")

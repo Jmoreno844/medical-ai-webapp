@@ -145,6 +145,7 @@ Después de `terraform apply`, configurar las mismas claves como **variables del
 | *(build)* `VITE_BASE_URL` | El workflow de frontend la deriva de `FRONTEND_BUCKET_NAME` (`/{bucket}/`) para que los assets carguen bajo `storage.googleapis.com/{bucket}/`. |
 | `GENERATE_DOCUMENT_CLOUD_FUNCTION_URL` | URL de la CF `document-workflow` (output) |
 | `TRANSCRIPTION_CLOUD_FUNCTION_URL` | URL de la CF `transcription-endpoint` (output) |
+| `INSTANCE_CONNECTION_NAME` | Mismo valor que output Terraform `cloud_sql_connection_name` (p. ej. `vex-stg:us-east1:vexthealth-db-test`) para el socket `/cloudsql/...` en Cloud Run |
 | `CF_SOURCE_BUCKET` | *(opcional)* Bucket del zip para Terraform; por defecto en CI: `{GCP_PROJECT_ID}-cf-source` (debe coincidir con `cf_source_bucket` en `terraform.tfvars`) |
 | `CF_SOURCE_OBJECT` | *(opcional)* Objeto del zip; por defecto `cloud-functions.zip` (igual que `cf_source_object` en Terraform) |
 

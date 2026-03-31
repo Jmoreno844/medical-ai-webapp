@@ -177,11 +177,12 @@ module "cloud_run" {
   session_affinity = true
 
   env_vars = {
-    DJANGO_SETTINGS_MODULE = "config.settings.test"
-    ENVIRONMENT            = var.environment
-    GCP_PROJECT_ID         = var.project_id
-    GCS_BUCKET_NAME        = module.storage_buckets.audio_bucket_name
-    ENABLE_SILK            = "true"
+    DJANGO_SETTINGS_MODULE   = "config.settings.test"
+    ENVIRONMENT              = var.environment
+    GCP_PROJECT_ID           = var.project_id
+    GCS_BUCKET_NAME          = module.storage_buckets.audio_bucket_name
+    ENABLE_SILK              = "true"
+    INSTANCE_CONNECTION_NAME = module.cloud_sql.connection_name
   }
 
   secret_env_vars = var.cloud_run_use_secret_manager ? [

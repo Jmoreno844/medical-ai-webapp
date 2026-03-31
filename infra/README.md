@@ -125,6 +125,7 @@ Después del primer apply exitoso, copiar los outputs de Terraform a las variabl
 - `VITE_API_URL` (output `cloud_run_url`)
 - `GENERATE_DOCUMENT_CLOUD_FUNCTION_URL`
 - `TRANSCRIPTION_CLOUD_FUNCTION_URL`
+- `INSTANCE_CONNECTION_NAME` — output `cloud_sql_connection_name` de Terraform (socket Cloud SQL en Cloud Run)
 - *(opcional)* `CF_SOURCE_BUCKET`, `CF_SOURCE_OBJECT` — ver `docs/architecture/gcp-infrastructure.md`
 
 Luego se puede eliminar el secret `GCP_SA_KEY` de GitHub.
