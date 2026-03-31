@@ -166,7 +166,7 @@ Así el artefacto en GCS queda alineado con lo que espera el módulo Terraform `
 | Requisito | Workflows afectados |
 |---|---|
 | Variables `GCP_PROJECT_ID`, `WIF_PROVIDER`, `GH_DEPLOYER_SA` definidas y WIF creado en GCP | Backend, Cloud Functions, Frontend |
-| `BACKEND_SERVICE_ACCOUNT`, `GCS_BUCKET_NAME`, URLs de CF, `VITE_API_URL` | Backend deploy |
+| `BACKEND_SERVICE_ACCOUNT`, `GCS_BUCKET_NAME`, URLs de CF, `VITE_API_URL`, `INSTANCE_CONNECTION_NAME` | Backend deploy |
 | `FRONTEND_BUCKET_NAME` | Frontend deploy |
 | SA `github-actions-deployer` con los roles del módulo Terraform (p. ej. `storage.admin`, `cloudfunctions.developer`) | Todos los despliegues |
 
@@ -176,6 +176,11 @@ Así el artefacto en GCS queda alineado con lo que espera el módulo Terraform `
 |---|---|
 | `Failed to generate Google Cloud access token` en Actions | Variables `WIF_PROVIDER` y `GH_DEPLOYER_SA`; en GCP, que el pool/provider existan y el binding `workloadIdentityUser` apunte al repo correcto (`terraform.tfvars` → `github_repo`). |
 | Backend no conecta a Cloud SQL | Secret `db-user` / `db-name` / `db-password` en Secret Manager; que la contraseña coincida con el usuario creado por Terraform (`TF_VAR_db_password` en el apply). |
+| Cloud Run / Django intenta `localhost:5432` | Falta `INSTANCE_CONNECTION_NAME` (env en Terraform y en variables del workflow `stg`); el backend debe usar host `/cloudsql/<connection_name>` (ver `config.settings.test`). |
+| `terraform apply` bloqueado por state lock | Otro `plan`/`apply` colgado o Ctrl+C; `terraform force-unlock <id>` tras confirmar que no hay otro proceso usando el state. |
+| Zip de Cloud Functions inválido en CI | No usar `mktemp … .zip` como destino de `zip` (archivo vacío previo); no usar exclusiones `**/` con `zip` en Ubuntu. El workflow ya usa ruta `$$` + patrones simples y `unzip -t`. |
+| Assets del SPA en `storage.googleapis.com/assets/...` 404 | `Vite` con `base: '/'` rompe en bucket; el workflow define `VITE_BASE_URL` desde `FRONTEND_BUCKET_NAME` y el router usa `basename`. |
+| Variables de GitHub vacías en Actions | Las variables solo en el environment `stg` no se ven en `env` a nivel workflow; los jobs de deploy deben tener `environment: stg` (ya aplicado en los workflows). |
 | `403` al crear bucket / APIs | Facturación del proyecto activa; APIs habilitadas (`terraform` o bootstrap). |
 | Terraform falla en Cloud Functions | Que exista `gs://{proyecto}-cf-source/cloud-functions.zip` (p. ej. tras un run del workflow Deploy Cloud Functions) o comenta el módulo hasta tener el zip. |
 | Cloud Functions falla con `missing permission on the build service account` | Dar `roles/storage.objectViewer` al service account de build (`PROJECT_NUMBER-compute@developer.gserviceaccount.com`) sobre el bucket interno `gcf-v2-sources-*`; el módulo `service_accounts` ya contempla este binding para nuevos applies. |
