@@ -7,6 +7,7 @@ Use **different values** for local development, CI/test, and production for Djan
 | Context | `DJANGO_SETTINGS_MODULE` |
 |---------|---------------------------|
 | Local CLI (`manage.py` default) | `config.settings.develop` |
+| Staging / Cloud Run | `config.settings.stg` |
 | Pytest / CI | `config.settings.test` |
 | Gunicorn / Cloud Run image | `config.settings.production` |
 
@@ -25,6 +26,23 @@ Legacy: `DJANGO_SETTINGS_MODULE=config.settings` still loads **develop** (see `c
 ### Test (`config.settings.test`)
 
 Use **test-only** `DJANGO_SECRET_KEY` and `JWT_SECRET_KEY` (pytest sets `DJANGO_SETTINGS_MODULE` via `pytest.ini`). Do not point test at production databases or buckets.
+
+### Staging (`config.settings.stg`)
+
+| Variable | Required |
+|----------|----------|
+| `DJANGO_SECRET_KEY` or Secret Manager `django-secret-key` | Yes |
+| `JWT_SECRET_KEY` or Secret Manager `jwt-secret-key` | Yes |
+| `DB_NAME` | Yes |
+| `DB_USER` | Yes; en `stg` es el usuario IAM derivado de `backend-runner` (formato canonical: sin `.gserviceaccount.com`; el backend normaliza el email completo si se le pasa así) |
+| `DB_HOST` / `DB_PORT` | Yes; en `stg` quedan `127.0.0.1:5432` vía Cloud SQL Auth Proxy sidecar |
+| `TRANSCRIPTION_CLOUD_FUNCTION_URL` | Yes |
+| `GENERATE_DOCUMENT_CLOUD_FUNCTION_URL` | Yes |
+| `CLOUD_TASKS_REGION` | Yes |
+| `TRANSCRIPTION_QUEUE_NAME` | Yes |
+| `CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT` | Yes |
+
+En `stg`, la conexión a Cloud SQL usa **IAM DB auth + Cloud SQL Auth Proxy**. Ya no se usan `db-user` ni `db-password` como runtime secrets del backend.
 
 ### Production (`config.settings.production`)
 
@@ -45,6 +63,7 @@ Inject via Cloud Run / Secret Manager; never commit real values.
 
 - **Local:** ADC plus service account impersonation for backend signed URLs (recommended); JSON key only as an exception.
 - **CI/test:** Inject JSON or path via CI secrets; isolated project or bucket where possible.
+- **Staging:** platform ADC del service account `backend-runner`; Cloud SQL vía IAM DB auth.
 - **Production:** Platform-injected secrets or Secret Manager; dedicated service account per environment where practical.
 
 See `apps/encounters/services/storage.py` for how the client is built from settings.

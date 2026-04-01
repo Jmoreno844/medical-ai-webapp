@@ -19,10 +19,12 @@ resource "google_sql_database_instance" "main" {
     }
 
     ip_configuration {
-      ipv4_enabled = true
+      ipv4_enabled                                  = var.ipv4_enabled
+      private_network                               = var.private_network
+      enable_private_path_for_google_cloud_services = var.private_network != null
 
       dynamic "authorized_networks" {
-        for_each = var.authorized_networks
+        for_each = var.ipv4_enabled ? var.authorized_networks : []
         content {
           name  = authorized_networks.value.name
           value = authorized_networks.value.cidr
@@ -34,6 +36,14 @@ resource "google_sql_database_instance" "main" {
       name  = "max_connections"
       value = var.max_connections
     }
+
+    dynamic "database_flags" {
+      for_each = var.enable_iam_auth ? ["on"] : []
+      content {
+        name  = "cloudsql.iam_authentication"
+        value = database_flags.value
+      }
+    }
   }
 }
 
@@ -44,8 +54,19 @@ resource "google_sql_database" "app" {
 }
 
 resource "google_sql_user" "app" {
+  count = var.database_user == null || var.database_password == null ? 0 : 1
+
   project  = var.project_id
   name     = var.database_user
   instance = google_sql_database_instance.main.name
   password = var.database_password
+}
+
+resource "google_sql_user" "iam_service_accounts" {
+  for_each = toset(var.iam_database_users)
+
+  project  = var.project_id
+  name     = trimsuffix(each.value, ".gserviceaccount.com")
+  instance = google_sql_database_instance.main.name
+  type     = "CLOUD_IAM_SERVICE_ACCOUNT"
 }

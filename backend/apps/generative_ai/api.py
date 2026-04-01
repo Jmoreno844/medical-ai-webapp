@@ -10,6 +10,11 @@ import logging
 import requests
 from typing import Dict, Any
 
+from apps.generative_ai.services.transcription_tasks import (
+    TranscriptionTaskConfigurationError,
+    enqueue_transcription_task,
+    should_use_cloud_tasks,
+)
 from utils.service_jwt import (
     build_transcription_callback_payload,
     encode_service_jwt,
@@ -134,19 +139,36 @@ def start_transcription(request, payload: TranscriptionRequest):
             "auth_token": auth_token,
         }
 
-        cloud_function_url = settings.TRANSCRIPTION_CLOUD_FUNCTION_URL
         try:
-            response = requests.post(cloud_function_url, json=cloud_function_payload)
+            if should_use_cloud_tasks():
+                task_name = enqueue_transcription_task(cloud_function_payload)
+                logger.info(
+                    "Transcription task queued for document %s with task %s",
+                    document_id,
+                    task_name,
+                )
+                return TranscriptionResponse(
+                    success=True,
+                    message="Transcription queued successfully",
+                )
+
+            cloud_function_url = settings.TRANSCRIPTION_CLOUD_FUNCTION_URL
+            response = requests.post(
+                cloud_function_url,
+                json=cloud_function_payload,
+                timeout=30,
+            )
             response.raise_for_status()
             logger.info(
                 f"Transcription initiated for document {document_id} with encounter {encounter_id}"
             )
 
-            enc.has_been_transcribed = True
-            enc.save()
             return TranscriptionResponse(
                 success=True, message="Transcription initiated successfully"
             )
+        except TranscriptionTaskConfigurationError as e:
+            logger.error("Cloud Tasks transcription misconfigured: %s", e)
+            return TranscriptionResponse(success=False, error=str(e))
         except requests.RequestException as e:
             logger.error(f"Error calling transcription cloud function: {str(e)}")
             return TranscriptionResponse(

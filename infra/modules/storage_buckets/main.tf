@@ -23,6 +23,13 @@ resource "google_storage_bucket" "audio" {
     }
   }
 
+  cors {
+    origin          = var.audio_cors_origins
+    method          = ["PUT", "GET", "HEAD", "OPTIONS", "DELETE"]
+    response_header = ["Content-Type"]
+    max_age_seconds = 3600
+  }
+
   labels = var.labels
 }
 
@@ -48,6 +55,19 @@ resource "google_storage_bucket" "frontend" {
     response_header = ["Content-Type"]
     max_age_seconds = 3600
   }
+
+  labels = var.labels
+}
+
+resource "google_storage_bucket" "cloud_functions_source" {
+  count = var.cf_source_bucket_name == null ? 0 : 1
+
+  project                     = var.project_id
+  name                        = var.cf_source_bucket_name
+  location                    = var.region
+  force_destroy               = var.force_destroy
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
 
   labels = var.labels
 }

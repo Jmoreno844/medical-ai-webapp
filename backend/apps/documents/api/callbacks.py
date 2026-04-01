@@ -150,6 +150,11 @@ def transcription_complete_notification(
         if doc.doctor.id != doctor_id_from_token:
             raise HttpError(403, "No tienes permiso para este documento")
 
+        encounter = doc.encounter
+        if not encounter.has_been_transcribed:
+            encounter.has_been_transcribed = True
+            encounter.save(update_fields=["has_been_transcribed"])
+
         notify_document_updated(document_id, "transcription_complete")
         return {
             "success": True,

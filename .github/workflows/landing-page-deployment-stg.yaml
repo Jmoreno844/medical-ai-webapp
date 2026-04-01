@@ -1,0 +1,90 @@
+name: Deploy Landing Page to GCS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: stg
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      BUCKET_NAME: ${{ vars.LANDING_BUCKET_NAME }}
+      NODE_ENV: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 2 # Needed to check for changes between commits
+
+      - name: Check for changes in landing-page directory or workflow file
+        id: check_changes
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Changes detected due to manual workflow dispatch"
+            echo "changes=true" >> $GITHUB_OUTPUT
+          else
+            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep -E "^landing-page/|^\.github/workflows/landing-page-deployment-stg\.yaml$" || echo "")
+            if [ -z "$CHANGED_FILES" ]; then
+              echo "No changes in landing-page directory or workflow file"
+              echo "changes=false" >> $GITHUB_OUTPUT
+            else
+              echo "Changes detected in landing-page directory or workflow file"
+              echo "changes=true" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Set up Node.js
+        if: steps.check_changes.outputs.changes == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: landing-page/package-lock.json
+
+      - name: Install dependencies
+        if: steps.check_changes.outputs.changes == 'true'
+        working-directory: ./landing-page
+        run: npm ci
+
+      - name: Build static site
+        if: steps.check_changes.outputs.changes == 'true'
+        working-directory: ./landing-page
+        run: npm run build
+
+      - name: Authenticate to Google Cloud
+        if: steps.check_changes.outputs.changes == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.GH_DEPLOYER_SA }}
+
+      - name: Set up gcloud CLI
+        if: steps.check_changes.outputs.changes == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Deploy to GCS bu  cket
+        if: steps.check_changes.outputs.changes == 'true'
+        working-directory: ./landing-page
+        run: |
+          echo "Syncing the out directory to GCS bucket gs://${{ env.BUCKET_NAME }}"
+          gsutil -m rsync -r -d out/ gs://${{ env.BUCKET_NAME }}/
+              
+          # Set long cache control for Next.js static assets
+          gsutil -m setmeta -h "Cache-Control:public, max-age=31536000" gs://${{ env.BUCKET_NAME }}/_next/static/** || true
+              
+          # Set long cache control for image files (adjust extensions as needed)
+          gsutil -m setmeta -h "Cache-Control:public, max-age=31536000" gs://${{ env.BUCKET_NAME }}/**/*.{png,jpg,jpeg,gif,svg,webp} || true
+              
+          # Set shorter cache control for HTML files
+          gsutil -m setmeta -h "Cache-Control:public, max-age=0, must-revalidate" gs://${{ env.BUCKET_NAME }}/*.html || true

@@ -57,12 +57,14 @@ variable "database_name" {
 variable "database_user" {
   description = "Name of the application database user"
   type        = string
+  default     = null
 }
 
 variable "database_password" {
   description = "Password for the application database user (use a sensitive variable)"
   type        = string
   sensitive   = true
+  default     = null
 }
 
 variable "authorized_networks" {
@@ -72,4 +74,28 @@ variable "authorized_networks" {
     cidr = string
   }))
   default = []
+}
+
+variable "ipv4_enabled" {
+  description = "Whether to enable public IPv4 access"
+  type        = bool
+  default     = true
+}
+
+variable "private_network" {
+  description = "Private VPC network self-link for the Cloud SQL instance"
+  type        = string
+  default     = null
+}
+
+variable "enable_iam_auth" {
+  description = "Enable Cloud SQL IAM database authentication"
+  type        = bool
+  default     = false
+}
+
+variable "iam_database_users" {
+  description = "IAM service account emails that should be created as Cloud SQL users"
+  type        = list(string)
+  default     = []
 }

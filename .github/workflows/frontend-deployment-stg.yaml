@@ -1,0 +1,99 @@
+name: Deploy Vite.js Static Site to GCS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Variables de GCP en GitHub Environment "stg" (ver job build-and-deploy).
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: stg
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      BUCKET_NAME: ${{ vars.FRONTEND_BUCKET_NAME }}
+      NODE_ENV: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for changes in webapp directory or workflow file
+        id: check_changes
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Changes detected due to manual workflow dispatch"
+            echo "changes=true" >> $GITHUB_OUTPUT
+          else
+            CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
+            APP_CHANGES=$(echo "$CHANGED_FILES" | grep "^webapp/" || echo "")
+            WORKFLOW_CHANGED=$(echo "$CHANGED_FILES" | grep "^.github/workflows/frontend-deployment-stg.yaml$" || echo "")
+            
+            if [ -z "$APP_CHANGES" ] && [ -z "$WORKFLOW_CHANGED" ]; then
+              echo "No changes in webapp directory or workflow file"
+              echo "changes=false" >> $GITHUB_OUTPUT
+            else
+              if [ -n "$APP_CHANGES" ]; then
+                echo "Changes detected in webapp directory"
+              fi
+              if [ -n "$WORKFLOW_CHANGED" ]; then
+                echo "Changes detected in workflow file"
+              fi
+              echo "changes=true" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Set up Node.js
+        if: steps.check_changes.outputs.changes == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: webapp/package-lock.json
+
+      - name: Install dependencies
+        if: steps.check_changes.outputs.changes == 'true'
+        working-directory: ./webapp
+        run: npm ci
+
+      - name: Build Vite.js static site
+        if: steps.check_changes.outputs.changes == 'true'
+        working-directory: ./webapp
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          # storage.googleapis.com/<bucket>/ — assets must not be rooted at /assets on the host
+          VITE_BASE_URL: ${{ format('/{0}/', vars.FRONTEND_BUCKET_NAME) }}
+        run: npm run build:skip-ts
+
+      - name: Authenticate to Google Cloud
+        if: steps.check_changes.outputs.changes == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.GH_DEPLOYER_SA }}
+
+      - name: Set up gcloud CLI
+        if: steps.check_changes.outputs.changes == 'true'
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Deploy to GCS bucket
+        if: steps.check_changes.outputs.changes == 'true'
+        working-directory: ./webapp
+        run: |
+          echo "Syncing the dist directory to GCS bucket gs://${{ env.BUCKET_NAME }}"
+          gsutil -m rsync -r -d dist/ gs://${{ env.BUCKET_NAME }}/
+
+          gsutil -m setmeta -h "Cache-Control:public, max-age=31536000" gs://${{ env.BUCKET_NAME }}/assets/**
+
+          gsutil -m setmeta -h "Cache-Control:public, max-age=0, must-revalidate" gs://${{ env.BUCKET_NAME }}/*.html

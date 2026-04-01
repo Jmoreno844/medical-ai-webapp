@@ -26,6 +26,7 @@ variable "service_account_email" {
 variable "cloud_sql_connection_name" {
   description = "Cloud SQL connection name (project:region:instance)"
   type        = string
+  default     = ""
 }
 
 variable "min_instances" {
@@ -90,6 +91,34 @@ variable "allow_unauthenticated" {
   description = "Allow unauthenticated invocations (public endpoint)"
   type        = bool
   default     = true
+}
+
+variable "cloud_sql_volume_enabled" {
+  description = "Whether to mount the Cloud SQL socket volume into the main container"
+  type        = bool
+  default     = true
+}
+
+variable "vpc_access" {
+  description = "Optional Direct VPC egress configuration"
+  type = object({
+    network    = string
+    subnetwork = string
+    egress     = optional(string, "PRIVATE_RANGES_ONLY")
+  })
+  default = null
+}
+
+variable "sidecars" {
+  description = "Additional sidecar containers"
+  type = list(object({
+    name     = string
+    image    = string
+    command  = optional(list(string), [])
+    args     = optional(list(string), [])
+    env_vars = optional(map(string), {})
+  }))
+  default = []
 }
 
 variable "labels" {

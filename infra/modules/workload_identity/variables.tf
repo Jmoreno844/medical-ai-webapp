@@ -24,3 +24,15 @@ variable "service_account_name" {
   description = "Full resource name of the SA to impersonate (projects/.../serviceAccounts/...)"
   type        = string
 }
+
+variable "allowed_refs" {
+  description = "Git refs allowed to use this WIF provider"
+  type        = list(string)
+  default     = ["refs/heads/main"]
+}
+
+variable "allowed_workflow_files" {
+  description = "Workflow files allowed to use this WIF provider"
+  type        = list(string)
+  default     = []
+}

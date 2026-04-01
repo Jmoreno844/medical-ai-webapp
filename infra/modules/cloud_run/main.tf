@@ -17,10 +17,25 @@ resource "google_cloud_run_v2_service" "backend" {
     session_affinity                 = var.session_affinity
     timeout                          = var.timeout
 
-    volumes {
-      name = "cloudsql"
-      cloud_sql_instance {
-        instances = [var.cloud_sql_connection_name]
+    dynamic "vpc_access" {
+      for_each = var.vpc_access == null ? [] : [var.vpc_access]
+      content {
+        egress = lookup(vpc_access.value, "egress", "PRIVATE_RANGES_ONLY")
+
+        network_interfaces {
+          network    = vpc_access.value.network
+          subnetwork = vpc_access.value.subnetwork
+        }
+      }
+    }
+
+    dynamic "volumes" {
+      for_each = var.cloud_sql_volume_enabled && var.cloud_sql_connection_name != "" ? [var.cloud_sql_connection_name] : []
+      content {
+        name = "cloudsql"
+        cloud_sql_instance {
+          instances = [volumes.value]
+        }
       }
     }
 
@@ -34,9 +49,12 @@ resource "google_cloud_run_v2_service" "backend" {
         }
       }
 
-      volume_mounts {
-        name       = "cloudsql"
-        mount_path = "/cloudsql"
+      dynamic "volume_mounts" {
+        for_each = var.cloud_sql_volume_enabled && var.cloud_sql_connection_name != "" ? [var.cloud_sql_connection_name] : []
+        content {
+          name       = "cloudsql"
+          mount_path = "/cloudsql"
+        }
       }
 
       dynamic "env" {
@@ -56,6 +74,24 @@ resource "google_cloud_run_v2_service" "backend" {
               secret  = env.value.secret_id
               version = lookup(env.value, "version", "latest")
             }
+          }
+        }
+      }
+    }
+
+    dynamic "containers" {
+      for_each = var.sidecars
+      content {
+        name    = containers.value.name
+        image   = containers.value.image
+        command = containers.value.command
+        args    = containers.value.args
+
+        dynamic "env" {
+          for_each = containers.value.env_vars
+          content {
+            name  = env.key
+            value = env.value
           }
         }
       }

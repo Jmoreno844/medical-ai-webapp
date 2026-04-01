@@ -1,0 +1,249 @@
+name: Backend Staging Deployment
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-deployment-stg.yaml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Variables de GCP viven en el GitHub Environment "stg" (no en repo-level vars).
+# Cada job que despliega debe declarar environment: stg para que vars.* se resuelva.
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  # test:
+  #   name: Test Backend
+  #   runs-on: ubuntu-latest
+
+  #   env:
+  #     DJANGO_SETTINGS_MODULE: config.settings.stg
+  #     GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  #     DB_NAME: ${{ secrets.TEST_DB_NAME }}
+  #     DB_USER: ${{ secrets.TEST_DB_USER }}
+  #     DB_PASSWORD: ${{ secrets.TEST_DB_PASSWORD }}
+  #     DB_HOST: ${{ secrets.TEST_DB_HOST }}
+  #     DB_PORT: ${{ secrets.DB_PORT || '5432' }}
+
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v3
+
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: "3.10"
+  #         cache: "pip"
+
+  #     - name: Install uv
+  #       uses: astral-sh/setup-uv@v5
+  #       with:
+  #         version: "0.11.2"
+
+  #     - name: Cache uv
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: ~/.cache/uv
+  #         key: ${{ runner.os }}-uv-${{ hashFiles('backend/uv.lock') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-uv-
+
+  #     - name: Install dependencies
+  #       run: |
+  #         cd backend
+  #         uv sync --frozen
+
+  #     - name: Authenticate to Google Cloud
+  #       uses: google-github-actions/auth@v2
+  #       with:
+  #         workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+  #         service_account: ${{ vars.GH_DEPLOYER_SA }}
+
+  #     # - name: Run tests
+  #     #   working-directory: backend
+  #     #   run: |
+  #     #     uv run python manage.py test
+
+  # lint:
+  #   name: Lint Backend
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v3
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: "3.10"
+  #     - name: Install uv
+  #       uses: astral-sh/setup-uv@v5
+  #       with:
+  #         version: "0.11.2"
+  #     - name: Install dependencies
+  #       run: |
+  #         cd backend
+  #         uv sync --frozen
+  #     # - name: Run black
+  #     #   working-directory: backend
+  #     #   run: |
+  #     #     uv run black --check .
+  #     - name: Run isort
+  #       working-directory: backend
+  #       run: |
+  #         uv run isort --check-only --profile black .
+  #     - name: Run flake8
+  #       working-directory: backend
+  #       run: |
+  #         uv run flake8
+
+  build-and-push:
+    name: Build and Push Docker Image
+    # needs: [test, lint]
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    environment: stg
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.stg
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      SERVICE_NAME: vexthealth-backend
+      REGION: us-east1
+      REPOSITORY: vexthealth-containers
+      IMAGE_NAME: django-backend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            network=host
+            image=moby/buildkit:latest
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.GH_DEPLOYER_SA }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: |
+            type=registry,ref=${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
+            type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
+      - name: Tag with latest for caching
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker pull ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker tag ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
+
+  deploy:
+    name: Deploy to Cloud Run
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: stg
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      SERVICE_NAME: vexthealth-backend
+      REGION: us-east1
+      REPOSITORY: vexthealth-containers
+      IMAGE_NAME: django-backend
+
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.GH_DEPLOYER_SA }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Resolve Cloud Function URLs
+        id: function_urls
+        run: |
+          set -euo pipefail
+          TRANSCRIPTION_URL="$(gcloud functions describe transcription-endpoint --gen2 --region="${REGION}" --format='value(serviceConfig.uri)')"
+          DOCUMENT_URL="$(gcloud functions describe document-workflow --gen2 --region="${REGION}" --format='value(serviceConfig.uri)')"
+          DB_IAM_USER="${{ vars.BACKEND_SERVICE_ACCOUNT }}"
+          DB_IAM_USER="${DB_IAM_USER%.gserviceaccount.com}"
+          echo "transcription_url=${TRANSCRIPTION_URL}" >> "$GITHUB_OUTPUT"
+          echo "document_url=${DOCUMENT_URL}" >> "$GITHUB_OUTPUT"
+          echo "db_iam_user=${DB_IAM_USER}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          region: ${{ env.REGION }}
+          flags: |
+            --ingress=all
+            --allow-unauthenticated
+            --session-affinity
+            --service-account=${{ vars.BACKEND_SERVICE_ACCOUNT }}
+            --cpu=1
+            --memory=1Gi
+            --min-instances=0
+            --max-instances=1
+            --concurrency=250
+          env_vars: |
+            DJANGO_SETTINGS_MODULE=config.settings.stg
+            GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }}
+            GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }}
+            GCP_PROJECT=${{ env.GCP_PROJECT_ID }}
+            GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT_ID }}
+            ENVIRONMENT=stg
+            ENABLE_SILK=true
+            DB_HOST=127.0.0.1
+            DB_PORT=5432
+            DB_NAME=${{ env.GCP_PROJECT_ID }}
+            DB_USER=${{ steps.function_urls.outputs.db_iam_user }}
+            CONN_MAX_AGE=300
+            CLOUD_TASKS_REGION=${{ env.REGION }}
+            TRANSCRIPTION_QUEUE_NAME=audio-transcription-queue
+            CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT=cloud-tasks-invoker@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+            GENERATE_DOCUMENT_CLOUD_FUNCTION_URL=${{ steps.function_urls.outputs.document_url }}
+            TRANSCRIPTION_CLOUD_FUNCTION_URL=${{ steps.function_urls.outputs.transcription_url }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Show Output
+        run: echo ${{ steps.deploy.outputs.url }}

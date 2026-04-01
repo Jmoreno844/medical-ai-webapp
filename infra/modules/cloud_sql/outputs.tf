@@ -13,6 +13,11 @@ output "public_ip" {
   value       = google_sql_database_instance.main.public_ip_address
 }
 
+output "private_ip" {
+  description = "Private IP address of the instance"
+  value       = google_sql_database_instance.main.private_ip_address
+}
+
 output "database_name" {
   description = "Name of the created database"
   value       = google_sql_database.app.name

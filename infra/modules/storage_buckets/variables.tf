@@ -18,10 +18,27 @@ variable "frontend_bucket_name" {
   type        = string
 }
 
+variable "cf_source_bucket_name" {
+  description = "Name of the Cloud Functions source bucket"
+  type        = string
+  default     = null
+}
+
 variable "audio_retention_days" {
   description = "Days before audio objects are auto-deleted"
   type        = number
   default     = 7
+}
+
+variable "audio_cors_origins" {
+  description = "Allowed browser origins for signed URL uploads to the audio bucket"
+  type        = list(string)
+  default = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+  ]
 }
 
 variable "frontend_cors_origins" {

@@ -42,9 +42,9 @@ resource "google_project_iam_member" "backend_secrets" {
   member  = "serviceAccount:${google_service_account.backend_runner.email}"
 }
 
-resource "google_project_iam_member" "backend_storage" {
+resource "google_project_iam_member" "backend_cloudsql_instance_user" {
   project = var.project_id
-  role    = "roles/storage.objectAdmin"
+  role    = "roles/cloudsql.instanceUser"
   member  = "serviceAccount:${google_service_account.backend_runner.email}"
 }
 
@@ -70,12 +70,6 @@ resource "google_project_iam_member" "cf_aiplatform" {
   member  = "serviceAccount:${google_service_account.cloud_functions_runner.email}"
 }
 
-resource "google_project_iam_member" "cf_storage" {
-  project = var.project_id
-  role    = "roles/storage.objectViewer"
-  member  = "serviceAccount:${google_service_account.cloud_functions_runner.email}"
-}
-
 resource "google_project_iam_member" "cf_trace" {
   project = var.project_id
   role    = "roles/cloudtrace.agent"
@@ -89,6 +83,7 @@ resource "google_project_iam_member" "cf_run_invoker" {
 }
 
 resource "google_project_iam_member" "cf_secrets" {
+  count   = var.grant_cloud_functions_secret_accessor ? 1 : 0
   project = var.project_id
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.cloud_functions_runner.email}"
@@ -119,7 +114,7 @@ resource "google_project_iam_member" "gcf_build_artifact_registry_writer" {
 }
 
 # ---------------------------------------------------------------------------
-# cloud-tasks-invoker IAM (per-function binding is done in cloud_functions module)
+# cloud-tasks-invoker IAM (per-function binding is applied by the deploy workflow)
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
@@ -138,20 +133,57 @@ resource "google_project_iam_member" "gh_cf_developer" {
   member  = "serviceAccount:${google_service_account.github_actions_deployer.email}"
 }
 
-resource "google_project_iam_member" "gh_storage_admin" {
-  project = var.project_id
-  role    = "roles/storage.admin"
-  member  = "serviceAccount:${google_service_account.github_actions_deployer.email}"
-}
-
 resource "google_project_iam_member" "gh_ar_writer" {
   project = var.project_id
   role    = "roles/artifactregistry.writer"
   member  = "serviceAccount:${google_service_account.github_actions_deployer.email}"
 }
 
-resource "google_project_iam_member" "gh_sa_user" {
-  project = var.project_id
-  role    = "roles/iam.serviceAccountUser"
-  member  = "serviceAccount:${google_service_account.github_actions_deployer.email}"
+resource "google_storage_bucket_iam_member" "backend_audio_bucket_admin" {
+  bucket = var.audio_bucket_name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.backend_runner.email}"
+}
+
+resource "google_storage_bucket_iam_member" "cf_audio_bucket_viewer" {
+  bucket = var.audio_bucket_name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.cloud_functions_runner.email}"
+}
+
+resource "google_storage_bucket_iam_member" "gh_frontend_bucket_admin" {
+  bucket = var.frontend_bucket_name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.github_actions_deployer.email}"
+}
+
+resource "google_storage_bucket_iam_member" "gh_cf_source_bucket_admin" {
+  count  = var.cf_source_bucket_name == null ? 0 : 1
+  bucket = var.cf_source_bucket_name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.github_actions_deployer.email}"
+}
+
+resource "google_service_account_iam_member" "gh_backend_runner_user" {
+  service_account_id = google_service_account.backend_runner.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.github_actions_deployer.email}"
+}
+
+resource "google_service_account_iam_member" "gh_cloud_functions_runner_user" {
+  service_account_id = google_service_account.cloud_functions_runner.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.github_actions_deployer.email}"
+}
+
+resource "google_service_account_iam_member" "backend_cloud_tasks_invoker_user" {
+  service_account_id = google_service_account.cloud_tasks_invoker.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.backend_runner.email}"
+}
+
+resource "google_service_account_iam_member" "backend_cloud_tasks_invoker_token_creator" {
+  service_account_id = google_service_account.cloud_tasks_invoker.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.backend_runner.email}"
 }

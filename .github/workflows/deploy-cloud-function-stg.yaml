@@ -1,0 +1,125 @@
+name: Deploy Cloud Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "cloud_functions/functions/**"
+      - ".github/workflows/deploy-cloud-function-stg.yaml"
+  workflow_dispatch:
+
+# Bucket/object must match Terraform: infra/environments/stg/terraform.tfvars
+# Variables de GCP en GitHub Environment "stg" (ver job deploy-functions).
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy-functions:
+    runs-on: ubuntu-latest
+    environment: stg
+    env:
+      GCP_PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: us-east1
+      CF_SOURCE_BUCKET: ${{ vars.CF_SOURCE_BUCKET }}
+      CF_SOURCE_OBJECT: ${{ vars.CF_SOURCE_OBJECT }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.1-flash-lite-preview' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.GH_DEPLOYER_SA }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+
+      - name: Zip source and upload to GCS (for Terraform / reproducible artifact)
+        run: |
+          set -euo pipefail
+          if [ -z "${GCP_PROJECT:-}" ]; then
+            echo "::error::Set repository variable GCP_PROJECT_ID (e.g. vext-stg)"
+            exit 1
+          fi
+          BUCKET="${CF_SOURCE_BUCKET:-${GCP_PROJECT}-cf-source}"
+          OBJECT="${CF_SOURCE_OBJECT:-cloud-functions.zip}"
+          echo "Using gs://${BUCKET}/${OBJECT}"
+
+          # mktemp creates an empty file; zip fails when the destination already exists
+          # and is not a valid zip. Use a unique path without pre-creating the file.
+          TMP_ZIP="/tmp/cf-source-$$.zip"
+          rm -f "${TMP_ZIP}"
+          cd cloud_functions/functions
+          zip -r "${TMP_ZIP}" . \
+            -x "*.pyc" \
+            -x "*__pycache__*" \
+            -x "*.venv*" \
+            -x ".env.local" \
+            -x ".pytest_cache/*" \
+            -x ".mypy_cache/*"
+          cd ../..
+          unzip -t "${TMP_ZIP}" >/dev/null
+
+          gcloud storage cp "${TMP_ZIP}" "gs://${BUCKET}/${OBJECT}" --project="${GCP_PROJECT}"
+          rm -f "${TMP_ZIP}"
+          echo "Uploaded Terraform source archive to gs://${BUCKET}/${OBJECT}"
+
+      - name: Deploy Transcription Function
+        run: |
+          cd cloud_functions/functions
+          gcloud functions deploy transcription-endpoint \
+            --gen2 \
+            --runtime=python312 \
+            --region=${{ env.GCP_REGION }} \
+            --source=. \
+            --entry-point=transcription_endpoint \
+            --trigger-http \
+            --no-allow-unauthenticated \
+            --min-instances=0 \
+            --max-instances=3 \
+            --memory=1024MB \
+            --timeout=300s \
+            --service-account=cloud-functions-runner@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com \
+            --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=${{ env.GEMINI_MODEL }},ENVIRONMENT=stg,DJANGO_API_BASE_URL=${{ vars.VITE_API_URL }}
+
+      - name: Bind transcription invokers
+        run: |
+          set -euo pipefail
+          MEMBER="serviceAccount:cloud-tasks-invoker@${GCP_PROJECT}.iam.gserviceaccount.com"
+          gcloud functions add-invoker-policy-binding transcription-endpoint \
+            --region="${GCP_REGION}" \
+            --member="${MEMBER}"
+
+      - name: Deploy Document Workflow Function
+        run: |
+          cd cloud_functions/functions
+          gcloud functions deploy document-workflow \
+            --gen2 \
+            --runtime=python312 \
+            --region=${{ env.GCP_REGION }} \
+            --source=. \
+            --entry-point=generate_document_workflow \
+            --trigger-http \
+            --no-allow-unauthenticated \
+            --min-instances=0 \
+            --max-instances=3 \
+            --memory=1024MB \
+            --timeout=300s \
+            --service-account=cloud-functions-runner@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com \
+            --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=${{ env.GEMINI_MODEL }},ENVIRONMENT=stg,DJANGO_API_BASE_URL=${{ vars.VITE_API_URL }}
+
+      - name: Bind document workflow invokers
+        run: |
+          set -euo pipefail
+          MEMBER="serviceAccount:backend-runner@${GCP_PROJECT}.iam.gserviceaccount.com"
+          gcloud functions add-invoker-policy-binding document-workflow \
+            --region="${GCP_REGION}" \
+            --member="${MEMBER}"

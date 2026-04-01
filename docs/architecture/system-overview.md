@@ -71,8 +71,9 @@ sequenceDiagram
         note over Browser,CF: Paso 2 — Inicio de transcripción
         Browser->>Django: POST /transcription/start
         Django->>Django: Genera JWT de servicio (15 min)
-        Django->>CF: POST { audio_uri, auth_token }
-        note right of CF: Llamada síncrona — Django espera
+        Django->>Django: Encola Cloud Task
+        Django-->>Browser: 200 OK { queued: true }
+        Django->>CF: POST { audio_uri, auth_token } via Cloud Tasks
     end
 
     rect rgb(240, 255, 248)
@@ -166,9 +167,9 @@ sequenceDiagram
 ## 5. Puntos de Atención Arquitectónica
 
 - **Hub SSE en memoria**: `apps/documents/services/sse_hub.py` usa estructuras en memoria. Con múltiples réplicas en Cloud Run, un evento emitido en la instancia A no llega a clientes SSE en la instancia B. Resolver con Redis o Pub/Sub en el futuro.
-- **Llamada síncrona a CF de transcripción**: Django espera respuesta de la Cloud Function. Si Gemini tarda demasiado, el request del frontend puede agotar el timeout.
+- **Backend público + DB privada**: Cloud Run sigue público para la SPA, pero PostgreSQL queda aislado por IP privada y acceso vía Cloud SQL Auth Proxy + IAM DB auth.
 - **Audio no se borra al transcribir**: `audio_expires_at` controla el acceso vía API, pero el blob en GCS solo se elimina si el médico lo solicita explícitamente.
-- **Cloud Functions `--allow-unauthenticated`**: La seguridad se delega enteramente en la validez del JWT del body. El `JWT_SECRET_KEY` no debe filtrarse.
+- **Cloud Functions IAM-auth**: las funciones están desplegadas con `--no-allow-unauthenticated`; la seguridad depende de IAM de invocación + JWT de callback. El `JWT_SECRET_KEY` no debe filtrarse.
 
 ---
 
