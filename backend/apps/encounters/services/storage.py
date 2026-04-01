@@ -28,10 +28,13 @@ def get_storage_client() -> storage.Client:
       use ADC (Cloud Run service account on GCP; optional JSON key locally).
     """
     if getattr(settings, "ENVIRONMENT", "dev") == "dev":
-        credentials = service_account.Credentials.from_service_account_file(
-            settings.GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH
-        )
-        return storage.Client(credentials=credentials)
+        key_path = getattr(settings, "GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH", "")
+        if key_path and key_path != "not-loaded":
+            credentials = service_account.Credentials.from_service_account_file(
+                key_path
+            )
+            return storage.Client(credentials=credentials)
+        logger.warning("GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH is not loaded, falling back to ADC in dev")
 
     raw = (getattr(settings, "SERVICE_ACCOUNT_JSON", None) or "").strip()
     if not raw or raw == "{}":

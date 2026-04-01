@@ -2,7 +2,7 @@
 
 Este bootstrap se hace **una sola vez por proyecto** para que Terraform pueda usar un backend remoto en GCS y autenticarse con una service account dedicada.
 
-Proyecto objetivo inicial: `vex-stg`  
+Proyecto objetivo inicial: `vext-stg`  
 Region principal: `us-east1`
 
 ## Prerrequisito: facturaci√≥n
@@ -12,7 +12,7 @@ GCS (bucket de `tfstate`) y varios servicios exigen un **proyecto con facturaci√
 ## 1. Variables base
 
 ```bash
-export PROJECT_ID="vex-stg"
+export PROJECT_ID="vext-stg"
 export REGION="us-east1"
 export TFSTATE_BUCKET="${PROJECT_ID}-terraform-state"
 export TERRAFORM_SA="terraform-admin"

@@ -1,8 +1,8 @@
 # =============================================================================
-# Test environment (vex-stg) — fill in values before running terraform apply
+# Test environment (vext-stg) — fill in values before running terraform apply
 # =============================================================================
 
-project_id  = "vex-stg"
+project_id  = "vext-stg"
 region      = "us-east1"
 environment = "test"
 
@@ -12,8 +12,8 @@ github_repo = "Jmoreno844/medical-ai-webapp"
 # Cloud SQL
 db_instance_name = "vexthealth-db-test"
 db_tier          = "db-f1-micro"
-db_name          = "vexthealthdb"
-db_user          = "appuser"
+db_name          = "vext-stg"
+db_user          = "vext-user"
 # db_password is sensitive — pass via env var TF_VAR_db_password or -var flag
 
 # Cloud Run
@@ -26,12 +26,12 @@ cloud_run_use_secret_manager    = true
 cloud_run_allow_unauthenticated = true # Set false if org policy blocks allUsers on Cloud Run
 
 # Cloud Functions source (deploy from GCS)
-cf_source_bucket = "vex-stg-cf-source"   # TODO: create this bucket or use a deploy script
+cf_source_bucket = "vext-stg-cf-source"   # TODO: create this bucket or use a deploy script
 cf_source_object = "cloud-functions.zip" # TODO: zip and upload before first apply
 
 # Storage buckets
-audio_bucket_name            = "vex-stg-audio"
-frontend_bucket_name         = "vex-stg-frontend-spa"
+audio_bucket_name            = "vext-stg-audio"
+frontend_bucket_name         = "vext-stg-frontend-spa"
 frontend_public_read_enabled = true # Set false if org policy blocks allUsers on GCS buckets
 
 # Artifact Registry

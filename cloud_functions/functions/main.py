@@ -2,13 +2,23 @@
 Main entry point for Cloud Functions.
 """
 
-import tracing
-
-tracing.configure_tracing()
+import warnings
 
 import functions_framework
+
+import tracing
 from endpoints.transcription_endpoint import transcription_endpoint
 from endpoints.document_workflow import generate_document_workflow
+
+# google-cloud libraries may emit an alias migration FutureWarning at import time.
+# This warning is non-actionable for local runtime and clutters container logs.
+warnings.filterwarnings(
+    "ignore",
+    message=r".*google\\.cloud\\.resourcemanager_v3.*",
+    category=FutureWarning,
+)
+
+tracing.configure_tracing()
 #
 # Export the Cloud Functions
 transcription_endpoint = functions_framework.http(transcription_endpoint)

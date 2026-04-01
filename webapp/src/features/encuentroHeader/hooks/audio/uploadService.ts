@@ -7,7 +7,7 @@ const tracer = trace.getTracer("vexthealth-webapp");
 /**
  * Upload audio to cloud storage
  *
- * @param blob - Audio blob to upload
+ * @param blob - Audio blob to upload|
  * @param uploadUrl - Google Cloud Storage signed URL
  * @param contentType - The mime type of the audio
  * @returns Promise resolving to success status

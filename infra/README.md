@@ -1,6 +1,6 @@
 # Infraestructura (Terraform)
 
-Gestiona todos los recursos GCP de VexHealth. Cada entorno (`test`, `prod`) tiene su propio directorio con `terraform.tfvars` y backend de estado separado.
+Gestiona todos los recursos GCP de VextHealth. Cada entorno (`test`, `prod`) tiene su propio directorio con `terraform.tfvars` y backend de estado separado.
 
 ## Estructura
 
@@ -19,7 +19,7 @@ infra/
     cloud_tasks/        Cola de transcripción
     workload_identity/  WIF para GitHub Actions
   environments/
-    test/               vex-stg
+    test/               vext-stg
     prod/               (placeholder)
 ```
 
@@ -107,7 +107,7 @@ Ver `environments/prod/README.md` para diferencias específicas.
 Terraform solo crea los recursos de Secret Manager vacíos. Para cargar valores:
 
 ```bash
-echo -n "tu-valor" | gcloud secrets versions add django-secret-key --data-file=- --project=vex-stg
+echo -n "tu-valor" | gcloud secrets versions add django-secret-key --data-file=- --project=vext-stg
 ```
 
 Repetir para cada secret: `jwt-secret-key`, `db-password`, `db-user`, `db-name`. `service-account-json` es **opcional** en Cloud Run si el contenedor usa solo ADC del SA `backend-runner` para GCS (comportamiento por defecto del código); en local desarrollo usa `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH` con `config.settings.develop`.

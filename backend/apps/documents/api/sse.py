@@ -17,7 +17,7 @@ from apps.documents.services.sse_hub import (
 
 import logging
 import json
-from queue import Queue
+from queue import Queue, Empty
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -134,7 +134,7 @@ def subscribe_to_document_updates_with_token(request, document_id: int, token: s
                         try:
                             message = client_queue.get(timeout=30)
                             yield f"data: {message}\n\n"
-                        except Queue.Empty:
+                        except Empty:
                             yield ": ping\n\n"
                     except Exception as e:
                         logger.error(f"Error in SSE stream: {str(e)}")
@@ -197,7 +197,7 @@ def subscribe_to_document_updates(request, document_id: int):
                         try:
                             message = client_queue.get(timeout=30)
                             yield f"data: {message}\n\n"
-                        except Queue.Empty:
+                        except Empty:
                             yield ": ping\n\n"
                     except Exception as e:
                         logger.error(f"Error in SSE stream: {str(e)}")

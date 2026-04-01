@@ -45,7 +45,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${GCP_PROJECT:-}" ]; then
-            echo "::error::Set repository variable GCP_PROJECT_ID (e.g. vex-stg)"
+            echo "::error::Set repository variable GCP_PROJECT_ID (e.g. vext-stg)"
             exit 1
           fi
           BUCKET="${CF_SOURCE_BUCKET:-${GCP_PROJECT}-cf-source}"

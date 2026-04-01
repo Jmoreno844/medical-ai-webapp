@@ -1,6 +1,6 @@
 terraform {
   backend "gcs" {
-    bucket = "vex-stg-terraform-state"
+    bucket = "vext-stg-terraform-state"
     prefix = "terraform/test"
   }
 }

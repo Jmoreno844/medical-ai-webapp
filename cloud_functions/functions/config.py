@@ -80,18 +80,29 @@ TEMPERATURE = float(os.environ.get("TEMPERATURE", "0.2"))
 TOP_P = float(os.environ.get("TOP_P", "0.95"))
 MAX_OUTPUT_TOKENS = int(os.environ.get("MAX_OUTPUT_TOKENS", "1024"))
 
+_DOCKER_COMPOSE_ADC = "/app/adc.json"
+
+
+def _is_docker_compose_local_dev() -> bool:
+    """True when running our docker-compose stack (ADC mount + compose env path)."""
+    ga = (os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") or "").strip()
+    if ga != _DOCKER_COMPOSE_ADC:
+        return False
+    return Path(_DOCKER_COMPOSE_ADC).exists()
+
 
 def get_environment():
     """Determine the current environment"""
-    env = os.environ.get("ENVIRONMENT", "").lower()
+    # Strip: env_file / Windows CRLF can leave trailing \r on values
+    env = (os.environ.get("ENVIRONMENT") or "").strip().lower()
 
-    # If environment explicitly set
-    if env in ["dev", "test", "production"]:
+    # env_file (.env.local) can override compose's ENVIRONMENT=local; treat compose+ADC as local
+    if _is_docker_compose_local_dev() and env in ("", "dev"):
+        return "local"
+
+    if env in ("dev", "test", "production", "local"):
         return env
 
-    #
-
-    # Default to local
     return "dev"
 
 
@@ -112,10 +123,6 @@ def is_local():
 
 def load_environment_from_files():
     """Load environment variables from .env files in priority order"""
-    if not is_local():
-        logger.info("Not in local environment, skipping .env file loading")
-        return False
-
     # Try loading from different .env files in order of priority
     env_files = [".env.local", ".env"]
 
@@ -133,7 +140,7 @@ def load_environment_from_files():
 def initialize_environment():
     """Load configuration from appropriate source based on environment"""
     env = get_environment()
-    logger.info(f"Detected environment: {env}")
+    logger.debug(f"Detected environment: {env}")
 
     if is_production():
         # In production, use Secret Manager (Cloud Run function context)

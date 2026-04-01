@@ -171,6 +171,8 @@ def generate_upload_url(request, encounter_id: int, payload: AudioUploadRequest)
         return {"success": True, "upload_url": url, "filename": filename}
 
     except Exception as e:
+        import logging
+        logging.getLogger(__name__).error("Error generating signed URL", exc_info=True)
         return {"success": False, "error": str(e)}
 
 

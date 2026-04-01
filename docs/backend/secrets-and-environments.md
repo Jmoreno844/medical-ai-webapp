@@ -57,7 +57,7 @@ Use ADC to authenticate to GCP **without** creating service account keys (recomm
 
 ```bash
 gcloud auth application-default login
-gcloud config set project vex-stg
+gcloud config set project vext-stg
 ```
 
 ### Verify ADC works

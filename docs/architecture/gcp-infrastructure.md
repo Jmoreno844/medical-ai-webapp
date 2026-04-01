@@ -7,7 +7,7 @@ IaC: `infra/` en la raíz del repo.
 
 | Entorno | Project ID | Región |
 |---|---|---|
-| Test | `vex-stg` | `us-east1` |
+| Test | `vext-stg` | `us-east1` |
 | Prod | *(por crear)* | `us-east1` |
 
 ## Convenciones de nombres
@@ -17,12 +17,12 @@ IaC: `infra/` en la raíz del repo.
 | Cloud Run service | `vexthealth-backend` | `vexthealth-backend` |
 | Cloud Function | `<nombre-funcional>` | `transcription-endpoint`, `document-workflow` |
 | Cloud SQL instance | `vexthealth-db-<env>` | `vexthealth-db-test` |
-| GCS audio | `<project>-audio` | `vex-stg-audio` |
-| GCS frontend | `<project>-frontend-spa` | `vex-stg-frontend-spa` |
+| GCS audio | `<project>-audio` | `vext-stg-audio` |
+| GCS frontend | `<project>-frontend-spa` | `vext-stg-frontend-spa` |
 | Artifact Registry | `vexthealth-containers` | `vexthealth-containers` |
 | Cloud Tasks queue | `audio-transcription-queue` | `audio-transcription-queue` |
-| Service accounts | `<rol>@<project>.iam` | `backend-runner@vex-stg.iam.gserviceaccount.com` |
-| Terraform state | `<project>-terraform-state` | `vex-stg-terraform-state` |
+| Service accounts | `<rol>@<project>.iam` | `backend-runner@vext-stg.iam.gserviceaccount.com` |
+| Terraform state | `<project>-terraform-state` | `vext-stg-terraform-state` |
 
 ## Matriz IAM (service accounts)
 
@@ -135,17 +135,17 @@ Después de `terraform apply`, configurar las mismas claves como **variables del
 
 | Variable | Valor (output de Terraform) |
 |---|---|
-| `GCP_PROJECT_ID` | `vex-stg` |
+| `GCP_PROJECT_ID` | `vext-stg` |
 | `WIF_PROVIDER` | `projects/<num>/locations/global/workloadIdentityPools/github-actions-pool/providers/github-oidc-provider` |
-| `GH_DEPLOYER_SA` | `github-actions-deployer@vex-stg.iam.gserviceaccount.com` |
-| `BACKEND_SERVICE_ACCOUNT` | `backend-runner@vex-stg.iam.gserviceaccount.com` |
-| `GCS_BUCKET_NAME` | `vex-stg-audio` |
-| `FRONTEND_BUCKET_NAME` | `vex-stg-frontend-spa` |
+| `GH_DEPLOYER_SA` | `github-actions-deployer@vext-stg.iam.gserviceaccount.com` |
+| `BACKEND_SERVICE_ACCOUNT` | `backend-runner@vext-stg.iam.gserviceaccount.com` |
+| `GCS_BUCKET_NAME` | `vext-stg-audio` |
+| `FRONTEND_BUCKET_NAME` | `vext-stg-frontend-spa` |
 | `VITE_API_URL` | URL de Cloud Run (output) |
 | *(build)* `VITE_BASE_URL` | El workflow de frontend la deriva de `FRONTEND_BUCKET_NAME` (`/{bucket}/`) para que los assets carguen bajo `storage.googleapis.com/{bucket}/`. |
 | `GENERATE_DOCUMENT_CLOUD_FUNCTION_URL` | URL de la CF `document-workflow` (output) |
 | `TRANSCRIPTION_CLOUD_FUNCTION_URL` | URL de la CF `transcription-endpoint` (output) |
-| `INSTANCE_CONNECTION_NAME` | Mismo valor que output Terraform `cloud_sql_connection_name` (p. ej. `vex-stg:us-east1:vexthealth-db-test`) para el socket `/cloudsql/...` en Cloud Run |
+| `INSTANCE_CONNECTION_NAME` | Mismo valor que output Terraform `cloud_sql_connection_name` (p. ej. `vext-stg:us-east1:vexthealth-db-test`) para el socket `/cloudsql/...` en Cloud Run |
 | `CF_SOURCE_BUCKET` | *(opcional)* Bucket del zip para Terraform; por defecto en CI: `{GCP_PROJECT_ID}-cf-source` (debe coincidir con `cf_source_bucket` en `terraform.tfvars`) |
 | `CF_SOURCE_OBJECT` | *(opcional)* Objeto del zip; por defecto `cloud-functions.zip` (igual que `cf_source_object` en Terraform) |
 
