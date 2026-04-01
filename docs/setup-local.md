@@ -24,7 +24,10 @@ Asegúrate de llenar:
 - `DJANGO_SECRET_KEY`
 - `JWT_SECRET_KEY`
 - `GCS_BUCKET_NAME`
-- `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH` (ruta absoluta al JSON de tu Service Account)
+- `GCP_PROJECT_ID`
+- `GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT` (service account dedicada para firmar URLs de GCS con ADC local)
+
+Para el backend, la recomendación es usar `gcloud auth application-default login` en tu máquina y luego dejar que Django impersonate una service account dedicada con acceso mínimo al bucket de audio. No uses una clave JSON salvo excepción explícita.
 
 ### Frontend
 Copia el archivo de ejemplo en `webapp/.env.local`:

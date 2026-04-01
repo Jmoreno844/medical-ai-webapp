@@ -43,7 +43,7 @@ Inject via Cloud Run / Secret Manager; never commit real values.
 
 ## GCP credentials policy (summary)
 
-- **Local:** ADC (recommended) or `.env` + optional `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH`.
+- **Local:** ADC plus service account impersonation for backend signed URLs (recommended); JSON key only as an exception.
 - **CI/test:** Inject JSON or path via CI secrets; isolated project or bucket where possible.
 - **Production:** Platform-injected secrets or Secret Manager; dedicated service account per environment where practical.
 
@@ -51,7 +51,7 @@ See `apps/encounters/services/storage.py` for how the client is built from setti
 
 ## Local ADC (Application Default Credentials)
 
-Use ADC to authenticate to GCP **without** creating service account keys (recommended; compatible with org policies that disable key creation).
+Use ADC to authenticate to GCP **without** creating service account keys. For this repo's Django signed-URL endpoint, the recommended local setup is ADC plus impersonation of a dedicated signer service account.
 
 ### One-time login
 
@@ -66,11 +66,33 @@ gcloud config set project vext-stg
 gcloud auth application-default print-access-token >/dev/null
 ```
 
-### How the backend uses ADC
+### Recommended local signer setup
 
-- With `DJANGO_SETTINGS_MODULE=config.settings.develop`, if you **do not** set `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH`, the storage client can use ADC (your user creds from the command above).
+Create or reuse a dedicated service account with the minimum required access to the audio bucket, then allow your user to impersonate it:
+
+```bash
+gcloud iam service-accounts add-iam-policy-binding \
+  backend-local-gcs-signer@vext-stg.iam.gserviceaccount.com \
+  --project=vext-stg \
+  --member='user:admin@vexthealth.com' \
+  --role='roles/iam.serviceAccountTokenCreator'
+```
+
+Set these variables in `backend/.env`:
+
+```env
+GCP_PROJECT_ID=vext-stg
+GCS_BUCKET_NAME=vext-stg-audio
+GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT=backend-local-gcs-signer@vext-stg.iam.gserviceaccount.com
+```
+
+### How the backend uses local ADC
+
+- With `DJANGO_SETTINGS_MODULE=config.settings.develop`, the backend first checks `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH`.
+- If that path is not set, it tries to impersonate `GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT` using your local ADC.
+- If neither is configured, it falls back to plain ADC, but local `blob.generate_signed_url(...)` may fail because plain user ADC does not provide a private signing key.
 - In Cloud Run, ADC comes from the service account attached to the service (e.g. `backend-runner@...`), so you typically **do not** need `SERVICE_ACCOUNT_JSON`.
 
 ### Optional: explicit creds file (only if you must)
 
-If you must use a JSON file locally, set `GOOGLE_APPLICATION_CREDENTIALS=/abs/path/key.json` (or `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH` for dev settings). Prefer ADC over long-lived keys.
+If your organization temporarily allows service account keys and you must use one locally, set `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH=/abs/path/key.json` (or `GOOGLE_APPLICATION_CREDENTIALS`). Treat this as a short-term exception, not the default workflow.

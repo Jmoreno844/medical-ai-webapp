@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 ENVIRONMENT = "dev"
+GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -28,6 +29,9 @@ JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "not-loaded")
 
 
 GCS_BUCKET_NAME = os.environ.get("GCS_BUCKET_NAME", "not-loaded")
+GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT = os.environ.get(
+    "GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT", "not-loaded"
+)
 GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH = os.environ.get(
     "GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH", "not-loaded"
 )

@@ -78,7 +78,7 @@ echo -n "VALOR" | gcloud secrets versions add SECRET_ID --data-file=-
 | `db-password` | Cloud Run | Password de Cloud SQL |
 | `db-user` | Cloud Run | Usuario de Cloud SQL |
 | `db-name` | Cloud Run | Nombre de la DB |
-| `service-account-json` | Cloud Run | SA key para signed URLs de GCS |
+| `service-account-json` | Cloud Run | Opcional; solo si se fuerza una SA key en lugar de ADC |
 
 ### Rotación de secrets
 
@@ -151,7 +151,7 @@ Después de `terraform apply`, configurar las mismas claves como **variables del
 
 El secret `GCP_SA_KEY` puede eliminarse una vez confirmado que WIF funciona.
 
-**`service-account-json` (opcional en Cloud Run):** el backend puede usar **Application Default Credentials** del service account del servicio (`backend-runner`), que ya tiene acceso a GCS. Si el secreto está vacío o no tiene versión, `get_storage_client()` usa ADC. En local, con `config.settings.develop`, se usa `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH` apuntando a un JSON (o `GOOGLE_APPLICATION_CREDENTIALS`).
+**`service-account-json` (opcional en Cloud Run):** el backend puede usar **Application Default Credentials** del service account del servicio (`backend-runner`), que ya tiene acceso a GCS. Si el secreto está vacío o no tiene versión, `get_storage_client()` usa ADC. En local, con `config.settings.develop`, la ruta recomendada es **ADC + impersonación** mediante `GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT`; `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH` queda como fallback solo si existe una excepción aprobada para usar JSON keys.
 
 ### Zip del código de Cloud Functions en CI
 

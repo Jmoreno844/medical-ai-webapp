@@ -3,7 +3,9 @@
 import json
 import logging
 
+import google.auth
 from django.conf import settings
+from google.auth import impersonated_credentials
 from google.cloud import storage
 from google.oauth2 import service_account
 
@@ -18,12 +20,43 @@ def _gcs_client_from_adc() -> storage.Client:
     return client
 
 
+def _gcs_client_from_impersonated_adc() -> storage.Client | None:
+    """Use local ADC to impersonate a dedicated signer service account."""
+    target_principal = (
+        getattr(settings, "GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT", "") or ""
+    ).strip()
+    if not target_principal or target_principal == "not-loaded":
+        return None
+
+    project = getattr(settings, "GCP_PROJECT_ID", None) or None
+    source_credentials, discovered_project = google.auth.default(
+        scopes=["https://www.googleapis.com/auth/cloud-platform"]
+    )
+    if hasattr(source_credentials, "with_quota_project") and project:
+        source_credentials = source_credentials.with_quota_project(project)
+
+    credentials = impersonated_credentials.Credentials(
+        source_credentials=source_credentials,
+        target_principal=target_principal,
+        target_scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        lifetime=900,
+    )
+    logger.debug(
+        "GCS client using impersonated ADC for service account %s", target_principal
+    )
+    return storage.Client(
+        credentials=credentials,
+        project=project or discovered_project,
+    )
+
+
 def get_storage_client() -> storage.Client:
     """
     Return a GCS client.
 
     - ``ENVIRONMENT == dev`` (``config.settings.develop``): JSON key file path
-      ``GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH``.
+      ``GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH``; otherwise local ADC may
+      impersonate ``GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT``.
     - Otherwise: if ``SERVICE_ACCOUNT_JSON`` is empty or not a full key payload,
       use ADC (Cloud Run service account on GCP; optional JSON key locally).
     """
@@ -34,7 +67,16 @@ def get_storage_client() -> storage.Client:
                 key_path
             )
             return storage.Client(credentials=credentials)
-        logger.warning("GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH is not loaded, falling back to ADC in dev")
+
+        impersonated_client = _gcs_client_from_impersonated_adc()
+        if impersonated_client is not None:
+            return impersonated_client
+
+        logger.warning(
+            "GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH is not loaded and "
+            "GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT is empty; falling back "
+            "to plain ADC in dev"
+        )
 
     raw = (getattr(settings, "SERVICE_ACCOUNT_JSON", None) or "").strip()
     if not raw or raw == "{}":

@@ -110,7 +110,7 @@ Terraform solo crea los recursos de Secret Manager vacíos. Para cargar valores:
 echo -n "tu-valor" | gcloud secrets versions add django-secret-key --data-file=- --project=vext-stg
 ```
 
-Repetir para cada secret: `jwt-secret-key`, `db-password`, `db-user`, `db-name`. `service-account-json` es **opcional** en Cloud Run si el contenedor usa solo ADC del SA `backend-runner` para GCS (comportamiento por defecto del código); en local desarrollo usa `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH` con `config.settings.develop`.
+Repetir para cada secret: `jwt-secret-key`, `db-password`, `db-user`, `db-name`. `service-account-json` es **opcional** en Cloud Run si el contenedor usa solo ADC del SA `backend-runner` para GCS (comportamiento por defecto del código); en local desarrollo la ruta recomendada es ADC + impersonación (`GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT`) con `config.settings.develop`.
 
 ## Configurar GitHub después de terraform apply
 
