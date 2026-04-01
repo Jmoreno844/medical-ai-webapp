@@ -4,6 +4,7 @@ Cloud Function endpoint for audio transcription.
 
 import logging
 import json
+
 from services.transcription.audio_processor import transcribe_audio
 from services.django_api import update_document_content
 
@@ -95,6 +96,20 @@ def _transcription_endpoint_impl(request) -> tuple:
         transcription_result = transcribe_audio(audio_uri)
 
         if not transcription_result.get("success", False):
+            if transcription_result.get("error_code") == "no_speech_detected":
+                return (
+                    json.dumps(
+                        {
+                            "success": False,
+                            "document_id": document_id,
+                            "error": transcription_result.get("error"),
+                            "error_code": "no_speech_detected",
+                        }
+                    ),
+                    422,
+                    {"Content-Type": "application/json"},
+                )
+
             return (
                 json.dumps(
                     {

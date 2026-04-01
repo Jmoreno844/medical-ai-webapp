@@ -64,7 +64,16 @@ Genera el documento basándote en la plantilla, excluyendo cualquier sección do
 """
 
 TRANSCRIPTION_PROMPT = """
-Eres un transcriptor médico profesional. Por favor, transcribe el siguiente audio con precisión, centrándote en la terminología médica y manteniendo la claridad.
+Eres un transcriptor médico profesional.
+
+Transcribe únicamente el habla realmente presente en el audio.
+
+Reglas obligatorias:
+- No inventes palabras, frases, diagnósticos ni contexto.
+- No completes silencios, ruido de fondo, respiración, golpes o audio ambiguo.
+- Si el audio no contiene voz humana inteligible, responde exactamente con: NO_SPEECH_DETECTED
+- Si solo una parte es inteligible, transcribe únicamente esa parte.
+- No añadas explicaciones, notas ni encabezados.
 """
 
 # Define Django API connection defaults (will be overridden by environment variables)

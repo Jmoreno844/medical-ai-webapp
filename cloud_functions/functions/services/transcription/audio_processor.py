@@ -3,15 +3,53 @@ Service for processing and transcribing audio using Gemini.
 """
 
 import logging
-from typing import Dict, Any, Optional
 import os
-from vertexai.generative_models import Part
+from typing import Dict, Any, Optional
+from urllib.parse import urlparse
+
+from vertexai.generative_models import GenerationConfig, Part
+
 from models.gemini_client import initialize_vertexai, get_gemini_model
-from services.transcription.extractor import extract_gs_uri
 from config import TRANSCRIPTION_PROMPT
+from services.transcription.extractor import extract_gs_uri
 
 # Initialize logger
 logger = logging.getLogger(__name__)
+
+NO_SPEECH_SENTINEL = "NO_SPEECH_DETECTED"
+_AUDIO_MIME_TYPES = {
+    ".aac": "audio/aac",
+    ".flac": "audio/flac",
+    ".m4a": "audio/mp4",
+    ".mp3": "audio/mpeg",
+    ".mp4": "audio/mp4",
+    ".oga": "audio/ogg",
+    ".ogg": "audio/ogg",
+    ".wav": "audio/wav",
+    ".webm": "audio/webm",
+}
+
+
+def _detect_audio_mime_type(audio_uri: str) -> str:
+    """Infer the MIME type from the URI path when possible."""
+    parsed = urlparse(audio_uri)
+    _, extension = os.path.splitext(parsed.path.lower())
+    return _AUDIO_MIME_TYPES.get(extension, "audio/mpeg")
+
+
+def _normalize_transcript(raw_text: Optional[str]) -> Optional[str]:
+    """Normalize model output and detect explicit no-speech responses."""
+    if not raw_text:
+        return None
+
+    transcript = raw_text.strip()
+    if not transcript:
+        return None
+
+    if transcript.upper() == NO_SPEECH_SENTINEL:
+        return NO_SPEECH_SENTINEL
+
+    return transcript
 
 
 def transcribe_audio(
@@ -47,9 +85,9 @@ def transcribe_audio(
         model = get_gemini_model(model_name)
         logger.info(f"Using model: {model_name}")
 
-        # Create audio part from URI - use audio/mpeg to match the API response
-        logger.info(f"Creating audio part from URI: {gcs_uri}")
-        audio_part = Part.from_uri(uri=gcs_uri, mime_type="audio/mpeg")
+        mime_type = _detect_audio_mime_type(gcs_uri)
+        logger.info(f"Creating audio part from URI: {gcs_uri} with mime_type={mime_type}")
+        audio_part = Part.from_uri(uri=gcs_uri, mime_type=mime_type)
 
         # Create text prompt part
         text_prompt = TRANSCRIPTION_PROMPT
@@ -59,10 +97,36 @@ def transcribe_audio(
 
         # Generate content with the model
         logger.info("Sending request to Gemini for audio transcription")
-        response = model.generate_content(contents)
+        response = model.generate_content(
+            contents,
+            generation_config=GenerationConfig(
+                temperature=0.0,
+                top_p=0.1,
+                candidate_count=1,
+                max_output_tokens=2048,
+            ),
+        )
 
         # Extract text from response
-        transcript = response.text
+        transcript = _normalize_transcript(getattr(response, "text", None))
+
+        if transcript == NO_SPEECH_SENTINEL:
+            logger.warning("Audio transcription skipped because no intelligible speech was detected")
+            return {
+                "success": False,
+                "error": "No intelligible speech detected in the audio",
+                "error_code": "no_speech_detected",
+                "model": model_name,
+            }
+
+        if not transcript:
+            logger.warning("Audio transcription returned an empty response")
+            return {
+                "success": False,
+                "error": "Empty transcription response from model",
+                "error_code": "empty_transcription",
+                "model": model_name,
+            }
 
         logger.info("Successfully received transcription response")
         return {
