@@ -36,9 +36,9 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 - `cloud_functions/functions/services/`
   - Lógica de negocio serverless y callbacks a Django.
 - `webapp/src/contexts/`
-  - Fuente de verdad actual del estado del detalle de encuentro.
+  - Fuente de verdad oficial del estado del detalle de encuentro y de sus side effects compartidos.
 - `webapp/src/features/`
-  - UI y hooks por feature. Algunos hooks antiguos no son la ruta principal hoy.
+  - UI y composición de pantallas. No debe convertirse en una segunda capa de ownership para SSE o estado compartido del detalle de encuentro.
 
 ## Si quieres cambiar X
 
@@ -102,11 +102,11 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 - No hay un dominio de billing de aplicación.
 - Lo único relacionado con costos está en `infra/modules/monitoring` y variables de budget del entorno.
 
-## Ambigüedades conocidas
+## Decisión de frontend
 
-- El frontend tiene lógica activa en `src/contexts/` y también hooks antiguos en `src/features/.../hooks`.
-- Para el detalle de encuentro, la ruta actual es `AppProviders -> contexts -> feature components`.
-- Antes de reusar un hook viejo, confirma si sigue conectado al árbol real de render.
+- Para el detalle de encuentro, la ruta oficial es `AppProviders -> contexts -> feature components`.
+- `contexts/` orquesta SSE, kickoff de procesos y estado compartido.
+- `features/` consume ese estado y renderiza UI.
 
 ## Qué revisar antes de un cambio grande
 

@@ -4,6 +4,14 @@
 
 Optimize for fast, safe edits in a medical fullstack product where AI agents are expected to work daily.
 
+Priorities, in order:
+
+1. Preserve correctness and existing behavior.
+2. Keep the codebase easy to navigate.
+3. Improve documentation and clarity.
+4. Reduce ambiguity, duplication, and mixed responsibilities.
+5. Avoid unnecessary abstraction or churn.
+
 ## Read Order
 
 1. `docs/architecture/repo-map.md`
@@ -51,6 +59,7 @@ Do not treat these as source of truth unless the task is specifically about gene
 - `backend/apps/users/` owns login/session/JWT for user-facing auth.
 - `cloud_functions/functions/` owns Gemini-facing logic only; it should not grow direct database responsibilities.
 - `webapp/src/contexts/` is the current state source of truth for encounter detail flows.
+- In the frontend, `webapp/src/features/` should render and compose UI, while `webapp/src/contexts/` owns shared encounter-detail state and long-lived side effects.
 
 ## Sensitive Domains
 
@@ -80,9 +89,33 @@ Do not treat these as source of truth unless the task is specifically about gene
 ## Edit Strategy
 
 - Prefer small, explicit functions and thin HTTP handlers.
+- Inspect nearby files and existing patterns before making changes.
+- Infer local conventions from the codebase and prefer matching them over inventing new ones.
+- Make the smallest change that solves the problem well.
+- Prefer explicit names over clever names.
+- Prefer simple structure over hidden magic.
+- Do not refactor broadly unless there is a clear benefit.
 - Document non-obvious constraints close to the module or in `docs/`.
 - When returning to the repo after time away, prefer adding a short module README over spreading tribal knowledge across code comments.
 - If you discover duplicate frontend patterns, preserve the active path first and only consolidate when the write scope is clearly safe.
+- Do not introduce a second frontend owner for SSE lifecycle or shared encounter-detail state outside the official contexts.
+
+## Creating New Files
+
+- Create a new file only when the responsibility is distinct, the current file mixes unrelated concerns, local documentation is needed, or reuse/discoverability clearly improves.
+- Before creating a new file, check whether a good home already exists and whether similar files already exist nearby.
+- Match the naming, folder layout, and import style already used in that module.
+- Choose highly explicit names and keep each new file focused on one responsibility.
+- Avoid thin wrapper files that add no meaningful clarity.
+
+## Folder And Module Organization
+
+- Prefer one folder per clear responsibility and one file per main idea.
+- Separate business logic from UI, transport, and persistence when practical.
+- Group related utilities together and keep sensitive logic in obvious, well-named places.
+- Avoid dumping unrelated helpers into generic utils files.
+- Avoid large god files and deep abstractions without a clear payoff.
+- If a reusable utility or service is not clearly justified, keep the logic close to the active flow.
 
 ## Documentation Policy
 
@@ -97,6 +130,7 @@ Do not treat these as source of truth unless the task is specifically about gene
 - Prefer leaving high-signal comments inside the relevant file when the context is local to that code path.
 - Create a new local `README.md` only when the explanation spans multiple files or would be awkward to keep inside code comments.
 - Prefer concise, high-signal docs. Avoid long essays and avoid duplicating the same explanation in many places.
+- If a convention is visible in code but undocumented, add it to the nearest relevant doc instead of leaving it implicit.
 
 ## New Code Standards
 
@@ -106,6 +140,28 @@ Do not treat these as source of truth unless the task is specifically about gene
 - Do not add comments that merely narrate syntax or restate the code line-by-line.
 - When code depends on an external contract, link that intent in code comments briefly and update the matching doc in the same change.
 - When introducing a temporary workaround, limitation, or known edge case, leave a short comment explaining why it exists and what would replace it.
+- If you see low-value comments, remove or simplify them rather than adding more noise.
+
+## Conventions Extraction
+
+- Preserve visible conventions around validation, error handling, API handlers, state management, data access, naming, testing, logging, background jobs, and security-sensitive operations.
+- When patterns are repeated, prefer documenting the convention in the appropriate repo doc instead of letting it remain tribal knowledge.
+- Be especially careful not to introduce a second competing pattern in sensitive or high-traffic areas.
+
+## Definition Of Done
+
+- Ensure the solution matches existing project conventions.
+- Update docs when behavior, architecture, contracts, or important conventions change.
+- Re-check whether any new file introduced is actually justified.
+- Remove obvious dead code or noisy comments introduced by the change.
+- Run the relevant verification commands when applicable.
+- Summarize the change clearly, including any assumptions or remaining risks.
+
+## Behavior For Repo Reviews
+
+- Prioritize structure, naming, documentation gaps, mixed responsibilities, and risky inconsistencies.
+- Prefer the smallest useful set of doc or code changes that improves future maintainability.
+- Report what changed and what still requires human judgment, especially in sensitive areas.
 
 ## Verification
 

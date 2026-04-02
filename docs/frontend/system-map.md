@@ -26,6 +26,7 @@ Documento de referencia rápida del `webapp` (React 18 + Vite + TypeScript). Los
 | Generación | `src/contexts/GenerationContext.tsx` | Plantillas, SSE de generación y modal. |
 
 `src/contexts/AppProviders.tsx` compone los providers en la página de detalle de encuentro.
+Para esa pantalla, `contexts/` es el owner de SSE, kickoff de procesos y estado compartido; `features/` se limita a consumir y renderizar.
 
 ## API cliente
 

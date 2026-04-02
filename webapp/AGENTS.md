@@ -20,10 +20,8 @@ These instructions apply to `webapp/`.
 ## Source Of Truth
 
 - For encounter detail flows, `src/contexts/AppProviders.tsx` plus the providers under `src/contexts/` are the current source of truth.
-- There are older feature hooks that overlap with current context behavior:
-  - `src/features/encuentroTextArea/hooks/useDocumentGeneration.tsx`
-  - `src/features/encuentroHeader/hooks/useTranscription.ts`
-- Do not extend those legacy hooks unless you are intentionally consolidating the flow.
+- `src/features/` should render and compose UI, not own duplicate SSE lifecycle or a second source of truth for encounter-detail flows.
+- If reusable logic needs extraction, prefer a helper or stateless hook consumed by the owning context instead of a new feature-level state manager.
 
 ## Editing Rules
 

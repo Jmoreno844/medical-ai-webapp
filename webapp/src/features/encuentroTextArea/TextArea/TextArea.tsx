@@ -125,7 +125,7 @@ const TextArea: React.FC = () => {
       );
       previousDocIdRef.current = activeDocument.id;
     }
-  }, [activeDocument?.id]);
+  }, [activeDocument]);
 
   // Show generation success indicator
   useEffect(() => {
@@ -160,12 +160,14 @@ const TextArea: React.FC = () => {
   const initialConfig = createEditorConfig(onError);
 
   // Check if content is being streamed for this document
-  const streamingContent =
+  const isStreamingActiveDocument =
     activeDocument &&
     generationStatus?.documentId === activeDocument.id &&
-    generationStatus.inProgress
-      ? generationStatus.content
-      : undefined;
+    generationStatus.inProgress;
+
+  const streamingContent = isStreamingActiveDocument
+    ? generationStatus.content
+    : undefined;
 
   return (
     <div className="flex flex-col h-full">
@@ -276,13 +278,19 @@ const TextArea: React.FC = () => {
               documentType={activeDocument.kind}
             />
             <ReadOnlyPlugin
-              isReadOnly={activeDocument.kind === "transcription"}
+              isReadOnly={
+                activeDocument.kind === "transcription" ||
+                isStreamingActiveDocument
+              }
             />
 
             {/* Conditional plugins for edit mode */}
-            {activeDocument.kind !== "transcription" && (
+            {activeDocument.kind !== "transcription" &&
+              !isStreamingActiveDocument && (
               <>
                 <AutoFocusPlugin />
+                {/* Generated note content is owned by GenerationContext while
+                    SSE is active, so autosave should wait until streaming ends. */}
                 <AutoSavePlugin
                   onSave={handleSave}
                   documentId={activeDocument.id}

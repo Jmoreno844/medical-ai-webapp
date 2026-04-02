@@ -66,16 +66,12 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
   // Handle document generation
   const handleExecuteGeneration = useCallback(async () => {
     try {
-      const newDocument = await generateDocumentation();
-      if (newDocument && newDocument.id) {
-        handleSelectDocument(newDocument.id);
-      }
-      return newDocument;
+      return await generateDocumentation();
     } catch (error) {
       logger.error("Error generating documentation:", error);
       return null;
     }
-  }, [generateDocumentation, handleSelectDocument]);
+  }, [generateDocumentation]);
 
   // Loading state
   if (loading) {

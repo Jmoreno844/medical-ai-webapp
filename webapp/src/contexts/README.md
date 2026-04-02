@@ -31,4 +31,5 @@ Ese orden importa porque los providers se consumen entre sí.
 
 - Mantén la lógica de `EventSource` dentro de `TranscriptionContext` y `GenerationContext`.
 - Evita duplicar el mismo estado en componentes hijos si ya existe en un contexto.
-- Los hooks antiguos en `src/features/.../hooks/` no son la fuente de verdad principal del flujo actual.
+- `features/` debe componer UI sobre estos providers, no volver a crear managers paralelos del mismo flujo.
+- Si una lógica reusable nace desde un feature, extráela como helper sin ownership global o muévela al context dueño.
