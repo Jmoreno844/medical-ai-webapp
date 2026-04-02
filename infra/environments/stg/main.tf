@@ -191,7 +191,7 @@ module "cloud_tasks" {
   project_id = var.project_id
   region     = var.region
 
-  queue_name          = "audio-transcription-queue"
+  queue_name          = "audio-transcription-queue-stg"
   max_attempts        = 3
   min_backoff_seconds = 10
   max_backoff_seconds = 300
@@ -279,6 +279,7 @@ module "cloud_run" {
 module "monitoring" {
   source     = "../../modules/monitoring"
   project_id = var.project_id
+  billing_account_name       = var.billing_account_name
   cloud_run_service_name      = var.cloud_run_service_name
   cloud_function_service_names = [
     "transcription-endpoint",

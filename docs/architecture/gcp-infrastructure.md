@@ -20,7 +20,7 @@ IaC: `infra/` en la raíz del repo.
 | GCS audio | `<project>-audio` | `vext-stg-audio` |
 | GCS frontend | `<project>-frontend-spa` | `vext-stg-frontend-spa` |
 | Artifact Registry | `vexthealth-containers` | `vexthealth-containers` |
-| Cloud Tasks queue | `audio-transcription-queue` | `audio-transcription-queue` |
+| Cloud Tasks queue | `audio-transcription-queue-stg` | `audio-transcription-queue-stg` |
 | Service accounts | `<rol>@<project>.iam` | `backend-runner@vext-stg.iam.gserviceaccount.com` |
 | Terraform state | `<project>-terraform-state` | `vext-stg-terraform-state` |
 
@@ -97,7 +97,7 @@ El bucket `*-audio` también necesita CORS para subida directa desde el navegado
 
 | Queue | Max attempts | Min backoff | Max backoff | Target |
 |---|---|---|---|---|
-| `audio-transcription-queue` | 3 | 10s | 300s | `transcription-endpoint` (CF, OIDC con `cloud-tasks-invoker`) |
+| `audio-transcription-queue-stg` | 3 | 10s | 300s | `transcription-endpoint` (CF, OIDC con `cloud-tasks-invoker`) |
 
 ## Cloud Run — configuración clave
 

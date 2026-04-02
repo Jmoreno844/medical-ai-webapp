@@ -46,6 +46,8 @@ GEMINI_MODEL=gemini-1.5-pro
 DJANGO_API_BASE_URL=http://host.docker.internal:8000  # Para que el contenedor vea a Django
 ```
 
+Si usas `cloud_functions/docker-compose.yml`, `GEMINI_MODEL` se lee desde `cloud_functions/functions/.env.local`.
+
 ---
 
 ## 2. Levantar la Base de Datos

@@ -10,6 +10,7 @@
 
 - `config.settings.base` define `LOGGING` con default `INFO`.
 - `config.settings.develop` sube el default a `DEBUG`.
+- `config.settings.stg` usa JSON logging para Cloud Logging y conserva correlación con Cloud Trace.
 - `config.settings.production` mantiene `INFO`.
 - `config.settings.test` elimina el dict `LOGGING` para seguir usando la configuración JSON de tests.
 

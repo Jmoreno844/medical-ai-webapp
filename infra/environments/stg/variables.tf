@@ -167,3 +167,9 @@ variable "monthly_budget_amount_usd" {
   type        = number
   default     = 100
 }
+
+variable "billing_account_name" {
+  description = "Billing account resource name used for the project budget"
+  type        = string
+  default     = ""
+}

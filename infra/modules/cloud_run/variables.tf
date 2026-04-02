@@ -71,6 +71,12 @@ variable "memory" {
   default     = "1Gi"
 }
 
+variable "container_port" {
+  description = "Port exposed by the main application container"
+  type        = number
+  default     = 8080
+}
+
 variable "env_vars" {
   description = "Plain-text environment variables"
   type        = map(string)

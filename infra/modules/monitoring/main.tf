@@ -1,9 +1,6 @@
-data "google_project" "current" {
-  project_id = var.project_id
-}
-
 locals {
   cloud_sql_database_id = "${var.project_id}:${var.cloud_sql_instance_name}"
+  billing_account_id    = trimprefix(var.billing_account_name, "billingAccounts/")
 }
 
 resource "google_monitoring_alert_policy" "backend_cloud_run_5xx" {
@@ -125,12 +122,12 @@ resource "google_monitoring_alert_policy" "cloud_sql_cpu" {
 }
 
 resource "google_billing_budget" "project_budget" {
-  count           = data.google_project.current.billing_account == "" ? 0 : 1
-  billing_account = data.google_project.current.billing_account
+  count           = var.billing_account_name == "" ? 0 : 1
+  billing_account = local.billing_account_id
   display_name    = "stg monthly budget"
 
   budget_filter {
-    projects = ["projects/${data.google_project.current.number}"]
+    projects = ["projects/${var.project_id}"]
   }
 
   amount {

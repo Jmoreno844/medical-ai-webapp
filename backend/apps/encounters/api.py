@@ -154,7 +154,7 @@ def generate_upload_url(request, encounter_id: int, payload: AudioUploadRequest)
         storage_client = get_storage_client()
         bucket = storage_client.bucket(settings.GCS_BUCKET_NAME)
 
-        filename = f"encounter_audio/{encounter_id}/{uuid.uuid4()}.mp3"
+        filename = f"encounter_audio/{encounter_id}/{uuid.uuid4()}.webm"
         blob = bucket.blob(filename)
 
         url = blob.generate_signed_url(

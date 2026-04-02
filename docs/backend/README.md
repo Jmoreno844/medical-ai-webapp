@@ -14,7 +14,7 @@ El `backend/` es la API central del sistema. Orquesta autenticación, encuentros
 ## Mapa rápido del código
 
 - `backend/apps/` — dominios de negocio (`users`, `encounters`, `documents`, `patients`, `templates`, `generative_ai`).
-- `backend/config/settings/` — `base`, `develop`, `test`, `production` y utilidades de logging.
+- `backend/config/settings/` — `base`, `develop`, `stg`, `test`, `production` y utilidades de logging.
 - `backend/utils/` — autenticación JWT y helpers compartidos.
 
 ## Cómo se relaciona con el resto

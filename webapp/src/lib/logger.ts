@@ -1,5 +1,5 @@
 /**
- * Central frontend logger. Use instead of raw console.* so dev/test stay verbose
+ * Central frontend logger. Use instead of raw console.* so local/staging stays verbose
  * and production builds stay quiet (see also vite esbuild.drop).
  *
  * Override in dev: VITE_LOG_LEVEL=silent disables all client logs.

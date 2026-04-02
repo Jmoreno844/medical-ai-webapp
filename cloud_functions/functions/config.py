@@ -109,7 +109,7 @@ def get_environment():
     if _is_docker_compose_local_dev() and env in ("", "dev"):
         return "local"
 
-    if env in ("dev", "test", "production", "local"):
+    if env in ("dev", "test", "stg", "staging", "production", "local"):
         return env
 
     return "dev"
@@ -123,6 +123,11 @@ def is_production():
 def is_test():
     """Check if running in test environment"""
     return get_environment() == "test"
+
+
+def is_staging():
+    """Check if running in staging environment."""
+    return get_environment() in {"stg", "staging"}
 
 
 def is_local():
@@ -158,8 +163,8 @@ def initialize_environment():
         )
 
         load_environment_from_secret_manager()
-    elif is_test():
-        # In test (GitHub Actions), environment variables are already set via GitHub Secrets
+    elif is_test() or is_staging():
+        # In CI/staging, environment variables are already provided by the platform.
         logger.info("Using environment variables from GitHub Secrets")
     else:
         # In local development, use .env files

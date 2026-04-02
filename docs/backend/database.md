@@ -176,7 +176,7 @@ Registro central de una consulta médica. Contiene metadatos del audio grabado.
 | `nombre_encuentro` | varchar(255) | nullable | Nombre descriptivo |
 | `fecha` | datetime | not null | Fecha/hora de la consulta |
 | `created_at` | datetime | auto_now_add | — |
-| `audio_file_name` | varchar(255) | nullable | Ruta en GCS: `encounter_audio/{id}/{uuid}.mp3` |
+| `audio_file_name` | varchar(255) | nullable | Ruta en GCS: `encounter_audio/{id}/{uuid}.webm` |
 | `audio_uploaded_at` | datetime | nullable | Timestamp de subida a GCS |
 | `audio_expires_at` | datetime | nullable | `audio_uploaded_at + 24 h` (seteado en `save()`) |
 | `audio_duration_seconds` | int | nullable | Duración en segundos |

@@ -16,7 +16,7 @@ El stack usa **OpenTelemetry** con propagación **W3C** (`traceparent` / `traces
 
 | Variable | Descripción |
 |----------|-------------|
-| `OTEL_SDK_DISABLED` | `1` / `true` — desactiva export e instrumentación pesada (p. ej. tests: ya se fija en `config.settings.test`). |
+| `OTEL_SDK_DISABLED` | `1` / `true` — desactiva export e instrumentación pesada (p. ej. tests: se usa en `config.settings.test`, no en `config.settings.stg`). |
 | `OTEL_TRACES_EXPORTER` | `none` \| `otlp` \| `gcp` (opcional; si no se define, se infiere). |
 | `OTEL_SERVICE_NAME` | Nombre del servicio en el backend de trazas (p. ej. `vexthealth-backend`, `vexthealth-cloud-functions`). |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | URL completa OTLP/HTTP, p. ej. `http://127.0.0.1:4318/v1/traces`. |
@@ -25,11 +25,17 @@ El stack usa **OpenTelemetry** con propagación **W3C** (`traceparent` / `traces
 | `OTEL_FORCE_OTLP` | `1` — fuerza OTLP aunque exista `GOOGLE_CLOUD_PROJECT` (útil en portátiles con proyecto GCP en shell). |
 | `GOOGLE_CLOUD_PROJECT` / `GCP_PROJECT` | Si están definidos y no se fuerza OTLP, el export por defecto es **Cloud Trace**. |
 
-## GCP (test / producción)
+## GCP (stg / producción)
 
 - En **Cloud Run** y **Cloud Functions**, suele existir `GOOGLE_CLOUD_PROJECT`; el exportador **GCP Trace** usa la cuenta de servicio del workload.
 - Concede a esa cuenta el rol **Cloud Trace Agent** (`roles/cloudtrace.agent`) si no viene ya en el rol de ejecución recomendado por GCP.
 - El navegador **no** envía trazas directamente a Cloud Trace en el modelo habitual (sin collector expuesto). Las trazas del front en producción suelen limitarse a spans locales o quedar desactivadas (`VITE_OTEL_EXPORTER_OTLP_TRACES_URL` vacío).
+
+### Estado actual en `stg`
+
+- `backend` y `cloud functions` sí pueden compartir el mismo `trace_id` en Cloud Trace cuando la petición pasa por HTTP normal (`Django -> Cloud Function -> callback Django`).
+- `webapp` todavía **no** participa en el mismo trace en `stg`: el workflow de frontend no configura `VITE_OTEL_EXPORTER_OTLP_TRACES_URL` y no hay un OTEL collector público/intermedio.
+- Hasta montar collector OTLP o un backend OTLP accesible desde navegador, la visibilidad de `stg` es **backend/cloud functions**, no navegador de extremo a extremo.
 
 ## Local con Jaeger
 

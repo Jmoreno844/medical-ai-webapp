@@ -5,6 +5,7 @@
 project_id  = "vext-stg"
 region      = "us-east1"
 environment = "stg"
+billing_account_name = "billingAccounts/01C163-A52891-471F1D"
 
 # GitHub (owner/repo) — must match WIF attribute_condition in Terraform
 github_repo = "Jmoreno844/medical-ai-webapp"
@@ -20,7 +21,7 @@ cloud_run_service_name = "vexthealth-backend"
 cloud_run_image                 = "us-docker.pkg.dev/cloudrun/container/hello"
 cloud_run_max_instances         = 1
 cloud_run_max_concurrency       = 250
-cloud_run_use_secret_manager    = true
+cloud_run_use_secret_manager    = false
 cloud_run_allow_unauthenticated = true # Set false if org policy blocks allUsers on Cloud Run
 
 # Cloud Functions source (deploy from GCS)

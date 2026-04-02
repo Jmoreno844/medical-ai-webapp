@@ -12,11 +12,11 @@
    - `TEST_DB_HOST`: optional
    - `TEST_DB_PORT`: optional
    - `GCP_SA_KEY`: Service account key with Secret Manager access
-   - `test_vpc_connector_name`: github variable
+   - `stg_vpc_connector_name`: github variable
 
 4. **Google Secrets Required:**
-   - `test-django-secret-key`: Django's secret key for test environment
-   - `test-db-name`: Database name
-   - `test-db-user`: Database username
-   - `test-db-password`: Database password
-   - `test-db-host`: Database host
+   - `django-secret-key`: Django's secret key for staging
+   - `db-name`: Database name
+   - `db-user`: Database username
+   - `db-password`: Database password
+   - `db-host`: Database host

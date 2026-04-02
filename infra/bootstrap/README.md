@@ -108,12 +108,12 @@ export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/.secrets/${PROJECT_ID}-terraform-a
 
 ## 9. Inicializar Terraform con backend remoto
 
-Desde `infra/environments/test`:
+Desde `infra/environments/stg`:
 
 ```bash
-terraform init \
+  terraform init \
   -backend-config="bucket=${TFSTATE_BUCKET}" \
-  -backend-config="prefix=terraform/test"
+  -backend-config="prefix=terraform/stg"
 ```
 
 ## 10. Despues del primer apply
@@ -141,4 +141,4 @@ gcloud iam service-accounts keys delete KEY_ID \
 - No subas `./.secrets/` al repo.
 - Mantén el bucket de `tfstate` privado.
 - Usa WIF en GitHub Actions; evita `GCP_SA_KEY` de larga vida.
-- Si mas adelante separas `test` y `prod`, repite este bootstrap por proyecto o usa un proyecto separado para estado remoto compartido.
+- Si más adelante separas `stg` y `prod`, repite este bootstrap por proyecto o usa un proyecto separado para estado remoto compartido.

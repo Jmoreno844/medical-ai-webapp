@@ -13,7 +13,6 @@ services:
       - "8082:8082"
     environment:
       - ENVIRONMENT=local
-      - GEMINI_MODEL=gemini-2.0-flash
       - GCP_PROJECT=vext-stg # Added GCP project ID
       - GOOGLE_CLOUD_PROJECT=vext-stg
       - GCP_REGION=us-east1 # Added GCP region
@@ -35,7 +34,6 @@ services:
       - "8083:8083"
     environment:
       - ENVIRONMENT=local
-      - GEMINI_MODEL=gemini-2.0-flash # Added missing GEMINI_MODEL
       - GCP_PROJECT=vext-stg # Added GCP project ID
       - GOOGLE_CLOUD_PROJECT=vext-stg
       - GCP_REGION=us-east1 # Added GCP region

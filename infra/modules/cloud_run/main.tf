@@ -42,6 +42,10 @@ resource "google_cloud_run_v2_service" "backend" {
     containers {
       image = var.image
 
+      ports {
+        container_port = var.container_port
+      }
+
       resources {
         limits = {
           cpu    = var.cpu

@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-- En desarrollo y test, ver trazas útiles sin dispersar `console.*` por todo el código.
+- En desarrollo y staging, ver trazas útiles sin dispersar `console.*` por todo el código.
 - En producción, no depender de la consola del navegador para diagnóstico ni filtrar datos sensibles.
 
 ## Módulo central
@@ -17,7 +17,7 @@ Usar siempre `webapp/src/lib/logger.ts`:
 
 ## Comportamiento
 
-- En `dev` y `test`, el logger puede emitir trazas.
+- En `dev` y `staging`, el logger puede emitir trazas.
 - En producción, Vite elimina llamadas a `console` con `esbuild.drop`.
 - ESLint mantiene `no-console` para evitar regresiones fuera de `logger.ts`.
 
@@ -25,7 +25,7 @@ Usar siempre `webapp/src/lib/logger.ts`:
 
 | Variable | Efecto |
 |----------|--------|
-| `VITE_LOG_LEVEL=silent` | Desactiva todo el logging incluso en `dev` / `test`. |
+| `VITE_LOG_LEVEL=silent` | Desactiva todo el logging incluso en `dev` / `staging`. |
 
 ## Qué no loguear
 
