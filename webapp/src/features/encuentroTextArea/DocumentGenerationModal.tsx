@@ -1,5 +1,6 @@
 import React from "react";
 import Modal from "@/commons/components/Modal";
+import { DocumentoOut } from "@/types/documento";
 
 interface Plantilla {
   id: number;
@@ -14,7 +15,7 @@ interface Plantilla {
 interface DocumentGenerationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onGenerate: () => Promise<any>; // Changed type to return Promise
+  onGenerate: () => Promise<DocumentoOut | null>;
   isGenerating: boolean;
   error: string | null;
   plantillas: Plantilla[];

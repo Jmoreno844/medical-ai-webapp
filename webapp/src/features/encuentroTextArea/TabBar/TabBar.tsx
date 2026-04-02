@@ -1,8 +1,7 @@
-import React, { useMemo, useState, useRef } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   DOCUMENT_TYPE_LABELS,
   DOCUMENT_TYPE_LABELS_LONG,
-  type DocumentoOut,
 } from "@/types/documento";
 import {
   Dialog,
@@ -20,56 +19,44 @@ import {
 } from "@/commons/components/ui/dropdown-menu";
 import { Trash } from "lucide-react";
 
-// Import context
 import { useDocumentContext } from "@/contexts/DocumentContext";
 import { useGenerationContext } from "@/contexts/GenerationContext";
-import { useTranscriptionContext } from "@/contexts/TranscriptionContext"; // Updated import
+import { useTranscriptionContext } from "@/contexts/TranscriptionContext";
 import { logger } from "@/lib/logger";
+import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
+import { WorkspaceDocument } from "@/workspace/types";
 
 const TabBar: React.FC = () => {
-  // Get state from context
-  const { documents, activeDocumentId, selectDocument, deleteDocument } =
-    useDocumentContext();
-
-  const { openGenerationModal } = useGenerationContext();
-  const { hasBeenTranscribed } = useTranscriptionContext(); // Use hasBeenTranscribed directly
-
-  // Local state for UI
-  const [documentToDelete, setDocumentToDelete] = useState<DocumentoOut | null>(
-    null
+  const { deleteDocument } = useDocumentContext();
+  const documentOrder = useWorkspaceStore((state) => state.documentOrder);
+  const documentsById = useWorkspaceStore((state) => state.documentsById);
+  const activeDocumentId = useWorkspaceStore((state) => state.activeDocumentId);
+  const setActiveDocument = useWorkspaceStore((state) => state.setActiveDocument);
+  const documents = useMemo(
+    () =>
+      documentOrder
+        .map((documentId) => documentsById[documentId])
+        .filter(Boolean),
+    [documentOrder, documentsById]
   );
+  const { openGenerationModal } = useGenerationContext();
+  const { hasBeenTranscribed } = useTranscriptionContext();
+
+  const [documentToDelete, setDocumentToDelete] =
+    useState<WorkspaceDocument | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const dropdownTriggerRef = useRef<HTMLButtonElement>(null);
   const [activeDropdownDoc, setActiveDropdownDoc] =
-    useState<DocumentoOut | null>(null);
+    useState<WorkspaceDocument | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Sort documents (same code as before)
-  const sortedDocuments = useMemo(() => {
-    return [...documents].sort((a, b) => {
-      const dateA = new Date(a.created_on).getTime();
-      const dateB = new Date(b.created_on).getTime();
-
-      if (dateA !== dateB) {
-        return dateA - dateB;
-      }
-
-      return a.id - b.id;
-    });
-  }, [documents]);
-
-  // Check if a document can show context menu
-  const canShowContextMenu = (doc: DocumentoOut) => {
-    const kind = doc.kind.toLowerCase();
+  const canShowContextMenu = (doc: WorkspaceDocument) => {
+    const kind = doc.type.toLowerCase();
     return kind !== "context" && kind !== "transcription";
   };
 
-  // Handle right-click on tabs
-  const handleContextMenu = (
-    e: React.MouseEvent,
-    doc: DocumentoOut
-  ) => {
+  const handleContextMenu = (e: React.MouseEvent, doc: WorkspaceDocument) => {
     if (canShowContextMenu(doc)) {
       e.preventDefault();
       setActiveDropdownDoc(doc);
@@ -86,7 +73,6 @@ const TabBar: React.FC = () => {
     }
   };
 
-  // Handle document deletion
   const handleDeleteDocument = async () => {
     if (!documentToDelete) return;
 
@@ -94,7 +80,7 @@ const TabBar: React.FC = () => {
     setDeleteError(null);
 
     try {
-      const success = await deleteDocument(documentToDelete.id);
+      const success = await deleteDocument(Number(documentToDelete.id));
       if (!success) {
         setDeleteError("No se pudo eliminar el documento");
       } else {
@@ -108,7 +94,7 @@ const TabBar: React.FC = () => {
     }
   };
 
-  if (!sortedDocuments.length) {
+  if (!documents.length) {
     return (
       <div className="bg-gray-100 p-2 text-sm text-gray-500 border-b">
         No hay documentos disponibles
@@ -120,10 +106,10 @@ const TabBar: React.FC = () => {
     <>
       <div className="flex justify-between items-center bg-gray-100 border-b">
         <div className="flex overflow-x-auto flex-grow">
-          {sortedDocuments.map((doc) => (
+          {documents.map((doc) => (
             <button
               key={doc.id}
-              onClick={() => selectDocument(doc.id)}
+              onClick={() => setActiveDocument(doc.id)}
               onContextMenu={(e) => handleContextMenu(e, doc)}
               className={`px-4 py-2 min-w-[120px] text-sm font-medium whitespace-nowrap transition-colors
                 ${
@@ -132,9 +118,9 @@ const TabBar: React.FC = () => {
                     : "text-gray-600 hover:bg-gray-200"
                 }`}
               aria-label={`Seleccionar ${getTabLabel(doc)}`}
-              data-document-type={doc.kind}
+              data-document-type={doc.type}
             >
-              {DOCUMENT_TYPE_LABELS[doc.kind.toLowerCase()] || doc.kind}
+              {DOCUMENT_TYPE_LABELS[doc.type.toLowerCase()] || doc.type}
             </button>
           ))}
 
@@ -147,11 +133,7 @@ const TabBar: React.FC = () => {
                 ? "text-blue-600 hover:bg-blue-100"
                 : "text-gray-400 cursor-not-allowed"
             } rounded-full transition-colors self-center mx-2`}
-            title={
-              hasBeenTranscribed
-                ? "Generar documentación"
-                : "Transcriba el audio primero para generar documentación"
-            }
+            title={hasBeenTranscribed ? "Generar documentación" : "Transcriba el audio primero para generar documentación"}
             aria-label="Generar documentación"
           >
             <svg
@@ -244,11 +226,11 @@ const TabBar: React.FC = () => {
 };
 
 // Helper functions (same as before)
-function getDocumentTitle(doc: DocumentoOut | null) {
+function getDocumentTitle(doc: WorkspaceDocument | null) {
   if (!doc) return "";
 
-  const docType = DOCUMENT_TYPE_LABELS_LONG[doc.kind.toLowerCase()] || doc.kind;
-  const date = new Date(doc.created_on).toLocaleDateString("es-ES", {
+  const docType = DOCUMENT_TYPE_LABELS_LONG[doc.type.toLowerCase()] || doc.type;
+  const date = new Date(doc.createdAt).toLocaleDateString("es-ES", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -257,8 +239,8 @@ function getDocumentTitle(doc: DocumentoOut | null) {
   return `${docType} - ${date}`;
 }
 
-function getTabLabel(doc: DocumentoOut) {
-  return DOCUMENT_TYPE_LABELS[doc.kind.toLowerCase()] || doc.kind;
+function getTabLabel(doc: WorkspaceDocument) {
+  return DOCUMENT_TYPE_LABELS[doc.type.toLowerCase()] || doc.type;
 }
 
 export default TabBar;

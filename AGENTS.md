@@ -58,8 +58,9 @@ Do not treat these as source of truth unless the task is specifically about gene
 - `backend/apps/templates/` owns base templates and doctor templates.
 - `backend/apps/users/` owns login/session/JWT for user-facing auth.
 - `cloud_functions/functions/` owns Gemini-facing logic only; it should not grow direct database responsibilities.
-- `webapp/src/contexts/` is the current state source of truth for encounter detail flows.
-- In the frontend, `webapp/src/features/` should render and compose UI, while `webapp/src/contexts/` owns shared encounter-detail state and long-lived side effects.
+- In the frontend, `webapp/src/workspace/` is the state layer for encounter-document workspace concerns such as tabs, active document, snapshot, draft, derived state, AI session state, and patch-review preparation.
+- `webapp/src/contexts/` remains the orchestration and compat layer around encounter detail flows; it owns SSE lifecycle and API side effects while delegating durable workspace state to the stores.
+- `webapp/src/features/` should render and compose UI, not become a second owner of shared encounter state, streaming lifecycle, or AI workspace payload assembly.
 
 ## Sensitive Domains
 
@@ -99,6 +100,8 @@ Do not treat these as source of truth unless the task is specifically about gene
 - When returning to the repo after time away, prefer adding a short module README over spreading tribal knowledge across code comments.
 - If you discover duplicate frontend patterns, preserve the active path first and only consolidate when the write scope is clearly safe.
 - Do not introduce a second frontend owner for SSE lifecycle or shared encounter-detail state outside the official contexts.
+- Do not collapse `snapshot`, `draft`, `derived`, and `patch preview` back into one opaque editor state.
+- When a frontend change affects the future AI workspace, update the nearest doc and keep `WorkspaceIndex`/editor mode conventions aligned with the code.
 
 ## Creating New Files
 
@@ -138,6 +141,12 @@ Do not treat these as source of truth unless the task is specifically about gene
 - Prefer small functions with clear ownership, explicit names, and obvious inputs/outputs.
 - Add comments only where they explain intent, constraints, invariants, security assumptions, or tradeoffs.
 - Do not add comments that merely narrate syntax or restate the code line-by-line.
+- In the frontend workspace, keep these boundaries explicit:
+  - `snapshot` = last known canonical content
+  - `draft` = local editable content
+  - `derived` = streaming, preview, or other non-canonical transient state
+  - `patch` = proposed write path, not direct document mutation
+- New AI-facing frontend code should read from a `WorkspaceIndex`-style adapter instead of assembling ad hoc payloads inside components.
 - When code depends on an external contract, link that intent in code comments briefly and update the matching doc in the same change.
 - When introducing a temporary workaround, limitation, or known edge case, leave a short comment explaining why it exists and what would replace it.
 - If you see low-value comments, remove or simplify them rather than adding more noise.

@@ -1,11 +1,12 @@
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { $convertToMarkdownString, TRANSFORMERS } from "@lexical/markdown";
 
 import { logger } from "@/lib/logger";
 interface AutoSavePluginProps {
   documentId: number;
   onSave: (docId: number, content: string) => Promise<void>;
+  onDraftChange?: (docId: number, content: string) => void;
   registerSaveFunction?: (saveFunc: (force?: boolean) => Promise<void>) => void;
   hasInitialContent?: boolean;
   saveInterval?: number; // Time in ms for auto-save
@@ -14,6 +15,7 @@ interface AutoSavePluginProps {
 export function AutoSavePlugin({
   documentId,
   onSave,
+  onDraftChange,
   registerSaveFunction,
   hasInitialContent = false,
   saveInterval = 2000,
@@ -24,54 +26,51 @@ export function AutoSavePlugin({
   const savingRef = useRef(false);
 
   // Convert editor state to Markdown (retaining ** markers) instead of just plain text
-  const getDocumentContent = (): string => {
+  const getDocumentContent = useCallback((): string => {
     let content = "";
     editor.getEditorState().read(() => {
-      // Convert all current editor content to Markdown
       content = $convertToMarkdownString(TRANSFORMERS);
     });
     return content;
-  };
+  }, [editor]);
 
-  const handleSave = async (force: boolean = false) => {
-    // Fetch the Markdown version of your content
-    const currentContent = getDocumentContent();
-    const lastSaved = lastSavedContentRef.current;
+  const handleSave = useCallback(
+    async (force: boolean = false) => {
+      const currentContent = getDocumentContent();
+      const lastSaved = lastSavedContentRef.current;
 
-    // Skip if content hasn't changed and not forced
-    if (
-      savingRef.current ||
-      (!force && currentContent.trim() === lastSaved.trim())
-    ) {
-      return;
-    }
-
-    // Skip saving empty content if the doc previously had content
-    if (hasInitialContent && currentContent.trim() === "") {
-      return;
-    }
-
-    try {
-      savingRef.current = true;
-      setIsSaving(true);
-
-      // Save the Markdown content (includes "**" markers)
-      await onSave(documentId, currentContent);
-
-      // Only update ref if content hasn't changed during save
-      if (currentContent === getDocumentContent()) {
-        lastSavedContentRef.current = currentContent;
+      if (
+        savingRef.current ||
+        (!force && currentContent.trim() === lastSaved.trim())
+      ) {
+        return;
       }
-    } catch (error) {
-      logger.error(
-        `[AUTO_SAVE] Failed to save document ${documentId}:`,
-        error
-      );
-    } finally {
-      savingRef.current = false;
-      setIsSaving(false);
-    }
-  };
+
+      if (hasInitialContent && currentContent.trim() === "") {
+        return;
+      }
+
+      try {
+        savingRef.current = true;
+        setIsSaving(true);
+
+        await onSave(documentId, currentContent);
+
+        if (currentContent === getDocumentContent()) {
+          lastSavedContentRef.current = currentContent;
+        }
+      } catch (error) {
+        logger.error(
+          `[AUTO_SAVE] Failed to save document ${documentId}:`,
+          error
+        );
+      } finally {
+        savingRef.current = false;
+        setIsSaving(false);
+      }
+    },
+    [documentId, getDocumentContent, hasInitialContent, onSave]
+  );
 
   // Register save function with the parent component
   useEffect(() => {
@@ -79,7 +78,7 @@ export function AutoSavePlugin({
       registerSaveFunction(handleSave);
       return () => registerSaveFunction(() => Promise.resolve());
     }
-  }, [registerSaveFunction, documentId]);
+  }, [handleSave, registerSaveFunction]);
 
   // Auto-save listener
   useEffect(() => {
@@ -91,6 +90,8 @@ export function AutoSavePlugin({
       if (timer) clearTimeout(timer);
 
       const currentContent = getDocumentContent();
+      onDraftChange?.(documentId, currentContent);
+
       // Only schedule a save if new content is different
       if (currentContent !== lastSavedContent) {
         lastSavedContent = currentContent;
@@ -102,7 +103,7 @@ export function AutoSavePlugin({
       removeUpdateListener();
       if (timer) clearTimeout(timer);
     };
-  }, [editor, documentId, saveInterval]);
+  }, [documentId, editor, getDocumentContent, handleSave, onDraftChange, saveInterval]);
 
   return null;
 }

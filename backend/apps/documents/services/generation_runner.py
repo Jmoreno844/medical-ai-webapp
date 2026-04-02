@@ -13,6 +13,9 @@ from apps.documents.services.sse_hub import notify_generation_progress
 
 logger = logging.getLogger(__name__)
 
+CONNECT_TIMEOUT_SECONDS = 5
+READ_TIMEOUT_SECONDS = 300
+
 
 def start_document_generation_thread(
     url: str,
@@ -27,11 +30,15 @@ def start_document_generation_thread(
     def worker() -> None:
         token = otel_context.attach(parent_ctx)
         try:
+            # The Cloud Function performs generation inline and emits progress
+            # callbacks while the HTTP request is still open. A short read
+            # timeout produces false negatives even when SSE chunks are already
+            # arriving in the browser.
             respuesta = requests.post(
                 url,
                 json=request_body,
                 headers={"Content-Type": "application/json"},
-                timeout=5,
+                timeout=(CONNECT_TIMEOUT_SECONDS, READ_TIMEOUT_SECONDS),
             )
             try:
                 response_data = respuesta.json()

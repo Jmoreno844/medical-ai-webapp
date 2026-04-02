@@ -7,8 +7,8 @@ El Copiloto Clínico no es un servicio monolítico frontend. Responde a una arqu
 ### Componentes Principales
 
 1. **Frontend (React / Vite):**
-   - **Responsabilidad:** Renderizado visual (Lexical), gestión de estados locales (Drafts, Tabs abiertas), UI del chat y revisión de parches (Accept/Reject).
-   - **Restricción:** No posee lógica del LLM, no gestiona el contexto completo, no almacena keys, no consolida documentos masivos para enviarlos por red.
+   - **Responsabilidad:** Renderizado visual (Lexical), estado del workspace (`WorkspaceStore`, `DocumentSnapshotStore`, `DocumentDraftStore`, `DocumentDerivedStore`), UI del chat futura y revisión de parches.
+   - **Restricción:** No posee lógica del LLM, no gestiona el contexto clínico completo, no almacena keys, no consolida documentos pesados directamente desde componentes.
 
 2. **Backend Transaccional (Django / Cloud Run):**
    - **Responsabilidad:** Fuente única de la verdad. Persistencia de `documents`, `snapshots`, seguridad, permisos y servicios de API (`DocumentOperationsService`).
@@ -26,8 +26,16 @@ Para resolver el problema de contexto masivo (ej. transcripciones de 30 minutos 
 ### Patrón "Index First"
 
 - El Frontend nunca sube archivos largos en los payloads de chat.
-- El Frontend envía un `WorkspaceIndex` ligero: `[{ doc_id: "123", version: 2 }, ...]`.
+- El Frontend expone un `WorkspaceIndex` ligero construido desde el workspace state layer, no desde JSX o estado local del editor.
+- Ese `WorkspaceIndex` contiene metadatos como documento activo, `version`, `hasDirtyDraft`, `hasStreamingState`, `aiReadable` y working set.
 - El Agente revisa su memoria interna para ver si ya procesó la versión 2. Si no, usa herramientas para recabar la información desde el Backend Transaccional.
+
+### Regla del frontend actual
+
+- `contexts/` orquestan SSE, kickoff y compatibilidad.
+- `workspace/` es el owner de tabs, snapshot, draft, derived state y preparación de patch review.
+- El editor resuelve `derived > draft > snapshot`.
+- El runtime futuro no debe leer markdown pesado desde componentes; debe leer el `WorkspaceIndex` y luego pedir contenido por herramientas.
 
 ### Context Caching (Vertex AI / Gemini)
 

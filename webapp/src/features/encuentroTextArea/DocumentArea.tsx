@@ -1,15 +1,14 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import TabBar from "./TabBar/TabBar";
 import TextArea from "./TextArea/TextArea";
 import LoadingSpinner from "@/commons/components/LoadingSpinner";
 import ErrorDisplay from "@/commons/components/ErrorDisplay";
 import DocumentGenerationModal from "./DocumentGenerationModal";
 import { DocumentGenerationProgress } from "./components/DocumentGenerationProgress";
-
-// Import the context hooks
 import { useDocumentContext } from "../../contexts/DocumentContext";
 import { useGenerationContext } from "../../contexts/GenerationContext";
 import { logger } from "@/lib/logger";
+import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
 interface DocumentAreaProps {
   onTranscriptionDocumentFound?: (documentId: number) => void;
 }
@@ -17,15 +16,18 @@ interface DocumentAreaProps {
 const DocumentArea: React.FC<DocumentAreaProps> = ({
   onTranscriptionDocumentFound,
 }) => {
-  // Get state from contexts instead of props
-  const {
-    documents,
-    activeDocumentId,
-    loading,
-    error,
-    isSaving,
-    selectDocument,
-  } = useDocumentContext();
+  const { loading, error, isSaving } = useDocumentContext();
+  const documentOrder = useWorkspaceStore((state) => state.documentOrder);
+  const documentsById = useWorkspaceStore((state) => state.documentsById);
+  const activeDocumentId = useWorkspaceStore((state) => state.activeDocumentId);
+  const setActiveDocument = useWorkspaceStore((state) => state.setActiveDocument);
+  const documents = useMemo(
+    () =>
+      documentOrder
+        .map((documentId) => documentsById[documentId])
+        .filter(Boolean),
+    [documentOrder, documentsById]
+  );
 
   const {
     isModalOpen,
@@ -43,27 +45,28 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
     setSearchQuery,
   } = useGenerationContext();
 
-  // Find and emit transcription document ID when documents load
-  useEffect(() => {
-    if (!loading && documents.length > 0 && onTranscriptionDocumentFound) {
-      const transcriptionDoc = documents.find(
-        (doc) => doc.kind === "transcription"
-      );
-      if (transcriptionDoc) {
-        onTranscriptionDocumentFound(transcriptionDoc.id);
-      }
-    }
-  }, [documents, loading, onTranscriptionDocumentFound]);
+  const transcriptionDocumentId = useMemo(() => {
+    const transcriptionDoc = documents.find((doc) => doc.type === "transcription");
+    return transcriptionDoc ? Number(transcriptionDoc.id) : null;
+  }, [documents]);
 
-  // Handle document selection
+  useEffect(() => {
+    if (
+      !loading &&
+      transcriptionDocumentId !== null &&
+      onTranscriptionDocumentFound
+    ) {
+      onTranscriptionDocumentFound(transcriptionDocumentId);
+    }
+  }, [loading, onTranscriptionDocumentFound, transcriptionDocumentId]);
+
   const handleSelectDocument = useCallback(
     (docId: number) => {
-      selectDocument(docId);
+      setActiveDocument(String(docId));
     },
-    [selectDocument]
+    [setActiveDocument]
   );
 
-  // Handle document generation
   const handleExecuteGeneration = useCallback(async () => {
     try {
       return await generateDocumentation();
@@ -72,6 +75,8 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
       return null;
     }
   }, [generateDocumentation]);
+
+  const generationTargetDocumentId = generationStatus.documentId;
 
   // Loading state
   if (loading) {
@@ -121,7 +126,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
       {/* Display real-time generation progress */}
       {!isModalOpen &&
         generationStatus?.inProgress &&
-        activeDocumentId !== generationStatus.documentId && (
+        activeDocumentId !== String(generationTargetDocumentId) && (
           <div className="p-4 bg-white border-t">
             <DocumentGenerationProgress
               isGenerating={generationStatus.inProgress}
@@ -129,8 +134,8 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
               isComplete={generationStatus.isComplete}
               error={generationStatus.error}
               onViewDocument={
-                generationStatus.documentId
-                  ? () => handleSelectDocument(generationStatus.documentId!)
+                generationTargetDocumentId
+                  ? () => handleSelectDocument(generationTargetDocumentId)
                   : undefined
               }
             />

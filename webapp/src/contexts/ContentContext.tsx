@@ -1,18 +1,17 @@
 import React, {
   createContext,
   useContext,
-  useState,
   useEffect,
   useCallback,
-  useRef,
+  useMemo,
+  useState,
 } from "react";
-import axiosInstance from "@/commons/utils/axiosInstance";
 import { useDocumentContext } from "./DocumentContext";
 import { logger } from "@/lib/logger";
+import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
+import { useDocumentSnapshotStore } from "@/workspace/stores/documentSnapshotStore";
 
-// Define the context type
 type ContentContextType = {
-  // State
   documentContent: string;
   isLoadingContent: boolean;
   fetchError: string | null;
@@ -21,7 +20,6 @@ type ContentContextType = {
   editorRefreshTrigger: number;
   loadedDocumentIds: number[];
 
-  // Actions
   fetchDocumentContent: (
     docId: number,
     forceRefresh?: boolean
@@ -32,167 +30,126 @@ type ContentContextType = {
   updateDocumentContent: (docId: number, content: string) => void; // New function
 };
 
-// Create the context
 const ContentContext = createContext<ContentContextType | undefined>(undefined);
 
-// Create the provider
+type ContentWindowBridge = Window & {
+  documentContentCache?: Map<number, string>;
+  triggerEditorRefresh?: () => void;
+};
+
 export function ContentProvider({ children }: { children: React.ReactNode }) {
   const { activeDocumentId, saveDocument } = useDocumentContext();
-
-  const [documentContent, setDocumentContent] = useState<string>("");
-  const [isLoadingContent, setIsLoadingContent] = useState<boolean>(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [contentLoadedSuccessfully, setContentLoadedSuccessfully] =
-    useState<boolean>(false);
-  const [documentContentCache, setDocumentContentCache] = useState<
-    Map<number, string>
-  >(new Map());
   const [editorRefreshTrigger, setEditorRefreshTrigger] = useState<number>(0);
 
-  // Track which documents have been loaded to avoid unnecessary refreshes
-  const loadedDocumentsRef = useRef<Set<number>>(new Set());
+  const snapshotsByDocumentId = useDocumentSnapshotStore(
+    (state) => state.snapshotsByDocumentId
+  );
+  const isLoadingByDocumentId = useDocumentSnapshotStore(
+    (state) => state.isLoadingByDocumentId
+  );
+  const fetchErrorByDocumentId = useDocumentSnapshotStore(
+    (state) => state.fetchErrorByDocumentId
+  );
+  const loadedDocumentIds = useDocumentSnapshotStore(
+    (state) => state.loadedDocumentIds
+  );
+  const getSnapshot = useDocumentSnapshotStore((state) => state.getSnapshot);
+  const setSnapshot = useDocumentSnapshotStore((state) => state.setSnapshot);
+  const fetchSnapshot = useDocumentSnapshotStore((state) => state.fetchSnapshot);
+
+  const draftsByDocumentId = useDocumentDraftStore(
+    (state) => state.draftsByDocumentId
+  );
+  const getDraft = useDocumentDraftStore((state) => state.getDraft);
+  const setDraftContent = useDocumentDraftStore((state) => state.setDraftContent);
+  const resetDraftFromSnapshot = useDocumentDraftStore(
+    (state) => state.resetDraftFromSnapshot
+  );
+  const markDraftClean = useDocumentDraftStore((state) => state.markDraftClean);
 
   const triggerEditorRefresh = useCallback(() => {
     setEditorRefreshTrigger((prev) => prev + 1);
   }, []);
 
-  // Make the cache and triggerEditorRefresh globally available
+  const activeDocumentKey = activeDocumentId ? String(activeDocumentId) : null;
+  const activeDraft = activeDocumentKey ? getDraft(activeDocumentKey) : null;
+  const activeSnapshot = activeDocumentKey ? getSnapshot(activeDocumentKey) : null;
+
+  const documentContent = activeDraft?.localUnsavedContent ?? activeSnapshot?.contentMarkdown ?? "";
+  const isLoadingContent = activeDocumentKey
+    ? Boolean(isLoadingByDocumentId[activeDocumentKey])
+    : false;
+  const fetchError = activeDocumentKey
+    ? fetchErrorByDocumentId[activeDocumentKey] ?? null
+    : null;
+  const contentLoadedSuccessfully = activeDocumentKey
+    ? loadedDocumentIds.includes(activeDocumentKey) ||
+      activeDraft?.localUnsavedContent !== undefined ||
+      Boolean(activeSnapshot)
+    : false;
+
+  const documentContentCache = useMemo(() => {
+    const cache = new Map<number, string>();
+
+    Object.entries(snapshotsByDocumentId).forEach(([documentId, snapshot]) => {
+      if (snapshot) {
+        cache.set(Number(documentId), snapshot.contentMarkdown);
+      }
+    });
+
+    Object.entries(draftsByDocumentId).forEach(([documentId, draft]) => {
+      if (draft?.localUnsavedContent !== null && draft?.localUnsavedContent !== undefined) {
+        cache.set(Number(documentId), draft.localUnsavedContent);
+      }
+    });
+
+    return cache;
+  }, [draftsByDocumentId, snapshotsByDocumentId]);
+
   useEffect(() => {
-    (window as any).documentContentCache = documentContentCache;
-    (window as any).triggerEditorRefresh = triggerEditorRefresh;
+    const contentWindow = window as ContentWindowBridge;
+    contentWindow.documentContentCache = documentContentCache;
+    contentWindow.triggerEditorRefresh = triggerEditorRefresh;
     return () => {
-      delete (window as any).documentContentCache;
-      delete (window as any).triggerEditorRefresh;
+      delete contentWindow.documentContentCache;
+      delete contentWindow.triggerEditorRefresh;
     };
   }, [documentContentCache, triggerEditorRefresh]);
 
-  // Fetch document content function
   const fetchDocumentContent = useCallback(
     async (docId: number, forceRefresh = false): Promise<string | null> => {
+      const documentKey = String(docId);
+      const cachedSnapshot = getSnapshot(documentKey);
+      const existingDraft = getDraft(documentKey);
+
       logger.debug(
         `[DOC_FETCH] Request for document ${docId}, forceRefresh: ${forceRefresh}`
       );
-      logger.debug(
-        `[CACHE_STATUS] Size: ${
-          documentContentCache.size
-        } documents, Loaded docs: ${Array.from(loadedDocumentsRef.current).join(
-          ", "
-        )}`
-      );
 
-      // Mark this document as loaded
-      const isFirstLoad = !loadedDocumentsRef.current.has(docId);
+      if (cachedSnapshot && !forceRefresh) {
+        if (!existingDraft) {
+          resetDraftFromSnapshot(documentKey);
+        }
 
-      // Only force refresh on first load for this document
-      const shouldForceRefresh = isFirstLoad && forceRefresh;
-
-      if (isFirstLoad) {
-        logger.debug(
-          `[DOC_LOAD ⚠️] Document ${docId}: First time loading this document`
-        );
-      } else {
-        logger.debug(
-          `[DOC_LOAD ℹ️] Document ${docId}: Document was previously loaded`
-        );
+        return cachedSnapshot.contentMarkdown;
       }
 
-      // Return cached content if available and not force refreshing
-      if (!shouldForceRefresh && documentContentCache.has(docId)) {
-        const cachedContent = documentContentCache.get(docId);
-
-        // Check for undefined instead of truthy to properly handle empty strings
-        if (cachedContent !== undefined) {
-          logger.debug(
-            `[CACHE_HIT ✅] Document ${docId}: Using cached content (${
-              cachedContent?.length ?? 0
-            } chars)`
-          );
-          // Mark document as loaded even when using cache
-          loadedDocumentsRef.current.add(docId);
-
-          // Update state for active document
-          if (docId === activeDocumentId) {
-            setDocumentContent(cachedContent);
-            setContentLoadedSuccessfully(true);
-            // Ensure loading is false when using cache for the active doc
-            setIsLoadingContent(false);
-          }
-
-          return cachedContent;
-        }
-        logger.debug(
-          `[CACHE_INVALID ⚠️] Document ${docId}: Cache entry exists but is undefined, fetching from database`
-        );
-      } else {
-        if (shouldForceRefresh) {
-          logger.debug(
-            `[CACHE_BYPASS ⏭️] Document ${docId}: Force refresh requested (first load)`
-          );
-        } else if (forceRefresh) {
-          logger.debug(
-            `[CACHE_IGNORE ℹ️] Document ${docId}: Force refresh requested but document already loaded, using cache`
-          );
-        } else {
-          logger.debug(`[CACHE_MISS ❌] Document ${docId}: Not in cache`);
-        }
-      }
-
-      try {
-        setIsLoadingContent(true);
-        setFetchError(null);
-        logger.debug(`[DB_FETCH 🔍] Document ${docId}: Fetching from database`);
-
-        const response = await axiosInstance.get(`/api/documents/${docId}`);
-
-        const documentData = response.data;
-        const content = documentData.content || "";
-
-        logger.debug(
-          `[DB_FETCH ✅] Document ${docId}: Received ${content.length} chars from database`
-        );
-
-        // Mark this document as loaded after successful fetch
-        loadedDocumentsRef.current.add(docId);
-
-        // Always cache the content, even if it's empty
-        logger.debug(
-          `[CACHE_UPDATE 📝] Document ${docId}: Storing content in cache (${content.length} chars)`
-        );
-        setDocumentContentCache((prev) => {
-          const newCache = new Map(prev);
-          newCache.set(docId, content); // Always cache, even empty content
-          logger.debug(
-            `[CACHE_STATUS] Updated size: ${newCache.size} documents`
-          );
-          return newCache;
-        });
-
-        // Update state for active document
-        if (docId === activeDocumentId) {
-          setDocumentContent(content);
-          setContentLoadedSuccessfully(true);
-        }
-
-        return content;
-      } catch (err: any) {
-        logger.error(`[DB_FETCH ❌] Document ${docId}: Failed to fetch:`, err);
-        setFetchError(
-          err.response?.data?.detail ||
-            err.message ||
-            "Error al cargar el contenido del documento"
-        );
+      const snapshot = await fetchSnapshot(documentKey, forceRefresh);
+      if (!snapshot) {
         return null;
-      } finally {
-        setIsLoadingContent(false);
       }
+
+      if (!existingDraft || !existingDraft.isDirty) {
+        resetDraftFromSnapshot(documentKey);
+      }
+
+      return snapshot.contentMarkdown;
     },
-    [documentContentCache, activeDocumentId]
+    [fetchSnapshot, getDraft, getSnapshot, resetDraftFromSnapshot]
   );
 
-  // Wrapper for saving content that uses DocumentContext's saveDocument
   const saveContent = useCallback(
     async (docId: number, content: string): Promise<boolean> => {
-      // Normalize line breaks and whitespace before comparing
       const normalizeBreaks = (text: string): string => {
         return text
           .replace(/\r\n/g, "\n")
@@ -203,28 +160,27 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
       };
 
       try {
-        // Check if content in cache is the same (if available)
-        const cachedContent = documentContentCache.get(docId);
+        const documentKey = String(docId);
+        const snapshot = getSnapshot(documentKey);
+        const cachedContent = snapshot?.contentMarkdown;
+
         if (
           cachedContent &&
           normalizeBreaks(cachedContent) === normalizeBreaks(content)
         ) {
-          logger.debug(
-            `[DOC_SAVE] Document ${docId}: Content unchanged from cache, skipping save`
-          );
-          return true; // Return success without API call
+          setDraftContent(documentKey, content);
+          resetDraftFromSnapshot(documentKey);
+          markDraftClean(documentKey);
+          return true;
         }
 
-        // Save via DocumentContext
+        setDraftContent(documentKey, content);
         const success = await saveDocument(docId, content);
 
-        // Update cache after successful save
         if (success) {
-          setDocumentContentCache((prev) => {
-            const newCache = new Map(prev);
-            newCache.set(docId, content);
-            return newCache;
-          });
+          setSnapshot(documentKey, content, snapshot?.version ?? 1);
+          resetDraftFromSnapshot(documentKey);
+          markDraftClean(documentKey);
         }
 
         return success;
@@ -233,62 +189,61 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
     },
-    [documentContentCache, saveDocument]
+    [
+      getSnapshot,
+      markDraftClean,
+      resetDraftFromSnapshot,
+      saveDocument,
+      setDraftContent,
+      setSnapshot,
+    ]
   );
 
-  // Reload content function
   const reloadContent = useCallback(
     async (forceRefresh: boolean = false): Promise<void> => {
       if (activeDocumentId) {
         logger.debug(
           `[RELOAD_CONTENT] Document ${activeDocumentId}, forceRefresh: ${forceRefresh}`
         );
-        await fetchDocumentContent(activeDocumentId, forceRefresh);
+        const documentKey = String(activeDocumentId);
+        const existingDraft = getDraft(documentKey);
+        const content = await fetchDocumentContent(activeDocumentId, forceRefresh);
+
+        if (content !== null && (!existingDraft || !existingDraft.isDirty)) {
+          resetDraftFromSnapshot(documentKey);
+        }
       }
     },
-    [activeDocumentId, fetchDocumentContent]
+    [activeDocumentId, fetchDocumentContent, getDraft, resetDraftFromSnapshot]
   );
 
-  // Load content when active document changes
   useEffect(() => {
     if (activeDocumentId) {
-      fetchDocumentContent(activeDocumentId);
-    } else {
-      setDocumentContent("");
-      setContentLoadedSuccessfully(false);
+      void fetchDocumentContent(activeDocumentId);
     }
   }, [activeDocumentId, fetchDocumentContent]);
 
-  // Clear cache when component unmounts
   useEffect(() => {
     return () => {
       logger.debug(`[CACHE_CLEAR 🧹] ContentContext unmounting, clearing cache`);
     };
   }, []);
 
-  // Add new function to update document content directly (for real-time updates)
   const updateDocumentContent = useCallback(
     (docId: number, content: string) => {
-      // Only update if it's the active document
-      if (docId === activeDocumentId) {
-        logger.debug(
-          `[CONTENT_UPDATE] Directly updating content for document ${docId}`
-        );
-        setDocumentContent(content);
-        setContentLoadedSuccessfully(true);
-      }
+      const documentKey = String(docId);
+      const existingDraft = getDraft(documentKey);
+      const snapshot = getSnapshot(documentKey);
 
-      // Update the cache regardless
-      setDocumentContentCache((prev) => {
-        const newCache = new Map(prev);
-        newCache.set(docId, content);
-        return newCache;
-      });
+      setSnapshot(documentKey, content, snapshot?.version ?? 1);
+
+      if (!existingDraft || !existingDraft.isDirty) {
+        resetDraftFromSnapshot(documentKey);
+      }
     },
-    [activeDocumentId]
+    [getDraft, getSnapshot, resetDraftFromSnapshot, setSnapshot]
   );
 
-  // Create the context value
   const value: ContentContextType = {
     documentContent,
     isLoadingContent,
@@ -296,12 +251,12 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
     contentLoadedSuccessfully,
     documentContentCache,
     editorRefreshTrigger,
-    loadedDocumentIds: Array.from(loadedDocumentsRef.current),
+    loadedDocumentIds: loadedDocumentIds.map((documentId) => Number(documentId)),
     fetchDocumentContent,
     reloadContent,
     triggerEditorRefresh,
     saveContent,
-    updateDocumentContent, // Include the new function
+    updateDocumentContent,
   };
 
   return (

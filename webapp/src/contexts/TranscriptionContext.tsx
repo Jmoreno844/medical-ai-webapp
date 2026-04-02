@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -11,6 +12,7 @@ import { useVoiceRecorder } from "../features/encuentroHeader/hooks/audio/useVoi
 import { useContentContext } from "./ContentContext";
 import { useEncuentroContext } from "./EncuentroContext";
 import { logger } from "@/lib/logger";
+import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -64,14 +66,48 @@ export function TranscriptionProvider({
   const [transcriptionCompleteTimestamp, setTranscriptionCompleteTimestamp] =
     useState<number | null>(null);
   const [hasBeenTranscribed, setHasBeenTranscribed] = useState(false);
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [transcriptionStatus, setTranscriptionStatus] = useState<
-    "idle" | "pending" | "success" | "error"
-  >("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const previousEncounterIdRef = useRef<number | null>(null);
+  const activeTranscriptionDocumentId = useDocumentDerivedStore(
+    (state) => state.activeTranscriptionDocumentId
+  );
+  const derivedByDocumentId = useDocumentDerivedStore(
+    (state) => state.derivedByDocumentId
+  );
+  const startTranscriptionStream = useDocumentDerivedStore(
+    (state) => state.startTranscription
+  );
+  const updateTranscriptionContent = useDocumentDerivedStore(
+    (state) => state.updateTranscriptionContent
+  );
+  const completeTranscription = useDocumentDerivedStore(
+    (state) => state.completeTranscription
+  );
+  const failTranscription = useDocumentDerivedStore(
+    (state) => state.failTranscription
+  );
+  const clearDocumentDerivedState = useDocumentDerivedStore(
+    (state) => state.clearDocumentDerivedState
+  );
+
+  const transcriptionDerivedState = useMemo(() => {
+    if (transcriptionDocId) {
+      return derivedByDocumentId[String(transcriptionDocId)] ?? null;
+    }
+
+    if (activeTranscriptionDocumentId) {
+      return derivedByDocumentId[activeTranscriptionDocumentId] ?? null;
+    }
+
+    return null;
+  }, [activeTranscriptionDocumentId, derivedByDocumentId, transcriptionDocId]);
+
+  const transcriptionStatus =
+    transcriptionDerivedState?.transcriptionStatus ?? "idle";
+  const isTranscribing = Boolean(transcriptionDerivedState?.inProgress);
+  const effectiveErrorMessage = transcriptionDerivedState?.error ?? errorMessage;
 
   // Transcription owns the streaming lifecycle for encounter detail so feature
   // components only consume shared state instead of creating parallel SSE flows.
@@ -100,39 +136,52 @@ export function TranscriptionProvider({
   );
 
   const handleTranscriptionComplete = useCallback(() => {
-    setTranscriptionCompleteTimestamp(Date.now());
-    setHasBeenTranscribed(true);
+    const complete = async () => {
+      setTranscriptionCompleteTimestamp(Date.now());
+      setHasBeenTranscribed(true);
 
-    updateEncuentro({ has_been_transcribed: true }).catch((error) =>
-      logger.error(
-        "[TRANSCRIPTION] Error updating has_been_transcribed:",
-        error
-      )
-    );
+      updateEncuentro({ has_been_transcribed: true }).catch((error) =>
+        logger.error(
+          "[TRANSCRIPTION] Error updating has_been_transcribed:",
+          error
+        )
+      );
 
-    if (!transcriptionDocId) {
-      return;
-    }
+      if (!transcriptionDocId) {
+        return;
+      }
 
-    if (window.documentContentCache) {
-      window.documentContentCache.delete(transcriptionDocId);
-    }
+      if (window.documentContentCache) {
+        window.documentContentCache.delete(transcriptionDocId);
+      }
 
-    contentContext
-      .fetchDocumentContent(transcriptionDocId, true)
-      .then(() => {
+      try {
+        const refreshedContent = await contentContext.fetchDocumentContent(
+          transcriptionDocId,
+          true
+        );
+        completeTranscription(
+          String(transcriptionDocId),
+          refreshedContent ?? undefined
+        );
         contentContext.triggerEditorRefresh();
-      })
-      .catch((error) => {
+      } catch (error) {
         logger.error("[TRANSCRIPTION] Error fetching updated content:", error);
-      });
-  }, [contentContext, transcriptionDocId, updateEncuentro]);
+        completeTranscription(String(transcriptionDocId));
+      }
+    };
+
+    void complete();
+  }, [completeTranscription, contentContext, transcriptionDocId, updateEncuentro]);
 
   const resetTranscriptionState = useCallback(() => {
-    setTranscriptionStatus("idle");
     setErrorMessage(null);
-    setIsTranscribing(false);
-  }, []);
+    if (transcriptionDocId) {
+      clearDocumentDerivedState(String(transcriptionDocId));
+    } else if (activeTranscriptionDocumentId) {
+      clearDocumentDerivedState(activeTranscriptionDocumentId);
+    }
+  }, [activeTranscriptionDocumentId, clearDocumentDerivedState, transcriptionDocId]);
 
   useEffect(() => {
     return () => {
@@ -241,9 +290,10 @@ export function TranscriptionProvider({
       try {
         const token = await getSSEToken(documentId);
         if (!token) {
-          setErrorMessage(
-            "No se pudo autenticar para las actualizaciones en tiempo real"
-          );
+          const message =
+            "No se pudo autenticar para las actualizaciones en tiempo real";
+          setErrorMessage(message);
+          failTranscription(String(documentId), message);
           return false;
         }
 
@@ -251,6 +301,7 @@ export function TranscriptionProvider({
         const sseUrl = `${apiBaseUrl}/api/sse/document/${documentId}/${token}`;
         const eventSource = new EventSource(sseUrl);
         eventSourceRef.current = eventSource;
+        startTranscriptionStream(String(documentId));
 
         eventSource.onopen = () => {
           logger.debug(
@@ -264,26 +315,13 @@ export function TranscriptionProvider({
             const data = JSON.parse(event.data);
 
             if (data.event === "transcription_complete") {
-              setTranscriptionStatus("success");
               handleTranscriptionComplete();
               closeEventSource();
               return;
             }
 
-            if (
-              data.event === "transcription_update" &&
-              data.content &&
-              transcriptionDocId
-            ) {
-              if (window.documentContentCache) {
-                window.documentContentCache.set(transcriptionDocId, data.content);
-              }
-
-              contentContext.updateDocumentContent(
-                transcriptionDocId,
-                data.content
-              );
-              contentContext.triggerEditorRefresh();
+            if (data.event === "transcription_update" && data.content) {
+              updateTranscriptionContent(String(documentId), data.content);
             }
           } catch (error) {
             logger.error("[TRANSCRIPTION] Error parsing SSE message:", error);
@@ -292,23 +330,29 @@ export function TranscriptionProvider({
 
         eventSource.onerror = (error) => {
           logger.error("[TRANSCRIPTION] SSE connection error:", error);
-          setErrorMessage("Error en la conexión de actualizaciones en tiempo real");
+          const message = "Error en la conexión de actualizaciones en tiempo real";
+          setErrorMessage(message);
+          failTranscription(String(documentId), message);
           closeEventSource();
         };
 
         return true;
       } catch (error) {
         logger.error("[TRANSCRIPTION] Error creating SSE connection:", error);
-        setErrorMessage("No se pudieron establecer las actualizaciones en tiempo real");
+        const message =
+          "No se pudieron establecer las actualizaciones en tiempo real";
+        setErrorMessage(message);
+        failTranscription(String(documentId), message);
         return false;
       }
     },
     [
       closeEventSource,
-      contentContext,
+      failTranscription,
       getSSEToken,
       handleTranscriptionComplete,
-      transcriptionDocId,
+      startTranscriptionStream,
+      updateTranscriptionContent,
     ]
   );
 
@@ -318,17 +362,21 @@ export function TranscriptionProvider({
         setErrorMessage(
           "Falta el ID del documento de transcripción o del encuentro"
         );
-        setTranscriptionStatus("error");
         return;
       }
 
-      setIsTranscribing(true);
-      setTranscriptionStatus("pending");
       setErrorMessage(null);
       setTranscriptionDocId(id_documento_transcripcion);
 
       try {
-        await subscribeToTranscriptionUpdates(id_documento_transcripcion);
+        const subscribed = await subscribeToTranscriptionUpdates(
+          id_documento_transcripcion
+        );
+        if (!subscribed) {
+          throw new Error(
+            "No se pudieron preparar las actualizaciones en tiempo real"
+          );
+        }
 
         const response = await axiosInstance.post(
           `/api/transcription/start`,
@@ -343,23 +391,21 @@ export function TranscriptionProvider({
         return response.data;
       } catch (error: unknown) {
         logger.error("Transcription error:", error);
-        setTranscriptionStatus("error");
         const apiError = error as {
           response?: { data?: { message?: string } };
           message?: string;
         };
-        setErrorMessage(
+        const message =
           apiError.response?.data?.message ||
-            apiError.message ||
-            "Error al transcribir el audio"
-        );
+          apiError.message ||
+          "Error al transcribir el audio";
+        setErrorMessage(message);
+        failTranscription(String(id_documento_transcripcion), message);
         closeEventSource();
         throw error;
-      } finally {
-        setIsTranscribing(false);
       }
     },
-    [closeEventSource, subscribeToTranscriptionUpdates]
+    [closeEventSource, failTranscription, subscribeToTranscriptionUpdates]
   );
 
   /**
@@ -419,7 +465,10 @@ export function TranscriptionProvider({
       )
     );
     setHasBeenTranscribed(false);
-  }, [updateEncuentro, voiceRecorder]);
+    if (transcriptionDocId) {
+      clearDocumentDerivedState(String(transcriptionDocId));
+    }
+  }, [clearDocumentDerivedState, transcriptionDocId, updateEncuentro, voiceRecorder]);
 
   const deleteRecording = useCallback(async () => {
     await voiceRecorder.deleteRecording();
@@ -438,7 +487,7 @@ export function TranscriptionProvider({
     isDeleting: voiceRecorder.isDeleting,
     isTranscribing,
     transcriptionStatus,
-    errorMessage,
+    errorMessage: effectiveErrorMessage,
     startRecording,
     stopRecording,
     pauseResumeRecording: voiceRecorder.pauseResumeRecording,

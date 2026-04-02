@@ -20,6 +20,9 @@ import { useDocumentContext } from "../../../contexts/DocumentContext";
 import { useContentContext } from "../../../contexts/ContentContext";
 import { useGenerationContext } from "../../../contexts/GenerationContext";
 import { useTranscriptionContext } from "../../../contexts/TranscriptionContext";
+import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
+import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
+import { usePatchStore } from "@/workspace/stores/patchStore";
 
 // Import utilities
 import { createEditorConfig } from "./utils/editorConfig";
@@ -42,6 +45,13 @@ const TextArea: React.FC = () => {
 
   const { generationStatus } = useGenerationContext();
   const { transcriptionCompleteTimestamp } = useTranscriptionContext();
+  const setDraftContent = useDocumentDraftStore((state) => state.setDraftContent);
+  const derivedByDocumentId = useDocumentDerivedStore(
+    (state) => state.derivedByDocumentId
+  );
+  const previewContentByDocumentId = usePatchStore(
+    (state) => state.previewContentByDocumentId
+  );
 
   // Local state & refs
   const [showGenerationSuccess, setShowGenerationSuccess] = useState(false);
@@ -115,6 +125,13 @@ const TextArea: React.FC = () => {
     [saveContent, contentLoadedSuccessfully]
   );
 
+  const handleDraftChange = useCallback(
+    (docId: number, content: string) => {
+      setDraftContent(String(docId), content);
+    },
+    [setDraftContent]
+  );
+
   // Track document changes
   useEffect(() => {
     if (!activeDocument) return;
@@ -159,15 +176,30 @@ const TextArea: React.FC = () => {
   // Create editor configuration
   const initialConfig = createEditorConfig(onError);
 
-  // Check if content is being streamed for this document
-  const isStreamingActiveDocument =
-    activeDocument &&
-    generationStatus?.documentId === activeDocument.id &&
-    generationStatus.inProgress;
+  const activeDerivedState = derivedByDocumentId[String(activeDocument.id)] ?? null;
+  const patchPreviewContent =
+    previewContentByDocumentId[String(activeDocument.id)] ??
+    activeDerivedState?.patchPreviewContent;
 
-  const streamingContent = isStreamingActiveDocument
-    ? generationStatus.content
-    : undefined;
+  const editorMode =
+    patchPreviewContent !== null && patchPreviewContent !== undefined
+      ? "patch_review"
+      : activeDerivedState?.editorMode === "streaming_preview" &&
+        activeDerivedState.inProgress
+      ? "streaming_preview"
+      : activeDocument.kind === "transcription"
+      ? "read_only"
+      : "edit";
+
+  const derivedContent =
+    editorMode === "patch_review"
+      ? patchPreviewContent ?? undefined
+      : editorMode === "streaming_preview"
+      ? activeDerivedState?.streamingContent
+      : undefined;
+
+  const isStreamingActiveDocument = editorMode === "streaming_preview";
+  const isPatchPreviewMode = editorMode === "patch_review";
 
   return (
     <div className="flex flex-col h-full">
@@ -179,41 +211,49 @@ const TextArea: React.FC = () => {
       )}
 
       {/* Streaming indicator */}
-      {streamingContent !== undefined && (
+      {isStreamingActiveDocument && (
         <div className="bg-purple-100 p-2 border-b border-purple-200">
           <div className="flex items-center justify-between">
             <div className="w-24 invisible"></div>
             <div className="flex items-center">
               <div className="animate-pulse h-3 w-3 rounded-full bg-purple-500 mr-2"></div>
               <span className="text-purple-800 font-medium">
-                Generando documento…
+                {activeDerivedState?.source === "transcription"
+                  ? "Transcribiendo documento…"
+                  : "Generando documento…"}
               </span>
             </div>
             <div className="text-purple-600 text-sm w-24 text-right">
-              {streamingContent.length} caracteres
+              {derivedContent?.length ?? 0} caracteres
             </div>
           </div>
 
-          {generationStatus?.error && (
+          {activeDerivedState?.error && (
             <div className="mt-2 p-2 bg-red-100 text-red-700 rounded text-sm">
-              <strong>Error:</strong> {generationStatus.error}
+              <strong>Error:</strong> {activeDerivedState.error}
             </div>
           )}
         </div>
       )}
 
       {/* Progress bar */}
-      {streamingContent !== undefined && (
+      {isStreamingActiveDocument && (
         <div className="h-1 w-full bg-purple-200">
           <div
             className="h-1 bg-purple-600 transition-all duration-300"
             style={{
               width: `${Math.min(
-                Math.max((streamingContent.length / 500) * 100, 10),
+                Math.max((((derivedContent ?? "").length || 0) / 500) * 100, 10),
                 95
               )}%`,
             }}
           />
+        </div>
+      )}
+
+      {isPatchPreviewMode && (
+        <div className="bg-amber-100 p-2 border-b border-amber-200 text-amber-900 text-sm text-center font-medium">
+          Vista previa de patch en modo solo lectura
         </div>
       )}
 
@@ -274,25 +314,22 @@ const TextArea: React.FC = () => {
               isLoading={isLoadingContent}
               refreshTrigger={editorRefreshTrigger}
               forceRefresh={false}
-              streamingContent={streamingContent}
+              derivedContent={derivedContent}
               documentType={activeDocument.kind}
             />
             <ReadOnlyPlugin
-              isReadOnly={
-                activeDocument.kind === "transcription" ||
-                isStreamingActiveDocument
-              }
+              isReadOnly={editorMode !== "edit"}
             />
 
             {/* Conditional plugins for edit mode */}
-            {activeDocument.kind !== "transcription" &&
-              !isStreamingActiveDocument && (
+            {editorMode === "edit" && (
               <>
                 <AutoFocusPlugin />
                 {/* Generated note content is owned by GenerationContext while
                     SSE is active, so autosave should wait until streaming ends. */}
                 <AutoSavePlugin
                   onSave={handleSave}
+                  onDraftChange={handleDraftChange}
                   documentId={activeDocument.id}
                   hasInitialContent={contentLoadedSuccessfully}
                 />

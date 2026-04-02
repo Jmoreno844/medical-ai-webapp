@@ -111,9 +111,10 @@ Antes de hablar de `WorkspaceStore`, `DocumentSnapshot` o `DocumentPatch`, hay q
 
 Hoy el flujo real del encounter detail ya tiene una base útil:
 
-- `DocumentContext` es dueño de la lista de documentos y del documento activo
-- `ContentContext` es dueño del contenido cargado y del cache por documento
-- `GenerationContext` y `TranscriptionContext` son dueños de SSE y side effects largos
+- `WorkspaceStore` ya es dueño de tabs y documento activo
+- `ContentContext` ya opera como bridge sobre `DocumentSnapshotStore` + `DocumentDraftStore`
+- `DocumentDerivedStore` ya empezó a absorber streaming y modo del editor
+- `GenerationContext` y `TranscriptionContext` siguen siendo dueños del lifecycle SSE y side effects largos
 - `Lexical` renderiza y edita, pero no debería consolidarse como fuente de verdad
 - el backend actual sigue teniendo `documents.content` como contenido canónico persistido
 
@@ -153,6 +154,12 @@ La transición correcta es:
 - `GenerationContext` -> primer candidato a `DocumentDerivedStore`
 - `TranscriptionContext` -> flujo especializado read-only conectado a stores del workspace
 - `Lexical` -> vista/edición del draft actual
+
+### Estado de avance real del repo
+
+- `Plan 1-2`: base de `Zustand`, `WorkspaceStore` y bridge de `DocumentContext` ya aterrizados
+- `Plan 3`: `snapshot + draft` y parte de la integración con `Lexical` ya aterrizados
+- siguiente prioridad práctica: cerrar ownership de `derived`, `WorkspaceIndex`, `AiSessionStore` y `PatchStore` antes de abrir el runtime del agente
 
 Este mapeo es importante porque permite avanzar sin exigir una migración total en el primer slice.
 

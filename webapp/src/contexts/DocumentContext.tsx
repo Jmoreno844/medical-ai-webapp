@@ -4,11 +4,19 @@ import React, {
   useState,
   useEffect,
   useCallback,
-  useRef,
+  useMemo,
 } from "react";
+import axios from "axios";
 import { DocumentoOut } from "@/types/documento";
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { logger } from "@/lib/logger";
+import { adaptWorkspaceDocumentToDocumentoOut } from "@/workspace/adapters/documentAdapter";
+import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
+import { useDocumentSnapshotStore } from "@/workspace/stores/documentSnapshotStore";
+import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
+import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
+import { usePatchStore } from "@/workspace/stores/patchStore";
+import { useAiSessionStore } from "@/workspace/stores/aiSessionStore";
 
 // Define the context type
 type DocumentContextType = {
@@ -38,6 +46,18 @@ const DocumentContext = createContext<DocumentContextType | undefined>(
   undefined
 );
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data?.detail ?? error.message ?? fallback;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
 // Create the provider
 export function DocumentProvider({
   children,
@@ -46,18 +66,75 @@ export function DocumentProvider({
   children: React.ReactNode;
   encounterId: number;
 }) {
-  const [documents, setDocuments] = useState<DocumentoOut[]>([]);
-  const [activeDocumentId, setActiveDocumentId] = useState<number | null>(null);
-  const [loading, setLoading] = useState<boolean>(false); // Changed initial state to false
-  const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [pendingSave, setPendingSave] = useState<{
     id: number;
     content: string;
   } | null>(null);
 
-  // Add ref to track loaded encounter
-  const loadedEncounterIdRef = useRef<number | null>(null);
+  const documentOrder = useWorkspaceStore((state) => state.documentOrder);
+  const documentsById = useWorkspaceStore((state) => state.documentsById);
+  const activeWorkspaceDocumentId = useWorkspaceStore(
+    (state) => state.activeDocumentId
+  );
+  const loading = useWorkspaceStore((state) => state.loading);
+  const error = useWorkspaceStore((state) => state.error);
+  const loadedEncounterId = useWorkspaceStore((state) => state.loadedEncounterId);
+  const bootstrapEncounterDocuments = useWorkspaceStore(
+    (state) => state.bootstrapEncounterDocuments
+  );
+  const setActiveDocument = useWorkspaceStore((state) => state.setActiveDocument);
+  const addDocumentToWorkspace = useWorkspaceStore((state) => state.addDocument);
+  const removeDocumentFromWorkspace = useWorkspaceStore(
+    (state) => state.removeDocument
+  );
+  const upsertDocumentInWorkspace = useWorkspaceStore(
+    (state) => state.upsertDocument
+  );
+  const clearEncounterWorkspace = useWorkspaceStore(
+    (state) => state.clearEncounterWorkspace
+  );
+  const setWorkspaceLoading = useWorkspaceStore(
+    (state) => state.setWorkspaceLoading
+  );
+  const setWorkspaceError = useWorkspaceStore((state) => state.setWorkspaceError);
+  const clearSnapshots = useDocumentSnapshotStore(
+    (state) => state.clearSnapshots
+  );
+  const clearDrafts = useDocumentDraftStore((state) => state.clearDrafts);
+  const clearDerivedState = useDocumentDerivedStore(
+    (state) => state.clearDerivedState
+  );
+  const clearPatches = usePatchStore((state) => state.clearPatches);
+  const clearSession = useAiSessionStore((state) => state.clearSession);
+
+  // Tabs and active document now live in WorkspaceStore; this context remains
+  // as a temporary bridge so the rest of the encounter detail can migrate
+  // without a flag day refactor.
+  const documents = useMemo(
+    () =>
+      documentOrder
+        .map((documentId) => documentsById[documentId])
+        .filter(Boolean)
+        .map((document) =>
+        adaptWorkspaceDocumentToDocumentoOut(document)
+      ),
+    [documentOrder, documentsById]
+  );
+
+  const activeDocument = useMemo(
+    () =>
+      activeWorkspaceDocumentId && documentsById[activeWorkspaceDocumentId]
+        ? adaptWorkspaceDocumentToDocumentoOut(
+            documentsById[activeWorkspaceDocumentId]
+          )
+        : null,
+    [activeWorkspaceDocumentId, documentsById]
+  );
+
+  const activeDocumentId = activeWorkspaceDocumentId
+    ? Number(activeWorkspaceDocumentId)
+    : null;
 
   /**
    * Fetch all documents for an encounter
@@ -73,8 +150,8 @@ export function DocumentProvider({
     logger.debug(
       `[DOC_CONTEXT] Attempting to fetch documents for encounter ${encounterId}`
     );
-    setLoading(true);
-    setError(null);
+    setWorkspaceLoading(true);
+    setWorkspaceError(null);
 
     try {
       const response = await axiosInstance.get(
@@ -85,38 +162,26 @@ export function DocumentProvider({
       logger.debug(
         `[DOC_CONTEXT] Successfully fetched ${data.length} documents for encounter ${encounterId}`
       );
-      setDocuments(data);
-      loadedEncounterIdRef.current = encounterId;
-
-      setActiveDocumentId((prevActiveId) => {
-        if (data.length > 0 && !prevActiveId) {
-          const sortedDocs = [...data].sort((a, b) => {
-            const dateA = new Date(a.created_on).getTime();
-            const dateB = new Date(b.created_on).getTime();
-            if (dateA !== dateB) return dateA - dateB;
-            return a.id - b.id;
-          });
-          return sortedDocs[0].id;
-        }
-        return prevActiveId;
-      });
-
-      setError(null);
-    } catch (err: any) {
+      bootstrapEncounterDocuments(encounterId, data);
+      setWorkspaceError(null);
+    } catch (err: unknown) {
       logger.error(
         `[DOC_CONTEXT] Failed to fetch documents for encounter ${encounterId}:`,
         err
       );
-      setError(
-        err.response?.data?.detail ||
-          err.message ||
-          "Error desconocido al cargar los documentos"
+      setWorkspaceError(
+        getErrorMessage(err, "Error desconocido al cargar los documentos")
       );
-      loadedEncounterIdRef.current = null;
     } finally {
-      setLoading(false);
+      setWorkspaceLoading(false);
     }
-  }, [encounterId, loading]);
+  }, [
+    encounterId,
+    loading,
+    bootstrapEncounterDocuments,
+    setWorkspaceError,
+    setWorkspaceLoading,
+  ]);
 
   /**
    * Select a document as active
@@ -126,69 +191,67 @@ export function DocumentProvider({
   const selectDocument = useCallback(
     (docId: number) => {
       if (activeDocumentId !== docId) {
-        setActiveDocumentId(docId);
+        setActiveDocument(String(docId));
       }
     },
-    [activeDocumentId]
+    [activeDocumentId, setActiveDocument]
   );
 
   /**
    * Save document content to the server
    */
-  const saveDocument = useCallback(async (docId: number, content: string) => {
-    try {
-      setIsSaving(true);
-      logger.debug(
-        `[DOC_SAVE] Document ${docId}: Saving content (${content.length} chars)`
-      );
+  const saveDocument = useCallback(
+    async (docId: number, content: string) => {
+      try {
+        setIsSaving(true);
+        logger.debug(
+          `[DOC_SAVE] Document ${docId}: Saving content (${content.length} chars)`
+        );
 
-      // Final content preparation - strip all HTML if it exists
-      let finalContent = content;
+        let finalContent = content;
 
-      // If content appears to have any HTML tags, completely strip them
-      if (finalContent.includes("<") && finalContent.includes(">")) {
-        try {
-          // Use DOM to strip all HTML
-          const tempDiv = document.createElement("div");
-          tempDiv.innerHTML = content;
-          finalContent = tempDiv.textContent || "";
-          logger.debug(`[DOC_SAVE] Document ${docId}: Stripped HTML tags`);
-        } catch (e) {
-          // Fallback: Use regex to strip HTML tags
-          finalContent = content.replace(/<[^>]*>/g, "");
-          logger.debug(
-            `[DOC_SAVE] Document ${docId}: Stripped HTML tags (regex fallback)`
+        if (finalContent.includes("<") && finalContent.includes(">")) {
+          try {
+            const tempDiv = document.createElement("div");
+            tempDiv.innerHTML = content;
+            finalContent = tempDiv.textContent || "";
+            logger.debug(`[DOC_SAVE] Document ${docId}: Stripped HTML tags`);
+          } catch {
+            finalContent = content.replace(/<[^>]*>/g, "");
+            logger.debug(
+              `[DOC_SAVE] Document ${docId}: Stripped HTML tags (regex fallback)`
+            );
+          }
+        }
+
+        logger.debug(
+          `[DOC_SAVE] Document ${docId}: Final content length: ${finalContent.length} chars`
+        );
+
+        await axiosInstance.patch(`/api/documents/by-editor/${docId}`, {
+          content: finalContent,
+        });
+
+        const currentDocument = documents.find((doc) => doc.id === docId);
+        if (currentDocument) {
+          upsertDocumentInWorkspace(
+            { ...currentDocument, content: finalContent },
+            encounterId
           );
         }
+
+        logger.debug(`[DOC_SAVE ✅] Document ${docId}: Saved successfully`);
+        return true;
+      } catch (err: unknown) {
+        logger.error(`[DOC_SAVE ❌] Document ${docId}: Error saving:`, err);
+        setPendingSave({ id: docId, content });
+        throw err;
+      } finally {
+        setIsSaving(false);
       }
-
-      logger.debug(
-        `[DOC_SAVE] Document ${docId}: Final content length: ${finalContent.length} chars`
-      );
-
-      // Send the update
-      await axiosInstance.patch(`/api/documents/by-editor/${docId}`, {
-        content: finalContent,
-      });
-
-      // Update local document data
-      setDocuments((docs) =>
-        docs.map((doc) =>
-          doc.id === docId ? { ...doc, content: finalContent } : doc
-        )
-      );
-
-      logger.debug(`[DOC_SAVE ✅] Document ${docId}: Saved successfully`);
-      return true;
-    } catch (err: any) {
-      logger.error(`[DOC_SAVE ❌] Document ${docId}: Error saving:`, err);
-      // Store failed save for retry
-      setPendingSave({ id: docId, content });
-      throw err; // Re-throw to allow handling in components
-    } finally {
-      setIsSaving(false);
-    }
-  }, []);
+    },
+    [documents, encounterId, upsertDocumentInWorkspace]
+  );
 
   /**
    * Create a new document for the encounter
@@ -200,7 +263,7 @@ export function DocumentProvider({
   const createDocument = useCallback(
     async (documentType: string, content: string = "") => {
       try {
-        setLoading(true);
+        setWorkspaceLoading(true);
         const response = await axiosInstance.post("/api/documents", {
           encounter_id: encounterId,
           kind: documentType,
@@ -209,26 +272,19 @@ export function DocumentProvider({
 
         const newDocument = response.data;
 
-        // Update documents list with the new document
-        setDocuments((docs) => [...docs, newDocument]);
-
-        // Select the new document
-        setActiveDocumentId(newDocument.id);
+        addDocumentToWorkspace(newDocument, encounterId);
+        setActiveDocument(String(newDocument.id));
 
         return newDocument;
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("Failed to create document:", err);
-        setError(
-          err.response?.data?.detail ||
-            err.message ||
-            "Error al crear el documento"
-        );
+        setWorkspaceError(getErrorMessage(err, "Error al crear el documento"));
         return null;
       } finally {
-        setLoading(false);
+        setWorkspaceLoading(false);
       }
     },
-    [encounterId]
+    [encounterId, addDocumentToWorkspace, setActiveDocument, setWorkspaceError, setWorkspaceLoading]
   );
 
   /**
@@ -240,79 +296,64 @@ export function DocumentProvider({
   const deleteDocument = useCallback(
     async (docId: number) => {
       try {
-        setLoading(true);
+        setWorkspaceLoading(true);
         await axiosInstance.delete(`/api/documents/${docId}`);
-
-        // Remove document from local state
-        setDocuments((docs) => docs.filter((doc) => doc.id !== docId));
-
-        // If we deleted the active document, select another one
-        if (activeDocumentId === docId) {
-          const remainingDocs = documents.filter((doc) => doc.id !== docId);
-          setActiveDocumentId(
-            remainingDocs.length > 0 ? remainingDocs[0].id : null
-          );
-        }
+        removeDocumentFromWorkspace(String(docId));
 
         return true;
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("Failed to delete document:", err);
-        setError(
-          err.response?.data?.detail ||
-            err.message ||
-            "Error al eliminar el documento"
+        setWorkspaceError(
+          getErrorMessage(err, "Error al eliminar el documento")
         );
         return false;
       } finally {
-        setLoading(false);
+        setWorkspaceLoading(false);
       }
     },
-    [activeDocumentId, documents]
+    [removeDocumentFromWorkspace, setWorkspaceError, setWorkspaceLoading]
   );
 
-  // Add a function to add a new document to the documents list
   const addDocument = useCallback((newDocument: DocumentoOut) => {
-    setDocuments((prev) => [...prev, newDocument]);
-  }, []);
+    addDocumentToWorkspace(newDocument, encounterId);
+  }, [addDocumentToWorkspace, encounterId]);
 
-  // Load documents when encounterId changes AND check loaded ref
+  const clearEncounterScopedState = useCallback(() => {
+    clearSnapshots();
+    clearDrafts();
+    clearDerivedState();
+    clearPatches();
+    clearSession();
+  }, [clearDerivedState, clearDrafts, clearPatches, clearSession, clearSnapshots]);
+
   useEffect(() => {
     if (encounterId) {
-      if (encounterId !== loadedEncounterIdRef.current) {
+      if (String(encounterId) !== loadedEncounterId) {
         logger.debug(
-          `[DOC_CONTEXT] Encounter changed to ${encounterId} (previously loaded: ${loadedEncounterIdRef.current}). Fetching documents.`
+          `[DOC_CONTEXT] Encounter changed to ${encounterId} (previously loaded: ${loadedEncounterId}). Fetching documents.`
         );
-        fetchDocuments(); // Initiate fetch
+        clearEncounterScopedState();
+        void fetchDocuments();
       } else {
         logger.debug(
           `[DOC_CONTEXT] Encounter ${encounterId} documents already loaded. Skipping fetch.`
         );
-        // Ensure loading state is correct if we skipped fetch but it might have been true
-        if (loading) setLoading(false);
       }
     } else {
-      // Handle encounterId becoming null/invalid
       logger.debug(
         `[DOC_CONTEXT] encounterId is null or invalid. Resetting state.`
       );
-      setDocuments([]);
-      setActiveDocumentId(null);
-      loadedEncounterIdRef.current = null;
-      setLoading(false); // Ensure loading is false
-      setError(null);
+      clearEncounterScopedState();
+      clearEncounterWorkspace();
     }
+  }, [
+    encounterId,
+    loadedEncounterId,
+    fetchDocuments,
+    clearEncounterScopedState,
+    clearEncounterWorkspace,
+  ]);
 
-    // Cleanup function (optional) - no changes needed here
-    return () => {
-      // logger.debug(`[DOC_CONTEXT] Cleanup for encounter effect (current encounterId: ${encounterId})`);
-    };
-  }, [encounterId, fetchDocuments]); // NEW - Corrected dependency array
-
-  // Get the active document
-  const activeDocument =
-    documents.find((doc) => doc.id === activeDocumentId) || null;
-
-  // Create the context value
   const value: DocumentContextType = {
     documents,
     activeDocument,

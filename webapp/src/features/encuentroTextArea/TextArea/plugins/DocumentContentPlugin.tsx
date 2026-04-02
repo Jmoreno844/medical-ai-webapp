@@ -1,7 +1,11 @@
 import React, { useEffect, useRef } from "react";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $getRoot, $createParagraphNode, $createTextNode } from "lexical";
-import { $convertFromMarkdownString, TRANSFORMERS } from "@lexical/markdown";
+import {
+  $convertFromMarkdownString,
+  $convertToMarkdownString,
+  TRANSFORMERS,
+} from "@lexical/markdown";
 
 import { logger } from "@/lib/logger";
 interface DocumentContentPluginProps {
@@ -10,7 +14,7 @@ interface DocumentContentPluginProps {
   isLoading: boolean;
   refreshTrigger?: number;
   forceRefresh?: boolean;
-  streamingContent?: string;
+  derivedContent?: string;
   documentType?: string;
 }
 
@@ -19,8 +23,7 @@ export function DocumentContentPlugin({
   content,
   isLoading,
   refreshTrigger,
-  forceRefresh: _forceRefresh = false,
-  streamingContent,
+  derivedContent,
   documentType,
 }: DocumentContentPluginProps): React.ReactElement | null {
   const [editor] = useLexicalComposerContext();
@@ -62,9 +65,20 @@ export function DocumentContentPlugin({
 
         // Apply content when not loading
         if (!isLoading) {
-          const newContent = streamingContent ?? content;
+          const newContent = derivedContent ?? content;
 
           if (newContent !== lastAppliedContentRef.current) {
+            const currentEditorMarkdown = $convertToMarkdownString(TRANSFORMERS);
+
+            if (
+              !isDocumentChanged &&
+              !derivedContent &&
+              currentEditorMarkdown === newContent
+            ) {
+              lastAppliedContentRef.current = newContent;
+              return;
+            }
+
             logger.debug(
               `📄 Applying content: Doc ${documentId}, content length: ${
                 newContent?.length ?? 0
@@ -101,7 +115,7 @@ export function DocumentContentPlugin({
     documentId,
     content,
     isLoading,
-    streamingContent,
+    derivedContent,
     editor,
     documentType,
     refreshTrigger,
