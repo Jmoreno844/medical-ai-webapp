@@ -22,3 +22,6 @@ infra/**/*.tfstate
 infra/**/*.tfstate.*
 infra/**/.terraform.lock.hcl
 infra/bootstrap/.secrets/
+
+# Local helper binaries
+/bin/cloud-sql-proxy
