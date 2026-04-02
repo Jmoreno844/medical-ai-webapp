@@ -197,13 +197,16 @@ DATABASES = {"default": database_config}
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 if os.environ.get("ENABLE_SILK", "false").lower() == "true":
-    INSTALLED_APPS += ["silk"]  # noqa: F405
+    if "silk" not in INSTALLED_APPS:  # noqa: F405
+        INSTALLED_APPS += ["silk"]  # noqa: F405
     try:
         anchor = "corsheaders.middleware.CorsMiddleware"
         idx = MIDDLEWARE.index(anchor)  # noqa: F405
-        MIDDLEWARE.insert(idx + 1, "silk.middleware.SilkyMiddleware")  # noqa: F405
+        if "silk.middleware.SilkyMiddleware" not in MIDDLEWARE:  # noqa: F405
+            MIDDLEWARE.insert(idx + 1, "silk.middleware.SilkyMiddleware")  # noqa: F405
     except ValueError:
-        MIDDLEWARE.append("silk.middleware.SilkyMiddleware")  # noqa: F405
+        if "silk.middleware.SilkyMiddleware" not in MIDDLEWARE:  # noqa: F405
+            MIDDLEWARE.append("silk.middleware.SilkyMiddleware")  # noqa: F405
 
     SILKY_PYTHON_PROFILER = True
     SILKY_INTERCEPT_PERCENT = 100
