@@ -22,6 +22,11 @@ Variables clave:
 
 - `DJANGO_SECRET_KEY`
 - `JWT_SECRET_KEY`
+- `COPILOT_AGENT_BASE_URL=http://localhost:8090`
+- `COPILOT_SERVICE_SHARED_JWT`
+- `COPILOT_AGENT_AUDIENCE=app-api-service`
+- `COPILOT_BACKEND_AUDIENCE=medical-api`
+- `COPILOT_AGENT_TIMEOUT_SECONDS=30`
 - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`
 - `GCS_BUCKET_NAME`
 - `GCP_PROJECT_ID`
@@ -56,6 +61,26 @@ Variables clave:
 - `DJANGO_API_BASE_URL=http://localhost:8000/`
 
 `cloud_functions/docker-compose.yml` ya monta ADC del host en `/app/adc.json`.
+
+### Copilot Agent
+
+```bash
+cp copilot_agent/.env.example copilot_agent/.env.local
+```
+
+Variables clave:
+
+- `COPILOT_AGENT_DATABASE_URL`
+- `COPILOT_LONG_TERM_DATABASE_URL`
+- `BACKEND_INTERNAL_BASE_URL=http://localhost:8000`
+- `BACKEND_INTERNAL_TIMEOUT_SECONDS=15`
+- `COPILOT_SERVICE_SHARED_JWT`
+- `COPILOT_ALLOWED_AUDIENCE=app-api-service`
+- `COPILOT_BACKEND_AUDIENCE=medical-api`
+- `GCP_PROJECT_ID`
+- `GCP_REGION`
+
+Para local, el valor recomendado es reutilizar la misma base `medical_web_app` que levanta `make -C backend db-up`. No necesitas crear una DB adicional solo para el agent runtime.
 
 ## 2. Base de datos
 
@@ -104,6 +129,7 @@ Puertos locales:
 3. Verificar que Django responda en `http://localhost:8000/api/health/`.
 4. Confirmar que el flujo de transcripción apunte a `http://localhost:8082`.
 5. Confirmar que la generación documental apunte a `http://localhost:8083`.
+6. Confirmar que `copilot_agent` responda en `http://localhost:8090/healthz`.
 
 ## 7. Checks rápidos
 
@@ -122,6 +148,13 @@ Cloud Functions:
 ```bash
 python -m pytest cloud_functions/functions/tests
 ```
+
+Copilot agent:
+```bash
+docker compose -f copilot_agent/docker-compose.yml up --build
+```
+
+Para el slice actual del broker, backend y `copilot_agent` deben compartir el mismo valor de `COPILOT_SERVICE_SHARED_JWT`. El runtime también usa `COPILOT_BACKEND_AUDIENCE` para firmar las tools internas read-only hacia Django. En local, el path más simple es apuntar `COPILOT_AGENT_DATABASE_URL` y `COPILOT_LONG_TERM_DATABASE_URL` a `medical_web_app`. La migración futura a OIDC/ID token está documentada en [`docs/debt/copilot-agent-runtime.md`](debt/copilot-agent-runtime.md).
 
 ## 8. Trazas distribuidas opcionales
 
@@ -146,5 +179,6 @@ Detalle completo en [`docs/backend/tracing.md`](backend/tracing.md).
 - `5432` — PostgreSQL local
 - `8082` — Cloud Function de transcripción
 - `8083` — Cloud Function de generación
+- `8090` — copilot agent service
 - `16686` — Jaeger UI
 - `4318` — OTLP HTTP para Jaeger

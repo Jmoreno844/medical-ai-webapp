@@ -141,6 +141,22 @@ TRANSCRIPTION_CLOUD_FUNCTION_URL = os.environ.get(
 GENERATE_DOCUMENT_CLOUD_FUNCTION_URL = os.environ.get(
     "GENERATE_DOCUMENT_CLOUD_FUNCTION_URL", "not-loaded"
 )
+COPILOT_AGENT_BASE_URL = os.environ.get(
+    "COPILOT_AGENT_BASE_URL",
+    "not-loaded",
+)
+COPILOT_SERVICE_SHARED_JWT = _env_strip("COPILOT_SERVICE_SHARED_JWT") or access_secret(
+    GCP_PROJECT_ID,
+    "copilot-service-shared-jwt",
+    default="not-loaded",
+)
+COPILOT_AGENT_AUDIENCE = os.environ.get(
+    "COPILOT_AGENT_AUDIENCE",
+    "app-api-service",
+)
+COPILOT_AGENT_TIMEOUT_SECONDS = float(
+    os.environ.get("COPILOT_AGENT_TIMEOUT_SECONDS", "30")
+)
 CLOUD_TASKS_REGION = os.environ.get("CLOUD_TASKS_REGION", "not-loaded")
 TRANSCRIPTION_QUEUE_NAME = os.environ.get("TRANSCRIPTION_QUEUE_NAME", "not-loaded")
 CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT = os.environ.get(

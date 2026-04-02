@@ -18,6 +18,7 @@ These instructions apply to `backend/`.
 - `apps/templates/` — base templates, doctor templates, template usage
 - `apps/documents/` — document CRUD, generation kickoff, callbacks, SSE
 - `apps/generative_ai/` — transcription kickoff and Cloud Tasks dispatch
+- future copilot broker endpoints should stay in `backend/` while the LangGraph runtime itself lives in `copilot_agent/`
 - `config/settings/` — environment-specific settings
 - `utils/` — service JWT encoding, auth helpers, JWT settings
 
@@ -25,6 +26,9 @@ These instructions apply to `backend/`.
 
 - `apps/documents/` owns document generation orchestration and SSE.
 - `apps/generative_ai/` owns starting transcription jobs, not saving streamed generation chunks.
+- backend remains the authority for permissions, clinical writes, patch application and audit even after the copilot runtime exists.
+- the current copilot slice supports `patch proposal + review + safe apply`, but Django remains the only owner of canonical document writes and future audit trail.
+- accepted temporary copilot-runtime debt lives in `docs/debt/copilot-agent-runtime.md`; keep local notes short and link there instead of duplicating rationale.
 - `apps/encounters/services/storage.py` is the place for GCS auth/signed URL behavior.
 - Keep Cloud Function callback validation centralized in `apps/documents/api/callbacks.py` and `utils.auth`.
 
@@ -46,6 +50,7 @@ These instructions apply to `backend/`.
 
 - User-facing auth is session-based plus `/api/auth/jwt-token`.
 - Service-to-service auth is separate and must stay separate.
+- Copilot broker auth and copilot tools auth are separate contracts even while they share the same temporary secret.
 - Do not mix callback JWT handling with `django_auth`.
 
 ### SSE / Generation

@@ -1,20 +1,27 @@
-# ADR-005: Aislamiento de Cargas de Trabajo de IA (LangGraph) en Cloud Functions
+# ADR-005: Aislamiento de Cargas de Trabajo de IA (LangGraph) en Cloud Run Dedicado
 
 ## Estatus
 
-Propuesto
+Aceptado
 
 ## Contexto
 
-Con la introducción de la Fase 2 (Pipeline de Inteligencia con LangGraph para detección de códigos CIE-10, CUM y CUPS), necesitamos desplegar un ecosistema pesado de agentes. Este flujo utiliza Gemini 2.0 Flash, búsquedas vectoriales, _Fan-out / Fan-in_ y persistencia de memoria (PostgresSaver).
+Con la introducción del copiloto clínico read-only y su evolución futura hacia `patch -> review -> apply`, necesitamos desplegar un ecosistema de agentes separado del backend transaccional. Este flujo utiliza LangGraph, streaming brokered, tools internas read-only y persistencia de memoria (`PostgresSaver`).
 
 La API principal de la plataforma está desarrollada en Django (Cloud Run), diseñada para servir tráfico web (REST/SSE) con latencia baja y alta concurrencia. Surgió la interrogante de si la lógica de LangGraph debería integrarse dentro del monolito actual de Django o separarse en su propio servicio.
 
 ## Decisión
 
-Hemos decidido **aislar completamente el workflow de los agentes (LangGraph) en un servicio independiente**, específicamente desplegado como una **Cloud Function (Gen 2)** dedicada (o un servicio de Cloud Run independiente).
+Hemos decidido **aislar completamente el workflow de los agentes (LangGraph) en un servicio independiente desplegado como Cloud Run**, bajo el boundary `copilot-agent-service`.
 
-El backend de Django se limitará a encolar la petición (vía Cloud Tasks, ver ADR-004) y recibir los resultados procesados mediante un webhook o polling.
+El backend de Django seguirá siendo el broker seguro:
+
+- autentica al usuario
+- valida permisos
+- decide el `thread_id`
+- llama al agent runtime por contrato interno
+- expone el stream seguro al frontend
+- conserva la autoridad para aplicar patches clínicos
 
 ## Justificación Técnica
 
@@ -30,7 +37,11 @@ El backend de Django se limitará a encolar la petición (vía Cloud Tasks, ver 
    - Aislar el servicio permite desplegar nuevas versiones de la IA sin redesplegar ni arriesgar el _core_ transaccional del sistema de salud (citas, usuarios, expedientes).
 
 4. **Principio de Mínimo Privilegio:**
-   - La Cloud Function de LangGraph puede operar bajo su propio Service Account de IAM, restringiendo estrictamente sus accesos a Vertex AI y a las tablas específicas de pgvector, sin exponer el resto de los secretos que maneja el backend.
+   - El `copilot-agent-service` opera bajo su propio Service Account de IAM, restringiendo estrictamente sus accesos a Vertex AI, Secret Manager y Cloud SQL para checkpoints/memoria, sin exponer el resto de los secretos que maneja el backend.
+
+5. **Durable Execution Real:**
+   - Cloud Run es efímero/stateless. Si el grafo necesita reanudación, interrupts o memoria por thread, el checkpointer no puede vivir en RAM del contenedor.
+   - Por eso se adopta una base de datos externa para el state del runtime.
 
 ## Consecuencias
 
@@ -39,12 +50,14 @@ El backend de Django se limitará a encolar la petición (vía Cloud Tasks, ver 
 - **Estabilidad:** El servicio principal no se ve afectado por picos de carga de procesamiento de IA.
 - **Eficiencia en Costos:** Podemos configurar hardware especializado (ej. mayor asignación de memoria y CPU) _únicamente_ para las instancias que ejecutan LangGraph, sin sobredimensionar las instancias del servidor web.
 - **Agilidad en Desarrollo:** Los equipos pueden modificar y testear los agentes de IA de forma independiente.
+- **Mejor Boundary Operativo:** El ciclo de deploy del runtime del agente queda separado del deploy del backend clínico.
 
 ### Negativas / Retos
 
 - **Mantenimiento Adicional:** Introduce un nuevo recurso en la infraestructura (Terraform/CI-CD) que debe monitorearse.
-- **Lógica de Webhooks:** Obliga a mantener y versionar correctamente el contrato de datos (payloads) entre la Cloud Function y Django.
+- **Nuevo Servicio e Infra:** Añade un segundo Cloud Run, una SA nueva, DB lógica separada y workflow CI/CD independiente.
+- **Contratos Internos:** Obliga a mantener y versionar correctamente el contrato `backend broker <-> agent runtime`.
 
 ## Notas
 
-La integración local o testing de este componente debe realizarse de manera aislada (mediante scripts en Python aislados o Jupyter Notebooks) antes de ser integrada al ciclo de CI/CD, para validar la latencia y la calidad de la estructuración JSON de los endpoints.
+La integración local de este componente debe ejecutarse como servicio propio (`copilot_agent/`) con Docker y configuración independiente del backend principal.

@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import EncuentroHeader from "../encuentroHeader/EncuentroHeader";
 import DocumentArea from "../encuentroTextArea/DocumentArea";
 import { AppProviders } from "@/contexts/AppProviders";
+import CopilotSidePanel from "@/features/copilotDebug/CopilotSidePanel";
 
 export default function EncuentroDetailPage() {
   // Get the encounter ID from URL params
@@ -18,6 +19,9 @@ export default function EncuentroDetailPage() {
   const handleTranscriptionDocumentFound = useCallback((docId: number) => {
     setTranscriptionDocId(docId);
   }, []);
+  const showCopilotDebugPanel =
+    import.meta.env.DEV ||
+    import.meta.env.VITE_ENABLE_COPILOT_DEBUG_PANEL === "true";
 
   // Use the AppProviders to wrap everything
   return (
@@ -27,10 +31,19 @@ export default function EncuentroDetailPage() {
     >
       <div className="flex flex-col h-screen overflow-hidden">
         <EncuentroHeader />
-        <div className="flex-1 overflow-hidden">
-          <DocumentArea
-            onTranscriptionDocumentFound={handleTranscriptionDocumentFound}
-          />
+        <div className="flex-1 overflow-hidden p-4">
+          <div className="flex h-full flex-col gap-4 lg:flex-row">
+            <div className="min-h-0 min-w-0 flex-1">
+              <DocumentArea
+                onTranscriptionDocumentFound={handleTranscriptionDocumentFound}
+              />
+            </div>
+            {showCopilotDebugPanel && (
+              <aside className="min-h-0 w-full shrink-0 overflow-y-auto lg:w-[380px] xl:w-[420px]">
+                <CopilotSidePanel encounterId={encounterId} />
+              </aside>
+            )}
+          </div>
         </div>
       </div>
     </AppProviders>

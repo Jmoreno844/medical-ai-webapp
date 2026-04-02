@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "apps.templates.apps.TemplatesConfig",
     "apps.documents.apps.DocumentsConfig",
     "apps.generative_ai.apps.GenerativeAIConfig",
+    "apps.copilot.apps.CopilotConfig",
 ]
 
 # Custom user model
@@ -115,3 +116,8 @@ LOGIN_URL = "/admin/login/"  # Redirect to the admin login page instead
 CSRF_COOKIE_NAME = "_xsrf"
 
 LOGGING = build_console_logging("INFO")
+
+COPILOT_BACKEND_AUDIENCE = os.environ.get(
+    "COPILOT_BACKEND_AUDIENCE",
+    "medical-api",
+)

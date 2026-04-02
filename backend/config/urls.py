@@ -15,6 +15,8 @@ from apps.documents.api import (
     documents_generation_router,
     sse_router,
 )
+from apps.copilot.api import router as copilot_router
+from apps.copilot.internal_tools_api import router as copilot_internal_tools_router
 from apps.generative_ai.api import router as generative_ai_router
 
 api = NinjaAPI(
@@ -41,6 +43,8 @@ api.add_router("/", encounters_router)
 api.add_router("/", patients_router)
 api.add_router("/", templates_router)
 api.add_router("/", generative_ai_router)
+api.add_router("/", copilot_router)
+api.add_router("/", copilot_internal_tools_router)
 
 def _health(_request):
     """Lightweight liveness check for load balancers and Docker HEALTHCHECK."""

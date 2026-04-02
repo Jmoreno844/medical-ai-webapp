@@ -9,13 +9,16 @@ El Copiloto Clínico no es un servicio monolítico frontend. Responde a una arqu
 1. **Frontend (React / Vite):**
    - **Responsabilidad:** Renderizado visual (Lexical), estado del workspace (`WorkspaceStore`, `DocumentSnapshotStore`, `DocumentDraftStore`, `DocumentDerivedStore`), UI del chat futura y revisión de parches.
    - **Restricción:** No posee lógica del LLM, no gestiona el contexto clínico completo, no almacena keys, no consolida documentos pesados directamente desde componentes.
+   - **Slice actual:** el primer consumidor del broker es un debug panel interno en `EncuentroDetail`, y hoy ya valida `proposal + review + safe apply`, no la UX final del copiloto.
 
 2. **Backend Transaccional (Django / Cloud Run):**
-   - **Responsabilidad:** Fuente única de la verdad. Persistencia de `documents`, `snapshots`, seguridad, permisos y servicios de API (`DocumentOperationsService`).
+   - **Responsabilidad:** Fuente única de la verdad. Persistencia de `documents`, `snapshots`, seguridad, permisos y servicios de API.
+   - **Boundary adicional:** actúa como broker seguro entre frontend y `copilot-agent-service` con endpoints `sessions / messages / runs / stream`.
 
 3. **Agent Runtime (LangGraph / Cloud Run):**
-   - **Responsabilidad:** Orquestación, memoria de sesión, toma de decisiones (Tools) y streaming de respuestas (SSE) al frontend.
-   - **Estado:** Utiliza un _Checkpointer_ respaldado temporalmente en PostgreSQL (y a futuro en Redis) para recordar qué documentos leyó en turnos previos de la sesión.
+   - **Responsabilidad:** Orquestación, memoria de sesión, toma de decisiones (Tools) y generación de respuestas/patches.
+   - **Boundary:** no es público al navegador; Django consume sus contratos internos.
+   - **Estado actual:** usa PostgreSQL como checkpointer, persiste `runs`/`events`, lee documentos/contexto reales desde Django, resuelve documento objetivo por título/familia y ya puede proponer patches que pasan por `waiting_review` antes de un `safe apply` en Django.
 
 ---
 
@@ -28,7 +31,9 @@ Para resolver el problema de contexto masivo (ej. transcripciones de 30 minutos 
 - El Frontend nunca sube archivos largos en los payloads de chat.
 - El Frontend expone un `WorkspaceIndex` ligero construido desde el workspace state layer, no desde JSX o estado local del editor.
 - Ese `WorkspaceIndex` contiene metadatos como documento activo, `version`, `hasDirtyDraft`, `hasStreamingState`, `aiReadable` y working set.
-- El Agente revisa su memoria interna para ver si ya procesó la versión 2. Si no, usa herramientas para recabar la información desde el Backend Transaccional.
+- Django entrega ese `WorkspaceIndex` al agent runtime.
+- El Agente usa el `WorkspaceIndex` para decidir qué leer y luego llama a tools internas read-only para obtener documentos y contexto reales desde Django.
+- El broker Django persiste `CopilotRun`, consulta el estado del runtime y reemite SSE al frontend.
 
 ### Regla del frontend actual
 
@@ -36,6 +41,15 @@ Para resolver el problema de contexto masivo (ej. transcripciones de 30 minutos 
 - `workspace/` es el owner de tabs, snapshot, draft, derived state y preparación de patch review.
 - El editor resuelve `derived > draft > snapshot`.
 - El runtime futuro no debe leer markdown pesado desde componentes; debe leer el `WorkspaceIndex` y luego pedir contenido por herramientas.
+
+### Boundary de red recomendado
+
+- `frontend -> Django`
+- `Django -> copilot-agent-service`
+- `copilot-agent-service -> Django tools/contracts internos`
+- `resolve target -> proposal -> persisted patch -> review -> safe apply -> resume`
+
+El frontend no habla directo con LangGraph.
 
 ### Context Caching (Vertex AI / Gemini)
 
@@ -60,9 +74,12 @@ El agente de IA **tiene prohibido escribir o sobreescribir** el contenido canón
 2. El sistema lo guarda en BD como `pending`.
 3. El frontend lo renderiza como previsualización de bloque.
 4. El médico audita: Acepta, Modifica o Rechaza el parche.
-5. Sólo tras la aprobación (audit log) el parche impacta el `DocumentSnapshot`.
+5. Tras la aprobación, Django aplica el contenido propuesto sobre el documento canónico, actualiza el estado del patch y el frontend sincroniza snapshot/draft/editor.
+
+Lo que sigue pendiente ya no es el apply básico, sino el audit trail clínico fuerte, versionado robusto y la UX final fuera del debug panel. La deuda canónica está en [`../debt/copilot-agent-runtime.md`](../debt/copilot-agent-runtime.md).
 
 ## 4. Checklist para Escalabilidad
 
-- [ ] **Fase MVP:** LangGraph y Django pueden compartir infraestructura en Cloud Run y PostgreSQL como checkpointer.
+- [x] **Fase actual:** Django ya brokeriza el flujo read-only y el runtime persiste `thread state` en PostgreSQL.
 - [ ] **Fase Escalamiento (Múltiples Réplicas):** Reemplazar estados en memoria y pub/sub SSE hacia Redis (Google Cloud Memorystore) para evitar pérdida de streams entre contadores concurrentes.
+- [ ] **Fase de Seguridad Operativa:** Migrar el broker `shared JWT` a OIDC/ID token service-to-service.

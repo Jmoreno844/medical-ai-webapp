@@ -10,7 +10,7 @@ Este plan asume:
 - editor actual con Lexical
 - tabs para transcripción, contexto y documentos extra
 - copiloto lateral / AI agent
-- necesidad futura de sugerencias, revisión, aceptación/rechazo, MIPRES draft y copy por partes hacia EHRs
+- necesidad futura de sugerencias, revisión, aceptación/rechazo y copy por partes hacia EHRs
 - un solo developer, por lo que la estrategia debe ser incremental, con hitos claros y evitando refactors suicidas
 
 ---
@@ -159,7 +159,9 @@ La transición correcta es:
 
 - `Plan 1-2`: base de `Zustand`, `WorkspaceStore` y bridge de `DocumentContext` ya aterrizados
 - `Plan 3`: `snapshot + draft` y parte de la integración con `Lexical` ya aterrizados
-- siguiente prioridad práctica: cerrar ownership de `derived`, `WorkspaceIndex`, `AiSessionStore` y `PatchStore` antes de abrir el runtime del agente
+- `Plan 4-6`: `derived`, `WorkspaceIndex`, `AiSessionStore` y `PatchStore` ya aterrizados como base del workspace AI-ready
+- runtime del agente y broker Django ya existen como slice separado y ya soportan `proposal + review + safe apply` en el debug panel
+- siguiente prioridad práctica: endurecer versionado/audit trail del writer flow y luego moverlo fuera del debug panel, no diseñar todavía la UX final del copiloto
 
 Este mapeo es importante porque permite avanzar sin exigir una migración total en el primer slice.
 
@@ -193,7 +195,7 @@ Introducir cambios sugeridos sin writes directos.
 
 Solo después de tener patches y revisión.
 
-### Fase 6 — MIPRES / docs estructurados / optimizaciones
+### Fase 6 — Producto específico y optimizaciones
 
 Lo más específico después.
 
@@ -282,7 +284,6 @@ export type WorkspaceDocumentType =
   | "context"
   | "uploaded_document"
   | "generated_document"
-  | "mipres_draft"
   | "patient_history_summary";
 
 export type WorkspaceDocumentStatus =
@@ -1101,7 +1102,6 @@ Permitir que el agente actúe sobre documentos editables, pero siempre por patch
 - proponer cambios a la nota
 - generar documento resumen
 - crear carta o documento adicional
-- preparar draft de MIPRES
 
 ### Restricciones
 
@@ -1125,7 +1125,6 @@ Agregar capas especializadas solo cuando la base esté sólida.
 
 - templates opcionales por especialidad
 - tags semánticos sugeridos en secciones
-- MIPRES draft estructurado
 - copy por sección a EHR
 - patient history summary
 - reglas de aprobación clínica
@@ -1418,7 +1417,6 @@ Mitigación: snapshot/draft/derived separados.
 
 ## Semana / tramo 6+
 
-- MIPRES draft estructurado
 - patient history summary
 - templates opcionales
 - optimizaciones finas
@@ -1519,6 +1517,7 @@ Preparar el workspace para lecturas eficientes del agente.
 
 - el agente ya puede leer el workspace sin pedir todo
 - existe base sólida para copiloto read-only
+- estado actual: `WorkspaceIndex` y `AiSessionStore` ya existen; el siguiente slice práctico es consumirlos desde un debug client del frontend contra el broker real
 
 ## Plan Codex 6 — PatchStore + review UI + safe write path
 
@@ -1577,6 +1576,7 @@ Retirar la capa vieja cuando las rutas activas ya usen el nuevo modelo.
 - responde usando docs correctos
 - no depende de meter todo al contexto
 - explica qué leyó
+- primer paso de integración frontend recomendado: panel técnico dentro de `EncuentroDetail` antes del chat final
 
 ## Milestone 4 — Safe write path
 
@@ -1587,7 +1587,6 @@ Retirar la capa vieja cuando las rutas activas ya usen el nuevo modelo.
 ## Milestone 5 — Advanced clinical workflow
 
 - documentos derivados útiles
-- MIPRES draft mejor soportado
 - copy por partes o bloques
 
 ---

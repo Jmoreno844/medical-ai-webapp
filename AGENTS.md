@@ -58,6 +58,7 @@ Do not treat these as source of truth unless the task is specifically about gene
 - `backend/apps/templates/` owns base templates and doctor templates.
 - `backend/apps/users/` owns login/session/JWT for user-facing auth.
 - `cloud_functions/functions/` owns Gemini-facing logic only; it should not grow direct database responsibilities.
+- `copilot_agent/` owns the LangGraph runtime for the future clinical copilot and must stay outside the backend monolith.
 - In the frontend, `webapp/src/workspace/` is the state layer for encounter-document workspace concerns such as tabs, active document, snapshot, draft, derived state, AI session state, and patch-review preparation.
 - `webapp/src/contexts/` remains the orchestration and compat layer around encounter detail flows; it owns SSE lifecycle and API side effects while delegating durable workspace state to the stores.
 - `webapp/src/features/` should render and compose UI, not become a second owner of shared encounter state, streaming lifecycle, or AI workspace payload assembly.
@@ -67,6 +68,10 @@ Do not treat these as source of truth unless the task is specifically about gene
 ### Auth / Security
 
 - Keep Django session auth and service JWT auth separate.
+- Keep backend user auth separate from copilot service-to-service auth.
+- Keep Django -> copilot broker auth separate from `copilot_agent -> Django` tools auth, even if both are temporarily backed by `COPILOT_SERVICE_SHARED_JWT`.
+- The current copilot slice supports `patch proposal + review + safe apply`, but the agent still must not write directly to canonical clinical documents; Django owns apply and any future audit trail.
+- Temporary cross-service copilot auth debt lives in `docs/debt/copilot-agent-runtime.md`; do not duplicate that explanation in every file.
 - If you change JWT claims, token purpose, token TTL, or callback endpoints, update Django, Cloud Functions, and docs together.
 - Never log full transcripts, generated documents, raw secrets, or tokens.
 
@@ -80,6 +85,8 @@ Do not treat these as source of truth unless the task is specifically about gene
 
 - Transcription may run through Cloud Tasks depending on environment/config.
 - Document generation currently starts in Django and streams back through callbacks + SSE.
+- The future copilot runtime must remain a separate Cloud Run service brokered by Django, not a hidden module inside the backend process.
+- If you touch the copilot broker/runtime boundary, update the nearest doc and keep `docs/debt/copilot-agent-runtime.md` aligned with any accepted temporary compromise.
 - SSE is not multi-instance safe today; treat that as a known constraint, not an accidental bug.
 
 ### Billing

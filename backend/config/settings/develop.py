@@ -3,7 +3,6 @@ Development settings for the medical web application.
 """
 
 import os
-import warnings
 from .base import *  # noqa: F403, F401
 from .logging_utils import build_console_logging
 from dotenv import load_dotenv
@@ -43,10 +42,25 @@ GENERATE_DOCUMENT_CLOUD_FUNCTION_URL = os.environ.get(
     "GENERATE_DOCUMENT_CLOUD_FUNCTION_URL",
     os.environ.get("GENERATE_DOCUMENT_CLOUD_FUNCTION_BASE_URL", "not-loaded"),
 )
+COPILOT_AGENT_BASE_URL = os.environ.get(
+    "COPILOT_AGENT_BASE_URL",
+    "http://localhost:8090",
+)
+COPILOT_SERVICE_SHARED_JWT = os.environ.get(
+    "COPILOT_SERVICE_SHARED_JWT",
+    "not-loaded",
+)
+COPILOT_AGENT_AUDIENCE = os.environ.get(
+    "COPILOT_AGENT_AUDIENCE",
+    "app-api-service",
+)
+COPILOT_AGENT_TIMEOUT_SECONDS = float(
+    os.environ.get("COPILOT_AGENT_TIMEOUT_SECONDS", "30")
+)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = _env_bool("DEBUG", default=True)
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "host.docker.internal"]
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",

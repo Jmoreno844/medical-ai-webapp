@@ -1,0 +1,214 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import {
+  createCopilotSession,
+  getCopilotRun,
+  listCopilotPatches,
+  reviewCopilotPatch,
+  sendCopilotMessage,
+  streamCopilotRun,
+} from "@/features/copilotDebug/api";
+import {
+  CopilotDebugState,
+  CopilotMessageRequest,
+  CopilotRunResponse,
+  CopilotStreamEvent,
+} from "@/features/copilotDebug/types";
+
+const INITIAL_STATE: CopilotDebugState = {
+  threadId: null,
+  runId: null,
+  status: "idle",
+  isStreaming: false,
+  lastError: null,
+  finalResponse: null,
+  events: [],
+  patches: [],
+};
+
+const TERMINAL_STATUSES = new Set(["completed", "failed"]);
+
+export function useCopilotDebug(encounterId: number) {
+  const [state, setState] = useState<CopilotDebugState>(INITIAL_STATE);
+  const closeStreamRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      closeStreamRef.current?.();
+    };
+  }, []);
+
+  const appendEvent = useCallback((event: CopilotStreamEvent) => {
+    setState((current) => {
+      const nextStatus =
+        event.event === "run_completed"
+          ? "completed"
+          : event.event === "run_failed"
+            ? "failed"
+            : event.event === "review_required"
+              ? "waiting_review"
+          : current.status;
+
+      const nextFinalResponse =
+        event.event === "response_chunk" &&
+        typeof event.payload.content === "string"
+          ? event.payload.content
+          : current.finalResponse;
+
+      return {
+        ...current,
+        status: nextStatus,
+        finalResponse: nextFinalResponse,
+        isStreaming: !TERMINAL_STATUSES.has(nextStatus),
+        lastError:
+          event.event === "run_failed" && typeof event.payload.error === "string"
+            ? event.payload.error
+            : current.lastError,
+        events: [...current.events, event],
+      };
+    });
+  }, []);
+
+  const openStream = useCallback(
+    (runId: string, afterSequence = 0) => {
+      closeStreamRef.current?.();
+      closeStreamRef.current = streamCopilotRun(runId, afterSequence, {
+        onOpen: () => {
+          setState((current) => ({
+            ...current,
+            isStreaming: true,
+            lastError: null,
+          }));
+        },
+        onEvent: (event) => {
+          appendEvent(event);
+        },
+        onError: async (message) => {
+          setState((current) => ({
+            ...current,
+            isStreaming: false,
+            lastError: message,
+          }));
+
+          try {
+            const run = await getCopilotRun(runId);
+            const patches = await listCopilotPatches(runId);
+            setState((current) => ({
+              ...current,
+              status: run.status,
+              finalResponse: run.final_response ?? current.finalResponse,
+              patches,
+            }));
+          } catch {
+            setState((current) => ({
+              ...current,
+              status: "failed",
+            }));
+          }
+        },
+      });
+    },
+    [appendEvent]
+  );
+
+  const ensureSession = useCallback(async () => {
+    const session = await createCopilotSession(encounterId);
+    setState((current) => ({
+      ...current,
+      threadId: session.thread_id,
+      status: current.status === "idle" ? "session_ready" : current.status,
+      lastError: null,
+    }));
+    return session;
+  }, [encounterId]);
+
+  const runMessage = useCallback(
+    async (payload: CopilotMessageRequest) => {
+      const run = await sendCopilotMessage(payload);
+      const patches =
+        run.requires_human_review ? await listCopilotPatches(run.run_id) : [];
+      setState({
+        threadId: run.thread_id,
+        runId: run.run_id,
+        status: run.status,
+        isStreaming: false,
+        lastError: null,
+        finalResponse: run.final_response ?? null,
+        events: [],
+        patches,
+      });
+      openStream(run.run_id);
+      return run;
+    },
+    [openStream]
+  );
+
+  const syncRunStatus = useCallback(async () => {
+    if (!state.runId) {
+      return null;
+    }
+
+    const run: CopilotRunResponse = await getCopilotRun(state.runId);
+    const patches = await listCopilotPatches(state.runId);
+    setState((current) => ({
+      ...current,
+      status: run.status,
+      finalResponse: run.final_response ?? current.finalResponse,
+      lastError: null,
+      patches,
+    }));
+    return run;
+  }, [state.runId]);
+
+  const submitReview = useCallback(
+    async (
+      patchId: string,
+      decision: "approve" | "reject",
+      comment?: string,
+      documentVersion?: number
+    ) => {
+      if (!state.runId) {
+        return null;
+      }
+
+      const afterSequence = Math.max(
+        0,
+        ...state.events
+          .map((event) => event.sequence ?? 0)
+          .filter((sequence) => Number.isFinite(sequence))
+      );
+      const run = await reviewCopilotPatch(state.runId, {
+        patch_id: patchId,
+        decision,
+        comment,
+        document_version: documentVersion,
+      });
+      const patches = await listCopilotPatches(state.runId);
+      setState((current) => ({
+        ...current,
+        status: run.status,
+        finalResponse: run.final_response ?? current.finalResponse,
+        patches,
+        lastError: null,
+      }));
+      openStream(state.runId, afterSequence);
+      return run;
+    },
+    [openStream, state.events, state.runId]
+  );
+
+  const reset = useCallback(() => {
+    closeStreamRef.current?.();
+    closeStreamRef.current = null;
+    setState(INITIAL_STATE);
+  }, []);
+
+  return {
+    state,
+    ensureSession,
+    runMessage,
+    syncRunStatus,
+    submitReview,
+    reset,
+  };
+}

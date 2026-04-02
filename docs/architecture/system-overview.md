@@ -4,7 +4,7 @@ Este documento describe la arquitectura global de la plataforma, sus componentes
 
 ## 1. Arquitectura de Alto Nivel
 
-El sistema es una plataforma fullstack que combina un backend Django, funciones serverless en GCP y una SPA en React. La pieza central es el backend Django, que coordina la comunicación entre todos los demás servicios.
+El sistema es una plataforma fullstack que combina un backend Django, funciones serverless en GCP, un runtime dedicado del copiloto y una SPA en React. La pieza central sigue siendo el backend Django, que coordina la comunicación entre los demás servicios.
 
 ```mermaid
 graph LR
@@ -15,6 +15,7 @@ graph LR
     subgraph gcp ["Google Cloud Platform"]
         subgraph backend_run ["Cloud Run"]
             Django["Django Ninja API"]
+            Copilot["copilot-agent-service\n(LangGraph)"]
         end
         subgraph functions ["Cloud Functions"]
             CF_Trans["transcription-endpoint"]
@@ -34,7 +35,11 @@ graph LR
     Django -->|"signed URL"| GCS
     Django -->|"JWT + payload"| CF_Trans
     Django -->|"JWT + payload"| CF_Gen
+    Django -->|"internal broker contract"| Copilot
     Django -->|"secrets"| SM
+
+    Copilot -->|"checkpoints + memory"| PG
+    Copilot -->|"Gemini / tools orchestration"| Vertex
 
     CF_Trans -->|"gs:// URI"| GCS
     CF_Trans -->|"Gemini API"| Vertex
@@ -156,6 +161,7 @@ sequenceDiagram
 |------------|-------|-----------------|
 | **Frontend** `webapp/` | React 18, Vite, TypeScript, Tailwind | SPA del médico. Maneja grabación, UI del editor y conexión SSE. |
 | **Backend** `backend/` | Django Ninja, PostgreSQL | API REST central. Orquesta flujos, emite JWTs, mantiene hub SSE. |
+| **Copilot Agent** `copilot_agent/` | Python, FastAPI, LangGraph | Runtime dedicado del copiloto, threads/runs/checkpoints y flujo read-only brokered por Django. |
 | **CF Transcripción** | Python, Functions Framework | Recibe audio de GCS → llama a Gemini → devuelve texto a Django. |
 | **CF Generación** | Python, Functions Framework | Recibe contexto+plantilla → streaming desde Gemini → envía chunks a Django. |
 | **Cloud Storage** | GCS | Almacena los audios clínicos. El frontend sube directo vía signed URL. |
@@ -168,6 +174,8 @@ sequenceDiagram
 
 - **Hub SSE en memoria**: `apps/documents/services/sse_hub.py` usa estructuras en memoria. Con múltiples réplicas en Cloud Run, un evento emitido en la instancia A no llega a clientes SSE en la instancia B. Resolver con Redis o Pub/Sub en el futuro.
 - **Backend público + DB privada**: Cloud Run sigue público para la SPA, pero PostgreSQL queda aislado por IP privada y acceso vía Cloud SQL Auth Proxy + IAM DB auth.
+- **Agent runtime separado**: LangGraph no vive dentro del backend principal. El backend hace de broker y conserva la autoridad clínica/transaccional.
+- **Auth interna temporal del copiloto**: Django y `copilot-agent-service` usan un `shared JWT` temporal en `local`/`stg`; ver deuda canónica en [`../debt/copilot-agent-runtime.md`](../debt/copilot-agent-runtime.md).
 - **Audio no se borra al transcribir**: `audio_expires_at` controla el acceso vía API, pero el blob en GCS solo se elimina si el médico lo solicita explícitamente.
 - **Cloud Functions IAM-auth**: las funciones están desplegadas con `--no-allow-unauthenticated`; la seguridad depende de IAM de invocación + JWT de callback. El `JWT_SECRET_KEY` no debe filtrarse.
 

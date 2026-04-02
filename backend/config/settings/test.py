@@ -9,7 +9,6 @@ import logging
 import datetime
 import socket
 import sys
-import json
 from .base import *  # noqa: F403, F401
 
 globals().pop("LOGGING", None)
@@ -191,6 +190,21 @@ TRANSCRIPTION_CLOUD_FUNCTION_URL = os.environ.get(
 )
 GENERATE_DOCUMENT_CLOUD_FUNCTION_URL = os.environ.get(
     "GENERATE_DOCUMENT_CLOUD_FUNCTION_URL", "not-loaded"
+)
+COPILOT_AGENT_BASE_URL = os.environ.get(
+    "COPILOT_AGENT_BASE_URL",
+    "http://localhost:8090",
+)
+COPILOT_SERVICE_SHARED_JWT = os.environ.get(
+    "COPILOT_SERVICE_SHARED_JWT",
+    "test-copilot-shared-jwt",
+)
+COPILOT_AGENT_AUDIENCE = os.environ.get(
+    "COPILOT_AGENT_AUDIENCE",
+    "app-api-service",
+)
+COPILOT_AGENT_TIMEOUT_SECONDS = float(
+    os.environ.get("COPILOT_AGENT_TIMEOUT_SECONDS", "30")
 )
 # Change to DEBUG mode to help diagnose issues
 DEBUG = True

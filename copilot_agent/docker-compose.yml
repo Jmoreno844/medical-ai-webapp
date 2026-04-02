@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  copilot_agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    env_file:
+      - .env.local
+    environment:
+      - COPILOT_AGENT_ENV=local
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

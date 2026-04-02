@@ -43,7 +43,8 @@ Ese orden importa porque los providers se consumen entre sí.
 - `PatchStore`
   - preparación de preview/review de patches
 - `AiSessionStore`
-  - working set y metadata mínima para lectura futura del copiloto
+  - working set y metadata mínima para lectura del copiloto
+  - también alimenta el debug client del copiloto mientras no exista la UX final
 
 ## Workspace migration
 
@@ -60,6 +61,8 @@ Ese orden importa porque los providers se consumen entre sí.
 - `patch` sigue siendo preparación interna; todavía no hay write path AI final.
 - `WorkspaceIndex` es el payload ligero para el runtime futuro del agente; no
   debe reconstruirse ad hoc en componentes de UI.
+- el primer consumidor frontend del broker debe ser un panel/debug client que
+  valide payload y stream antes de introducir el chat final.
 
 ## Restricciones importantes
 
