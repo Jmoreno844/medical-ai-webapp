@@ -48,6 +48,7 @@ Para resolver el problema de contexto masivo (ej. transcripciones de 30 minutos 
 - `Django -> copilot-agent-service`
 - `copilot-agent-service -> Django tools/contracts internos`
 - `resolve target -> proposal -> persisted patch -> review -> safe apply -> resume`
+- En writer flows, un run de edición solo es válido si termina en `waiting_review` con un patch persistible o en `failed`; `patch_proposed + completed` se trata como inconsistencia del runtime.
 
 El frontend no habla directo con LangGraph.
 
@@ -75,6 +76,8 @@ El agente de IA **tiene prohibido escribir o sobreescribir** el contenido canón
 3. El frontend lo renderiza como previsualización de bloque.
 4. El médico audita: Acepta, Modifica o Rechaza el parche.
 5. Tras la aprobación, Django aplica el contenido propuesto sobre el documento canónico, actualiza el estado del patch y el frontend sincroniza snapshot/draft/editor.
+
+El debug panel y la futura UI lateral no dependen únicamente de la lista persistida de patches: si el stream ya emitió `patch_proposed` y el run está en `waiting_review`, el frontend deriva un `effectivePendingPatch` hasta que Django termine de reflejarlo en `GET /patches`.
 
 Lo que sigue pendiente ya no es el apply básico, sino el audit trail clínico fuerte, versionado robusto y la UX final fuera del debug panel. La deuda canónica está en [`../debt/copilot-agent-runtime.md`](../debt/copilot-agent-runtime.md).
 

@@ -27,6 +27,16 @@ logger = logging.getLogger(__name__)
 
 DONE_STATUSES = {"completed", "failed", "waiting_review"}
 
+PATCH_REQUIRED_FIELDS = {
+    "patch_id",
+    "target_document_id",
+    "target_document_title",
+    "target_selection_reason",
+    "base_version",
+    "operation_type",
+    "content_preview",
+}
+
 
 class CopilotRuntime:
     """Persist runs and thread state so Cloud Run restarts do not lose context."""
@@ -87,6 +97,7 @@ class CopilotRuntime:
             "patch_id": None,
             "requires_human_review": False,
             "review_comment": None,
+            "run_error": None,
             "trace_metadata": request.trace_metadata,
         }
         tools_client = CopilotBackendToolsClient(
@@ -108,10 +119,12 @@ class CopilotRuntime:
                     state,
                     config={"configurable": {"thread_id": request.thread_id}},
                 )
-            status = (
-                "waiting_review"
-                if next_state.get("requires_human_review") and next_state.get("patch_preview")
-                else "completed"
+            # Edit runs must stop at waiting_review or fail closed; they cannot silently degrade to completed.
+            status = self._derive_status(next_state)
+            final_response = (
+                None
+                if status == "waiting_review"
+                else next_state.get("final_response") or next_state.get("run_error")
             )
             stored_run = StoredRun(
                 run_id=run_id,
@@ -122,9 +135,16 @@ class CopilotRuntime:
                 status=status,
                 intent=next_state.get("intent"),
                 requires_human_review=next_state.get("requires_human_review", False),
-                patch_preview=next_state.get("patch_preview"),
-                final_response=next_state.get("final_response"),
-                trace_metadata=next_state.get("trace_metadata", {}),
+                patch_preview=next_state.get("patch_preview") if status == "waiting_review" else None,
+                final_response=final_response,
+                trace_metadata={
+                    **next_state.get("trace_metadata", {}),
+                    **(
+                        {"run_error": next_state.get("run_error")}
+                        if next_state.get("run_error")
+                        else {}
+                    ),
+                },
             )
             events = self._build_events(run_id=run_id, state=next_state, status=status)
         except Exception as error:
@@ -282,6 +302,27 @@ class CopilotRuntime:
             done=run.status in DONE_STATUSES,
         )
 
+    @staticmethod
+    def _is_edit_intent(intent: str | None) -> bool:
+        return str(intent or "").strip().lower() == "edit_document"
+
+    @staticmethod
+    def _has_valid_patch_preview(patch_preview: dict[str, Any] | None) -> bool:
+        if not isinstance(patch_preview, dict):
+            return False
+        return all(patch_preview.get(field_name) for field_name in PATCH_REQUIRED_FIELDS)
+
+    def _derive_status(self, state: CopilotState) -> str:
+        if self._has_valid_patch_preview(state.get("patch_preview")) and state.get(
+            "requires_human_review"
+        ):
+            return "waiting_review"
+        if state.get("run_error"):
+            return "failed"
+        if self._is_edit_intent(state.get("intent")):
+            return "failed"
+        return "completed"
+
     @contextmanager
     def _connection(self) -> Iterator[Connection]:
         conn = Connection.connect(
@@ -347,7 +388,9 @@ class CopilotRuntime:
                 }
             )
 
-        if state.get("retrieved_context") or state.get("encounter_context"):
+        encounter_context = state.get("encounter_context") or {}
+        context_view = state.get("context_view") or {}
+        if state.get("retrieved_context") or encounter_context or context_view:
             events.append(
                 {
                     "event": "retrieval_progress",
@@ -371,23 +414,19 @@ class CopilotRuntime:
                             for span in state.get("read_spans", [])
                         ],
                         "search_query": state.get("search_query"),
+                        "context_view": context_view,
                         "encounter_context": {
-                            "encounter_id": state.get("encounter_context", {}).get(
-                                "encounter_id"
+                            "encounter_id": encounter_context.get("encounter_id"),
+                            "encounter_name": encounter_context.get("encounter_name"),
+                            "has_been_transcribed": encounter_context.get(
+                                "has_been_transcribed"
                             ),
-                            "encounter_name": state.get("encounter_context", {}).get(
-                                "encounter_name"
-                            ),
-                            "has_been_transcribed": state.get(
-                                "encounter_context",
-                                {},
-                            ).get("has_been_transcribed"),
                         },
                     },
                 }
             )
 
-        if state.get("patch_preview"):
+        if CopilotRuntime._has_valid_patch_preview(state.get("patch_preview")):
             events.append(
                 {
                     "event": "patch_proposed",
@@ -398,7 +437,11 @@ class CopilotRuntime:
                     },
                 }
             )
-        if state.get("requires_human_review") and state.get("patch_preview"):
+        if (
+            status == "waiting_review"
+            and state.get("requires_human_review")
+            and CopilotRuntime._has_valid_patch_preview(state.get("patch_preview"))
+        ):
             events.append(
                 {
                     "event": "review_required",
@@ -408,7 +451,7 @@ class CopilotRuntime:
                     },
                 }
             )
-        if state.get("final_response"):
+        if status == "completed" and state.get("final_response"):
             events.append(
                 {
                     "event": "response_chunk",
@@ -418,6 +461,17 @@ class CopilotRuntime:
 
         if status == "completed":
             events.append({"event": "run_completed", "payload": {"status": status}})
+        if status == "failed":
+            events.append(
+                {
+                    "event": "run_failed",
+                    "payload": {
+                        "error": state.get("run_error")
+                        or state.get("final_response")
+                        or "El run termino con un flujo inconsistente de edicion.",
+                    },
+                }
+            )
         return events
 
     @staticmethod

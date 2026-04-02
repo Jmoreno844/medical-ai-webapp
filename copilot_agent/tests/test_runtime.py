@@ -83,3 +83,35 @@ def test_resume_run_completes_waiting_review_run(monkeypatch):
         "response_chunk",
         "run_completed",
     ]
+
+
+def test_runtime_marks_inconsistent_edit_flow_as_failed():
+    runtime = CopilotRuntime(settings=SimpleNamespace(database_url="postgresql://unused"))
+    inconsistent_state = {
+        "intent": "edit_document",
+        "requires_human_review": False,
+        "patch_preview": None,
+        "final_response": "Contexto sintetizado: ...",
+        "run_error": "La solicitud de edicion no produjo un patch revisable y el run se cancelo de forma segura.",
+    }
+
+    status = runtime._derive_status(inconsistent_state)
+    events = runtime._build_events(
+        run_id="run-123",
+        state={
+            "encounter_id": "12",
+            "selected_document_ids": [],
+            "available_documents": [],
+            "retrieved_context": [],
+            "tool_calls": [],
+            "tool_results": [],
+            "intent": "edit_document",
+            "iteration_count": 1,
+            **inconsistent_state,
+        },
+        status=status,
+    )
+
+    assert status == "failed"
+    assert [event["event"] for event in events][-1] == "run_failed"
+    assert all(event["event"] != "run_completed" for event in events)

@@ -30,6 +30,7 @@ export default function CopilotDebugPanel({
     latestToolResults,
     searchQueryFromRun,
     pendingPatch,
+    patchFlowError,
     readMode,
     ensureSession,
     syncRunStatus,
@@ -156,9 +157,9 @@ export default function CopilotDebugPanel({
         </button>
       </form>
 
-      {state.lastError && (
+      {patchFlowError && (
         <div className="rounded border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-          {state.lastError}
+          {patchFlowError}
         </div>
       )}
 
@@ -261,7 +262,9 @@ export default function CopilotDebugPanel({
           </>
         ) : (
           <div className="text-xs text-slate-500">
-            No hay patch pendiente para este run.
+            {patchFlowError
+              ? "El flujo de edicion termino en un estado inconsistente; revisa los eventos del run."
+              : "No hay patch pendiente para este run."}
           </div>
         )}
       </div>

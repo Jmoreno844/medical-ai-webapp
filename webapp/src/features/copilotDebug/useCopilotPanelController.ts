@@ -24,6 +24,7 @@ type UseCopilotPanelControllerResult = {
   latestToolResults: Array<Record<string, unknown>>;
   searchQueryFromRun: string | null;
   pendingPatch: CopilotPatchResponse | null;
+  patchFlowError: string | null;
   readMode: ReturnType<typeof useAiSessionStore.getState>["readMode"];
   ensureSession: () => Promise<unknown>;
   syncRunStatus: () => Promise<unknown>;
@@ -74,6 +75,7 @@ export function useCopilotPanelController(
   const [chatMessages, setChatMessages] = useState<CopilotChatMessage[]>([]);
   const lastAssistantResponseRef = useRef<string | null>(null);
   const lastReviewPatchIdRef = useRef<string | null>(null);
+  const didAutoRefreshWaitingReviewRef = useRef<string | null>(null);
 
   const workspaceIndex = buildWorkspaceIndex();
 
@@ -114,10 +116,137 @@ export function useCopilotPanelController(
       ? latestRetrievalEvent.payload.search_query
       : null;
 
-  const pendingPatch = useMemo(
+  const latestPatchProposedEvent = [...state.events]
+    .reverse()
+    .find((event) => event.event === "patch_proposed");
+  const latestReviewRequiredEvent = [...state.events]
+    .reverse()
+    .find((event) => event.event === "review_required");
+
+  // The stream can deliver patch_proposed before Django patch persistence is re-fetched.
+  const eventDerivedPendingPatch = useMemo(() => {
+    if (!latestPatchProposedEvent) {
+      return null;
+    }
+    if (state.status !== "waiting_review" && !latestReviewRequiredEvent) {
+      return null;
+    }
+
+    const payload = latestPatchProposedEvent.payload;
+    const patchId =
+      typeof payload.patch_id === "string" ? payload.patch_id : null;
+    const targetDocumentId =
+      typeof payload.target_document_id === "string"
+        ? payload.target_document_id
+        : null;
+    const targetDocumentTitle =
+      typeof payload.target_document_title === "string"
+        ? payload.target_document_title
+        : null;
+    const targetSelectionReason =
+      typeof payload.target_selection_reason === "string"
+        ? payload.target_selection_reason
+        : null;
+    const contentPreview =
+      typeof payload.content_preview === "string" ? payload.content_preview : null;
+    const operationType =
+      typeof payload.operation_type === "string" ? payload.operation_type : null;
+    const baseVersion =
+      typeof payload.base_version === "number" ? payload.base_version : null;
+
+    if (
+      !patchId ||
+      !targetDocumentId ||
+      !targetDocumentTitle ||
+      !targetSelectionReason ||
+      !contentPreview ||
+      !operationType ||
+      baseVersion === null
+    ) {
+      return null;
+    }
+
+    return {
+      patch_id: patchId,
+      run_id: latestPatchProposedEvent.run_id,
+      target_document_id: targetDocumentId,
+      base_version: baseVersion,
+      operation_type: operationType,
+      anchor:
+        typeof payload.anchor === "object" && payload.anchor !== null
+          ? (payload.anchor as Record<string, unknown>)
+          : {},
+      expected_hash:
+        typeof payload.expected_hash === "string" ? payload.expected_hash : null,
+      before_preview:
+        typeof payload.before_preview === "string" ? payload.before_preview : null,
+      after_preview:
+        typeof payload.after_preview === "string" ? payload.after_preview : null,
+      document_preview_after:
+        typeof payload.document_preview_after === "string"
+          ? payload.document_preview_after
+          : null,
+      content_preview: contentPreview,
+      rationale: typeof payload.rationale === "string" ? payload.rationale : null,
+      source_context_document_ids: Array.isArray(
+        payload.source_context_document_ids
+      )
+        ? payload.source_context_document_ids.map(String)
+        : [],
+      target_document_title: targetDocumentTitle,
+      target_selection_reason: targetSelectionReason,
+      status: "pending" as const,
+      review_comment: null,
+      created_at:
+        latestPatchProposedEvent.created_at ?? new Date().toISOString(),
+      updated_at:
+        latestPatchProposedEvent.created_at ?? new Date().toISOString(),
+    } satisfies CopilotPatchResponse;
+  }, [latestPatchProposedEvent, latestReviewRequiredEvent, state.status]);
+
+  const persistedPendingPatch = useMemo(
     () => state.patches.find((patch) => patch.status === "pending") ?? null,
     [state.patches]
   );
+
+  const pendingPatch = persistedPendingPatch ?? eventDerivedPendingPatch;
+
+  const patchFlowError = useMemo(() => {
+    if (state.lastError) {
+      return state.lastError;
+    }
+    if (
+      latestPatchProposedEvent &&
+      state.status === "completed" &&
+      !persistedPendingPatch
+    ) {
+      return (
+        "El run emitio patch_proposed pero termino en completed sin review_required " +
+        "ni patch pendiente persistido. El flujo de edicion fue inconsistente."
+      );
+    }
+    return null;
+  }, [
+    latestPatchProposedEvent,
+    persistedPendingPatch,
+    state.lastError,
+    state.status,
+  ]);
+
+  useEffect(() => {
+    if (
+      state.status === "waiting_review" &&
+      state.runId &&
+      state.patches.length === 0 &&
+      didAutoRefreshWaitingReviewRef.current !== state.runId
+    ) {
+      didAutoRefreshWaitingReviewRef.current = state.runId;
+      void syncRunStatus();
+    }
+    if (state.status !== "waiting_review") {
+      didAutoRefreshWaitingReviewRef.current = null;
+    }
+  }, [state.patches.length, state.runId, state.status, syncRunStatus]);
 
   useEffect(() => {
     clearPatches();
@@ -309,6 +438,7 @@ export function useCopilotPanelController(
     latestToolResults,
     searchQueryFromRun,
     pendingPatch,
+    patchFlowError,
     readMode,
     ensureSession,
     syncRunStatus,

@@ -33,6 +33,8 @@ def build_clinical_copilot_graph(*, tools_client, planner, checkpointer=None):
         if (state.get("pending_action") or {}).get("action_type") == "call_tool"
         else "interrupt_for_review"
         if state.get("requires_human_review") and state.get("patch_preview")
+        else "finalize_response"
+        if state.get("run_error")
         else "finalize_response",
         {
             "call_tool": "call_tool",
@@ -45,6 +47,8 @@ def build_clinical_copilot_graph(*, tools_client, planner, checkpointer=None):
         "accumulate_observation",
         lambda state: "interrupt_for_review"
         if state.get("requires_human_review") and state.get("patch_preview")
+        else "finalize_response"
+        if state.get("run_error")
         else "finalize_response"
         if state.get("final_response")
         else "plan_or_next_action",

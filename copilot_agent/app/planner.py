@@ -44,11 +44,77 @@ EDIT_KEYWORDS = {
     "añade",
 }
 
+EDIT_PHRASES = {
+    "haz el egreso",
+    "haz la nota",
+    "haz nota",
+    "prepara el egreso",
+    "prepara la nota",
+    "completa el egreso",
+}
+
 DOCUMENT_TITLE_FAMILIES = {
     "clinical_note": {"nota", "nota clinica", "historia clinica", "soap", "evolucion"},
     "discharge_note": {"egreso", "epicrisis", "discharge"},
     "transcription": {"transcripcion", "transcript"},
     "context": {"contexto"},
+}
+
+EDIT_INTENT_HINTS = {
+    "edit",
+    "document",
+    "patch",
+    "rewrite",
+    "replace",
+    "insert",
+    "add_information",
+    "update",
+    "modify",
+}
+
+TOOL_ALLOWED_INPUT_KEYS = {
+    "list_open_documents": set(),
+    "list_encounter_documents": set(),
+    "read_document_summary": {"document_id"},
+    "read_document_span": {
+        "document_id",
+        "exact_text",
+        "prefix_text",
+        "suffix_text",
+        "start_offset",
+        "end_offset",
+        "max_chars",
+    },
+    "search_documents": {"query", "max_results", "allowed_document_types"},
+    "read_patch_history": {"document_id", "limit"},
+    "build_context_view": {
+        "active_document_id",
+        "include_document_ids",
+        "include_manual_context",
+    },
+    "propose_replace_span": {"target_document_id"},
+    "propose_insert_after_span": {"target_document_id"},
+    "propose_create_document": set(),
+}
+
+TOOL_INPUT_ALIASES = {
+    "build_context_view": {"document_id": "active_document_id"},
+    "read_document_span": {
+        "exactText": "exact_text",
+        "prefixText": "prefix_text",
+        "suffixText": "suffix_text",
+        "startOffset": "start_offset",
+        "endOffset": "end_offset",
+        "documentId": "document_id",
+    },
+    "search_documents": {
+        "topK": "max_results",
+        "allowedDocumentTypes": "allowed_document_types",
+    },
+    "read_document_summary": {"documentId": "document_id"},
+    "read_patch_history": {"documentId": "document_id"},
+    "propose_replace_span": {"targetDocumentId": "target_document_id"},
+    "propose_insert_after_span": {"targetDocumentId": "target_document_id"},
 }
 
 
@@ -113,7 +179,9 @@ def _is_simple_greeting(message: str) -> bool:
 
 def _message_mentions_edit(message: str) -> bool:
     normalized_message = _normalize_text(message.lower())
-    return any(keyword in normalized_message for keyword in EDIT_KEYWORDS)
+    return any(keyword in normalized_message for keyword in EDIT_KEYWORDS) or any(
+        phrase in normalized_message for phrase in EDIT_PHRASES
+    )
 
 
 def _message_document_hint(message: str) -> str | None:
@@ -129,6 +197,65 @@ def _message_document_hint(message: str) -> str | None:
 
 def _content_hash(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _canonical_intent(
+    *,
+    raw_intent: str | None,
+    action_type: str,
+    tool_name: str | None,
+    user_message: str,
+) -> str:
+    normalized_intent = _normalize_text((raw_intent or "").lower())
+    if any(hint in normalized_intent for hint in EDIT_INTENT_HINTS):
+        return "edit_document"
+    if tool_name and tool_name.startswith("propose_"):
+        return "edit_document"
+    if _message_mentions_edit(user_message):
+        return "edit_document"
+    if action_type == "respond":
+        return "answer_question"
+    return "answer_question"
+
+
+def _sanitize_tool_input(tool_name: str, raw_tool_input: Any) -> dict[str, Any]:
+    if not isinstance(raw_tool_input, dict):
+        raw_tool_input = {}
+
+    aliases = TOOL_INPUT_ALIASES.get(tool_name, {})
+    normalized_input: dict[str, Any] = {}
+    for raw_key, raw_value in raw_tool_input.items():
+        target_key = aliases.get(raw_key, raw_key)
+        normalized_input[target_key] = raw_value
+
+    allowed_keys = TOOL_ALLOWED_INPUT_KEYS[tool_name]
+    sanitized_input = {
+        key: value for key, value in normalized_input.items() if key in allowed_keys
+    }
+
+    if tool_name == "build_context_view":
+        include_document_ids = sanitized_input.get("include_document_ids")
+        if isinstance(include_document_ids, str):
+            sanitized_input["include_document_ids"] = [include_document_ids]
+        if "include_manual_context" in sanitized_input:
+            sanitized_input["include_manual_context"] = bool(
+                sanitized_input["include_manual_context"]
+            )
+    if tool_name == "search_documents" and "max_results" in sanitized_input:
+        sanitized_input["max_results"] = int(sanitized_input["max_results"])
+    if tool_name == "read_document_span" and "max_chars" in sanitized_input:
+        sanitized_input["max_chars"] = int(sanitized_input["max_chars"])
+    if tool_name == "read_patch_history" and "limit" in sanitized_input:
+        sanitized_input["limit"] = int(sanitized_input["limit"])
+
+    if tool_name in {"read_document_summary", "read_document_span", "read_patch_history"}:
+        if not sanitized_input.get("document_id"):
+            raise ValueError(f"{tool_name} requires document_id")
+    if tool_name in {"propose_replace_span", "propose_insert_after_span"}:
+        if not sanitized_input.get("target_document_id"):
+            raise ValueError(f"{tool_name} requires target_document_id")
+
+    return sanitized_input
 
 
 def _best_target_document(
@@ -519,7 +646,7 @@ class VertexToolPlanner:
                     response_mime_type="application/json",
                 ),
             ).text
-            return self._parse_decision(response_text)
+            return self._parse_decision(response_text, state)
         except Exception as error:
             logger.warning("Vertex planner failed, using fallback: %s", error)
             return self.fallback.plan_next_action(state)
@@ -593,8 +720,11 @@ class VertexToolPlanner:
             "tool_name solo puede ser: list_open_documents, list_encounter_documents, read_document_summary, "
             "read_document_span, search_documents, read_patch_history, build_context_view, "
             "propose_replace_span, propose_insert_after_span, propose_create_document. "
+            "tool_input valido por tool: build_context_view solo admite active_document_id, include_document_ids, include_manual_context; "
+            "read_document_summary y read_document_span usan document_id; propose_replace_span y propose_insert_after_span usan target_document_id. "
             "Reglas: saludos simples responden sin leer documentos; preguntas usan build_context_view antes de buscar spans; "
-            "ediciones siempre terminan en una tool propose_*, nunca aplican directo. "
+            "ediciones nunca terminan en respond y siempre deben pasar por read_document_summary/read_document_span antes de una tool propose_*; "
+            "build_context_view no reemplaza la lectura del documento objetivo para editar. "
             "No uses markdown ni texto fuera del JSON.\n\n"
             f"STATE:\n{json.dumps(payload, ensure_ascii=False)}"
         )
@@ -630,16 +760,39 @@ class VertexToolPlanner:
             f"PATCH_INPUT:\n{json.dumps(payload, ensure_ascii=False)}"
         )
 
-    def _parse_decision(self, response_text: str) -> PlannerDecision:
+    def _parse_decision(self, response_text: str, state: dict[str, Any]) -> PlannerDecision:
         try:
-            decision = PlannerDecision.model_validate_json(_extract_json_object(response_text))
+            raw_payload = json.loads(_extract_json_object(response_text))
+            if raw_payload.get("tool_input") is None:
+                raw_payload["tool_input"] = {}
+            action_type = str(raw_payload.get("action_type") or "")
+            tool_name = raw_payload.get("tool_name")
+            if action_type == "call_tool":
+                if tool_name not in ALLOWED_TOOL_NAMES:
+                    raise ValueError("Planner returned unsupported tool_name")
+                raw_payload["tool_input"] = _sanitize_tool_input(
+                    tool_name,
+                    raw_payload.get("tool_input"),
+                )
+            else:
+                raw_payload["tool_input"] = {}
+            raw_payload["intent"] = _canonical_intent(
+                raw_intent=raw_payload.get("intent"),
+                action_type=action_type,
+                tool_name=tool_name,
+                user_message=state["user_message"],
+            )
+            decision = PlannerDecision.model_validate(raw_payload)
         except (ValidationError, ValueError) as error:
             raise ValueError(f"Invalid planner response: {error}") from error
 
         if decision.action_type not in {"call_tool", "respond"}:
             raise ValueError("Planner returned unsupported action_type")
-        if decision.action_type == "call_tool" and decision.tool_name not in ALLOWED_TOOL_NAMES:
-            raise ValueError("Planner returned unsupported tool_name")
+        if decision.action_type == "respond":
+            if decision.intent == "edit_document":
+                raise ValueError("Planner cannot finish an edit request with respond")
+            if not decision.response_content:
+                raise ValueError("Planner respond action requires response_content")
         return decision
 
 

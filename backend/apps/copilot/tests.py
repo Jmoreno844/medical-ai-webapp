@@ -160,6 +160,8 @@ class CopilotBrokerTests(SimpleTestCase):
                         "target_document_id": "99",
                         "base_version": 3,
                         "operation_type": "rewrite_document",
+                        "target_document_title": "Note",
+                        "target_selection_reason": "title_family_match:clinical_note; score=72",
                         "content_preview": "## Propuesta",
                         "rationale": "Actualizar el documento activo",
                     },
@@ -181,6 +183,49 @@ class CopilotBrokerTests(SimpleTestCase):
 
         update_or_create_mock.assert_called_once()
         self.assertEqual(response["status"], "waiting_review")
+
+    def test_create_message_rejects_inconsistent_edit_run_from_agent(self):
+        request = SimpleNamespace(user=self.doctor)
+        payload = SimpleNamespace(
+            encounter_id=self.encounter.id,
+            user_message="Actualiza la nota",
+            workspace_index=SimpleNamespace(
+                model_dump=lambda mode="python": self.workspace_index
+            ),
+            active_document_id="99",
+            selected_document_ids=["99"],
+        )
+
+        with patch(
+            "apps.copilot.api._get_owned_encounter",
+            return_value=self.encounter,
+        ), patch(
+            "apps.copilot.api.CopilotAgentClient.create_run",
+            return_value={
+                "run": {
+                    "run_id": "run-456",
+                    "thread_id": f"copilot:encounter:{self.encounter.id}:doctor:{self.doctor.id}",
+                    "status": "completed",
+                    "intent": "edit_document",
+                    "requires_human_review": False,
+                    "patch_preview": {
+                        "patch_id": "patch-123",
+                        "target_document_id": "99",
+                        "base_version": 3,
+                        "operation_type": "rewrite_document",
+                        "target_document_title": "Note",
+                        "target_selection_reason": "title_family_match:clinical_note; score=72",
+                        "content_preview": "## Propuesta",
+                    },
+                    "trace_metadata": {},
+                },
+                "events": [],
+            },
+        ):
+            with self.assertRaises(HttpError) as ctx:
+                create_copilot_message(request, payload)
+
+        self.assertEqual(ctx.exception.status_code, 502)
 
     def test_create_message_rejects_other_doctor(self):
         request = SimpleNamespace(user=self.other_doctor)
@@ -688,3 +733,71 @@ class CopilotPatchApplyServiceTests(SimpleTestCase):
         patch_instance.save.assert_called_once_with(
             update_fields=["status", "review_comment", "updated_at"]
         )
+
+    def test_apply_copilot_patch_replaces_anchor_span(self):
+        document = Mock(id=99, content="Motivo: dolor abdominal. Plan: hidratacion.")
+        patch_instance = Mock(
+            patch_id="patch-123",
+            status="pending",
+            base_version=3,
+            operation_type="replace_span",
+            content_preview="Motivo: dolor abdominal. Plan: hidratacion intensiva.",
+            anchor={
+                "exactText": "Plan: hidratacion.",
+                "prefixText": "Motivo: dolor abdominal. ",
+                "suffixText": "",
+                "startOffset": 25,
+                "endOffset": 43,
+            },
+            before_preview="Plan: hidratacion.",
+            after_preview="Plan: hidratacion intensiva.",
+            expected_hash=None,
+            document_preview_after="Motivo: dolor abdominal. Plan: hidratacion intensiva.",
+            target_document=document,
+        )
+        stale_queryset = Mock()
+        stale_queryset.exclude.return_value = stale_queryset
+        stale_queryset.values_list.return_value = []
+
+        with patch(
+            "apps.copilot.services.patch_apply.CopilotPatch.objects.filter",
+            return_value=stale_queryset,
+        ):
+            result = apply_copilot_patch(
+                patch=patch_instance,
+                document_version=3,
+                review_comment="Aplicar cambio puntual",
+            )
+
+        self.assertEqual(
+            document.content,
+            "Motivo: dolor abdominal. Plan: hidratacion intensiva.",
+        )
+        self.assertEqual(result.content, document.content)
+
+    def test_apply_copilot_patch_detects_ambiguous_anchor(self):
+        document = Mock(id=99, content="Plan. Diagnostico. Plan.")
+        patch_instance = Mock(
+            patch_id="patch-123",
+            status="pending",
+            base_version=3,
+            operation_type="insert_after_span",
+            content_preview="Plan. Diagnostico. Plan.\nSeguimiento",
+            anchor={
+                "exactText": "Plan.",
+                "prefixText": None,
+                "suffixText": None,
+            },
+            before_preview="Plan.",
+            after_preview="\nSeguimiento",
+            expected_hash=None,
+            document_preview_after="Plan. Diagnostico. Plan.\nSeguimiento",
+            target_document=document,
+        )
+
+        with self.assertRaises(CopilotPatchConflictError):
+            apply_copilot_patch(
+                patch=patch_instance,
+                document_version=3,
+                review_comment="Aplicar",
+            )

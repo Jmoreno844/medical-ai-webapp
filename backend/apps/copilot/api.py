@@ -34,6 +34,15 @@ logger = logging.getLogger(__name__)
 router = Router(tags=["copilot"])
 
 STREAM_DONE_RUN_STATUSES = {"completed", "failed", "waiting_review"}
+PATCH_PREVIEW_REQUIRED_FIELDS = {
+    "patch_id",
+    "target_document_id",
+    "target_document_title",
+    "target_selection_reason",
+    "base_version",
+    "operation_type",
+    "content_preview",
+}
 
 
 def _serialize_run(run: CopilotRun, remote_run: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -116,6 +125,45 @@ def _sync_run_from_remote(run: CopilotRun, remote_run: dict[str, Any]) -> Copilo
     return run
 
 
+def _validate_remote_patch_preview(remote_run: dict[str, Any]) -> dict[str, Any] | None:
+    patch_preview = remote_run.get("patch_preview")
+    if not patch_preview:
+        if remote_run.get("requires_human_review") or remote_run.get("status") == "waiting_review":
+            raise HttpError(
+                502,
+                "Copilot agent devolvio waiting_review sin un patch_preview valido.",
+            )
+        return None
+
+    missing_fields = [
+        field_name
+        for field_name in PATCH_PREVIEW_REQUIRED_FIELDS
+        if not patch_preview.get(field_name)
+    ]
+    if missing_fields:
+        raise HttpError(
+            502,
+            "Copilot agent devolvio un patch_preview incompleto: "
+            + ", ".join(missing_fields),
+        )
+
+    if remote_run.get("status") != "waiting_review" or not remote_run.get(
+        "requires_human_review"
+    ):
+        logger.error(
+            "Copilot agent returned inconsistent edit flow for run %s: status=%s requires_human_review=%s",
+            remote_run.get("run_id"),
+            remote_run.get("status"),
+            remote_run.get("requires_human_review"),
+        )
+        raise HttpError(
+            502,
+            "Copilot agent devolvio un patch de edicion sin dejar el run en waiting_review.",
+        )
+
+    return patch_preview
+
+
 def _persist_patch_preview(
     *,
     run: CopilotRun,
@@ -123,7 +171,7 @@ def _persist_patch_preview(
     user_id: int,
     encounter_id: int,
 ) -> CopilotPatch | None:
-    patch_preview = remote_run.get("patch_preview")
+    patch_preview = _validate_remote_patch_preview(remote_run)
     if not patch_preview:
         return None
 
@@ -213,6 +261,7 @@ def create_copilot_message(request, payload: CopilotMessageIn):
         raise HttpError(502, f"Copilot agent unavailable: {error}") from error
 
     remote_run = response["run"]
+    _validate_remote_patch_preview(remote_run)
     with transaction.atomic():
         run = CopilotRun.objects.create(
             run_id=remote_run["run_id"],
@@ -243,6 +292,8 @@ def get_copilot_run(request, run_id: str):
         remote_run = client.get_run(run_id)
     except CopilotServiceError as error:
         raise HttpError(502, f"Copilot agent unavailable: {error}") from error
+
+    _validate_remote_patch_preview(remote_run)
 
     run = _sync_run_from_remote(run, remote_run)
     return _serialize_run(run, remote_run)

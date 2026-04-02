@@ -215,6 +215,7 @@ def _serialize_workspace_documents(
                 type=document["type"],
                 status=document["status"],
                 source=document["source"],
+                ai_writable=bool(document.get("ai_writable", False)),
                 version=int(document.get("version") or 1),
                 updated_at=document["updated_at"],
                 is_active=document.get("is_active", False),

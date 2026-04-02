@@ -130,6 +130,7 @@ class CopilotToolDocumentOut(Schema):
     type: str
     status: str
     source: str
+    ai_writable: bool = False
     version: int
     updated_at: str
     is_active: bool = False

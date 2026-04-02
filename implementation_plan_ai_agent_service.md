@@ -81,6 +81,9 @@ backend Django como broker seguro.
 - audit trail clínico completo del apply
 - versionado fuerte del documento para conflictos y stale detection más robusta
 - patch synthesis más precisa que la reescritura full-document actual
+- guardrails para que un run de edición nunca termine en `completed` antes de `waiting_review`
+- validación estricta de `tool_input` del planner y rechazo de runs inconsistentes desde Django
+- derivación frontend de `effectivePendingPatch` desde stream + persistencia, no solo desde la lista de patches
 - mover la experiencia desde debug panel hacia UX final del copiloto
 
 ## Infra y operación

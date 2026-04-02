@@ -72,6 +72,16 @@ DOCUMENT_TITLE_FAMILIES = {
     },
 }
 
+PATCH_REQUIRED_FIELDS = {
+    "patch_id",
+    "target_document_id",
+    "target_document_title",
+    "target_selection_reason",
+    "base_version",
+    "operation_type",
+    "content_preview",
+}
+
 
 def _normalize_text(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value)
@@ -82,6 +92,29 @@ def _shorten_text(content: str | None, *, max_length: int = 220) -> str:
     if not content:
         return ""
     return " ".join(content.split())[:max_length].strip()
+
+
+def _is_edit_intent(intent: str | None) -> bool:
+    normalized_intent = _normalize_text(str(intent or "").lower())
+    return normalized_intent == "edit_document"
+
+
+def _mark_run_error(state: CopilotState, message: str) -> CopilotState:
+    state["run_error"] = message
+    state["final_response"] = None
+    state["requires_human_review"] = False
+    state["patch_preview"] = None
+    state["patch_id"] = None
+    return state
+
+
+def _is_valid_patch_preview(patch_preview: dict[str, Any] | None) -> bool:
+    if not isinstance(patch_preview, dict):
+        return False
+    for field_name in PATCH_REQUIRED_FIELDS:
+        if not patch_preview.get(field_name):
+            return False
+    return True
 
 
 def _default_selected_document_ids(state: CopilotState) -> list[str]:
@@ -216,10 +249,6 @@ def _resolve_target_document(
     explicit_document_id: str | None = None,
 ) -> tuple[dict[str, Any] | None, str | None]:
     candidates = _target_document_candidates(state)
-    if explicit_document_id:
-        for document in candidates:
-            if str(document["document_id"]) == str(explicit_document_id):
-                return document, "explicit_document_id"
     if not candidates:
         return None, None
 
@@ -231,6 +260,37 @@ def _resolve_target_document(
         ((score, reasons, document) for score, reasons, document in scored_candidates),
         key=lambda item: item[0],
     )
+    if explicit_document_id:
+        explicit_document = next(
+            (
+                document
+                for document in candidates
+                if str(document["document_id"]) == str(explicit_document_id)
+            ),
+            None,
+        )
+        if explicit_document is not None:
+            explicit_score, explicit_reasons = _score_target_document(
+                state,
+                explicit_document,
+                preferred_hint=preferred_hint,
+            )
+            prompt_families = _prompt_document_families(state["user_message"])
+            explicit_family = _document_family(explicit_document)
+            if (
+                prompt_families
+                and explicit_family not in prompt_families
+                and best_score > explicit_score
+            ):
+                reason = (
+                    "ignored_explicit_document_id_due_to_prompt_family_mismatch, "
+                    + ", ".join(best_reasons)
+                    + f"; score={best_score}"
+                )
+                return best_document, reason
+
+            reason = ", ".join(explicit_reasons) if explicit_reasons else "explicit_document_id"
+            return explicit_document, f"explicit_document_id, {reason}; score={explicit_score}"
     reason = ", ".join(best_reasons) if best_reasons else "fallback_first_writable"
     return best_document, f"{reason}; score={best_score}"
 
@@ -323,8 +383,14 @@ def make_plan_or_next_action_node(planner: CopilotPlanner):
         next_state["proposed_action"] = decision.action_type
 
         if decision.action_type == "respond":
-            next_state["final_response"] = decision.response_content
-            next_state["requires_human_review"] = False
+            if _is_edit_intent(next_state.get("intent")):
+                _mark_run_error(
+                    next_state,
+                    "El planner intento cerrar una solicitud de edicion sin generar un patch revisable.",
+                )
+            else:
+                next_state["final_response"] = decision.response_content
+                next_state["requires_human_review"] = False
         return next_state
 
     return plan_or_next_action
@@ -449,6 +515,13 @@ def make_call_tool_node(
                         "excerpt": _shorten_text(span_payload.get("content"), max_length=320),
                     },
                 }
+                if not _is_valid_patch_preview(payload):
+                    payload = {
+                        "error": (
+                            "El runtime no pudo construir un patch revisable con metadata "
+                            "completa para este documento."
+                        )
+                    }
         else:
             payload = {"error": f"Unsupported tool: {tool_name}"}
 
@@ -481,11 +554,13 @@ def accumulate_observation(state: CopilotState) -> CopilotState:
     payload = pending_tool_result["payload"]
 
     if payload.get("error"):
-        next_state["final_response"] = (
-            "No pude completar una accion del copiloto con seguridad. "
-            f"Detalle: {payload['error']}"
+        _mark_run_error(
+            next_state,
+            (
+                "No pude completar una accion del copiloto con seguridad. "
+                f"Detalle: {payload['error']}"
+            ),
         )
-        next_state["requires_human_review"] = False
     elif tool_name in {"list_open_documents", "list_encounter_documents"}:
         next_state["available_documents"] = payload.get("documents", [])
         next_state["selected_document_ids"] = _default_selected_document_ids(next_state)
@@ -568,9 +643,17 @@ def accumulate_observation(state: CopilotState) -> CopilotState:
             "target_document_title": payload["target_document_title"],
             "target_selection_reason": payload["target_selection_reason"],
         }
-        next_state["requires_human_review"] = True
-        next_state["final_response"] = None
-        next_state["patch_operations_count"] = int(next_state.get("patch_operations_count") or 0) + 1
+        if not _is_valid_patch_preview(next_state["patch_preview"]):
+            _mark_run_error(
+                next_state,
+                "El patch generado por el runtime no quedo listo para review humana.",
+            )
+        else:
+            next_state["requires_human_review"] = True
+            next_state["final_response"] = None
+            next_state["patch_operations_count"] = int(
+                next_state.get("patch_operations_count") or 0
+            ) + 1
 
     next_state["tool_results"] = [
         *(next_state.get("tool_results") or []),
@@ -595,8 +678,19 @@ def apply_patch(state: CopilotState) -> CopilotState:
 
 def finalize_response(state: CopilotState) -> CopilotState:
     next_state = cast(CopilotState, dict(state))
-    if next_state.get("patch_preview"):
+    if _is_valid_patch_preview(next_state.get("patch_preview")):
         return next_state
+
+    if next_state.get("run_error"):
+        next_state["requires_human_review"] = False
+        next_state["patch_preview"] = None
+        return next_state
+
+    if _is_edit_intent(next_state.get("intent")):
+        return _mark_run_error(
+            next_state,
+            "La solicitud de edicion no produjo un patch revisable y el run se cancelo de forma segura.",
+        )
 
     if next_state.get("final_response"):
         return next_state

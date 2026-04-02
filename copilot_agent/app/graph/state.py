@@ -41,6 +41,7 @@ class CopilotState(TypedDict):
     patch_preview: NotRequired[dict[str, Any] | None]
     patch_id: NotRequired[str | None]
     final_response: NotRequired[str | None]
+    run_error: NotRequired[str | None]
     requires_human_review: bool
     review_result: NotRequired[Literal["approve", "reject", "edit"] | None]
     review_comment: NotRequired[str | None]

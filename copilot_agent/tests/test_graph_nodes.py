@@ -1,77 +1,57 @@
+from types import SimpleNamespace
+
+import pytest
+
 from app.graph.workflow import build_clinical_copilot_graph
-from app.planner import DraftedPatch, PlannerDecision
+from app.planner import HeuristicFallbackPlanner, PlannerDecision, VertexToolPlanner
+from tests.fixtures_copilot import (
+    FakeToolsClient,
+    ScriptedPlanner,
+    build_state,
+    make_document,
+)
 
 
-class FakeToolsClient:
+class EncounterRegressionToolsClient(FakeToolsClient):
     def list_open_documents(self, _workspace_index):
         return {
             "documents": [
-                {
-                    "document_id": "99",
-                    "title": "Nota clinica",
-                    "type": "note",
-                    "is_active": True,
-                    "is_open": True,
-                    "ai_writable": True,
-                    "pinned_for_agent": False,
-                    "version": 3,
-                },
-                {
-                    "document_id": "12",
-                    "title": "Contexto del encuentro",
-                    "type": "context",
-                    "is_active": False,
-                    "is_open": True,
-                    "ai_writable": False,
-                    "pinned_for_agent": True,
-                    "version": 1,
-                },
-                {
-                    "document_id": "77",
-                    "title": "Epicrisis de egreso",
-                    "type": "note",
-                    "is_active": False,
-                    "is_open": True,
-                    "ai_writable": True,
-                    "pinned_for_agent": False,
-                    "version": 2,
-                },
+                make_document(
+                    "3",
+                    title="Contexto",
+                    document_type="context",
+                    ai_writable=False,
+                    is_active=True,
+                ),
+                make_document(
+                    "4",
+                    title="Transcripcion",
+                    document_type="transcription",
+                    ai_writable=False,
+                ),
+                make_document(
+                    "7",
+                    title="Nota clinica",
+                    document_type="note",
+                ),
             ]
         }
 
-    def list_encounter_documents(self):
-        return self.list_open_documents({})
-
     def read_document_summary(self, document_id: str):
-        title = {
-            "99": "Nota clinica",
-            "12": "Contexto del encuentro",
-            "77": "Epicrisis de egreso",
-            "55": "Nota relacionada",
-        }[document_id]
-        document_type = {
-            "99": "note",
-            "12": "context",
-            "77": "note",
-            "55": "note",
-        }[document_id]
-        content = {
-            "99": "Paciente estable y con mejoria.",
-            "12": "Paciente con dolor abdominal.",
-            "77": "Paciente egresa estable.",
-            "55": "Coincidencia de busqueda.",
-        }[document_id]
-        return {
-            "document_id": document_id,
-            "encounter_id": "12",
-            "title": title,
-            "type": document_type,
-            "version": 3,
-            "content_hash": "hash-demo",
-            "updated_at": "2026-04-02T10:00:00Z",
-            "short_summary": content[:120],
-            "excerpt": content,
+        summaries = {
+            "7": {
+                "document_id": "7",
+                "encounter_id": "2",
+                "title": "Nota clinica",
+                "type": "note",
+                "version": 1,
+                "content_hash": "note-hash",
+                "updated_at": "2026-04-02T10:00:00Z",
+                "short_summary": "Nota clinica activa del encounter.",
+                "excerpt": "**HISTORIA CLINICA**\nMotivo de consulta: Dolor de estomago.",
+            }
         }
+        return summaries[document_id]
 
     def read_document_span(
         self,
@@ -85,78 +65,26 @@ class FakeToolsClient:
         max_chars: int = 600,
     ):
         del exact_text, prefix_text, suffix_text, start_offset, end_offset, max_chars
-        title = {
-            "99": "Nota clinica",
-            "12": "Contexto del encuentro",
-            "77": "Epicrisis de egreso",
-            "55": "Nota relacionada",
-        }[document_id]
-        document_type = {
-            "99": "note",
-            "12": "context",
-            "77": "note",
-            "55": "note",
-        }[document_id]
-        content = {
-            "99": "Paciente estable y con mejoria.",
-            "12": "Paciente con dolor abdominal.",
-            "77": "Paciente egresa estable.",
-            "55": "Coincidencia de busqueda.",
-        }[document_id]
-        return {
-            "document_id": document_id,
-            "title": title,
-            "type": document_type,
-            "version": 3,
-            "content_hash": "hash-demo",
-            "content": content,
-            "start_offset": 0,
-            "end_offset": len(content),
-            "anchor": {
-                "exactText": content,
-                "prefixText": "",
-                "suffixText": "",
-                "startOffset": 0,
-                "endOffset": len(content),
-            },
+        spans = {
+            "7": {
+                "document_id": "7",
+                "title": "Nota clinica",
+                "type": "note",
+                "version": 1,
+                "content_hash": "note-hash",
+                "content": "**HISTORIA CLINICA**\n\nMotivo de consulta: Dolor de estomago.",
+                "start_offset": 0,
+                "end_offset": 62,
+                "anchor": {
+                    "exactText": "**HISTORIA CLINICA**\n\nMotivo de consulta: Dolor de estomago.",
+                    "prefixText": "",
+                    "suffixText": "",
+                    "startOffset": 0,
+                    "endOffset": 62,
+                },
+            }
         }
-
-    def search_documents(self, *, query: str, max_results: int = 3, allowed_document_types=None):
-        del allowed_document_types
-        return {
-            "query": query,
-            "matches": [
-                {
-                    "document_id": "55",
-                    "title": "Nota relacionada",
-                    "type": "note",
-                    "updated_at": "2026-04-02T10:00:00Z",
-                    "snippet": "Coincidencia de busqueda",
-                    "score": 0.81,
-                    "anchor": {
-                        "exactText": "Coincidencia de busqueda.",
-                        "prefixText": "",
-                        "suffixText": "",
-                        "startOffset": 0,
-                        "endOffset": 24,
-                    },
-                }
-            ][:max_results],
-        }
-
-    def read_patch_history(self, document_id: str, *, limit: int = 5):
-        del limit
-        return {"document_id": document_id, "patches": []}
-
-    def read_encounter_context(self):
-        return {
-            "encounter_id": "12",
-            "encounter_name": "Encuentro demo",
-            "occurred_at": "2026-04-02T10:00:00Z",
-            "has_been_transcribed": True,
-            "patient_id": None,
-            "patient_summary": None,
-        }
+        return spans[document_id]
 
     def build_context_view(
         self,
@@ -169,92 +97,99 @@ class FakeToolsClient:
         return {
             "facts": [
                 {
-                    "category": "diagnosis",
-                    "value": "Paciente con dolor abdominal.",
-                    "source_document_id": "12",
+                    "category": "plan",
+                    "value": "El paciente tenia dolor de estomago.",
+                    "source_document_id": "3",
                     "source_anchor": {
-                        "exactText": "Paciente con dolor abdominal.",
+                        "exactText": "El paciente tenia dolor de estomago.",
                         "prefixText": "",
                         "suffixText": "",
                         "startOffset": 0,
-                        "endOffset": 29,
+                        "endOffset": 35,
                     },
-                    "confidence": 0.8,
+                    "confidence": 0.82,
                 }
             ],
             "ambiguities": [],
-            "source_document_ids": ["12"],
+            "source_document_ids": ["3", "4", "7"],
         }
 
 
-class ScriptedPlanner:
-    def __init__(self, decisions, drafted_patch=None):
-        self._decisions = list(decisions)
-        self._drafted_patch = drafted_patch or DraftedPatch(
-            operation_type="insert_after_span",
-            anchor={
-                "exactText": "Paciente estable y con mejoria.",
-                "prefixText": "",
-                "suffixText": "",
-                "startOffset": 0,
-                "endOffset": 29,
-            },
-            expected_hash="hash-demo",
-            before_preview="Paciente estable y con mejoria.",
-            after_preview="\n\nFecha: 2 abril 2026",
-            document_preview_after="Paciente estable y con mejoria.\n\nFecha: 2 abril 2026",
-            content_preview="Paciente estable y con mejoria.\n\nFecha: 2 abril 2026",
-            rationale="Integrar fecha solicitada en la nota.",
-        )
+def test_vertex_planner_accepts_null_tool_input_for_respond():
+    planner = VertexToolPlanner(
+        settings=SimpleNamespace(gcp_project_id="demo", gcp_region="us-central1", vertex_model="gemini-2.5-flash"),
+        fallback=HeuristicFallbackPlanner(),
+    )
 
-    def plan_next_action(self, _state):
-        return self._decisions.pop(0)
+    decision = planner._parse_decision(
+        """
+        {
+          "action_type": "respond",
+          "tool_name": null,
+          "tool_input": null,
+          "reasoning_summary": "simple greeting",
+          "response_content": "Hola",
+          "intent": "answer_question"
+        }
+        """,
+        build_state("hola"),
+    )
 
-    def draft_patch_preview(self, **_kwargs):
-        return self._drafted_patch
+    assert decision.action_type == "respond"
+    assert decision.tool_input == {}
+    assert decision.response_content == "Hola"
 
 
-def build_state(user_message="Hazme un resumen"):
-    return {
-        "tenant_id": "doctor:7",
-        "user_id": "7",
-        "encounter_id": "12",
-        "active_document_id": "99",
-        "thread_id": "copilot:encounter:12:doctor:7",
-        "user_message": user_message,
-        "workspace_index": {
-            "encounter_id": "12",
-            "workspace_version": "v1",
-            "active_document_id": "99",
-            "open_document_ids": ["99", "12", "77"],
-            "documents": [],
-        },
-        "messages": [{"role": "user", "content": user_message}],
-        "selected_document_ids": [],
-        "available_documents": [],
-        "context_view": None,
-        "document_summaries": {},
-        "read_spans": [],
-        "retrieved_context": [],
-        "read_documents": [],
-        "encounter_context": None,
-        "search_matches": [],
-        "search_query": None,
-        "patch_history": {},
-        "tool_calls": [],
-        "tool_results": [],
-        "planner_decisions": [],
-        "current_plan_step": "start",
-        "pending_action": None,
-        "pending_tool_result": None,
-        "iteration_count": 0,
-        "max_iterations": 6,
-        "max_document_reads": 4,
-        "patch_operations_count": 0,
-        "max_patch_operations": 1,
-        "requires_human_review": False,
-        "trace_metadata": {},
+def test_vertex_planner_normalizes_build_context_view_input_shape():
+    planner = VertexToolPlanner(
+        settings=SimpleNamespace(gcp_project_id="demo", gcp_region="us-central1", vertex_model="gemini-2.5-flash"),
+        fallback=HeuristicFallbackPlanner(),
+    )
+
+    decision = planner._parse_decision(
+        """
+        {
+          "action_type": "call_tool",
+          "tool_name": "build_context_view",
+          "tool_input": {
+            "document_id": "7",
+            "include_document_ids": "7",
+            "unexpected": "drop-me"
+          },
+          "reasoning_summary": "Need context",
+          "intent": "add_information_to_document"
+        }
+        """,
+        build_state("agrega cualquier fecha a la nota clinica"),
+    )
+
+    assert decision.intent == "edit_document"
+    assert decision.tool_input == {
+        "active_document_id": "7",
+        "include_document_ids": ["7"],
     }
+
+
+def test_vertex_planner_rejects_respond_for_edit_requests():
+    planner = VertexToolPlanner(
+        settings=SimpleNamespace(gcp_project_id="demo", gcp_region="us-central1", vertex_model="gemini-2.5-flash"),
+        fallback=HeuristicFallbackPlanner(),
+    )
+
+    with pytest.raises(ValueError, match="cannot finish an edit request with respond"):
+        planner._parse_decision(
+            """
+            {
+              "action_type": "respond",
+              "tool_name": null,
+              "tool_input": {},
+              "reasoning_summary": "Done",
+              "response_content": "Listo",
+              "intent": "add_information_to_document"
+            }
+            """,
+            build_state("agrega cualquier fecha a la nota clinica"),
+        )
 
 
 def test_greeting_can_finish_without_tool_calls():
@@ -399,6 +334,33 @@ def test_edit_request_proposes_patch_after_tool_loop():
     assert next_state["patch_preview"]["document_preview_after"].endswith("Fecha: 2 abril 2026")
 
 
+def test_regression_edit_note_request_stays_in_waiting_review_path():
+    graph = build_clinical_copilot_graph(
+        tools_client=EncounterRegressionToolsClient(),
+        planner=HeuristicFallbackPlanner(),
+    )
+    state = build_state("agrega cualquier fecha a la nota clinica")
+    state["encounter_id"] = "2"
+    state["active_document_id"] = "3"
+    state["workspace_index"]["encounter_id"] = "2"
+    state["workspace_index"]["active_document_id"] = "3"
+    state["workspace_index"]["open_document_ids"] = ["3", "4", "7"]
+
+    next_state = graph.invoke(
+        state,
+        config={"configurable": {"thread_id": "copilot:encounter:2:doctor:1"}},
+    )
+
+    assert next_state["requires_human_review"] is True
+    assert next_state["final_response"] is None
+    assert next_state["patch_preview"]["target_document_id"] == "7"
+    assert next_state["target_document_title"] == "Nota clinica"
+    assert "title_family_match:clinical_note" in str(
+        next_state["target_selection_reason"]
+    )
+    assert next_state.get("run_error") is None
+
+
 def test_egreso_request_can_target_discharge_family():
     planner = ScriptedPlanner(
         [
@@ -470,4 +432,150 @@ def test_invalid_tool_finishes_with_safe_response():
         config={"configurable": {"thread_id": "copilot:encounter:12:doctor:7"}},
     )
 
-    assert "No pude completar una accion del copiloto" in next_state["final_response"]
+    assert "No pude completar una accion del copiloto" in next_state["run_error"]
+
+
+@pytest.mark.parametrize(
+    ("user_message", "expected_tool"),
+    [
+        ("Hazme un resumen del encounter", "list_open_documents"),
+        ("Que dice la nota clinica?", "list_open_documents"),
+    ],
+)
+def test_heuristic_planner_requests_open_documents_when_workspace_is_empty(
+    user_message: str,
+    expected_tool: str,
+):
+    planner = HeuristicFallbackPlanner()
+
+    decision = planner.plan_next_action(build_state(user_message))
+
+    assert decision.action_type == "call_tool"
+    assert decision.tool_name == expected_tool
+
+
+def test_heuristic_planner_uses_context_view_before_searching():
+    planner = HeuristicFallbackPlanner()
+    state = build_state("Hazme un resumen del encounter")
+    state["available_documents"] = [
+        make_document("99", title="Nota clinica", document_type="note", is_active=True),
+        make_document("12", title="Contexto del encuentro", document_type="context", ai_writable=False),
+    ]
+
+    decision = planner.plan_next_action(state)
+
+    assert decision.action_type == "call_tool"
+    assert decision.tool_name == "build_context_view"
+    assert decision.tool_input["active_document_id"] == "99"
+
+
+def test_heuristic_planner_answers_simple_greeting_without_documents():
+    planner = HeuristicFallbackPlanner()
+
+    decision = planner.plan_next_action(build_state("hola"))
+
+    assert decision.action_type == "respond"
+    assert "Hola." in str(decision.response_content)
+
+
+def test_heuristic_planner_reads_search_hit_span_for_question():
+    planner = HeuristicFallbackPlanner()
+    state = build_state("Que medicamentos se mencionan?")
+    state["available_documents"] = [
+        make_document("99", title="Nota clinica", document_type="note", is_active=True),
+    ]
+    state["context_view"] = {"facts": [], "ambiguities": [], "source_document_ids": []}
+    state["search_matches"] = [
+        {
+            "document_id": "55",
+            "anchor": {
+                "exactText": "Metformina 500 mg",
+                "prefixText": "",
+                "suffixText": "",
+            },
+        }
+    ]
+
+    decision = planner.plan_next_action(state)
+
+    assert decision.action_type == "call_tool"
+    assert decision.tool_name == "read_document_span"
+    assert decision.tool_input["document_id"] == "55"
+    assert decision.tool_input["exact_text"] == "Metformina 500 mg"
+
+
+def test_heuristic_planner_prefers_note_title_over_active_context_for_edit():
+    planner = HeuristicFallbackPlanner()
+    state = build_state("a la nota clinica agregale la fecha de hoy 2 abril 2026")
+    state["active_document_id"] = "12"
+    state["available_documents"] = [
+        make_document("12", title="Contexto del encuentro", document_type="context", ai_writable=False, is_active=True),
+        make_document("99", title="Nota clinica", document_type="note"),
+        make_document("77", title="Epicrisis de egreso", document_type="note"),
+    ]
+    state["context_view"] = {"facts": [], "ambiguities": [], "source_document_ids": ["12"]}
+
+    decision = planner.plan_next_action(state)
+
+    assert decision.action_type == "call_tool"
+    assert decision.tool_name == "read_document_summary"
+    assert decision.tool_input["document_id"] == "99"
+    assert decision.target_document_hint == "nota"
+
+
+def test_heuristic_planner_prefers_discharge_family_for_egreso_request():
+    planner = HeuristicFallbackPlanner()
+    state = build_state("haz el egreso con recomendaciones de salida")
+    state["available_documents"] = [
+        make_document("99", title="Nota clinica", document_type="note", is_active=True),
+        make_document("77", title="Epicrisis de egreso", document_type="note"),
+    ]
+    state["context_view"] = {"facts": [], "ambiguities": [], "source_document_ids": ["99"]}
+
+    decision = planner.plan_next_action(state)
+
+    assert decision.action_type == "call_tool"
+    assert decision.tool_name == "read_document_summary"
+    assert decision.tool_input["document_id"] == "77"
+    assert decision.target_document_hint == "egreso"
+
+
+def test_heuristic_planner_returns_safe_response_when_no_editable_documents_exist():
+    planner = HeuristicFallbackPlanner()
+    state = build_state("corrige la nota")
+    state["available_documents"] = [
+        make_document("12", title="Contexto del encuentro", document_type="context", ai_writable=False, is_active=True),
+        make_document("13", title="Transcripcion", document_type="transcription", ai_writable=False),
+    ]
+    state["context_view"] = {"facts": [], "ambiguities": [], "source_document_ids": ["12"]}
+
+    decision = planner.plan_next_action(state)
+
+    assert decision.action_type == "respond"
+    assert "No encontre un documento editable" in str(decision.response_content)
+
+
+def test_heuristic_planner_respects_iteration_limit():
+    planner = HeuristicFallbackPlanner()
+    state = build_state("Hazme un resumen del encounter")
+    state["iteration_count"] = state["max_iterations"]
+
+    decision = planner.plan_next_action(state)
+
+    assert decision.action_type == "respond"
+    assert decision.reasoning_summary == "iteration_limit_reached"
+
+
+def test_heuristic_planner_respects_patch_budget():
+    planner = HeuristicFallbackPlanner()
+    state = build_state("agrega la fecha a la nota")
+    state["available_documents"] = [
+        make_document("99", title="Nota clinica", document_type="note", is_active=True),
+    ]
+    state["context_view"] = {"facts": [], "ambiguities": [], "source_document_ids": ["99"]}
+    state["patch_operations_count"] = state["max_patch_operations"]
+
+    decision = planner.plan_next_action(state)
+
+    assert decision.action_type == "respond"
+    assert decision.reasoning_summary == "patch_budget_reached"
