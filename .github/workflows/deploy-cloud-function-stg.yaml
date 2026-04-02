@@ -49,7 +49,9 @@ jobs:
             echo "::error::Set repository variable GCP_PROJECT_ID (e.g. vext-stg)"
             exit 1
           fi
-          BUCKET="${CF_SOURCE_BUCKET:-${GCP_PROJECT}-cf-source}"
+          # Limpiar posibles comas o espacios al final de la variable que vienen de GitHub
+          CLEAN_BUCKET=$(echo "${CF_SOURCE_BUCKET:-${GCP_PROJECT}-cf-source}" | tr -d ',' | xargs)
+          BUCKET="${CLEAN_BUCKET}"
           OBJECT="${CF_SOURCE_OBJECT:-cloud-functions.zip}"
           echo "Using gs://${BUCKET}/${OBJECT}"
 
