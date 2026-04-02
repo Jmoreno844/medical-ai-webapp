@@ -1,149 +1,150 @@
-# Guía de Inicio Local (Onboarding)
+# Guía de Inicio Local
 
-Esta guía describe los pasos para levantar todo el ecosistema del Proyecto AI Médico en tu máquina local para desarrollo.
+Esta guía busca dejar un entorno local repetible para volver al proyecto rápido después de una pausa.
 
-## Requisitos Previos
+## Requisitos
 
-- **Docker** y **Docker Compose**
-- **Python 3.12+** y **uv** (para el backend)
-- **Node.js 20+** y **npm** (para el frontend)
-- Cuenta de **Google Cloud** con un proyecto configurado (Vertex AI, Cloud Storage)
-- **ngrok** (para recibir webhooks de Cloud Functions localmente)
+- Docker y Docker Compose
+- Python 3.10+ y `uv`
+- Node.js 20+ y `npm`
+- `gcloud auth application-default login`
+- Acceso a un proyecto GCP con Vertex AI y bucket de audio
 
----
-
-## 1. Configuración de Variables de Entorno
+## 1. Variables de entorno
 
 ### Backend
-Copia el archivo de ejemplo y configura tus credenciales en `backend/.env`:
+
 ```bash
-cd backend
-cp .env.example .env
+cp backend/.env.example backend/.env
 ```
-Asegúrate de llenar:
+
+Variables clave:
+
 - `DJANGO_SECRET_KEY`
 - `JWT_SECRET_KEY`
+- `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`
 - `GCS_BUCKET_NAME`
 - `GCP_PROJECT_ID`
-- `GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT` (service account dedicada para firmar URLs de GCS con ADC local)
+- `GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT`
+- `TRANSCRIPTION_CLOUD_FUNCTION_URL=http://localhost:8082`
+- `GENERATE_DOCUMENT_CLOUD_FUNCTION_URL=http://localhost:8083`
 
-Para el backend, la recomendación es usar `gcloud auth application-default login` en tu máquina y luego dejar que Django impersonate una service account dedicada con acceso mínimo al bucket de audio. No uses una clave JSON salvo excepción explícita.
+La ruta recomendada para firmar URLs de GCS en local es ADC + impersonación. Usa `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH` solo como excepción.
 
 ### Frontend
-Copia el archivo de ejemplo en `webapp/.env.local`:
+
 ```bash
-cd webapp
-cp .env.example .env.local
+cp webapp/.env.example webapp/.env.local
 ```
-Por defecto, `VITE_API_URL=http://localhost:8000`.
+
+Por defecto:
+
+- `VITE_API_URL=http://localhost:8000`
 
 ### Cloud Functions
-Crea un archivo `.env` en `cloud_functions/` con:
-```env
-GCP_PROJECT=tu-proyecto-gcp
-GCP_REGION=us-central1
-GEMINI_MODEL=gemini-1.5-pro
-DJANGO_API_BASE_URL=http://host.docker.internal:8000  # Para que el contenedor vea a Django
-```
-
-Si usas `cloud_functions/docker-compose.yml`, `GEMINI_MODEL` se lee desde `cloud_functions/functions/.env.local`.
-
----
-
-## 2. Levantar la Base de Datos
-
-El backend usa PostgreSQL. Puedes levantarlo fácilmente con Docker Compose desde la carpeta `backend/`:
 
 ```bash
-cd backend
-make db-up
-# o manualmente: docker compose up -d db
+cp cloud_functions/functions/.env.example cloud_functions/functions/.env.local
 ```
 
----
+Variables clave:
 
-## 3. Iniciar el Backend (Django)
+- `ENVIRONMENT=local`
+- `GCP_PROJECT`
+- `GCP_REGION`
+- `GEMINI_MODEL`
+- `DJANGO_API_BASE_URL=http://localhost:8000/`
 
-Con la base de datos corriendo, instala las dependencias y corre las migraciones:
+`cloud_functions/docker-compose.yml` ya monta ADC del host en `/app/adc.json`.
+
+## 2. Base de datos
 
 ```bash
-cd backend
-uv sync
-uv run python manage.py migrate
-uv run python manage.py createsuperuser  # Opcional, para acceder al admin
-uv run python manage.py runserver 0.0.0.0:8000
+make -C backend db-up
 ```
 
----
-
-## 4. Iniciar el Frontend (React/Vite)
-
-En otra terminal:
+## 3. Backend Django
 
 ```bash
-cd webapp
-npm install
-npm run dev
+make -C backend sync-dev
+make -C backend migrate
+make -C backend runserver
 ```
-El frontend estará disponible en `http://localhost:5173`.
 
----
-
-## 5. Emular Cloud Functions Localmente
-
-Las Cloud Functions se pueden correr localmente usando Docker. Esto es útil para probar la integración con Gemini sin desplegar a GCP.
+Opcional:
 
 ```bash
-cd cloud_functions
-docker-compose up --build
+make -C backend createsuperuser
 ```
-Esto levantará el emulador de Functions Framework en el puerto `8080`.
 
-### Configurar ngrok para Webhooks (Opcional pero recomendado)
-
-Si las Cloud Functions locales necesitan enviar peticiones de vuelta al backend de Django (callbacks), y estás usando herramientas externas o probando flujos complejos, puedes exponer tu backend local con ngrok:
+## 4. Frontend
 
 ```bash
-ngrok http 8000
+npm --prefix webapp install
+npm --prefix webapp run dev
 ```
 
-Luego, actualiza `DJANGO_API_BASE_URL` en el `.env` de `cloud_functions/` con la URL de ngrok (ej. `https://1234-abcd.ngrok.io`) y reinicia el contenedor de Cloud Functions.
+Frontend: `http://localhost:5173`
 
----
+## 5. Cloud Functions locales
 
-## 6. Trazas distribuidas (opcional, Jaeger)
+```bash
+docker compose -f cloud_functions/docker-compose.yml up --build
+```
 
-Para ver un solo trace de **webapp → Django → Cloud Functions → Django**:
+Puertos locales:
 
-1. Levanta Jaeger en la raíz del repo:
-   ```bash
-   docker compose -f docker-compose.tracing.yml up -d
-   ```
-2. **Backend** (en la misma shell donde corres Django), por ejemplo:
-   ```bash
-   export OTEL_TRACES_EXPORTER=otlp
-   export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces
-   export OTEL_SERVICE_NAME=vexthealth-backend
-   # Si tienes GOOGLE_CLOUD_PROJECT en el entorno:
-   export OTEL_FORCE_OTLP=1
-   ```
-3. **Webapp** — en `webapp/.env.local`:
-   ```env
-   VITE_OTEL_EXPORTER_OTLP_TRACES_URL=/otel/v1/traces
-   VITE_OTEL_SERVICE_NAME=vexthealth-webapp
-   ```
-   El proxy de Vite reenvía `/otel/v1/traces` a Jaeger (ver `webapp/vite.config.ts`).
-4. **Cloud Functions** (contenedor local): apunta OTLP al host, p. ej. `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://host.docker.internal:4318/v1/traces` y `OTEL_SERVICE_NAME=vexthealth-cloud-functions`.
+- `8082` — `transcription-endpoint`
+- `8083` — `document-workflow`
 
-Interfaz Jaeger: `http://localhost:16686`. Detalle en [backend/tracing.md](backend/tracing.md).
+## 6. Smoke test recomendado
 
----
+1. Abrir el frontend en `http://localhost:5173`.
+2. Crear o abrir un `Encuentro`.
+3. Verificar que Django responda en `http://localhost:8000/api/health/`.
+4. Confirmar que el flujo de transcripción apunte a `http://localhost:8082`.
+5. Confirmar que la generación documental apunte a `http://localhost:8083`.
 
-## Resumen de Puertos Locales
+## 7. Checks rápidos
 
-- **`5173`**: Frontend (Vite)
-- **`8000`**: Backend (Django API)
-- **`5432`**: Base de Datos (PostgreSQL en Docker)
-- **`8080`**: Cloud Functions (Emulador local)
-- **`16686`**: Jaeger UI (si usas `docker-compose.tracing.yml`)
-- **`4318`**: OTLP HTTP para Jaeger (collector)
+Backend:
+```bash
+make -C backend check
+```
+
+Frontend:
+```bash
+npm --prefix webapp run lint
+npm --prefix webapp run build
+```
+
+Cloud Functions:
+```bash
+python -m pytest cloud_functions/functions/tests
+```
+
+## 8. Trazas distribuidas opcionales
+
+Para un trace local de `webapp -> Django -> Cloud Functions -> Django`:
+
+```bash
+docker compose -f docker-compose.tracing.yml up -d
+```
+
+Luego configura:
+
+- Backend: `OTEL_TRACES_EXPORTER`, `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_SERVICE_NAME`
+- Frontend: `VITE_OTEL_EXPORTER_OTLP_TRACES_URL`, `VITE_OTEL_SERVICE_NAME`
+- Cloud Functions: `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_SERVICE_NAME`
+
+Detalle completo en [`docs/backend/tracing.md`](backend/tracing.md).
+
+## Puertos locales
+
+- `5173` — frontend Vite
+- `8000` — backend Django
+- `5432` — PostgreSQL local
+- `8082` — Cloud Function de transcripción
+- `8083` — Cloud Function de generación
+- `16686` — Jaeger UI
+- `4318` — OTLP HTTP para Jaeger

@@ -199,3 +199,19 @@ resource "google_service_account_iam_member" "backend_cloud_tasks_invoker_token_
   role               = "roles/iam.serviceAccountTokenCreator"
   member             = "serviceAccount:${google_service_account.backend_runner.email}"
 }
+
+# ---------------------------------------------------------------------------
+# Local Dev SA for GCS Signing
+# ---------------------------------------------------------------------------
+
+resource "google_service_account" "backend_local_gcs_signer" {
+  project      = var.project_id
+  account_id   = "backend-local-gcs-signer"
+  display_name = "Used by local developers to sign GCS URLs via impersonation"
+}
+
+resource "google_storage_bucket_iam_member" "backend_local_gcs_signer_audio_admin" {
+  bucket = var.audio_bucket_name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.backend_local_gcs_signer.email}"
+}

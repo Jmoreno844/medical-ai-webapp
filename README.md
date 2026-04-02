@@ -1,25 +1,63 @@
 # Proyecto AI Médico
 
-Plataforma fullstack de documentación médica asistida por IA. Este sistema permite a los profesionales de la salud grabar consultas médicas, transcribir el audio automáticamente y generar documentos clínicos (como notas SOAP o de evolución) utilizando inteligencia artificial.
+Producto fullstack para documentación médica asistida por IA. El flujo principal es:
 
-## Arquitectura Principal
+1. El médico crea un `Encuentro` y graba audio.
+2. El frontend sube el audio directo a GCS con signed URL.
+3. Django dispara la transcripción y la generación documental.
+4. Cloud Functions llama a Gemini y devuelve resultados a Django.
+5. El frontend recibe transcripción y generación por SSE.
 
-El proyecto se divide en tres componentes principales:
+## Mapa del repo
 
-- **`backend/`**: API REST principal construida con Django Ninja y PostgreSQL.
-- **`cloud_functions/`**: Funciones serverless en Google Cloud para la transcripción de audio y generación de documentos con IA (Gemini).
-- **`webapp/`**: Aplicación frontend construida con React, TypeScript y Vite.
+- `backend/` — API Django Ninja, modelos, auth, SSE y orquestación.
+- `cloud_functions/` — transcripción y generación documental en GCP Functions.
+- `webapp/` — SPA React/Vite usada por el médico.
+- `infra/` — Terraform, IAM, Cloud Run, Cloud SQL, buckets, budgets.
+- `landing-page/` — sitio de marketing separado del producto principal.
+- `docs/` — documentación operativa y arquitectónica.
+
+## Leer primero
+
+- [`docs/architecture/repo-map.md`](docs/architecture/repo-map.md)
+- [`docs/architecture/system-overview.md`](docs/architecture/system-overview.md)
+- [`docs/setup-local.md`](docs/setup-local.md)
+- [`docs/backend/auth-and-jwt.md`](docs/backend/auth-and-jwt.md)
+- [`docs/backend/database.md`](docs/backend/database.md)
+
+## Comandos comunes
+
+Backend:
+```bash
+make -C backend sync-dev
+make -C backend db-up
+make -C backend migrate
+make -C backend runserver
+make -C backend test
+```
+
+Frontend:
+```bash
+npm --prefix webapp install
+npm --prefix webapp run dev
+npm --prefix webapp run lint
+npm --prefix webapp run build
+```
+
+Cloud Functions:
+```bash
+cp cloud_functions/functions/.env.example cloud_functions/functions/.env.local
+docker compose -f cloud_functions/docker-compose.yml up --build
+python -m pytest cloud_functions/functions/tests
+```
+
+## Notas para iteración rápida con IA
+
+- Usa [`AGENTS.md`](AGENTS.md) como contrato principal para agentes.
+- La guía más útil para retomar contexto rápido es [`docs/architecture/repo-map.md`](docs/architecture/repo-map.md).
+- `webapp/dist/`, `webapp/node_modules/`, `landing-page/.next/`, `landing-page/node_modules/`, `backend/.venv/`, `backend/logs/` e `infra/**/.terraform/` son artefactos locales, no fuente de verdad.
+- No existe billing de producto dentro de la app hoy; el único “billing” del repo está en budgets/monitoring de Terraform.
 
 ## Documentación
 
-Toda la documentación técnica, guías de arquitectura, configuración y despliegue se encuentra centralizada en la carpeta `docs/`.
-
-👉 **[Ir a la Documentación Principal](docs/README.md)**
-
-### Enlaces Rápidos
-- [Guía de Inicio Local](docs/setup-local.md)
-- [Visión General del Sistema](docs/architecture/system-overview.md)
-- [Backend](docs/backend/README.md)
-- [Frontend](docs/frontend/README.md)
-- [Cloud Functions](docs/cloud-functions/README.md)
-- [Registro de Decisiones (ADRs)](docs/decisions/README.md)
+La entrada central está en [`docs/README.md`](docs/README.md).

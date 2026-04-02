@@ -1,56 +1,31 @@
-# React + TypeScript + Vite
+# Webapp
 
-Documentación del frontend: [Ver `../docs/frontend/README.md`](../docs/frontend/README.md).
+SPA React + TypeScript + Vite usada por el médico para grabar, transcribir, editar y generar documentos clínicos.
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Leer primero
 
-Currently, two official plugins are available:
+- [`../docs/frontend/README.md`](../docs/frontend/README.md)
+- [`src/contexts/README.md`](src/contexts/README.md)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Comandos comunes
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+```bash
+npm install
+npm run dev
+npm run lint
+npm run build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Mapa rápido
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- `src/router.tsx` — rutas
+- `src/commons/` — utilidades compartidas, `axiosInstance`, auth context
+- `src/contexts/` — estado principal del detalle de encuentro
+- `src/features/encuentroHeader/` — audio, paciente, transcripción
+- `src/features/encuentroTextArea/` — editor, tabs, generación documental
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
-```
+## Notas de mantenimiento
+
+- La fuente de verdad actual para el detalle de encuentro pasa por `AppProviders` y los contexts.
+- Si cambias SSE o generación, revisa tanto `GenerationContext` como `TranscriptionContext`.
+- Los hooks viejos bajo `src/features/.../hooks/` no siempre representan la ruta activa del producto.

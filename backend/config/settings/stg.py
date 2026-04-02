@@ -74,7 +74,9 @@ def configure_json_logging() -> None:
             format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
             handlers=[logging.StreamHandler(sys.stderr)],
         )
-        logging.warning("Failed to configure JSON logging, using basic logging: %s", exc)
+        logging.warning(
+            "Failed to configure JSON logging, using basic logging: %s", exc
+        )
 
 
 configure_json_logging()

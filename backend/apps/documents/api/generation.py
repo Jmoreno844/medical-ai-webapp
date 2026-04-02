@@ -4,6 +4,7 @@ Authenticated document generation workflow (Django session).
 
 import json
 import logging
+import time
 
 import requests
 from django.conf import settings
@@ -138,11 +139,17 @@ def generate_document_workflow(request, data: DocumentGenerationWorkflowRequest)
 
         try:
             logger.info("Making validation request to cloud function")
+            validation_started_at = time.monotonic()
             validation_resp = requests.post(
                 url_cloud_function,
                 json=request_body,
                 headers={"Content-Type": "application/json"},
                 timeout=10,
+            )
+            logger.info(
+                "Cloud function validation completed in %.3f seconds with status %s",
+                time.monotonic() - validation_started_at,
+                validation_resp.status_code,
             )
 
             if validation_resp.status_code != 200:

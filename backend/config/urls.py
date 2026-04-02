@@ -32,10 +32,10 @@ def get_csrf_token(request):
     return HttpResponse()
 
 
-api.add_router("/", documents_base_router)
 api.add_router("/", sse_router)
 api.add_router("/", documents_callbacks_router)
 api.add_router("/", documents_generation_router)
+api.add_router("/", documents_base_router)
 api.add_router("/auth/", accounts_router)
 api.add_router("/", encounters_router)
 api.add_router("/", patients_router)

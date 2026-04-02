@@ -22,3 +22,8 @@ output "github_actions_deployer_name" {
   description = "Full resource name of the GitHub Actions deployer SA"
   value       = google_service_account.github_actions_deployer.name
 }
+
+output "backend_local_gcs_signer_email" {
+  description = "Email of the local GCS URL signer SA for development impersonation"
+  value       = google_service_account.backend_local_gcs_signer.email
+}

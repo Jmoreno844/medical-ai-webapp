@@ -1,5 +1,8 @@
 backend/.venv
 backend/db.sqlite3
+backend/logs/
+backend/.pytest_cache/
+backend/.ruff_cache/
 django_ninja_project/.venv
 .env
 .env.local
@@ -25,3 +28,10 @@ infra/bootstrap/.secrets/
 
 # Local helper binaries
 /bin/cloud-sql-proxy
+
+# Frontend and local app artifacts
+webapp/node_modules/
+webapp/dist/
+landing-page/node_modules/
+landing-page/.next/
+landing-page/out/

@@ -176,6 +176,27 @@ export function GenerationProvider({
     }
   }, [encounterId, addDocument]);
 
+  const getSSEToken = useCallback(async (documentId: number) => {
+    try {
+      const response = await axiosInstance.post(
+        `/api/generate-sse-token/${documentId}`
+      );
+
+      if (response.data.success && response.data.token) {
+        return response.data.token as string;
+      }
+
+      logger.error(
+        "❌ Failed to get SSE token for generation:",
+        response.data.error
+      );
+      return null;
+    } catch (err) {
+      logger.error("❌ Error getting SSE token for generation:", err);
+      return null;
+    }
+  }, []);
+
   // Connect to SSE with token
   const connectToSSE = useCallback(
     (documentId: number, sseToken: string) => {
@@ -395,6 +416,25 @@ export function GenerationProvider({
         throw new Error("Error al crear nuevo documento");
       }
 
+      setGenerationStatus((prev) => ({
+        ...prev,
+        documentId: newDocument.id,
+      }));
+
+      if (selectDocument) {
+        selectDocument(newDocument.id);
+      }
+
+      const sseToken = await getSSEToken(newDocument.id);
+      if (!sseToken) {
+        throw new Error(
+          "No se pudo autenticar para las actualizaciones en tiempo real"
+        );
+      }
+
+      connectToSSE(newDocument.id, sseToken);
+      setIsModalOpen(false);
+
       // Request document generation workflow
       const response = await axiosInstance.post("/api/documents/generate", {
         context_document_id: contextDoc.id,
@@ -422,23 +462,16 @@ export function GenerationProvider({
       setGenerationStatus((prev) => ({
         ...prev,
         processingId: response.data.process_id,
-        documentId: newDocument.id,
       }));
-
-      // Connect to SSE for real-time updates
-      connectToSSE(newDocument.id, response.data.sse_token);
-
-      // Close the modal as generation has started
-      setIsModalOpen(false);
-
-      // Select the new document
-      if (selectDocument) {
-        selectDocument(newDocument.id);
-      }
 
       // Return the new document so it can be selected
       return newDocument;
     } catch (err) {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+
       setError(err instanceof Error ? err.message : "Error desconocido");
       setIsGenerating(false);
       setGenerationStatus((prev) => ({
@@ -452,6 +485,7 @@ export function GenerationProvider({
   }, [
     documents,
     createNewDocument,
+    getSSEToken,
     selectedPlantillaId,
     connectToSSE,
     selectDocument,
