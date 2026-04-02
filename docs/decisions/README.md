@@ -26,5 +26,7 @@ Cada ADR deberia incluir al menos estas secciones:
 
 ## Indice
 
-- [0001. Uso de Cloud Tasks para procesamiento de audio](0001-uso-de-cloud-tasks-para-procesamiento-de-audio.md)
 - [0002. Notificaciones en tiempo real (SSE en memoria)](0002-notificaciones-en-tiempo-real-sse-en-memoria.md)
+- [0003. Procesamiento asincrono de audio](0003-procesamiento-asincrono-de-audio.md)
+- [0004. Procesamiento asincrono de agentes de IA](0004-procesamiento-asincrono-agentes-ia.md)
+- [0005. Aislamiento de cargas de trabajo IA (LangGraph)](0005-aislamiento-cargas-trabajo-ia-langgraph.md)

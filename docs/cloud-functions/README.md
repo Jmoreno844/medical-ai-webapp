@@ -20,12 +20,12 @@ El directorio `cloud_functions/` contiene las funciones serverless que hacen el 
 
 ## Variables de entorno clave
 
-| Variable | Uso |
-|----------|-----|
-| `DJANGO_API_BASE_URL` | URL base del backend Django para callbacks. |
-| `GCP_PROJECT` | Proyecto usado para inicializar Vertex AI. |
-| `GCP_REGION` | Región de Vertex AI. |
-| `GEMINI_MODEL` | Modelo de Gemini a usar. |
+| Variable                         | Uso                                                                 |
+| -------------------------------- | ------------------------------------------------------------------- |
+| `DJANGO_API_BASE_URL`            | URL base del backend Django para callbacks.                         |
+| `GCP_PROJECT`                    | Proyecto usado para inicializar Vertex AI.                          |
+| `GCP_REGION`                     | Región de Vertex AI.                                                |
+| `GEMINI_MODEL`                   | Modelo de Gemini a usar.                                            |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Ruta **dentro del contenedor** al JSON de credenciales (ver abajo). |
 
 En local con Docker Compose, `GEMINI_MODEL` se toma de `functions/.env.local`. En despliegue por GitHub Actions, el workflow lee la variable `GEMINI_MODEL` desde el environment de GitHub `stg` si existe; si no, usa `gemini-3.1-flash-lite-preview`.
@@ -69,4 +69,4 @@ Si el archivo de ADC no existe aún, ejecuta en el host: `gcloud auth applicatio
 ## Cómo se conecta con el resto
 
 - El flujo global está en [`../architecture/system-overview.md`](../architecture/system-overview.md).
-- La decisión arquitectónica relevante está en [`../decisions/0001-uso-de-cloud-tasks-para-procesamiento-de-audio.md`](../decisions/0001-uso-de-cloud-tasks-para-procesamiento-de-audio.md).
+- La decisión arquitectónica relevante está en [`../decisions/0003-procesamiento-asincrono-de-audio.md`](../decisions/0003-procesamiento-asincrono-de-audio.md).

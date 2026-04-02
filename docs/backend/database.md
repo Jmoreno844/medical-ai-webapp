@@ -13,13 +13,15 @@ En entornos Cloud (`stg`, `production`), el backend ya **no utiliza contraseñas
 2. Django usa el SA del contenedor (`backend-runner@...`) intercambiando temporalmente OAuth tokens por la sesión.
 3. El usuario de base de datos en `config/settings/stg.py` asume el nombre truncado de la cuenta de servicio (`DB_USER=backend-runner@<proyecto>.iam`).
 
-> **Importante (PostgreSQL 15+):** 
+> **Importante (PostgreSQL 15+):**
 > Al crear el entorno por primera vez con Terraform, el nuevo _IAM User_ no tendrá permisos implícitos en el esquema `public`. El administrador del proyecto debe habilitar temporalmente la IP Pública y conectarse como el usuario maestro `postgres` para conceder permisos explícitos:
+>
 > ```sql
 > GRANT ALL ON SCHEMA public TO "backend-runner@<proyecto>.iam";
 > GRANT ALL ON DATABASE "<tu-base-de-datos>" TO "backend-runner@<proyecto>.iam";
 > ```
-> *(Este paso ya fue realizado en el entorno `stg`)*.
+>
+> _(Este paso ya fue realizado en el entorno `stg`)_.
 
 ---
 
