@@ -312,6 +312,95 @@ Restricciones:
 
 ---
 
+### `copilot_copilotrun`, `copilot_copilotpatchset`, `copilot_copilotpatch` (`apps/copilot/models.py`)
+
+Persisten el broker del runtime del copiloto, el review humano y el apply seguro de escritura clínica.
+
+#### `copilot_copilotrun`
+
+| Campo | Tipo | Restricciones | Descripción |
+| --- | --- | --- | --- |
+| `run_id` | varchar(64) | unique, not null | Identificador del run brokered con `copilot-agent-service` |
+| `thread_id` | varchar(255) | not null | Thread estable por `encounter + doctor` |
+| `doctor_id` | bigint | FK → `users_user`, CASCADE | Médico dueño del run |
+| `encounter_id` | bigint | FK → `encuentro_encuentro`, CASCADE | Encuentro dueño del run |
+| `status` | varchar(32) | `created`, `running`, `waiting_review`, `completed`, `failed` | Estado público del run |
+| `intent` | varchar(64) | nullable | Intención canónica inferida por el runtime |
+| `requires_human_review` | bool | default false | Flag de pausa para writer flow |
+| `created_at`, `updated_at` | datetime | auto | Trazabilidad básica |
+
+Índices:
+
+- `(doctor, encounter)` — `copilot_cop_doctor__553b6b_idx`
+- `(thread_id)` — `copilot_cop_thread__60ab29_idx`
+
+#### `copilot_copilotpatchset`
+
+Unidad de review del writer flow. En v1 apunta a **un solo documento target por run** y agrupa hasta ~12 cambios pequeños propuestos por el agente.
+
+| Campo | Tipo | Restricciones | Descripción |
+| --- | --- | --- | --- |
+| `patch_set_id` | varchar(64) | unique, not null | ID externo del conjunto de sugerencias |
+| `run_id` | bigint | FK → `copilot_copilotrun`, CASCADE | Run que originó el set |
+| `doctor_id` | bigint | FK → `users_user`, CASCADE | Dueño |
+| `encounter_id` | bigint | FK → `encuentro_encuentro`, CASCADE | Encounter asociado |
+| `target_document_id` | bigint | FK → `documentos_documento`, CASCADE | Documento canónico que puede mutarse |
+| `base_version` | int | not null | Versión lógica del documento usada al proponer |
+| `base_hash` | varchar(128) | not null | Hash del contenido base para stale detection |
+| `rationale` | text | nullable | Justificación general del set |
+| `source_context_document_ids` | json | default `[]` | IDs de documentos usados como contexto |
+| `target_document_title` | varchar(255) | nullable | Título usado para review/debug |
+| `target_selection_reason` | text | nullable | Motivo determinístico de selección del target |
+| `document_preview_after` | text | nullable | Preview combinado del documento tras aplicar los cambios válidos |
+| `status` | varchar(32) | `pending`, `partially_accepted`, `accepted`, `rejected`, `stale`, `applied` | Estado agregado del set |
+| `review_comment` | text | nullable | Comentario humano final del review/apply |
+
+Índices:
+
+- `(run, status)` — `copilot_pset_run_status_idx`
+- `(doctor, encounter)` — `copilot_pset_doctor_enc_idx`
+- `(target_document)` — `copilot_pset_target_doc_idx`
+
+#### `copilot_copilotpatch`
+
+Unidad granular de cambio. Cada fila representa un cambio anclado que Django puede aceptar, rechazar, marcar como conflictivo o aplicar.
+
+| Campo | Tipo | Restricciones | Descripción |
+| --- | --- | --- | --- |
+| `patch_id` | varchar(64) | unique, not null | ID externo del cambio |
+| `patch_set_id` | bigint | FK → `copilot_copilotpatchset`, nullable | Set padre; los rows legacy pueden nacer sin set y se normalizan al vuelo |
+| `run_id` | bigint | FK → `copilot_copilotrun`, CASCADE | Run que originó el cambio |
+| `target_document_id` | bigint | FK → `documentos_documento`, CASCADE | Documento objetivo |
+| `base_version` | int | not null | Versión lógica usada al proponer |
+| `order_index` | int | default 0 | Orden estable de aplicación dentro del set |
+| `patch_type` | varchar(64) | not null | `replace_span`, `insert_before`, `insert_after`, `delete_span` o legado normalizado |
+| `operation_type` | varchar(64) | not null | Valor bruto del runtime para compatibilidad |
+| `anchor` | json | default `{}` | Anchor textual del cambio |
+| `expected_hash` | varchar(128) | nullable | Hash esperado del span/ancla |
+| `old_text`, `new_text` | text | nullable | Texto previo y propuesto |
+| `resolved_start`, `resolved_end` | int | nullable | Rango resuelto por Django sobre el contenido base |
+| `confidence` | float | nullable | Confianza del runtime cuando exista |
+| `conflict_reason` | text | nullable | Motivo de conflicto interno o stale |
+| `before_preview`, `after_preview` | text | nullable | Preview corto del cambio |
+| `document_preview_after` | text | nullable | Preview del documento luego de aplicar ese cambio |
+| `content_preview` | text | not null | Fallback legacy para previews |
+| `status` | varchar(32) | `pending`, `accepted`, `rejected`, `conflicted`, `applied`, `stale` | Estado por cambio |
+
+Índices:
+
+- `(patch_set, status)` — `copilot_patch_pset_status_idx`
+- `(run, status)` — `copilot_cop_run_id_468f25_idx`
+- `(doctor, encounter)` — `copilot_cop_doctor__6f0cd0_idx`
+- `(target_document)` — `copilot_cop_target__1321e5_idx`
+
+Notas de operación:
+
+- Django, no el frontend, resuelve anchors a `resolved_start/resolved_end`.
+- Si el `base_hash` ya no coincide al aplicar, el `CopilotPatchSet` pasa a `stale`.
+- El endpoint legacy `/api/copilot/runs/{run_id}/review` sigue existiendo solo para patch sets de un cambio mientras migra la UI.
+
+---
+
 ## Convenciones de naming
 
 | Convención                                  | Ejemplo                                            |
@@ -343,6 +432,7 @@ Cloud SQL y la arquitectura descrita en `docs/architecture/system-overview.md`.
 | `encuentro`  | `0001–0005` (audio fields, has_been_transcribed)                | ✓      |
 | `documentos` | `0001_initial`, `0002_alter_tipo`                               | ✓      |
 | `plantillas` | `0001_initial`, `0002_usoplantilla`, `0003_seed_base_templates` | ✓      |
+| `copilot`    | `0001_initial`–`0006_copilotpatchset_and_granular_patches`      | ✓      |
 
 La migración `plantillas/0003_seed_base_templates.py` inyecta datos iniciales de `PlantillaBase`
 (en el despliegue, los nuevos usuarios reciben automáticamente una `PlantillaDoctor` por cada fila existente en `PlantillaBase`).

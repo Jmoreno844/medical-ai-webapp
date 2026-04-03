@@ -38,6 +38,11 @@ variable "db_name" {
   type        = string
 }
 
+variable "copilot_agent_db_name" {
+  description = "Logical database name for copilot agent checkpoints and memory"
+  type        = string
+}
+
 # --- Cloud Run ---
 
 variable "cloud_run_service_name" {
@@ -45,8 +50,18 @@ variable "cloud_run_service_name" {
   type        = string
 }
 
+variable "copilot_agent_service_name" {
+  description = "Cloud Run copilot agent service name"
+  type        = string
+}
+
 variable "cloud_run_image" {
   description = "Initial Docker image for Cloud Run (CI/CD updates this)"
+  type        = string
+}
+
+variable "copilot_agent_image" {
+  description = "Initial Docker image for the copilot agent service (CI/CD updates this)"
   type        = string
 }
 
@@ -56,10 +71,22 @@ variable "cloud_run_max_instances" {
   default     = 1
 }
 
+variable "copilot_agent_max_instances" {
+  description = "Maximum copilot agent Cloud Run instances"
+  type        = number
+  default     = 2
+}
+
 variable "cloud_run_max_concurrency" {
   description = "Maximum requests per Cloud Run instance"
   type        = number
   default     = 250
+}
+
+variable "copilot_agent_max_concurrency" {
+  description = "Maximum requests per copilot agent Cloud Run instance"
+  type        = number
+  default     = 20
 }
 
 variable "cloud_run_use_secret_manager" {
@@ -72,6 +99,12 @@ variable "cloud_run_allow_unauthenticated" {
   description = "Whether Cloud Run should allow unauthenticated invocations"
   type        = bool
   default     = true
+}
+
+variable "copilot_agent_allow_unauthenticated" {
+  description = "Whether the copilot agent service should allow unauthenticated invocations"
+  type        = bool
+  default     = false
 }
 
 # --- Cloud Functions source ---

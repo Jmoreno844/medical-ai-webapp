@@ -48,6 +48,7 @@ class CopilotSessionOut(Schema):
 
 class CopilotMessageIn(Schema):
     encounter_id: int
+    thread_id: str
     user_message: str
     workspace_index: WorkspaceIndexIn
     active_document_id: Optional[str] = None
@@ -60,7 +61,9 @@ class CopilotRunOut(Schema):
     status: str
     intent: Optional[str] = None
     requires_human_review: bool = False
+    active_patch_set_id: Optional[str] = None
     final_response: Optional[str] = None
+    applied_patch_set_id: Optional[str] = None
     applied_patch_id: Optional[str] = None
     applied_document_id: Optional[str] = None
     applied_content: Optional[str] = None
@@ -70,12 +73,21 @@ class CopilotRunOut(Schema):
 
 class CopilotPatchOut(Schema):
     patch_id: str
+    patch_set_id: Optional[str] = None
     run_id: str
     target_document_id: str
     base_version: int
+    order_index: int = 0
+    patch_type: str
     operation_type: str
     anchor: dict[str, Any] = Field(default_factory=dict)
     expected_hash: Optional[str] = None
+    old_text: Optional[str] = None
+    new_text: Optional[str] = None
+    resolved_start: Optional[int] = None
+    resolved_end: Optional[int] = None
+    confidence: Optional[float] = None
+    conflict_reason: Optional[str] = None
     before_preview: Optional[str] = None
     after_preview: Optional[str] = None
     document_preview_after: Optional[str] = None
@@ -84,8 +96,33 @@ class CopilotPatchOut(Schema):
     source_context_document_ids: list[str] = Field(default_factory=list)
     target_document_title: Optional[str] = None
     target_selection_reason: Optional[str] = None
-    status: Literal["pending", "approved", "rejected", "applied", "stale"]
+    status: Literal["pending", "accepted", "rejected", "conflicted", "applied", "stale"]
     review_comment: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class CopilotPatchSetOut(Schema):
+    patch_set_id: str
+    run_id: str
+    target_document_id: str
+    base_version: int
+    base_hash: str
+    rationale: Optional[str] = None
+    source_context_document_ids: list[str] = Field(default_factory=list)
+    target_document_title: Optional[str] = None
+    target_selection_reason: Optional[str] = None
+    document_preview_after: Optional[str] = None
+    status: Literal[
+        "pending",
+        "partially_accepted",
+        "accepted",
+        "rejected",
+        "stale",
+        "applied",
+    ]
+    review_comment: Optional[str] = None
+    patches: list[CopilotPatchOut] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -93,6 +130,16 @@ class CopilotPatchOut(Schema):
 class CopilotReviewIn(Schema):
     patch_id: str
     decision: Literal["approve", "reject"]
+    comment: Optional[str] = None
+    document_version: Optional[int] = None
+
+
+class CopilotPatchDecisionIn(Schema):
+    patch_id: str
+    comment: Optional[str] = None
+
+
+class CopilotPatchSetDecisionIn(Schema):
     comment: Optional[str] = None
     document_version: Optional[int] = None
 
@@ -213,7 +260,7 @@ class CopilotReadDocumentSpanIn(CopilotInternalToolRequest):
     suffix_text: Optional[str] = None
     start_offset: Optional[int] = None
     end_offset: Optional[int] = None
-    max_chars: int = Field(default=600, ge=50, le=3000)
+    max_chars: int = Field(default=600, ge=50, le=20000)
 
 
 class CopilotReadDocumentSpanOut(Schema):

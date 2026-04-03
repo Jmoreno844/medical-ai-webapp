@@ -1,7 +1,7 @@
 import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
 import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
 import { useDocumentSnapshotStore } from "@/workspace/stores/documentSnapshotStore";
-import { usePatchStore } from "@/workspace/stores/patchStore";
+import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
 import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
 import { WorkspaceIndex } from "@/workspace/types";
 
@@ -10,7 +10,7 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
   const draftState = useDocumentDraftStore.getState();
   const derivedState = useDocumentDerivedStore.getState();
   const snapshotState = useDocumentSnapshotStore.getState();
-  const patchState = usePatchStore.getState();
+  const patchSetState = usePatchSetStore.getState();
 
   const documents = workspaceState.documentOrder
     .map((documentId) => workspaceState.documentsById[documentId])
@@ -19,7 +19,11 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
       const draft = draftState.draftsByDocumentId[document.id];
       const derived = derivedState.derivedByDocumentId[document.id];
       const snapshot = snapshotState.snapshotsByDocumentId[document.id];
-      const patches = patchState.patchesByDocumentId[document.id] ?? [];
+      
+      const activePatchSet = patchSetState.activePatchSetId 
+        ? patchSetState.patchSets[patchSetState.activePatchSetId]
+        : null;
+      const patches = activePatchSet?.patches.filter(p => p.documentId === document.id && p.status === "pending") ?? [];
       const contentForExcerpt =
         draft?.localUnsavedContent ??
         snapshot?.contentMarkdown ??
@@ -51,7 +55,7 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
         excerpt: contentForExcerpt.trim().slice(0, 160) || undefined,
         shortSummary: document.summaryShort,
         estimatedTokens: document.estimatedTokens,
-        hasPendingPatches: patches.some((patch) => patch.status === "pending"),
+        hasPendingPatches: patches.length > 0,
       };
     });
 

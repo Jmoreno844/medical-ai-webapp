@@ -1,0 +1,141 @@
+name: Copilot Agent Staging Deployment
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "copilot_agent/**"
+      - ".github/workflows/copilot-agent-deployment-stg.yaml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "copilot_agent/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-push:
+    name: Build and Push Copilot Agent Image
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    environment: stg
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      SERVICE_NAME: vexthealth-copilot-agent
+      REGION: us-east1
+      REPOSITORY: vexthealth-containers
+      IMAGE_NAME: copilot-agent
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.GH_DEPLOYER_SA }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./copilot_agent
+          push: true
+          tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: |
+            type=registry,ref=${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
+            type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
+      - name: Tag with latest for caching
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker pull ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker tag ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
+
+  deploy:
+    name: Deploy Copilot Agent to Cloud Run
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: stg
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      SERVICE_NAME: vexthealth-copilot-agent
+      REGION: us-east1
+      REPOSITORY: vexthealth-containers
+      IMAGE_NAME: copilot-agent
+
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.GH_DEPLOYER_SA }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Deploy Copilot Agent to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          region: ${{ env.REGION }}
+          flags: |
+            --ingress=all
+            --no-allow-unauthenticated
+            --service-account=${{ vars.COPILOT_AGENT_SERVICE_ACCOUNT }}
+            --cpu=1
+            --memory=1Gi
+            --min-instances=0
+            --max-instances=2
+            --concurrency=20
+            --port=8090
+          env_vars: |
+            COPILOT_AGENT_ENV=stg
+            COPILOT_AGENT_PORT=8090
+            COPILOT_AGENT_LOG_LEVEL=INFO
+            GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }}
+            GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT_ID }}
+            GCP_REGION=${{ env.REGION }}
+            VERTEX_MODEL=gemini-2.5-flash
+            BACKEND_INTERNAL_BASE_URL=${{ vars.VITE_API_URL }}
+            COPILOT_ALLOWED_AUDIENCE=app-api-service
+            COPILOT_AGENT_DATABASE_URL=postgresql://127.0.0.1:5432/${{ vars.COPILOT_AGENT_DB_NAME }}
+            COPILOT_LONG_TERM_DATABASE_URL=postgresql://127.0.0.1:5432/${{ vars.COPILOT_AGENT_DB_NAME }}
+          secrets: |
+            COPILOT_SERVICE_SHARED_JWT=copilot-service-shared-jwt:latest
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Show Output
+        run: echo ${{ steps.deploy.outputs.url }}

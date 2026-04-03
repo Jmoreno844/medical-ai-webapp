@@ -24,3 +24,9 @@ variable "grant_cloud_functions_secret_accessor" {
   type        = bool
   default     = true
 }
+
+variable "grant_copilot_agent_secret_accessor" {
+  description = "Whether the copilot agent runtime SA should be able to read Secret Manager"
+  type        = bool
+  default     = true
+}

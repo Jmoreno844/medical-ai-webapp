@@ -47,28 +47,44 @@ class RunCreateRequest(BaseModel):
 
 
 class RunResumeRequest(BaseModel):
-    patch_id: str
+    patch_set_id: str
     review_result: Literal["approve", "reject", "edit"]
     reviewer_id: str
     comment: str | None = None
     trace_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class PatchPreview(BaseModel):
+class PatchSetPatchPreview(BaseModel):
     patch_id: str
-    target_document_id: str
-    base_version: int
-    operation_type: str
+    patch_type: str
+    order_index: int
     anchor: dict[str, Any] = Field(default_factory=dict)
     expected_hash: str | None = None
+    old_text: str | None = None
+    new_text: str | None = None
+    resolved_start: int | None = None
+    resolved_end: int | None = None
+    confidence: float | None = None
+    conflict_reason: str | None = None
+    status: str = "pending"
     before_preview: str | None = None
     after_preview: str | None = None
     document_preview_after: str | None = None
     rationale: str | None = None
     content_preview: str
-    source_context_document_ids: list[str] = Field(default_factory=list)
+
+
+class PatchSetPreview(BaseModel):
+    patch_set_id: str
+    target_document_id: str
     target_document_title: str | None = None
     target_selection_reason: str | None = None
+    base_version: int
+    base_hash: str
+    rationale: str | None = None
+    source_context_document_ids: list[str] = Field(default_factory=list)
+    document_preview_after: str | None = None
+    patches: list[PatchSetPatchPreview] = Field(default_factory=list)
 
 
 class RunEvent(BaseModel):
@@ -86,9 +102,10 @@ class RunStatusResponse(BaseModel):
     status: str
     intent: str | None = None
     requires_human_review: bool = False
-    patch_preview: PatchPreview | None = None
+    active_patch_set_id: str | None = None
+    patch_set_preview: PatchSetPreview | None = None
     final_response: str | None = None
-    applied_patch_id: str | None = None
+    applied_patch_set_id: str | None = None
     applied_document_id: str | None = None
     applied_content: str | None = None
     applied_version: int | None = None

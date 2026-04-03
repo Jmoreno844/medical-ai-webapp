@@ -18,7 +18,10 @@ class CopilotServiceError(Exception):
 class CopilotAgentClient:
     def __init__(self) -> None:
         self.base_url = settings.COPILOT_AGENT_BASE_URL.rstrip("/")
-        self.timeout = settings.COPILOT_AGENT_TIMEOUT_SECONDS
+        # Edit runs can spend most of their wall time in Vertex drafting. Keep a
+        # safety floor here so Django does not return a false 502 while the agent
+        # is still finishing a valid reviewable proposal.
+        self.timeout = max(60.0, float(settings.COPILOT_AGENT_TIMEOUT_SECONDS))
 
     def create_run(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._request("POST", "/internal/copilot/runs", json=payload)

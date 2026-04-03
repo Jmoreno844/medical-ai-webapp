@@ -15,7 +15,7 @@ infra/
     artifact_registry/  Repositorio Docker
     cloud_sql/          PostgreSQL
     storage_buckets/    Audio + frontend SPA
-    cloud_run/          Backend Django
+    cloud_run/          Cloud Run services (backend + copilot agent)
     cloud_tasks/        Cola de transcripción
     workload_identity/  WIF para GitHub Actions
     monitoring/         Alertas básicas + budget
@@ -85,7 +85,7 @@ terraform apply
 terraform output
 ```
 
-Los outputs incluyen URL de Cloud Run, Cloud SQL private IP, buckets, service accounts y el WIF provider path necesario para configurar GitHub.
+Los outputs incluyen URL de Cloud Run, URL del copilot agent, Cloud SQL private IP, buckets, service accounts y el WIF provider path necesario para configurar GitHub.
 
 ## Variables sensibles
 
@@ -121,10 +121,13 @@ Después del primer apply exitoso, copiar los outputs de Terraform a las variabl
 - `WIF_PROVIDER` (output `workload_identity_provider`)
 - `GH_DEPLOYER_SA` (output `github_actions_deployer_email`)
 - `BACKEND_SERVICE_ACCOUNT` (output `backend_service_account`)
+- `COPILOT_AGENT_SERVICE_ACCOUNT` (output `copilot_agent_service_account`)
+- `COPILOT_AGENT_DB_NAME` (valor de `terraform.tfvars`)
 - `GCS_BUCKET_NAME` (output `audio_bucket`)
 - `FRONTEND_BUCKET_NAME` (output `frontend_bucket`)
 - `CF_SOURCE_BUCKET` (output `cf_source_bucket`)
 - `VITE_API_URL` (output `cloud_run_url`)
+- `COPILOT_AGENT_URL` (output `copilot_agent_cloud_run_url`)
 - `LANDING_BUCKET_NAME` si el workflow de landing page usa un bucket distinto
 - *(opcional)* `CF_SOURCE_OBJECT` — ver `docs/architecture/gcp-infrastructure.md`
 

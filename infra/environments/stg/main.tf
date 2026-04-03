@@ -56,10 +56,10 @@ module "network" {
   project_id = var.project_id
   region     = var.region
 
-  network_name                       = var.vpc_network_name
-  subnetwork_name                    = var.vpc_subnetwork_name
-  subnetwork_cidr                    = var.vpc_subnetwork_cidr
-  private_service_range_name         = var.private_service_range_name
+  network_name                        = var.vpc_network_name
+  subnetwork_name                     = var.vpc_subnetwork_name
+  subnetwork_cidr                     = var.vpc_subnetwork_cidr
+  private_service_range_name          = var.private_service_range_name
   private_service_range_prefix_length = var.private_service_range_prefix_length
 
   depends_on = [module.project_services]
@@ -77,6 +77,7 @@ module "secret_manager" {
     "django-secret-key",
     "jwt-secret-key",
     "service-account-json",
+    "copilot-service-shared-jwt",
   ]
 
   labels = local.labels
@@ -122,12 +123,13 @@ module "storage_buckets" {
 # ---------------------------------------------------------------------------
 
 module "service_accounts" {
-  source                         = "../../modules/service_accounts"
-  project_id                     = var.project_id
-  audio_bucket_name              = module.storage_buckets.audio_bucket_name
-  frontend_bucket_name           = module.storage_buckets.frontend_bucket_name
-  cf_source_bucket_name          = module.storage_buckets.cf_source_bucket_name
+  source                                = "../../modules/service_accounts"
+  project_id                            = var.project_id
+  audio_bucket_name                     = module.storage_buckets.audio_bucket_name
+  frontend_bucket_name                  = module.storage_buckets.frontend_bucket_name
+  cf_source_bucket_name                 = module.storage_buckets.cf_source_bucket_name
   grant_cloud_functions_secret_accessor = false
+  grant_copilot_agent_secret_accessor   = true
 
   depends_on = [
     module.project_services,
@@ -148,6 +150,7 @@ module "workload_identity" {
   allowed_refs         = ["refs/heads/main"]
   allowed_workflow_files = [
     ".github/workflows/backend-deployment-stg.yaml",
+    ".github/workflows/copilot-agent-deployment-stg.yaml",
     ".github/workflows/deploy-cloud-function-stg.yaml",
     ".github/workflows/frontend-deployment-stg.yaml",
     ".github/workflows/landing-page-deployment-stg.yaml",
@@ -161,17 +164,19 @@ module "workload_identity" {
 # ---------------------------------------------------------------------------
 
 module "cloud_sql" {
-  source            = "../../modules/cloud_sql"
-  project_id        = var.project_id
-  region            = var.region
-  instance_name     = var.db_instance_name
-  tier              = var.db_tier
-  database_name     = var.db_name
-  ipv4_enabled      = false
-  private_network   = module.network.network_id
-  enable_iam_auth   = true
+  source                    = "../../modules/cloud_sql"
+  project_id                = var.project_id
+  region                    = var.region
+  instance_name             = var.db_instance_name
+  tier                      = var.db_tier
+  database_name             = var.db_name
+  additional_database_names = [var.copilot_agent_db_name]
+  ipv4_enabled              = false
+  private_network           = module.network.network_id
+  enable_iam_auth           = true
   iam_database_users = [
     module.service_accounts.backend_runner_email,
+    module.service_accounts.copilot_agent_runner_email,
   ]
 
   deletion_protection = true
@@ -220,20 +225,20 @@ module "cloud_run" {
   session_affinity = true
 
   env_vars = {
-    DJANGO_SETTINGS_MODULE   = "config.settings.stg"
-    ENVIRONMENT              = var.environment
-    GCP_PROJECT              = var.project_id
-    GOOGLE_CLOUD_PROJECT     = var.project_id
-    GCP_PROJECT_ID           = var.project_id
-    GCS_BUCKET_NAME          = module.storage_buckets.audio_bucket_name
-    ENABLE_SILK              = "true"
-    DB_HOST                  = "127.0.0.1"
-    DB_PORT                  = "5432"
-    DB_NAME                  = var.db_name
-    DB_USER                  = trimsuffix(module.service_accounts.backend_runner_email, ".gserviceaccount.com")
-    CONN_MAX_AGE             = "300"
-    CLOUD_TASKS_REGION       = var.region
-    TRANSCRIPTION_QUEUE_NAME = module.cloud_tasks.queue_name
+    DJANGO_SETTINGS_MODULE              = "config.settings.stg"
+    ENVIRONMENT                         = var.environment
+    GCP_PROJECT                         = var.project_id
+    GOOGLE_CLOUD_PROJECT                = var.project_id
+    GCP_PROJECT_ID                      = var.project_id
+    GCS_BUCKET_NAME                     = module.storage_buckets.audio_bucket_name
+    ENABLE_SILK                         = "true"
+    DB_HOST                             = "127.0.0.1"
+    DB_PORT                             = "5432"
+    DB_NAME                             = var.db_name
+    DB_USER                             = trimsuffix(module.service_accounts.backend_runner_email, ".gserviceaccount.com")
+    CONN_MAX_AGE                        = "300"
+    CLOUD_TASKS_REGION                  = var.region
+    TRANSCRIPTION_QUEUE_NAME            = module.cloud_tasks.queue_name
     CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT = module.service_accounts.cloud_tasks_invoker_email
   }
 
@@ -273,24 +278,94 @@ module "cloud_run" {
 }
 
 # ---------------------------------------------------------------------------
+# 10b. Cloud Run (copilot agent)
+# ---------------------------------------------------------------------------
+
+module "copilot_agent_cloud_run" {
+  source     = "../../modules/cloud_run"
+  project_id = var.project_id
+  region     = var.region
+
+  service_name              = var.copilot_agent_service_name
+  image                     = var.copilot_agent_image
+  service_account_email     = module.service_accounts.copilot_agent_runner_email
+  cloud_sql_connection_name = module.cloud_sql.connection_name
+  cloud_sql_volume_enabled  = false
+
+  min_instances    = 0
+  max_instances    = var.copilot_agent_max_instances
+  max_concurrency  = var.copilot_agent_max_concurrency
+  session_affinity = false
+  container_port   = 8090
+
+  env_vars = {
+    COPILOT_AGENT_ENV              = var.environment
+    COPILOT_AGENT_PORT             = "8090"
+    COPILOT_AGENT_LOG_LEVEL        = "INFO"
+    GCP_PROJECT_ID                 = var.project_id
+    GOOGLE_CLOUD_PROJECT           = var.project_id
+    GCP_REGION                     = var.region
+    VERTEX_MODEL                   = "gemini-2.5-flash"
+    BACKEND_INTERNAL_BASE_URL      = module.cloud_run.service_url
+    COPILOT_ALLOWED_AUDIENCE       = "app-api-service"
+    COPILOT_AGENT_DATABASE_URL     = "postgresql://127.0.0.1:5432/${var.copilot_agent_db_name}"
+    COPILOT_LONG_TERM_DATABASE_URL = "postgresql://127.0.0.1:5432/${var.copilot_agent_db_name}"
+  }
+
+  secret_env_vars = var.cloud_run_use_secret_manager ? [
+    { name = "COPILOT_SERVICE_SHARED_JWT", secret_id = "copilot-service-shared-jwt" },
+  ] : []
+
+  vpc_access = {
+    network    = module.network.network_name
+    subnetwork = module.network.subnetwork_name
+    egress     = "PRIVATE_RANGES_ONLY"
+  }
+
+  sidecars = [
+    {
+      name  = "cloud-sql-proxy"
+      image = var.cloud_run_db_proxy_image
+      args = [
+        "--private-ip",
+        "--auto-iam-authn",
+        "--address=127.0.0.1",
+        "--port=5432",
+        module.cloud_sql.connection_name,
+      ]
+    },
+  ]
+
+  allow_unauthenticated = var.copilot_agent_allow_unauthenticated
+  labels                = local.labels
+
+  depends_on = [
+    module.service_accounts,
+    module.cloud_sql,
+    module.secret_manager,
+  ]
+}
+
+# ---------------------------------------------------------------------------
 # 11. Monitoring
 # ---------------------------------------------------------------------------
 
 module "monitoring" {
-  source     = "../../modules/monitoring"
-  project_id = var.project_id
-  billing_account_name       = var.billing_account_name
-  cloud_run_service_name      = var.cloud_run_service_name
+  source                 = "../../modules/monitoring"
+  project_id             = var.project_id
+  billing_account_name   = var.billing_account_name
+  cloud_run_service_name = var.cloud_run_service_name
   cloud_function_service_names = [
     "transcription-endpoint",
     "document-workflow",
   ]
-  cloud_sql_instance_name     = var.db_instance_name
-  monthly_budget_amount_usd   = var.monthly_budget_amount_usd
+  cloud_sql_instance_name   = var.db_instance_name
+  monthly_budget_amount_usd = var.monthly_budget_amount_usd
 
   depends_on = [
     module.project_services,
     module.cloud_run,
+    module.copilot_agent_cloud_run,
     module.cloud_sql,
   ]
 }

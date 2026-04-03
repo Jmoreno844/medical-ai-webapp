@@ -80,6 +80,6 @@ Payload mínimo:
 | `COPILOT_SERVICE_SHARED_JWT` | Secreto compartido temporal del broker Django -> copilot agent |
 | `COPILOT_AGENT_AUDIENCE` | Audiencia esperada por el agent runtime |
 | `COPILOT_BACKEND_AUDIENCE` | Audiencia esperada por Django para las tools internas llamadas desde `copilot_agent` |
-| `COPILOT_AGENT_TIMEOUT_SECONDS` | Timeout HTTP del cliente interno del copiloto |
+| `COPILOT_AGENT_TIMEOUT_SECONDS` | Timeout HTTP del cliente interno del copiloto. En local y broker síncrono conviene `60` para no cortar runs de edición mientras Vertex termina el draft. |
 | `TRANSCRIPTION_CLOUD_FUNCTION_URL` | URL HTTP de la función de transcripción |
 | `GENERATE_DOCUMENT_CLOUD_FUNCTION_URL` | URL base de la función de generación (también se acepta `GENERATE_DOCUMENT_CLOUD_FUNCTION_BASE_URL` en develop) |

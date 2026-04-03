@@ -34,7 +34,7 @@ backend Django como broker seguro.
 ### Fase 2 — Broker Django
 
 - endpoints internos/públicos en Django
-- mapping `encounter + user -> thread_id`
+- creación de `thread_id` por conversación del sidechat, con scope validable de `encounter + user`
 - validación de permisos antes de crear o reanudar runs
 - relay de eventos al frontend
 - `CopilotRun` persistido para reconnect y trazabilidad
@@ -52,6 +52,7 @@ backend Django como broker seguro.
 
 - cliente frontend pequeño contra el broker Django ya existente
 - envío de `WorkspaceIndex` real desde el encounter detail
+- `thread_id` nuevo por conversación del sidechat, creado al iniciar chat y reenviado en mensajes posteriores
 - panel interno de validación para `thread_id`, `run_id`, estado y stream SSE
 - slice técnico de verificación antes de diseñar la UX final del copiloto
 
@@ -64,26 +65,35 @@ backend Django como broker seguro.
 
 ### Fase 4 — Patch proposal
 
-- generar `patch_preview` persistido en Django como `CopilotPatch`
+- generar `patch_set_preview` persistido en Django como `CopilotPatchSet` + `CopilotPatch`
 - `waiting_review` + `review_required` como estado público del run
-- approve/reject desde Django y desde el debug panel lateral actual
-- `resume` del run en el agent service sin `apply` real todavía
+- resolución determinística de anchors y detección de conflictos internos en Django
+- review granular por patch y review bulk por patch set
+- `resume` del run en el agent service solo después del `apply` o rechazo final del set
+- estado actual: el runtime ya puede draftar varios patches anclados dentro de un mismo `patch_set_preview` para un solo documento target; la UI todavía mantiene compat temporal con una card legacy del primer patch
 
 ### Fase 5 — Safe apply
 
-- backend aplica patch aprobado sobre `Document.content`
+- backend aplica solo patches aceptados sobre `Document.content`
 - el review devuelve metadata del documento aplicado para hidratar frontend sin reload
 - invalidación/sincronización de `snapshot`, `draft` y preview local del editor
-- estado actual: implementado con version check pragmático desde frontend, apply transaccional en Django y targeting determinístico por título/familia de documento
+- invalidación de patch sets hermanos pendientes/aceptados sobre el mismo documento
+- estado actual: implementado con `PatchSet`, anchors resueltos en Django, apply transaccional y targeting determinístico por título/familia de documento
 
 ### Fase 6 — Hardening del writer flow
 
 - audit trail clínico completo del apply
 - versionado fuerte del documento para conflictos y stale detection más robusta
-- patch synthesis más precisa que la reescritura full-document actual
+- patch synthesis más precisa y fiable para prompts complejos de varios cambios, sin depender de parsing semántico heurístico en el fallback
+- planner/tool loop migrado a tool calling nativo (`ChatGoogleGenerativeAI` + `ToolNode`) con mensajes LangChain reales y contexto XML por turno
+- tools tipadas y auditables contra Django, con observaciones corregibles (`ToolMessage`) cuando una llamada falla
+- structured output `json_schema` para `DraftedPatchPlan` y patch drafting sin `json.loads()` manual ni fallback a `function_calling`
+- si el drafter no devuelve cambios materializados, el runtime debe fallar cerrado y no abrir una review con texto placeholder
+- el planner del runtime ya no usa fallback heurístico de routing; si Vertex falla, el run debe cerrar en `failed` con error explícito
 - guardrails para que un run de edición nunca termine en `completed` antes de `waiting_review`
 - validación estricta de `tool_input` del planner y rechazo de runs inconsistentes desde Django
-- derivación frontend de `effectivePendingPatch` desde stream + persistencia, no solo desde la lista de patches
+- derivación frontend de estado efectivo desde stream + persistencia, no solo desde la lista de patches
+- UX de review multi-patch sobre `PatchSet` en vez del debug panel single-patch legacy
 - mover la experiencia desde debug panel hacia UX final del copiloto
 
 ## Infra y operación

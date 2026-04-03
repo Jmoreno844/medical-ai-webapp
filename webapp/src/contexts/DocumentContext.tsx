@@ -15,7 +15,7 @@ import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
 import { useDocumentSnapshotStore } from "@/workspace/stores/documentSnapshotStore";
 import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
 import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
-import { usePatchStore } from "@/workspace/stores/patchStore";
+import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
 import { useAiSessionStore } from "@/workspace/stores/aiSessionStore";
 
 // Define the context type
@@ -105,7 +105,7 @@ export function DocumentProvider({
   const clearDerivedState = useDocumentDerivedStore(
     (state) => state.clearDerivedState
   );
-  const clearPatches = usePatchStore((state) => state.clearPatches);
+  const clearPatchSets = usePatchSetStore((state) => state.clearAll);
   const clearSession = useAiSessionStore((state) => state.clearSession);
 
   // Tabs and active document now live in WorkspaceStore; this context remains
@@ -322,9 +322,9 @@ export function DocumentProvider({
     clearSnapshots();
     clearDrafts();
     clearDerivedState();
-    clearPatches();
+    clearPatchSets();
     clearSession();
-  }, [clearDerivedState, clearDrafts, clearPatches, clearSession, clearSnapshots]);
+  }, [clearDerivedState, clearDrafts, clearPatchSets, clearSession, clearSnapshots]);
 
   useEffect(() => {
     if (encounterId) {

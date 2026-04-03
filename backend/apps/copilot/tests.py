@@ -4,19 +4,28 @@ from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 from ninja.errors import HttpError
 
 from apps.copilot.api import (
+    apply_copilot_patch_set,
     create_copilot_message,
     create_copilot_session,
     get_copilot_run,
     list_copilot_patches,
+    list_copilot_patch_sets,
     review_copilot_patch,
     stream_copilot_run,
 )
 from apps.copilot.services.patch_apply import CopilotPatchConflictError
 from apps.copilot.services.patch_apply import apply_copilot_patch
+from apps.copilot.services.client import CopilotAgentClient
+from apps.copilot.services.patch_sets import (
+    _apply_patches_to_content,
+    _detect_internal_conflicts,
+    _resolve_patch_against_document,
+    content_hash,
+)
 from apps.copilot.internal_tools_api import (
     list_open_documents_tool,
     read_document_tool,
@@ -29,6 +38,10 @@ class CopilotBrokerTests(SimpleTestCase):
         self.doctor = SimpleNamespace(id=7)
         self.other_doctor = SimpleNamespace(id=9)
         self.encounter = SimpleNamespace(id=12, doctor_id=self.doctor.id)
+        self.thread_id = (
+            f"copilot:encounter:{self.encounter.id}:doctor:{self.doctor.id}:chat:"
+            "11111111-1111-4111-8111-111111111111"
+        )
         self.workspace_index = {
             "encounter_id": str(self.encounter.id),
             "workspace_version": "v1",
@@ -55,21 +68,35 @@ class CopilotBrokerTests(SimpleTestCase):
             ],
         }
 
-    def test_create_session_returns_deterministic_thread_id(self):
+    def test_create_session_returns_new_scoped_thread_id(self):
         request = SimpleNamespace(user=self.doctor)
 
         with patch(
             "apps.copilot.api._get_owned_encounter",
             return_value=self.encounter,
+        ), patch(
+            "apps.copilot.services.threads.uuid.uuid4",
+            side_effect=[
+                "11111111-1111-4111-8111-111111111111",
+                "22222222-2222-4222-8222-222222222222",
+            ],
         ):
             response = create_copilot_session(
+                request,
+                SimpleNamespace(encounter_id=self.encounter.id),
+            )
+            second_response = create_copilot_session(
                 request,
                 SimpleNamespace(encounter_id=self.encounter.id),
             )
 
         self.assertEqual(
             response["thread_id"],
-            f"copilot:encounter:{self.encounter.id}:doctor:{self.doctor.id}",
+            f"copilot:encounter:{self.encounter.id}:doctor:{self.doctor.id}:chat:11111111-1111-4111-8111-111111111111",
+        )
+        self.assertEqual(
+            second_response["thread_id"],
+            f"copilot:encounter:{self.encounter.id}:doctor:{self.doctor.id}:chat:22222222-2222-4222-8222-222222222222",
         )
         self.assertEqual(response["capability"], "read_only")
 
@@ -77,6 +104,7 @@ class CopilotBrokerTests(SimpleTestCase):
         request = SimpleNamespace(user=self.doctor)
         payload = SimpleNamespace(
             encounter_id=self.encounter.id,
+            thread_id=self.thread_id,
             user_message="Hazme un resumen",
             workspace_index=SimpleNamespace(
                 model_dump=lambda mode="python": self.workspace_index
@@ -96,7 +124,7 @@ class CopilotBrokerTests(SimpleTestCase):
             return_value={
                 "run": {
                     "run_id": "run-123",
-                    "thread_id": f"copilot:encounter:{self.encounter.id}:doctor:{self.doctor.id}",
+                    "thread_id": self.thread_id,
                     "status": "completed",
                     "intent": "answer_question",
                     "requires_human_review": False,
@@ -105,11 +133,11 @@ class CopilotBrokerTests(SimpleTestCase):
                 },
                 "events": [],
             },
-        ), patch(
+        ) as agent_create_run_mock, patch(
             "apps.copilot.api.CopilotRun.objects.create",
             return_value=SimpleNamespace(
                 run_id="run-123",
-                thread_id=f"copilot:encounter:{self.encounter.id}:doctor:{self.doctor.id}",
+                thread_id=self.thread_id,
                 status="completed",
                 intent="answer_question",
                 requires_human_review=False,
@@ -117,14 +145,20 @@ class CopilotBrokerTests(SimpleTestCase):
         ) as create_run_mock:
             response = create_copilot_message(request, payload)
 
+        agent_create_run_mock.assert_called_once()
+        self.assertEqual(
+            agent_create_run_mock.call_args.args[0]["thread_id"],
+            self.thread_id,
+        )
         create_run_mock.assert_called_once()
         self.assertEqual(response["run_id"], "run-123")
         self.assertEqual(response["status"], "completed")
 
-    def test_create_message_persists_patch_preview(self):
+    def test_create_message_persists_patch_set_preview(self):
         request = SimpleNamespace(user=self.doctor)
         payload = SimpleNamespace(
             encounter_id=self.encounter.id,
+            thread_id=self.thread_id,
             user_message="Actualiza la nota",
             workspace_index=SimpleNamespace(
                 model_dump=lambda mode="python": self.workspace_index
@@ -134,7 +168,7 @@ class CopilotBrokerTests(SimpleTestCase):
         )
         run_instance = SimpleNamespace(
             run_id="run-456",
-            thread_id=f"copilot:encounter:{self.encounter.id}:doctor:{self.doctor.id}",
+            thread_id=self.thread_id,
             status="waiting_review",
             intent="edit_document",
             requires_human_review=True,
@@ -155,15 +189,26 @@ class CopilotBrokerTests(SimpleTestCase):
                     "status": "waiting_review",
                     "intent": "edit_document",
                     "requires_human_review": True,
-                    "patch_preview": {
-                        "patch_id": "patch-123",
+                    "active_patch_set_id": "pset-123",
+                    "patch_set_preview": {
+                        "patch_set_id": "pset-123",
                         "target_document_id": "99",
                         "base_version": 3,
-                        "operation_type": "rewrite_document",
+                        "base_hash": "hash-123",
                         "target_document_title": "Note",
                         "target_selection_reason": "title_family_match:clinical_note; score=72",
-                        "content_preview": "## Propuesta",
                         "rationale": "Actualizar el documento activo",
+                        "document_preview_after": "## Propuesta",
+                        "patches": [
+                            {
+                                "patch_id": "patch-123",
+                                "patch_type": "replace_span",
+                                "operation_type": "rewrite_document",
+                                "order_index": 0,
+                                "anchor": {"exactText": "Texto"},
+                                "content_preview": "## Propuesta",
+                            }
+                        ],
                     },
                     "trace_metadata": {},
                 },
@@ -176,18 +221,20 @@ class CopilotBrokerTests(SimpleTestCase):
             "apps.copilot.api.get_object_or_404",
             side_effect=[SimpleNamespace(id=99, encounter_id=12, doctor_id=7)],
         ), patch(
-            "apps.copilot.api.CopilotPatch.objects.update_or_create",
-            return_value=(Mock(), True),
-        ) as update_or_create_mock:
+            "apps.copilot.api.persist_patch_set_preview",
+            return_value=Mock(),
+        ) as persist_patch_set_mock:
             response = create_copilot_message(request, payload)
 
-        update_or_create_mock.assert_called_once()
+        persist_patch_set_mock.assert_called_once()
         self.assertEqual(response["status"], "waiting_review")
+        self.assertEqual(response["active_patch_set_id"], "pset-123")
 
     def test_create_message_rejects_inconsistent_edit_run_from_agent(self):
         request = SimpleNamespace(user=self.doctor)
         payload = SimpleNamespace(
             encounter_id=self.encounter.id,
+            thread_id=self.thread_id,
             user_message="Actualiza la nota",
             workspace_index=SimpleNamespace(
                 model_dump=lambda mode="python": self.workspace_index
@@ -204,18 +251,27 @@ class CopilotBrokerTests(SimpleTestCase):
             return_value={
                 "run": {
                     "run_id": "run-456",
-                    "thread_id": f"copilot:encounter:{self.encounter.id}:doctor:{self.doctor.id}",
+                    "thread_id": self.thread_id,
                     "status": "completed",
                     "intent": "edit_document",
                     "requires_human_review": False,
-                    "patch_preview": {
-                        "patch_id": "patch-123",
+                    "patch_set_preview": {
+                        "patch_set_id": "pset-123",
                         "target_document_id": "99",
                         "base_version": 3,
-                        "operation_type": "rewrite_document",
+                        "base_hash": "hash-123",
                         "target_document_title": "Note",
                         "target_selection_reason": "title_family_match:clinical_note; score=72",
-                        "content_preview": "## Propuesta",
+                        "patches": [
+                            {
+                                "patch_id": "patch-123",
+                                "patch_type": "replace_span",
+                                "operation_type": "rewrite_document",
+                                "order_index": 0,
+                                "anchor": {"exactText": "Texto"},
+                                "content_preview": "## Propuesta",
+                            }
+                        ],
                     },
                     "trace_metadata": {},
                 },
@@ -227,10 +283,56 @@ class CopilotBrokerTests(SimpleTestCase):
 
         self.assertEqual(ctx.exception.status_code, 502)
 
+
+class CopilotClientTests(SimpleTestCase):
+    def setUp(self):
+        self.doctor = SimpleNamespace(id=7)
+        self.other_doctor = SimpleNamespace(id=9)
+        self.encounter = SimpleNamespace(id=12, doctor_id=self.doctor.id)
+        self.thread_id = (
+            f"copilot:encounter:{self.encounter.id}:doctor:{self.doctor.id}:chat:"
+            "11111111-1111-4111-8111-111111111111"
+        )
+        self.workspace_index = {
+            "encounter_id": str(self.encounter.id),
+            "workspace_version": "v1",
+            "active_document_id": "99",
+            "open_document_ids": ["99"],
+            "documents": [
+                {
+                    "document_id": "99",
+                    "type": "note",
+                    "title": "Note",
+                    "status": "draft",
+                    "source": "user",
+                    "ai_readable": True,
+                    "ai_writable": True,
+                    "version": 1,
+                    "updated_at": "2026-04-02T10:00:00Z",
+                    "is_active": True,
+                    "is_open": True,
+                    "has_dirty_draft": False,
+                    "has_streaming_state": False,
+                    "hidden_from_agent": False,
+                    "pinned_for_agent": False,
+                }
+            ],
+        }
+
+    @override_settings(
+        COPILOT_AGENT_BASE_URL="http://localhost:8090",
+        COPILOT_AGENT_TIMEOUT_SECONDS=30,
+    )
+    def test_client_enforces_timeout_floor_for_edit_runs(self):
+        client = CopilotAgentClient()
+
+        self.assertEqual(client.timeout, 60.0)
+
     def test_create_message_rejects_other_doctor(self):
         request = SimpleNamespace(user=self.other_doctor)
         payload = SimpleNamespace(
             encounter_id=self.encounter.id,
+            thread_id=self.thread_id,
             user_message="Resumen",
             workspace_index=SimpleNamespace(
                 model_dump=lambda mode="python": self.workspace_index
@@ -248,10 +350,35 @@ class CopilotBrokerTests(SimpleTestCase):
 
         self.assertEqual(ctx.exception.status_code, 403)
 
+    def test_create_message_rejects_thread_id_from_other_scope(self):
+        request = SimpleNamespace(user=self.doctor)
+        payload = SimpleNamespace(
+            encounter_id=self.encounter.id,
+            thread_id="copilot:encounter:99:doctor:7:chat:11111111-1111-4111-8111-111111111111",
+            user_message="Resumen",
+            workspace_index=SimpleNamespace(
+                model_dump=lambda mode="python": self.workspace_index
+            ),
+            active_document_id="99",
+            selected_document_ids=["99"],
+        )
+
+        with patch(
+            "apps.copilot.api._get_owned_encounter",
+            return_value=self.encounter,
+        ):
+            with self.assertRaises(HttpError) as ctx:
+                create_copilot_message(request, payload)
+
+        self.assertEqual(ctx.exception.status_code, 403)
+
     def test_get_run_syncs_remote_status(self):
         run = Mock(
             run_id="run-123",
-            thread_id=f"copilot:encounter:{self.encounter.id}:doctor:{self.doctor.id}",
+            thread_id=(
+                f"copilot:encounter:{self.encounter.id}:doctor:{self.doctor.id}:"
+                "chat:11111111-1111-4111-8111-111111111111"
+            ),
             doctor_id=self.doctor.id,
             status="created",
             intent=None,
@@ -279,7 +406,10 @@ class CopilotBrokerTests(SimpleTestCase):
     def test_stream_replays_remote_events(self):
         run = Mock(
             run_id="run-123",
-            thread_id=f"copilot:encounter:{self.encounter.id}:doctor:{self.doctor.id}",
+            thread_id=(
+                f"copilot:encounter:{self.encounter.id}:doctor:{self.doctor.id}:"
+                "chat:11111111-1111-4111-8111-111111111111"
+            ),
             doctor_id=self.doctor.id,
             status="created",
         )
@@ -315,12 +445,22 @@ class CopilotBrokerTests(SimpleTestCase):
         run = SimpleNamespace(run_id="run-123", doctor_id=self.doctor.id)
         patch_instance = SimpleNamespace(
             patch_id="patch-123",
+            patch_set_id="pset-123",
+            patch_set=SimpleNamespace(patch_set_id="pset-123"),
             run=SimpleNamespace(run_id="run-123"),
             target_document_id=99,
             base_version=3,
+            order_index=0,
+            patch_type="replace_span",
             operation_type="rewrite_document",
             anchor={},
             expected_hash=None,
+            old_text=None,
+            new_text=None,
+            resolved_start=None,
+            resolved_end=None,
+            confidence=None,
+            conflict_reason=None,
             before_preview=None,
             after_preview=None,
             document_preview_after=None,
@@ -364,6 +504,10 @@ class CopilotBrokerTests(SimpleTestCase):
             decision="reject",
             comment="No aplicar",
         )
+        patch_set = SimpleNamespace(
+            patch_set_id="pset-123",
+            patches=SimpleNamespace(count=lambda: 1),
+        )
 
         with patch(
             "apps.copilot.api.get_object_or_404",
@@ -372,20 +516,25 @@ class CopilotBrokerTests(SimpleTestCase):
             "apps.copilot.api.transaction.atomic",
             return_value=nullcontext(),
         ), patch(
+            "apps.copilot.api.ensure_patch_set_for_legacy_patch",
+            return_value=patch_set,
+        ), patch(
+            "apps.copilot.api.reject_patch",
+        ), patch(
             "apps.copilot.api.CopilotAgentClient.resume_run",
             return_value={
                 "run_id": "run-123",
-                "thread_id": "copilot:encounter:12:doctor:7",
+                "thread_id": "copilot:encounter:12:doctor:7:chat:11111111-1111-4111-8111-111111111111",
                 "status": "completed",
                 "intent": "edit_document",
                 "requires_human_review": False,
+                "active_patch_set_id": None,
                 "final_response": "Patch rechazado",
                 "trace_metadata": {},
             },
         ):
             response = review_copilot_patch(request, "run-123", payload)
 
-        patch_instance.save.assert_called_once()
         run.save.assert_called_once()
         self.assertEqual(response["status"], "completed")
 
@@ -408,6 +557,10 @@ class CopilotBrokerTests(SimpleTestCase):
             comment="Aplicar",
             document_version=3,
         )
+        patch_set = SimpleNamespace(
+            patch_set_id="pset-123",
+            patches=SimpleNamespace(count=lambda: 1),
+        )
 
         with patch(
             "apps.copilot.api.get_object_or_404",
@@ -415,6 +568,11 @@ class CopilotBrokerTests(SimpleTestCase):
         ), patch(
             "apps.copilot.api.transaction.atomic",
             return_value=nullcontext(),
+        ), patch(
+            "apps.copilot.api.ensure_patch_set_for_legacy_patch",
+            return_value=patch_set,
+        ), patch(
+            "apps.copilot.api.accept_patch",
         ), patch(
             "apps.copilot.api.apply_copilot_patch",
             return_value=SimpleNamespace(
@@ -428,10 +586,12 @@ class CopilotBrokerTests(SimpleTestCase):
             "apps.copilot.api.CopilotAgentClient.resume_run",
             return_value={
                 "run_id": "run-123",
-                "thread_id": "copilot:encounter:12:doctor:7",
+                "thread_id": "copilot:encounter:12:doctor:7:chat:11111111-1111-4111-8111-111111111111",
                 "status": "completed",
                 "intent": "edit_document",
                 "requires_human_review": False,
+                "active_patch_set_id": None,
+                "applied_patch_set_id": "pset-123",
                 "final_response": "Patch aplicado",
                 "applied_patch_id": "patch-123",
                 "applied_document_id": "99",
@@ -495,6 +655,101 @@ class CopilotBrokerTests(SimpleTestCase):
         resume_run_mock.assert_not_called()
         self.assertEqual(ctx.exception.status_code, 409)
 
+    def test_list_patch_sets_returns_serialized_patch_sets(self):
+        request = SimpleNamespace(user=self.doctor)
+        run = SimpleNamespace(run_id="run-123", doctor_id=self.doctor.id)
+        patch_set = SimpleNamespace(
+            patch_set_id="pset-123",
+            run=SimpleNamespace(run_id="run-123"),
+            target_document_id=99,
+            base_version=3,
+            base_hash="hash-123",
+            rationale="Actualizar plan",
+            source_context_document_ids=["12"],
+            target_document_title="Nota clínica",
+            target_selection_reason="title_family_match:clinical_note",
+            document_preview_after="## Propuesta",
+            status="pending",
+            review_comment=None,
+            created_at="2026-04-02T10:00:00Z",
+            updated_at="2026-04-02T10:00:00Z",
+            patches=SimpleNamespace(
+                select_related=lambda *args, **kwargs: SimpleNamespace(
+                    order_by=lambda *a, **k: []
+                )
+            ),
+        )
+
+        with patch("apps.copilot.api.get_object_or_404", return_value=run), patch(
+            "apps.copilot.api.CopilotPatch.objects.filter",
+            return_value=[],
+        ), patch(
+            "apps.copilot.api.CopilotPatchSet.objects.filter",
+            return_value=SimpleNamespace(
+                select_related=lambda *args, **kwargs: [patch_set]
+            ),
+        ):
+            response = list_copilot_patch_sets(request, "run-123")
+
+        self.assertEqual(response[0]["patch_set_id"], "pset-123")
+
+    def test_apply_patch_set_endpoint_resumes_agent_after_apply(self):
+        request = SimpleNamespace(user=self.doctor)
+        run = SimpleNamespace(
+            run_id="run-123",
+            thread_id="copilot:encounter:12:doctor:7:chat:11111111-1111-4111-8111-111111111111",
+            doctor_id=self.doctor.id,
+            status="waiting_review",
+            intent="edit_document",
+            requires_human_review=True,
+            save=Mock(),
+        )
+        patch_set = SimpleNamespace(
+            patch_set_id="pset-123",
+            run=run,
+            doctor_id=self.doctor.id,
+        )
+
+        with patch(
+            "apps.copilot.api._get_owned_patch_set",
+            return_value=patch_set,
+        ), patch(
+            "apps.copilot.api.apply_accepted_patch_set",
+            return_value=SimpleNamespace(
+                patch_set_id="pset-123",
+                document_id="99",
+                content="Contenido aplicado",
+                applied_version=4,
+                applied_patch_ids=["patch-1"],
+                stale_patch_set_ids=["pset-old"],
+                stale_patch_ids=["patch-old"],
+            ),
+        ), patch(
+            "apps.copilot.api.CopilotAgentClient.resume_run",
+            return_value={
+                "run_id": "run-123",
+                "thread_id": "copilot:encounter:12:doctor:7:chat:11111111-1111-4111-8111-111111111111",
+                "status": "completed",
+                "intent": "edit_document",
+                "requires_human_review": False,
+                "active_patch_set_id": None,
+                "applied_patch_set_id": "pset-123",
+                "applied_patch_id": "patch-1",
+                "applied_document_id": "99",
+                "applied_content": "Contenido aplicado",
+                "applied_version": 4,
+                "trace_metadata": {"applied_patch_set_id": "pset-123"},
+            },
+        ):
+            response = apply_copilot_patch_set(
+                request,
+                "pset-123",
+                SimpleNamespace(comment="Aplicar", document_version=3),
+            )
+
+        self.assertEqual(response["applied_patch_set_id"], "pset-123")
+        self.assertEqual(response["applied_document_id"], "99")
+
 
 class _WorkspaceDocumentStub:
     def __init__(self, **data):
@@ -519,7 +774,9 @@ class _FakeDocumentQuerySet(list):
 
 class CopilotInternalToolsTests(SimpleTestCase):
     def setUp(self):
-        self.thread_id = "copilot:encounter:12:doctor:7"
+        self.thread_id = (
+            "copilot:encounter:12:doctor:7:chat:11111111-1111-4111-8111-111111111111"
+        )
         self.request = SimpleNamespace(
             auth={
                 "purpose": "copilot_internal_tools",
@@ -677,25 +934,27 @@ class CopilotInternalToolsTests(SimpleTestCase):
 
 
 class CopilotPatchApplyServiceTests(SimpleTestCase):
-    def test_apply_copilot_patch_updates_document_and_stales_siblings(self):
-        document = Mock(id=99, content="Contenido previo")
+    def test_apply_copilot_patch_wraps_patch_set_apply(self):
         patch_instance = Mock(
             patch_id="patch-123",
             status="pending",
-            base_version=3,
-            operation_type="rewrite_document",
-            content_preview="Contenido aplicado",
-            anchor={},
-            document_preview_after="Contenido aplicado",
-            target_document=document,
         )
-        stale_queryset = Mock()
-        stale_queryset.exclude.return_value = stale_queryset
-        stale_queryset.values_list.return_value = ["patch-old"]
+        patch_set = Mock()
 
         with patch(
-            "apps.copilot.services.patch_apply.CopilotPatch.objects.filter",
-            return_value=stale_queryset,
+            "apps.copilot.services.patch_apply.ensure_patch_set_for_legacy_patch",
+            return_value=patch_set,
+        ), patch(
+            "apps.copilot.services.patch_apply.apply_accepted_patch_set",
+            return_value=SimpleNamespace(
+                patch_set_id="pset-123",
+                document_id="99",
+                content="Contenido aplicado",
+                applied_version=4,
+                applied_patch_ids=["patch-123"],
+                stale_patch_set_ids=["pset-old"],
+                stale_patch_ids=["patch-old"],
+            ),
         ):
             result = apply_copilot_patch(
                 patch=patch_instance,
@@ -703,101 +962,102 @@ class CopilotPatchApplyServiceTests(SimpleTestCase):
                 review_comment="Aplicar",
             )
 
-        document.save.assert_called_once_with(update_fields=["content"])
-        patch_instance.save.assert_called_once_with(
-            update_fields=["status", "review_comment", "content_preview", "updated_at"]
-        )
-        stale_queryset.update.assert_called_once_with(status="stale")
-        self.assertEqual(result.document_id, "99")
-        self.assertEqual(result.content, "Contenido aplicado")
-        self.assertEqual(result.applied_version, 4)
-
-    def test_apply_copilot_patch_marks_patch_stale_on_version_conflict(self):
-        document = Mock(id=99, content="Contenido previo")
-        patch_instance = Mock(
-            patch_id="patch-123",
-            status="pending",
-            base_version=3,
-            content_preview="Contenido aplicado",
-            target_document=document,
-        )
-
-        with self.assertRaises(CopilotPatchConflictError):
-            apply_copilot_patch(
-                patch=patch_instance,
-                document_version=5,
-                review_comment=None,
-            )
-
-        document.save.assert_not_called()
         patch_instance.save.assert_called_once_with(
             update_fields=["status", "review_comment", "updated_at"]
         )
+        self.assertEqual(result.patch_id, "patch-123")
+        self.assertEqual(result.document_id, "99")
+        self.assertEqual(result.applied_version, 4)
 
-    def test_apply_copilot_patch_replaces_anchor_span(self):
-        document = Mock(id=99, content="Motivo: dolor abdominal. Plan: hidratacion.")
+    def test_apply_copilot_patch_bubbles_patch_set_conflicts(self):
         patch_instance = Mock(
             patch_id="patch-123",
             status="pending",
-            base_version=3,
-            operation_type="replace_span",
-            content_preview="Motivo: dolor abdominal. Plan: hidratacion intensiva.",
-            anchor={
-                "exactText": "Plan: hidratacion.",
-                "prefixText": "Motivo: dolor abdominal. ",
-                "suffixText": "",
-                "startOffset": 25,
-                "endOffset": 43,
-            },
-            before_preview="Plan: hidratacion.",
-            after_preview="Plan: hidratacion intensiva.",
-            expected_hash=None,
-            document_preview_after="Motivo: dolor abdominal. Plan: hidratacion intensiva.",
-            target_document=document,
         )
-        stale_queryset = Mock()
-        stale_queryset.exclude.return_value = stale_queryset
-        stale_queryset.values_list.return_value = []
 
         with patch(
-            "apps.copilot.services.patch_apply.CopilotPatch.objects.filter",
-            return_value=stale_queryset,
+            "apps.copilot.services.patch_apply.ensure_patch_set_for_legacy_patch",
+            return_value=Mock(),
+        ), patch(
+            "apps.copilot.services.patch_apply.apply_accepted_patch_set",
+            side_effect=CopilotPatchConflictError("conflict"),
         ):
-            result = apply_copilot_patch(
-                patch=patch_instance,
-                document_version=3,
-                review_comment="Aplicar cambio puntual",
-            )
+            with self.assertRaises(CopilotPatchConflictError):
+                apply_copilot_patch(
+                    patch=patch_instance,
+                    document_version=3,
+                    review_comment="Aplicar",
+                )
+
+
+class CopilotPatchSetServiceTests(SimpleTestCase):
+    def test_resolve_patch_against_document_resolves_replace_span(self):
+        resolved = _resolve_patch_against_document(
+            preview={
+                "patch_id": "patch-1",
+                "patch_type": "replace_span",
+                "operation_type": "replace_span",
+                "order_index": 0,
+                "anchor": {
+                    "exactText": "Plan: hidratacion.",
+                    "prefixText": "Motivo: dolor abdominal. ",
+                    "suffixText": "",
+                },
+                "after_preview": "Plan: hidratacion intensiva.",
+                "content_preview": "Plan: hidratacion intensiva.",
+            },
+            document_content="Motivo: dolor abdominal. Plan: hidratacion.",
+        )
+
+        self.assertEqual(resolved["resolved_start"], 25)
+        self.assertEqual(resolved["resolved_end"], 43)
+        self.assertEqual(resolved["status"], "pending")
+
+    def test_detect_internal_conflicts_marks_overlapping_patches(self):
+        conflicted = _detect_internal_conflicts(
+            [
+                {
+                    "patch_id": "patch-1",
+                    "patch_type": "replace_span",
+                    "resolved_start": 25,
+                    "resolved_end": 43,
+                    "order_index": 0,
+                    "status": "pending",
+                },
+                {
+                    "patch_id": "patch-2",
+                    "patch_type": "insert_after",
+                    "resolved_start": 25,
+                    "resolved_end": 43,
+                    "order_index": 1,
+                    "status": "pending",
+                },
+            ]
+        )
+
+        self.assertEqual(conflicted[0]["status"], "conflicted")
+        self.assertEqual(conflicted[1]["status"], "conflicted")
+        self.assertEqual(conflicted[0]["conflict_reason"], "overlapping")
+
+    def test_apply_patches_to_content_combines_accepted_changes(self):
+        content = _apply_patches_to_content(
+            "Motivo: dolor abdominal. Plan: hidratacion.",
+            [
+                {
+                    "patch_id": "patch-1",
+                    "patch_type": "replace_span",
+                    "resolved_start": 25,
+                    "resolved_end": 43,
+                    "new_text": "Plan: hidratacion intensiva.",
+                    "order_index": 0,
+                }
+            ],
+        )
 
         self.assertEqual(
-            document.content,
+            content,
             "Motivo: dolor abdominal. Plan: hidratacion intensiva.",
         )
-        self.assertEqual(result.content, document.content)
 
-    def test_apply_copilot_patch_detects_ambiguous_anchor(self):
-        document = Mock(id=99, content="Plan. Diagnostico. Plan.")
-        patch_instance = Mock(
-            patch_id="patch-123",
-            status="pending",
-            base_version=3,
-            operation_type="insert_after_span",
-            content_preview="Plan. Diagnostico. Plan.\nSeguimiento",
-            anchor={
-                "exactText": "Plan.",
-                "prefixText": None,
-                "suffixText": None,
-            },
-            before_preview="Plan.",
-            after_preview="\nSeguimiento",
-            expected_hash=None,
-            document_preview_after="Plan. Diagnostico. Plan.\nSeguimiento",
-            target_document=document,
-        )
-
-        with self.assertRaises(CopilotPatchConflictError):
-            apply_copilot_patch(
-                patch=patch_instance,
-                document_version=3,
-                review_comment="Aplicar",
-            )
+    def test_content_hash_is_stable_for_same_text(self):
+        self.assertEqual(content_hash("abc"), content_hash("abc"))

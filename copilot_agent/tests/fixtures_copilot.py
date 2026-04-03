@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from app.planner import DraftedPatch
+from langchain_core.messages import AIMessage, HumanMessage
+
+from app.planner import DraftedPatch, DraftedPatchPlan
 
 
 class FakeToolsClient:
@@ -139,16 +141,6 @@ class FakeToolsClient:
         del limit
         return {"document_id": document_id, "patches": []}
 
-    def read_encounter_context(self):
-        return {
-            "encounter_id": "12",
-            "encounter_name": "Encuentro demo",
-            "occurred_at": "2026-04-02T10:00:00Z",
-            "has_been_transcribed": True,
-            "patient_id": None,
-            "patient_summary": None,
-        }
-
     def build_context_view(
         self,
         *,
@@ -179,15 +171,54 @@ class FakeToolsClient:
 
 
 class ScriptedPlanner:
-    def __init__(self, decisions, drafted_patch=None):
-        self._decisions = list(decisions)
-        self._drafted_patch = drafted_patch or default_drafted_patch()
+    def __init__(
+        self,
+        *,
+        responses: list[AIMessage] | None = None,
+        drafted_patch: DraftedPatchPlan | None = None,
+        model_error: Exception | None = None,
+        draft_error: Exception | None = None,
+    ):
+        self._responses = list(responses or [])
+        self._drafted_patch = drafted_patch or default_drafted_patch_plan()
+        self._model_error = model_error
+        self._draft_error = draft_error
 
-    def plan_next_action(self, _state):
-        return self._decisions.pop(0)
+    def invoke_model(self, **_kwargs):
+        if self._model_error is not None:
+            raise self._model_error
+        if not self._responses:
+            raise RuntimeError("Scripted planner ran out of AI messages")
+        return self._responses.pop(0)
 
     def draft_patch_preview(self, **_kwargs):
+        if self._draft_error is not None:
+            raise self._draft_error
         return self._drafted_patch
+
+
+def make_ai_tool_call(
+    *,
+    tool_name: str,
+    args: dict | None = None,
+    tool_call_id: str,
+    content: str = "",
+) -> AIMessage:
+    return AIMessage(
+        content=content,
+        tool_calls=[
+            {
+                "name": tool_name,
+                "args": args or {},
+                "id": tool_call_id,
+                "type": "tool_call",
+            }
+        ],
+    )
+
+
+def make_ai_response(content: str) -> AIMessage:
+    return AIMessage(content=content)
 
 
 def default_drafted_patch() -> DraftedPatch:
@@ -209,13 +240,22 @@ def default_drafted_patch() -> DraftedPatch:
     )
 
 
+def default_drafted_patch_plan() -> DraftedPatchPlan:
+    patch = default_drafted_patch()
+    return DraftedPatchPlan(
+        rationale=patch.rationale,
+        document_preview_after=patch.document_preview_after,
+        patches=[patch],
+    )
+
+
 def build_state(user_message: str = "Hazme un resumen") -> dict:
     return {
         "tenant_id": "doctor:7",
         "user_id": "7",
         "encounter_id": "12",
         "active_document_id": "99",
-        "thread_id": "copilot:encounter:12:doctor:7",
+        "thread_id": "copilot:encounter:12:doctor:7:chat:test",
         "user_message": user_message,
         "workspace_index": {
             "encounter_id": "12",
@@ -224,7 +264,7 @@ def build_state(user_message: str = "Hazme un resumen") -> dict:
             "open_document_ids": ["99", "12", "77"],
             "documents": [],
         },
-        "messages": [{"role": "user", "content": user_message}],
+        "messages": [HumanMessage(content=user_message)],
         "selected_document_ids": [],
         "available_documents": [],
         "context_view": None,
@@ -240,13 +280,14 @@ def build_state(user_message: str = "Hazme un resumen") -> dict:
         "tool_results": [],
         "planner_decisions": [],
         "current_plan_step": "start",
-        "pending_action": None,
-        "pending_tool_result": None,
         "iteration_count": 0,
         "max_iterations": 6,
         "max_document_reads": 4,
         "patch_operations_count": 0,
         "max_patch_operations": 1,
+        "planner_retry_count": 0,
+        "last_planner_error": None,
+        "last_tool_error": None,
         "requires_human_review": False,
         "trace_metadata": {},
     }

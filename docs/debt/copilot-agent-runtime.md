@@ -9,6 +9,7 @@ Aprobada y explícita.
 El copiloto ya tiene un boundary real `frontend -> Django broker -> copilot-agent-service`,
 y el slice actual ya cubre `proposal + review + safe apply` con persistencia del thread state y streaming brokered.
 La deuda importante que sigue abierta ya no es el apply básico, sino endurecer el writer flow con versionado fuerte, audit trail clínico y mejor UX que el debug panel.
+En el sidechat actual, `thread_id` ya identifica una conversación real: Django crea uno nuevo al iniciar chat, el frontend lo mantiene solo en memoria del panel y LangGraph lo usa como checkpoint key para conservar contexto entre mensajes del mismo chat.
 
 ## Deudas activas
 
@@ -25,6 +26,13 @@ La deuda importante que sigue abierta ya no es el apply básico, sino endurecer 
 - **Por qué se aceptó:** el flujo actual sigue siendo corto y suficiente para validar contratos, proposal/review y thread state duradero sin meter otra pieza de infraestructura.
 - **Owner:** `backend/apps/copilot/`.
 - **Trigger para pagarla:** cuando los runs del copiloto empiecen a durar más, requieran retries fuertes o fan-out/fan-in pesado.
+
+### 2.5. Reintentos/availability del planner LLM aún minimalistas
+
+- **Impacto:** el runtime ya no usa fallback heurístico para routing ni drafting; el planner/drafter hacen un retry técnico corto y, si Vertex sigue fallando o devuelve salida inválida, el run cierra en `failed`.
+- **Por qué se aceptó:** evita degradaciones silenciosas y mantiene el comportamiento clínico acotado mientras se estabiliza el contrato estructurado del planner/tool loop nativo.
+- **Owner:** `copilot_agent/`.
+- **Trigger para pagarla:** cuando se quiera endurecer disponibilidad con retries explícitos, circuit breakers o modelos secundarios sin reintroducir heurísticas de producto.
 
 ### 3. Versionado y audit trail aún pragmáticos en el writer flow
 

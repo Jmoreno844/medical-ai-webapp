@@ -14,11 +14,12 @@ El Copiloto Clínico no es un servicio monolítico frontend. Responde a una arqu
 2. **Backend Transaccional (Django / Cloud Run):**
    - **Responsabilidad:** Fuente única de la verdad. Persistencia de `documents`, `snapshots`, seguridad, permisos y servicios de API.
    - **Boundary adicional:** actúa como broker seguro entre frontend y `copilot-agent-service` con endpoints `sessions / messages / runs / stream`.
+   - **Estado actual del writer flow:** persiste `CopilotPatchSet` + `CopilotPatch`, resuelve anchors a rangos reales, detecta conflictos internos y aplica solo cambios aceptados.
 
 3. **Agent Runtime (LangGraph / Cloud Run):**
    - **Responsabilidad:** Orquestación, memoria de sesión, toma de decisiones (Tools) y generación de respuestas/patches.
    - **Boundary:** no es público al navegador; Django consume sus contratos internos.
-   - **Estado actual:** usa PostgreSQL como checkpointer, persiste `runs`/`events`, lee documentos/contexto reales desde Django, resuelve documento objetivo por título/familia y ya puede proponer patches que pasan por `waiting_review` antes de un `safe apply` en Django.
+   - **Estado actual:** usa PostgreSQL como checkpointer, persiste `runs`/`events`, lee documentos/contexto reales desde Django y ya corre con `ToolNode` + tool calling nativo de LangChain sobre Gemini/Vertex (`ChatGoogleGenerativeAI`). El planner mantiene mensajes LangChain reales y renderiza el contexto por turno con bloques XML, mientras el drafter usa `json_schema` structured output para construir `patch_set_preview` de un solo documento target. El `safe apply` final sigue en Django. El `thread_id` público identifica la conversación activa del sidechat y LangGraph lo usa directamente como checkpoint key para conservar contexto entre mensajes del mismo chat. Aunque usemos function/tool calling nativo, el runtime desactiva `Automatic Function Calling` del SDK de Google para que la orquestación siga ocurriendo dentro de LangGraph y no en el proveedor; en patch drafting no hay fallback a `function_calling`.
 
 ---
 
@@ -34,6 +35,7 @@ Para resolver el problema de contexto masivo (ej. transcripciones de 30 minutos 
 - Django entrega ese `WorkspaceIndex` al agent runtime.
 - El Agente usa el `WorkspaceIndex` para decidir qué leer y luego llama a tools internas read-only para obtener documentos y contexto reales desde Django.
 - El broker Django persiste `CopilotRun`, consulta el estado del runtime y reemite SSE al frontend.
+- En el sidechat actual, Django crea un `thread_id` nuevo por conversación; el frontend lo conserva solo en memoria del panel y lo reusa en mensajes siguientes hasta resetear el chat.
 
 ### Regla del frontend actual
 
@@ -47,8 +49,8 @@ Para resolver el problema de contexto masivo (ej. transcripciones de 30 minutos 
 - `frontend -> Django`
 - `Django -> copilot-agent-service`
 - `copilot-agent-service -> Django tools/contracts internos`
-- `resolve target -> proposal -> persisted patch -> review -> safe apply -> resume`
-- En writer flows, un run de edición solo es válido si termina en `waiting_review` con un patch persistible o en `failed`; `patch_proposed + completed` se trata como inconsistencia del runtime.
+- `resolve target -> patch set proposal -> persisted patch set -> review granular -> safe apply -> resume`
+- En writer flows, un run de edición solo es válido si termina en `waiting_review` con un `patch_set_preview` persistible o en `failed`; `patch_set_proposed + completed` se trata como inconsistencia del runtime.
 
 El frontend no habla directo con LangGraph.
 
@@ -71,15 +73,19 @@ El frontend no habla directo con LangGraph.
 
 El agente de IA **tiene prohibido escribir o sobreescribir** el contenido canónico directamente (Snapshot).
 
-1. El Agente genera un `DocumentPatch`.
-2. El sistema lo guarda en BD como `pending`.
-3. El frontend lo renderiza como previsualización de bloque.
-4. El médico audita: Acepta, Modifica o Rechaza el parche.
-5. Tras la aprobación, Django aplica el contenido propuesto sobre el documento canónico, actualiza el estado del patch y el frontend sincroniza snapshot/draft/editor.
+1. El Agente genera un `patch_set_preview` con cambios pequeños y anclados para un solo documento target.
+   - La descomposición semántica del pedido vive en el LLM drafter.
+   - El runtime de producción ya no usa fallback heurístico para decidir tools ni para redactar cambios.
+   - El loop principal usa tool calling nativo (`AIMessage.tool_calls -> ToolNode -> ToolMessage`) y devuelve observaciones corregibles a la conversación cuando una tool falla o recibe un schema inválido.
+   - Si Vertex falla o no materializa cambios reales, el writer flow falla cerrado en vez de abrir un review con placeholders.
+2. Django resuelve anchors a rangos reales, persiste un `CopilotPatchSet` y marca cada `CopilotPatch` como `pending` o `conflicted`.
+3. El frontend renderiza la propuesta desde el patch set y sus patches hijos.
+4. El médico audita: acepta o rechaza cambios individuales, o el set completo.
+5. Tras la aprobación final, Django aplica solo los patches aceptados sobre el documento canónico, invalida sets hermanos y el frontend sincroniza snapshot/draft/editor.
 
-El debug panel y la futura UI lateral no dependen únicamente de la lista persistida de patches: si el stream ya emitió `patch_proposed` y el run está en `waiting_review`, el frontend deriva un `effectivePendingPatch` hasta que Django termine de reflejarlo en `GET /patches`.
+El debug panel y la futura UI lateral no dependen únicamente de la lista persistida de patches: si el stream ya emitió `patch_set_proposed` y el run está en `waiting_review`, el frontend puede derivar un estado efectivo temporal hasta que Django termine de reflejarlo en `GET /patch-sets`.
 
-Lo que sigue pendiente ya no es el apply básico, sino el audit trail clínico fuerte, versionado robusto y la UX final fuera del debug panel. La deuda canónica está en [`../debt/copilot-agent-runtime.md`](../debt/copilot-agent-runtime.md).
+Lo que sigue pendiente ya no es el apply básico, sino el audit trail clínico fuerte, versionado robusto, rebase seguro sobre documentos cambiados y la UX final fuera del debug panel. La deuda canónica está en [`../debt/copilot-agent-runtime.md`](../debt/copilot-agent-runtime.md).
 
 ## 4. Checklist para Escalabilidad
 

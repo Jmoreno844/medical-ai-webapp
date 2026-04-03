@@ -26,6 +26,12 @@ resource "google_service_account" "github_actions_deployer" {
   display_name = "GitHub Actions CI/CD deployer (WIF)"
 }
 
+resource "google_service_account" "copilot_agent_runner" {
+  project      = var.project_id
+  account_id   = "copilot-agent-runner"
+  display_name = "Cloud Run copilot agent service account"
+}
+
 # ---------------------------------------------------------------------------
 # backend-runner IAM
 # ---------------------------------------------------------------------------
@@ -60,6 +66,12 @@ resource "google_project_iam_member" "backend_tasks_enqueue" {
   member  = "serviceAccount:${google_service_account.backend_runner.email}"
 }
 
+resource "google_project_iam_member" "backend_run_invoker" {
+  project = var.project_id
+  role    = "roles/run.invoker"
+  member  = "serviceAccount:${google_service_account.backend_runner.email}"
+}
+
 # ---------------------------------------------------------------------------
 # cloud-functions-runner IAM
 # ---------------------------------------------------------------------------
@@ -74,6 +86,47 @@ resource "google_project_iam_member" "cf_trace" {
   project = var.project_id
   role    = "roles/cloudtrace.agent"
   member  = "serviceAccount:${google_service_account.cloud_functions_runner.email}"
+}
+
+# ---------------------------------------------------------------------------
+# copilot-agent-runner IAM
+# ---------------------------------------------------------------------------
+
+resource "google_project_iam_member" "copilot_agent_cloudsql" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.copilot_agent_runner.email}"
+}
+
+resource "google_project_iam_member" "copilot_agent_cloudsql_instance_user" {
+  project = var.project_id
+  role    = "roles/cloudsql.instanceUser"
+  member  = "serviceAccount:${google_service_account.copilot_agent_runner.email}"
+}
+
+resource "google_project_iam_member" "copilot_agent_trace" {
+  project = var.project_id
+  role    = "roles/cloudtrace.agent"
+  member  = "serviceAccount:${google_service_account.copilot_agent_runner.email}"
+}
+
+resource "google_project_iam_member" "copilot_agent_vertex" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.copilot_agent_runner.email}"
+}
+
+resource "google_project_iam_member" "copilot_agent_run_invoker" {
+  project = var.project_id
+  role    = "roles/run.invoker"
+  member  = "serviceAccount:${google_service_account.copilot_agent_runner.email}"
+}
+
+resource "google_project_iam_member" "copilot_agent_secrets" {
+  count   = var.grant_copilot_agent_secret_accessor ? 1 : 0
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.copilot_agent_runner.email}"
 }
 
 resource "google_project_iam_member" "cf_run_invoker" {
@@ -184,6 +237,12 @@ resource "google_service_account_iam_member" "gh_backend_runner_user" {
 
 resource "google_service_account_iam_member" "gh_cloud_functions_runner_user" {
   service_account_id = google_service_account.cloud_functions_runner.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.github_actions_deployer.email}"
+}
+
+resource "google_service_account_iam_member" "gh_copilot_agent_runner_user" {
+  service_account_id = google_service_account.copilot_agent_runner.name
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.github_actions_deployer.email}"
 }

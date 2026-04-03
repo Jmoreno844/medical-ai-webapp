@@ -5,6 +5,7 @@ import uuid
 from contextlib import contextmanager
 from typing import Any, Iterator
 
+from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.postgres import PostgresSaver
 from psycopg import Connection
 from psycopg.rows import dict_row
@@ -16,7 +17,7 @@ from app.graph.workflow import build_clinical_copilot_graph
 from app.planner import build_planner
 from app.repository import CopilotRunRepository, StoredRun
 from app.schemas import (
-    PatchPreview,
+    PatchSetPreview,
     RunCreateRequest,
     RunEvent,
     RunEventsResponse,
@@ -27,14 +28,14 @@ logger = logging.getLogger(__name__)
 
 DONE_STATUSES = {"completed", "failed", "waiting_review"}
 
-PATCH_REQUIRED_FIELDS = {
-    "patch_id",
+PATCH_SET_REQUIRED_FIELDS = {
+    "patch_set_id",
     "target_document_id",
     "target_document_title",
     "target_selection_reason",
     "base_version",
-    "operation_type",
-    "content_preview",
+    "base_hash",
+    "patches",
 }
 
 
@@ -62,12 +63,7 @@ class CopilotRuntime:
             "thread_id": request.thread_id,
             "user_message": request.user_message,
             "workspace_index": request.workspace_index.model_dump(mode="python"),
-            "messages": [
-                {
-                    "role": "user",
-                    "content": request.user_message,
-                }
-            ],
+            "messages": [HumanMessage(content=request.user_message)],
             "selected_document_ids": request.selected_document_ids,
             "available_documents": [],
             "context_view": None,
@@ -83,19 +79,24 @@ class CopilotRuntime:
             "tool_results": [],
             "planner_decisions": [],
             "current_plan_step": "start",
-            "pending_action": None,
-            "pending_tool_result": None,
             "iteration_count": 0,
             "max_iterations": self._settings.planner_max_iterations,
             "max_document_reads": 4,
             "patch_operations_count": 0,
             "max_patch_operations": 1,
+            "planner_retry_count": 0,
+            "last_planner_error": None,
+            "last_tool_error": None,
             "target_document_id": None,
             "target_document_title": None,
             "target_selection_reason": None,
             "base_version": None,
+            "patch_set_preview": None,
+            "patch_preview": None,
             "patch_id": None,
+            "final_response": None,
             "requires_human_review": False,
+            "review_result": None,
             "review_comment": None,
             "run_error": None,
             "trace_metadata": request.trace_metadata,
@@ -115,12 +116,16 @@ class CopilotRuntime:
                     planner=self._planner,
                     checkpointer=checkpointer,
                 )
+                # The public thread_id is the sidechat conversation identity. Each
+                # new HTTP run reuses that checkpoint so the model keeps prior turns,
+                # while the graph itself clears run-scoped tool/review state on turn 0.
                 next_state = graph.invoke(
                     state,
                     config={"configurable": {"thread_id": request.thread_id}},
                 )
+            patch_set_preview = self._build_patch_set_preview(next_state)
             # Edit runs must stop at waiting_review or fail closed; they cannot silently degrade to completed.
-            status = self._derive_status(next_state)
+            status = self._derive_status(next_state, patch_set_preview=patch_set_preview)
             final_response = (
                 None
                 if status == "waiting_review"
@@ -135,7 +140,10 @@ class CopilotRuntime:
                 status=status,
                 intent=next_state.get("intent"),
                 requires_human_review=next_state.get("requires_human_review", False),
-                patch_preview=next_state.get("patch_preview") if status == "waiting_review" else None,
+                active_patch_set_id=(
+                    patch_set_preview.get("patch_set_id") if patch_set_preview else None
+                ),
+                patch_set_preview=patch_set_preview if status == "waiting_review" else None,
                 final_response=final_response,
                 trace_metadata={
                     **next_state.get("trace_metadata", {}),
@@ -146,7 +154,12 @@ class CopilotRuntime:
                     ),
                 },
             )
-            events = self._build_events(run_id=run_id, state=next_state, status=status)
+            events = self._build_events(
+                run_id=run_id,
+                state=next_state,
+                status=status,
+                patch_set_preview=patch_set_preview,
+            )
         except Exception as error:
             logger.exception("Copilot run failed before completion")
             stored_run = StoredRun(
@@ -158,7 +171,8 @@ class CopilotRuntime:
                 status="failed",
                 intent=state.get("intent"),
                 requires_human_review=False,
-                patch_preview=None,
+                active_patch_set_id=None,
+                patch_set_preview=None,
                 final_response=None,
                 trace_metadata={
                     **request.trace_metadata,
@@ -197,25 +211,30 @@ class CopilotRuntime:
 
             if stored_run.status != "waiting_review":
                 raise ValueError("Run is not waiting for review")
-            if not stored_run.patch_preview:
-                raise ValueError("Run does not have a pending patch preview")
-            if request.patch_id != stored_run.patch_preview.get("patch_id"):
-                raise ValueError("Patch id does not match the stored run")
+            if not stored_run.patch_set_preview:
+                raise ValueError("Run does not have a pending patch set preview")
+            if request.patch_set_id != (
+                stored_run.active_patch_set_id
+                or stored_run.patch_set_preview.get("patch_set_id")
+            ):
+                raise ValueError("Patch set id does not match the stored run")
 
             decision = request.review_result
             if decision == "approve":
+                applied_patch_set_id = request.trace_metadata.get("applied_patch_set_id")
                 applied_patch_id = request.trace_metadata.get("applied_patch_id")
                 applied_document_id = request.trace_metadata.get("applied_document_id")
                 applied_version = request.trace_metadata.get("applied_version")
                 final_response = (
-                    "La propuesta del copiloto fue aprobada y aplicada al documento canonico."
+                    "El patch set del copiloto fue aprobado y aplicado al documento canonico."
                 )
             else:
+                applied_patch_set_id = None
                 applied_patch_id = None
                 applied_document_id = None
                 applied_version = None
                 final_response = (
-                    "La propuesta del copiloto fue rechazada. "
+                    "El patch set del copiloto fue rechazado. "
                     "No se aplicaron cambios al documento canonico."
                 )
 
@@ -228,7 +247,8 @@ class CopilotRuntime:
                 status="completed",
                 intent=stored_run.intent,
                 requires_human_review=False,
-                patch_preview=None,
+                active_patch_set_id=None,
+                patch_set_preview=None,
                 final_response=final_response,
                 trace_metadata={
                     **stored_run.trace_metadata,
@@ -246,8 +266,9 @@ class CopilotRuntime:
                     *(
                         [
                             {
-                                "event": "patch_applied",
+                                "event": "patch_set_applied",
                                 "payload": {
+                                    "patch_set_id": applied_patch_set_id,
                                     "patch_id": applied_patch_id,
                                     "document_id": applied_document_id,
                                     "applied_version": applied_version,
@@ -255,14 +276,14 @@ class CopilotRuntime:
                             }
                         ]
                         if decision == "approve"
-                        and applied_patch_id
+                        and applied_patch_set_id
                         and applied_document_id
                         else []
                     ),
                     {
                         "event": "review_resolved",
                         "payload": {
-                            "patch_id": request.patch_id,
+                            "patch_set_id": request.patch_set_id,
                             "decision": decision,
                             "comment": request.comment,
                         },
@@ -303,24 +324,108 @@ class CopilotRuntime:
         )
 
     @staticmethod
-    def _is_edit_intent(intent: str | None) -> bool:
-        return str(intent or "").strip().lower() == "edit_document"
+    def _has_valid_patch_set_preview(patch_set_preview: dict[str, Any] | None) -> bool:
+        if not isinstance(patch_set_preview, dict):
+            return False
+        if not all(
+            patch_set_preview.get(field_name) for field_name in PATCH_SET_REQUIRED_FIELDS
+        ):
+            return False
+        patches = patch_set_preview.get("patches") or []
+        if not isinstance(patches, list) or not patches:
+            return False
+        return True
 
     @staticmethod
-    def _has_valid_patch_preview(patch_preview: dict[str, Any] | None) -> bool:
-        if not isinstance(patch_preview, dict):
-            return False
-        return all(patch_preview.get(field_name) for field_name in PATCH_REQUIRED_FIELDS)
+    def _build_patch_set_preview(state: CopilotState) -> dict[str, Any] | None:
+        patch_set_preview = state.get("patch_set_preview")
+        if isinstance(patch_set_preview, dict):
+            normalized_preview = dict(patch_set_preview)
+            if not normalized_preview.get("base_hash"):
+                target_document_id = str(normalized_preview.get("target_document_id") or "")
+                for document in state.get("read_documents") or []:
+                    if str(document.get("document_id")) == target_document_id:
+                        normalized_preview["base_hash"] = document.get("content_hash")
+                        break
+                if not normalized_preview.get("base_hash"):
+                    for span in state.get("read_spans") or []:
+                        if str(span.get("document_id")) == target_document_id:
+                            normalized_preview["base_hash"] = span.get("content_hash")
+                            break
+            if CopilotRuntime._has_valid_patch_set_preview(normalized_preview):
+                return normalized_preview
 
-    def _derive_status(self, state: CopilotState) -> str:
-        if self._has_valid_patch_preview(state.get("patch_preview")) and state.get(
+        patch_preview = state.get("patch_preview")
+        if not isinstance(patch_preview, dict):
+            return None
+        if not all(patch_preview.get(field_name) for field_name in {"patch_id", "target_document_id", "base_version"}):
+            return None
+
+        document_hash = None
+        target_document_id = str(patch_preview["target_document_id"])
+        for document in state.get("read_documents") or []:
+            if str(document.get("document_id")) == target_document_id:
+                document_hash = document.get("content_hash")
+                break
+        if not document_hash:
+            for span in state.get("read_spans") or []:
+                if str(span.get("document_id")) == target_document_id:
+                    document_hash = span.get("content_hash")
+                    break
+        if not document_hash:
+            document_hash = patch_preview.get("expected_hash")
+        if not document_hash:
+            return None
+
+        # Legacy runs may still only populate patch_preview. Normalize that path
+        # into a one-patch PatchSet so Django/frontend keep a single review model.
+        patch_set_id = str(uuid.uuid4())
+        return {
+            "patch_set_id": patch_set_id,
+            "target_document_id": target_document_id,
+            "target_document_title": patch_preview.get("target_document_title")
+            or state.get("target_document_title"),
+            "target_selection_reason": patch_preview.get("target_selection_reason")
+            or state.get("target_selection_reason"),
+            "base_version": int(patch_preview.get("base_version") or 1),
+            "base_hash": str(document_hash),
+            "rationale": patch_preview.get("rationale"),
+            "source_context_document_ids": patch_preview.get("source_context_document_ids") or [],
+            "document_preview_after": patch_preview.get("document_preview_after")
+            or patch_preview.get("content_preview"),
+            "patches": [
+                {
+                    "patch_id": patch_preview["patch_id"],
+                    "patch_type": patch_preview.get("operation_type"),
+                    "operation_type": patch_preview.get("operation_type"),
+                    "order_index": 0,
+                    "anchor": patch_preview.get("anchor") or {},
+                    "expected_hash": patch_preview.get("expected_hash"),
+                    "old_text": patch_preview.get("before_preview"),
+                    "new_text": patch_preview.get("after_preview"),
+                    "before_preview": patch_preview.get("before_preview"),
+                    "after_preview": patch_preview.get("after_preview"),
+                    "document_preview_after": patch_preview.get("document_preview_after"),
+                    "content_preview": patch_preview.get("content_preview"),
+                    "rationale": patch_preview.get("rationale"),
+                }
+            ],
+        }
+
+    def _derive_status(
+        self,
+        state: CopilotState,
+        *,
+        patch_set_preview: dict[str, Any] | None = None,
+    ) -> str:
+        if self._has_valid_patch_set_preview(patch_set_preview) and state.get(
             "requires_human_review"
         ):
             return "waiting_review"
         if state.get("run_error"):
             return "failed"
-        if self._is_edit_intent(state.get("intent")):
-            return "failed"
+        if state.get("final_response"):
+            return "completed"
         return "completed"
 
     @contextmanager
@@ -337,17 +442,22 @@ class CopilotRuntime:
 
     @staticmethod
     def _build_events(
-        *, run_id: str, state: CopilotState, status: str
+        *, run_id: str, state: CopilotState, status: str, patch_set_preview: dict[str, Any] | None
     ) -> list[dict[str, Any]]:
         events: list[dict[str, Any]] = [
             {
                 "event": "run_started",
                 "payload": {"encounter_id": state["encounter_id"]},
             },
-            {
-                "event": "intent_classified",
-                "payload": {"intent": state.get("intent")},
-            },
+        ]
+        if state.get("intent") is not None:
+            events.append(
+                {
+                    "event": "intent_classified",
+                    "payload": {"intent": state.get("intent")},
+                }
+            )
+        events.append(
             {
                 "event": "agent_decision",
                 "payload": {
@@ -355,8 +465,8 @@ class CopilotRuntime:
                     "iteration_count": state.get("iteration_count"),
                     "last_decision": (state.get("planner_decisions") or [None])[-1],
                 },
-            },
-        ]
+            }
+        )
 
         for tool_call in state.get("tool_calls", []):
             events.append(
@@ -426,28 +536,52 @@ class CopilotRuntime:
                 }
             )
 
-        if CopilotRuntime._has_valid_patch_preview(state.get("patch_preview")):
+        if CopilotRuntime._has_valid_patch_set_preview(patch_set_preview):
             events.append(
                 {
-                    "event": "patch_proposed",
+                    "event": "patch_set_proposed",
                     "payload": {
-                        **state["patch_preview"],
-                        "target_document_title": state.get("target_document_title"),
-                        "target_selection_reason": state.get("target_selection_reason"),
+                        **patch_set_preview,
                     },
                 }
             )
+            for patch in patch_set_preview.get("patches") or []:
+                if not isinstance(patch, dict):
+                    continue
+                events.append(
+                    {
+                        "event": "patch_proposed",
+                        "payload": {
+                            **patch,
+                            "patch_set_id": patch_set_preview["patch_set_id"],
+                            "target_document_id": patch_set_preview["target_document_id"],
+                            "target_document_title": patch_set_preview.get(
+                                "target_document_title"
+                            ),
+                            "target_selection_reason": patch_set_preview.get(
+                                "target_selection_reason"
+                            ),
+                            "base_version": patch_set_preview["base_version"],
+                        },
+                    }
+                )
         if (
             status == "waiting_review"
             and state.get("requires_human_review")
-            and CopilotRuntime._has_valid_patch_preview(state.get("patch_preview"))
+            and CopilotRuntime._has_valid_patch_set_preview(patch_set_preview)
         ):
             events.append(
                 {
                     "event": "review_required",
                     "payload": {
-                        "patch_id": state["patch_preview"]["patch_id"],
-                        "target_document_id": state["patch_preview"]["target_document_id"],
+                        "patch_set_id": patch_set_preview["patch_set_id"],
+                        "patch_id": patch_set_preview["patches"][0]["patch_id"],
+                        "patch_ids": [
+                            patch["patch_id"]
+                            for patch in patch_set_preview.get("patches", [])
+                            if isinstance(patch, dict) and patch.get("patch_id")
+                        ],
+                        "target_document_id": patch_set_preview["target_document_id"],
                     },
                 }
             )
@@ -487,15 +621,19 @@ class CopilotRuntime:
 
     @staticmethod
     def to_status_response(stored_run: StoredRun) -> RunStatusResponse:
-        patch_preview = stored_run.patch_preview
+        patch_set_preview = stored_run.patch_set_preview
         return RunStatusResponse(
             run_id=stored_run.run_id,
             thread_id=stored_run.thread_id,
             status=stored_run.status,
             intent=stored_run.intent,
             requires_human_review=stored_run.requires_human_review,
-            patch_preview=PatchPreview(**patch_preview) if patch_preview else None,
+            active_patch_set_id=stored_run.active_patch_set_id,
+            patch_set_preview=PatchSetPreview(**patch_set_preview)
+            if patch_set_preview
+            else None,
             final_response=stored_run.final_response,
+            applied_patch_set_id=stored_run.trace_metadata.get("applied_patch_set_id"),
             applied_patch_id=stored_run.trace_metadata.get("applied_patch_id"),
             applied_document_id=stored_run.trace_metadata.get("applied_document_id"),
             applied_content=stored_run.trace_metadata.get("applied_content"),

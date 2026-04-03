@@ -155,7 +155,7 @@ COPILOT_AGENT_AUDIENCE = os.environ.get(
     "app-api-service",
 )
 COPILOT_AGENT_TIMEOUT_SECONDS = float(
-    os.environ.get("COPILOT_AGENT_TIMEOUT_SECONDS", "30")
+    os.environ.get("COPILOT_AGENT_TIMEOUT_SECONDS", "60")
 )
 CLOUD_TASKS_REGION = os.environ.get("CLOUD_TASKS_REGION", "not-loaded")
 TRANSCRIPTION_QUEUE_NAME = os.environ.get("TRANSCRIPTION_QUEUE_NAME", "not-loaded")

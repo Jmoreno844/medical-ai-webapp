@@ -43,7 +43,7 @@ export default function CopilotSideChatPanel({
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => void ensureSession()}>
-              Init
+              Init chat
             </Button>
             <Button
               size="sm"
@@ -68,7 +68,7 @@ export default function CopilotSideChatPanel({
           <div className="space-y-3">
             {chatMessages.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                Aun no hay mensajes. Puedes iniciar sesion y enviar una pregunta o instruccion.
+                Aun no hay mensajes. Puedes iniciar un chat y enviar una pregunta o instruccion.
               </div>
             ) : (
               chatMessages.map((messageItem) => (
@@ -104,8 +104,7 @@ export default function CopilotSideChatPanel({
                     Review required
                   </div>
                   <div className="mt-1 font-medium">
-                    {pendingPatch.target_document_title ??
-                      `Documento ${pendingPatch.target_document_id}`}
+                    {`Documento ${pendingPatch.documentId}`}
                   </div>
                   <div className="mt-1 text-xs text-amber-800">
                     {pendingPatch.rationale ?? "Patch pendiente de revision humana."}
@@ -115,15 +114,13 @@ export default function CopilotSideChatPanel({
                   <div>
                     <div className="mb-1 font-medium">Before</div>
                     <pre className="max-h-32 overflow-auto rounded border border-amber-200 bg-white p-2 whitespace-pre-wrap">
-                      {pendingPatch.before_preview ?? "—"}
+                      {pendingPatch.oldText || "—"}
                     </pre>
                   </div>
                   <div>
                     <div className="mb-1 font-medium">After</div>
                     <pre className="max-h-32 overflow-auto rounded border border-amber-200 bg-white p-2 whitespace-pre-wrap">
-                      {pendingPatch.after_preview ??
-                        pendingPatch.document_preview_after ??
-                        pendingPatch.content_preview}
+                      {pendingPatch.newText || "—"}
                     </pre>
                   </div>
                 </div>

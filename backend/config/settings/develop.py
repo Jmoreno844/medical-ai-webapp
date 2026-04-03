@@ -55,7 +55,7 @@ COPILOT_AGENT_AUDIENCE = os.environ.get(
     "app-api-service",
 )
 COPILOT_AGENT_TIMEOUT_SECONDS = float(
-    os.environ.get("COPILOT_AGENT_TIMEOUT_SECONDS", "30")
+    os.environ.get("COPILOT_AGENT_TIMEOUT_SECONDS", "60")
 )
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = _env_bool("DEBUG", default=True)

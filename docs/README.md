@@ -16,6 +16,8 @@ La documentación está organizada para responder dos preguntas:
 | [Frontend](frontend/README.md) | Rutas, contextos, features principales y logging del `webapp/`. |
 | [Cloud Functions](cloud-functions/README.md) | Entry points, servicios internos, callbacks a Django y variables clave. |
 | [Infraestructura GCP](architecture/gcp-infrastructure.md) | IAM, secrets, lifecycle, naming, Terraform, CI y troubleshooting. |
+| [Arquitectura del workspace + copiloto](architecture/ai-agent-workspace.md) | Workspace frontend, boundary del agent runtime y patrón de patches/review. |
+| [Deuda técnica canónica](debt/README.md) | Deudas aceptadas y transversales que futuros chats deben tener presentes. |
 | [Infra (Terraform)](../infra/README.md) | Bootstrap, primer apply, estado remoto y matiz Terraform vs GitHub Actions. |
 | [ADRs](decisions/README.md) | Decisiones arquitectónicas relevantes del proyecto. |
 | [Notas](notes/cloud-run-concurrency-y-pgvector.md) | Notas técnicas temporales sobre operación, escala y decisiones aún no formalizadas. |

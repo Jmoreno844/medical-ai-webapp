@@ -35,24 +35,102 @@ class CopilotRun(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["doctor", "encounter"]),
-            models.Index(fields=["thread_id"]),
+            models.Index(
+                fields=["doctor", "encounter"],
+                name="copilot_cop_doctor__553b6b_idx",
+            ),
+            models.Index(
+                fields=["thread_id"],
+                name="copilot_cop_thread__60ab29_idx",
+            ),
         ]
 
     def __str__(self) -> str:
         return f"CopilotRun {self.run_id} ({self.status})"
 
 
+class CopilotPatchSet(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("partially_accepted", "Partially Accepted"),
+        ("accepted", "Accepted"),
+        ("rejected", "Rejected"),
+        ("stale", "Stale"),
+        ("applied", "Applied"),
+    ]
+
+    patch_set_id = models.CharField(max_length=64, unique=True)
+    run = models.ForeignKey(
+        CopilotRun,
+        on_delete=models.CASCADE,
+        related_name="patch_sets",
+    )
+    encounter = models.ForeignKey(
+        Encounter,
+        on_delete=models.CASCADE,
+        related_name="copilot_patch_sets",
+    )
+    doctor = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="copilot_patch_sets",
+    )
+    target_document = models.ForeignKey(
+        Document,
+        on_delete=models.CASCADE,
+        related_name="copilot_patch_sets",
+    )
+    base_version = models.IntegerField(default=1)
+    base_hash = models.CharField(max_length=128)
+    rationale = models.TextField(blank=True, null=True)
+    source_context_document_ids = models.JSONField(default=list, blank=True)
+    target_document_title = models.CharField(max_length=255, blank=True, null=True)
+    target_selection_reason = models.TextField(blank=True, null=True)
+    document_preview_after = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
+    review_comment = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(
+                fields=["run", "status"],
+                name="copilot_pset_run_status_idx",
+            ),
+            models.Index(
+                fields=["doctor", "encounter"],
+                name="copilot_pset_doctor_enc_idx",
+            ),
+            models.Index(
+                fields=["target_document"],
+                name="copilot_pset_target_doc_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"CopilotPatchSet {self.patch_set_id} ({self.status})"
+
+
 class CopilotPatch(models.Model):
     STATUS_CHOICES = [
         ("pending", "Pending"),
-        ("approved", "Approved"),
+        ("accepted", "Accepted"),
         ("rejected", "Rejected"),
+        ("conflicted", "Conflicted"),
         ("applied", "Applied"),
         ("stale", "Stale"),
     ]
 
     patch_id = models.CharField(max_length=64, unique=True)
+    patch_set = models.ForeignKey(
+        CopilotPatchSet,
+        on_delete=models.CASCADE,
+        related_name="patches",
+        null=True,
+        blank=True,
+    )
     run = models.ForeignKey(
         CopilotRun,
         on_delete=models.CASCADE,
@@ -74,9 +152,17 @@ class CopilotPatch(models.Model):
         related_name="copilot_patches",
     )
     base_version = models.IntegerField(default=1)
+    order_index = models.IntegerField(default=0)
+    patch_type = models.CharField(max_length=64, default="rewrite_document")
     operation_type = models.CharField(max_length=64)
     anchor = models.JSONField(default=dict, blank=True)
     expected_hash = models.CharField(max_length=128, blank=True, null=True)
+    old_text = models.TextField(blank=True, null=True)
+    new_text = models.TextField(blank=True, null=True)
+    resolved_start = models.IntegerField(blank=True, null=True)
+    resolved_end = models.IntegerField(blank=True, null=True)
+    confidence = models.FloatField(blank=True, null=True)
+    conflict_reason = models.TextField(blank=True, null=True)
     before_preview = models.TextField(blank=True, null=True)
     after_preview = models.TextField(blank=True, null=True)
     document_preview_after = models.TextField(blank=True, null=True)
@@ -93,9 +179,22 @@ class CopilotPatch(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["run", "status"]),
-            models.Index(fields=["doctor", "encounter"]),
-            models.Index(fields=["target_document"]),
+            models.Index(
+                fields=["patch_set", "status"],
+                name="copilot_patch_pset_status_idx",
+            ),
+            models.Index(
+                fields=["run", "status"],
+                name="copilot_cop_run_id_468f25_idx",
+            ),
+            models.Index(
+                fields=["doctor", "encounter"],
+                name="copilot_cop_doctor__6f0cd0_idx",
+            ),
+            models.Index(
+                fields=["target_document"],
+                name="copilot_cop_target__1321e5_idx",
+            ),
         ]
 
     def __str__(self) -> str:

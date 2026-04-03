@@ -9,9 +9,8 @@ import {
 import { buildWorkspaceIndex } from "@/workspace/builders/workspaceIndex";
 import { applyCopilotPatchToWorkspace } from "@/workspace/adapters/applyCopilotPatchToWorkspace";
 import { useAiSessionStore } from "@/workspace/stores/aiSessionStore";
-import { usePatchStore } from "@/workspace/stores/patchStore";
+import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
 import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
-import { DocumentPatch } from "@/workspace/types";
 
 type UseCopilotPanelControllerResult = {
   state: ReturnType<typeof useCopilotDebug>["state"];
@@ -63,12 +62,7 @@ export function useCopilotPanelController(
     (state) => state.selectedDocumentIds
   );
   const readMode = useAiSessionStore((state) => state.readMode);
-  const setPatch = usePatchStore((state) => state.setPatch);
-  const setPreviewContent = usePatchStore((state) => state.setPreviewContent);
-  const selectPatch = usePatchStore((state) => state.selectPatch);
-  const clearPatches = usePatchStore((state) => state.clearPatches);
   useWorkspaceStore();
-  usePatchStore();
 
   const { state, ensureSession, runMessage, syncRunStatus, submitReview, reset } =
     useCopilotDebug(encounterId);
@@ -76,6 +70,7 @@ export function useCopilotPanelController(
   const lastAssistantResponseRef = useRef<string | null>(null);
   const lastReviewPatchIdRef = useRef<string | null>(null);
   const didAutoRefreshWaitingReviewRef = useRef<string | null>(null);
+  const lastPatchSetSyncSignatureRef = useRef<string>("");
 
   const workspaceIndex = buildWorkspaceIndex();
 
@@ -123,7 +118,6 @@ export function useCopilotPanelController(
     .reverse()
     .find((event) => event.event === "review_required");
 
-  // The stream can deliver patch_proposed before Django patch persistence is re-fetched.
   const eventDerivedPendingPatch = useMemo(() => {
     if (!latestPatchProposedEvent) {
       return null;
@@ -133,83 +127,108 @@ export function useCopilotPanelController(
     }
 
     const payload = latestPatchProposedEvent.payload;
-    const patchId =
-      typeof payload.patch_id === "string" ? payload.patch_id : null;
+    const patchId = typeof payload.patch_id === "string" ? payload.patch_id : null;
     const targetDocumentId =
-      typeof payload.target_document_id === "string"
-        ? payload.target_document_id
-        : null;
-    const targetDocumentTitle =
-      typeof payload.target_document_title === "string"
-        ? payload.target_document_title
-        : null;
-    const targetSelectionReason =
-      typeof payload.target_selection_reason === "string"
-        ? payload.target_selection_reason
-        : null;
-    const contentPreview =
-      typeof payload.content_preview === "string" ? payload.content_preview : null;
-    const operationType =
-      typeof payload.operation_type === "string" ? payload.operation_type : null;
-    const baseVersion =
-      typeof payload.base_version === "number" ? payload.base_version : null;
-
-    if (
-      !patchId ||
-      !targetDocumentId ||
-      !targetDocumentTitle ||
-      !targetSelectionReason ||
-      !contentPreview ||
-      !operationType ||
-      baseVersion === null
-    ) {
+      typeof payload.target_document_id === "string" ? payload.target_document_id : null;
+    if (!patchId || !targetDocumentId) {
       return null;
     }
 
+    const resolvedRangePayload =
+      typeof payload.resolved_range === "object" && payload.resolved_range !== null
+        ? (payload.resolved_range as { start?: unknown; end?: unknown })
+        : null;
+
+    const resolvedStart =
+      resolvedRangePayload && typeof resolvedRangePayload.start === "number"
+        ? resolvedRangePayload.start
+        : typeof payload.resolved_start === "number"
+          ? payload.resolved_start
+          : 0;
+    const resolvedEnd =
+      resolvedRangePayload && typeof resolvedRangePayload.end === "number"
+        ? resolvedRangePayload.end
+        : typeof payload.resolved_end === "number"
+          ? payload.resolved_end
+          : resolvedStart;
+
     return {
-      patch_id: patchId,
-      run_id: latestPatchProposedEvent.run_id,
-      target_document_id: targetDocumentId,
-      base_version: baseVersion,
-      operation_type: operationType,
+      id: patchId,
+      patchSetId:
+        typeof payload.patch_set_id === "string" ? payload.patch_set_id : "event-derived",
+      documentId: targetDocumentId,
+      type:
+        typeof payload.patch_type === "string"
+          ? payload.patch_type
+          : typeof payload.operation_type === "string"
+            ? payload.operation_type
+            : "replace_span",
       anchor:
         typeof payload.anchor === "object" && payload.anchor !== null
           ? (payload.anchor as Record<string, unknown>)
           : {},
-      expected_hash:
-        typeof payload.expected_hash === "string" ? payload.expected_hash : null,
-      before_preview:
-        typeof payload.before_preview === "string" ? payload.before_preview : null,
-      after_preview:
-        typeof payload.after_preview === "string" ? payload.after_preview : null,
-      document_preview_after:
-        typeof payload.document_preview_after === "string"
-          ? payload.document_preview_after
-          : null,
-      content_preview: contentPreview,
+      oldText:
+        typeof payload.old_text === "string"
+          ? payload.old_text
+          : typeof payload.before_preview === "string"
+            ? payload.before_preview
+            : "",
+      newText:
+        typeof payload.new_text === "string"
+          ? payload.new_text
+          : typeof payload.after_preview === "string"
+            ? payload.after_preview
+            : typeof payload.content_preview === "string"
+              ? payload.content_preview
+              : "",
+      resolvedRange: { start: resolvedStart, end: resolvedEnd },
+      orderIndex: typeof payload.order_index === "number" ? payload.order_index : 0,
+      status: "pending",
       rationale: typeof payload.rationale === "string" ? payload.rationale : null,
-      source_context_document_ids: Array.isArray(
-        payload.source_context_document_ids
-      )
-        ? payload.source_context_document_ids.map(String)
-        : [],
-      target_document_title: targetDocumentTitle,
-      target_selection_reason: targetSelectionReason,
-      status: "pending" as const,
-      review_comment: null,
-      created_at:
-        latestPatchProposedEvent.created_at ?? new Date().toISOString(),
-      updated_at:
-        latestPatchProposedEvent.created_at ?? new Date().toISOString(),
+      confidence: typeof payload.confidence === "number" ? payload.confidence : null,
     } satisfies CopilotPatchResponse;
   }, [latestPatchProposedEvent, latestReviewRequiredEvent, state.status]);
 
-  const persistedPendingPatch = useMemo(
-    () => state.patches.find((patch) => patch.status === "pending") ?? null,
-    [state.patches]
-  );
+  const persistedPendingPatch = useMemo(() => {
+    if (!Array.isArray(state.patchSets)) {
+      return null;
+    }
+    for (const patchSet of state.patchSets) {
+      if (!Array.isArray(patchSet.patches)) {
+        continue;
+      }
+      const pending = patchSet.patches.find((patch) => patch.status === "pending");
+      if (pending) {
+        return pending;
+      }
+    }
+    return null;
+  }, [state.patchSets]);
+
+  const pendingPatchBaseVersion = useMemo(() => {
+    if (!persistedPendingPatch || !Array.isArray(state.patchSets)) {
+      return null;
+    }
+    const owner = state.patchSets.find((patchSet) =>
+      patchSet.patches.some((patch) => patch.id === persistedPendingPatch.id)
+    );
+    return owner?.base_version ?? null;
+  }, [persistedPendingPatch, state.patchSets]);
 
   const pendingPatch = persistedPendingPatch ?? eventDerivedPendingPatch;
+
+  const patchSetSyncSignature = useMemo(
+    () =>
+      state.patchSets
+        .map((patchSet) => {
+          const patchSignature = patchSet.patches
+            .map((patch) => `${patch.id}:${patch.status}`)
+            .join(",");
+          return `${patchSet.id}:${patchSet.status}:${patchSet.updated_at}:${patchSignature}`;
+        })
+        .join("|") || "empty",
+    [state.patchSets]
+  );
 
   const patchFlowError = useMemo(() => {
     if (state.lastError) {
@@ -237,7 +256,7 @@ export function useCopilotPanelController(
     if (
       state.status === "waiting_review" &&
       state.runId &&
-      state.patches.length === 0 &&
+      state.patchSets.length === 0 &&
       didAutoRefreshWaitingReviewRef.current !== state.runId
     ) {
       didAutoRefreshWaitingReviewRef.current = state.runId;
@@ -246,61 +265,73 @@ export function useCopilotPanelController(
     if (state.status !== "waiting_review") {
       didAutoRefreshWaitingReviewRef.current = null;
     }
-  }, [state.patches.length, state.runId, state.status, syncRunStatus]);
+  }, [state.patchSets.length, state.runId, state.status, syncRunStatus]);
 
   useEffect(() => {
-    clearPatches();
-    state.patches.forEach((patch) => {
-      const mappedPatch: DocumentPatch = {
-        id: patch.patch_id,
-        documentId: patch.target_document_id,
-        documentVersionBase: patch.base_version,
-        createdBy: "ai",
-        operationType:
-          patch.operation_type === "replace_span"
-            ? "replace_range"
-            : patch.operation_type === "insert_after_span"
-              ? "append_text"
-              : "replace_range",
-        summary: patch.rationale ?? "Patch propuesto por el copiloto",
-        rationale: patch.rationale ?? undefined,
-        sourceContextDocumentIds: patch.source_context_document_ids,
-        beforeContent: patch.before_preview ?? undefined,
-        afterContent: patch.document_preview_after ?? patch.content_preview,
-        status:
-          patch.status === "approved"
-            ? "accepted"
-            : patch.status === "rejected"
-              ? "rejected"
-              : patch.status === "applied"
-                ? "applied"
-                : patch.status === "stale"
-                  ? "stale"
-                  : "pending",
-        createdAt: patch.created_at,
-      };
-      setPatch(mappedPatch);
-      setPreviewContent(
-        patch.target_document_id,
-        patch.status === "pending"
-          ? patch.document_preview_after ?? patch.content_preview
-          : null
-      );
-    });
-
-    if (pendingPatch) {
-      selectPatch(pendingPatch.patch_id);
-    } else {
-      selectPatch(null);
+    if (lastPatchSetSyncSignatureRef.current === patchSetSyncSignature) {
+      return;
     }
-  }, [
-    clearPatches,
-    pendingPatch,
-    selectPatch,
-    setPatch,
-    setPreviewContent,
-    state.patches,
-  ]);
+    lastPatchSetSyncSignatureRef.current = patchSetSyncSignature;
+
+    if (state.patchSets.length === 0) {
+      usePatchSetStore.setState((storeState) => {
+        const hasAnyPatchSet = Object.keys(storeState.patchSets).length > 0;
+        if (
+          !hasAnyPatchSet &&
+          storeState.activePatchSetId === null &&
+          storeState.selectedPatchId === null
+        ) {
+          return storeState;
+        }
+        return {
+          ...storeState,
+          patchSets: {},
+          activePatchSetId: null,
+          selectedPatchId: null,
+        };
+      });
+      return;
+    }
+
+    const activePatchSet = state.patchSets[0];
+    const pendingInActiveSet = activePatchSet.patches.find(
+      (patch) => patch.status === "pending"
+    );
+    const nextSelectedPatchId = pendingInActiveSet?.id ?? null;
+
+    usePatchSetStore.setState((storeState) => {
+      const existingPatchSet = storeState.patchSets[activePatchSet.id];
+      const existingPatchCount = existingPatchSet?.patches.length ?? -1;
+      const shouldUpsertPatchSet =
+        !existingPatchSet ||
+        existingPatchCount !== activePatchSet.patches.length ||
+        existingPatchSet.updated_at !== activePatchSet.updated_at ||
+        existingPatchSet.status !== activePatchSet.status;
+
+      const nextPatchSets = shouldUpsertPatchSet
+        ? {
+            ...storeState.patchSets,
+            [activePatchSet.id]: activePatchSet,
+          }
+        : storeState.patchSets;
+
+      const nextActivePatchSetId = activePatchSet.id;
+      if (
+        nextPatchSets === storeState.patchSets &&
+        storeState.activePatchSetId === nextActivePatchSetId &&
+        storeState.selectedPatchId === nextSelectedPatchId
+      ) {
+        return storeState;
+      }
+
+      return {
+        ...storeState,
+        patchSets: nextPatchSets,
+        activePatchSetId: nextActivePatchSetId,
+        selectedPatchId: nextSelectedPatchId,
+      };
+    });
+  }, [patchSetSyncSignature, state.patchSets]);
 
   useEffect(() => {
     if (
@@ -316,19 +347,16 @@ export function useCopilotPanelController(
   }, [state.finalResponse, state.runId]);
 
   useEffect(() => {
-    if (
-      pendingPatch &&
-      pendingPatch.patch_id !== lastReviewPatchIdRef.current
-    ) {
+    if (pendingPatch && pendingPatch.id !== lastReviewPatchIdRef.current) {
       setChatMessages((current) => [
         ...current,
         buildChatMessage(
           "system",
-          `Patch pendiente para ${pendingPatch.target_document_title ?? `documento ${pendingPatch.target_document_id}`}. Requiere review humana.`,
+          `Patch pendiente para documento ${pendingPatch.documentId}. Requiere review humana.`,
           state.runId
         ),
       ]);
-      lastReviewPatchIdRef.current = pendingPatch.patch_id;
+      lastReviewPatchIdRef.current = pendingPatch.id;
     }
     if (!pendingPatch) {
       lastReviewPatchIdRef.current = null;
@@ -341,6 +369,8 @@ export function useCopilotPanelController(
       if (!trimmed) {
         return null;
       }
+
+      const session = await ensureSession();
 
       syncWorkingSetFromWorkspace();
       const currentWorkspaceIndex = buildWorkspaceIndex();
@@ -363,6 +393,7 @@ export function useCopilotPanelController(
 
       const payload: CopilotMessageRequest = {
         encounter_id: encounterId,
+        thread_id: session.thread_id,
         user_message: trimmed,
         workspace_index: currentWorkspaceIndex,
         active_document_id: currentWorkspaceIndex.activeDocumentId,
@@ -370,7 +401,7 @@ export function useCopilotPanelController(
       };
       return runMessage(payload);
     },
-    [encounterId, runMessage, state.runId, syncWorkingSetFromWorkspace]
+    [encounterId, ensureSession, runMessage, state.runId, syncWorkingSetFromWorkspace]
   );
 
   const submitPatchReview = useCallback(
@@ -381,10 +412,11 @@ export function useCopilotPanelController(
 
       const currentWorkspaceIndex = buildWorkspaceIndex();
       const currentDocument = currentWorkspaceIndex.documents.find(
-        (document) => document.documentId === pendingPatch.target_document_id
+        (document) => document.documentId === pendingPatch.documentId
       );
       const run = await submitReview(
-        pendingPatch.patch_id,
+        pendingPatch.patchSetId,
+        pendingPatch.id,
         decision,
         comment?.trim() || undefined,
         currentDocument?.version
@@ -398,7 +430,7 @@ export function useCopilotPanelController(
         applyCopilotPatchToWorkspace({
           documentId: run.applied_document_id,
           content: run.applied_content,
-          baseVersion: pendingPatch.base_version,
+          baseVersion: pendingPatchBaseVersion ?? currentDocument?.version ?? 1,
           appliedVersion: run.applied_version,
           appliedPatchId: run.applied_patch_id,
         });
@@ -408,22 +440,26 @@ export function useCopilotPanelController(
         ...current,
         buildChatMessage(
           "system",
-          decision === "approve"
-            ? "Patch aprobado."
-            : "Patch rechazado.",
+          decision === "approve" ? "Patch aprobado." : "Patch rechazado.",
           run?.run_id ?? state.runId
         ),
       ]);
 
       return run;
     },
-    [pendingPatch, state.runId, submitReview]
+    [pendingPatch, pendingPatchBaseVersion, state.runId, submitReview]
   );
 
   const wrappedReset = useCallback(() => {
     lastAssistantResponseRef.current = null;
     lastReviewPatchIdRef.current = null;
+    lastPatchSetSyncSignatureRef.current = "";
     setChatMessages([]);
+    usePatchSetStore.setState({
+      patchSets: {},
+      activePatchSetId: null,
+      selectedPatchId: null,
+    });
     reset();
   }, [reset]);
 

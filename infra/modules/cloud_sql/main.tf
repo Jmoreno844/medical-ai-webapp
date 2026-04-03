@@ -53,6 +53,14 @@ resource "google_sql_database" "app" {
   instance = google_sql_database_instance.main.name
 }
 
+resource "google_sql_database" "additional" {
+  for_each = toset(var.additional_database_names)
+
+  project  = var.project_id
+  name     = each.value
+  instance = google_sql_database_instance.main.name
+}
+
 resource "google_sql_user" "app" {
   count = var.database_user == null || var.database_password == null ? 0 : 1
 

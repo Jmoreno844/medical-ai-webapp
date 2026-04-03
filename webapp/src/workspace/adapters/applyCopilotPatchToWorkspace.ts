@@ -1,7 +1,7 @@
 import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
 import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
 import { useDocumentSnapshotStore } from "@/workspace/stores/documentSnapshotStore";
-import { usePatchStore } from "@/workspace/stores/patchStore";
+import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
 import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
 
 type ApplyCopilotPatchToWorkspaceParams = {
@@ -23,7 +23,7 @@ export function applyCopilotPatchToWorkspace({
   const snapshotStore = useDocumentSnapshotStore.getState();
   const draftStore = useDocumentDraftStore.getState();
   const derivedStore = useDocumentDerivedStore.getState();
-  const patchStore = usePatchStore.getState();
+  const patchSetStore = usePatchSetStore.getState();
 
   const activeDocumentId = workspaceState.activeDocumentId
     ? String(workspaceState.activeDocumentId)
@@ -46,11 +46,13 @@ export function applyCopilotPatchToWorkspace({
     draftStore.markDraftClean(documentId);
   }
 
-  patchStore.setPreviewContent(documentId, null);
   derivedStore.clearPatchPreview(documentId);
 
-  if (appliedPatchId && patchStore.selectedPatchId === appliedPatchId) {
-    patchStore.selectPatch(null);
+  if (appliedPatchId && patchSetStore.selectedPatchId === appliedPatchId) {
+    if (patchSetStore.activePatchSetId) {
+       patchSetStore.updatePatchStatus(patchSetStore.activePatchSetId, appliedPatchId, "applied");
+    }
+    patchSetStore.setSelectedPatch(null);
   }
 
   window.triggerEditorRefresh?.();

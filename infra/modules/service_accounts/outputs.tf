@@ -23,6 +23,11 @@ output "github_actions_deployer_name" {
   value       = google_service_account.github_actions_deployer.name
 }
 
+output "copilot_agent_runner_email" {
+  description = "Email of the Cloud Run copilot agent service account"
+  value       = google_service_account.copilot_agent_runner.email
+}
+
 output "backend_local_gcs_signer_email" {
   description = "Email of the local GCS URL signer SA for development impersonation"
   value       = google_service_account.backend_local_gcs_signer.email

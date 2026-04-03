@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  acceptCopilotPatch,
+  applyAcceptedCopilotPatchSet,
   createCopilotSession,
   getCopilotRun,
-  listCopilotPatches,
+  listCopilotPatchSets,
   reviewCopilotPatch,
   sendCopilotMessage,
   streamCopilotRun,
@@ -23,7 +25,7 @@ const INITIAL_STATE: CopilotDebugState = {
   lastError: null,
   finalResponse: null,
   events: [],
-  patches: [],
+  patchSets: [],
 };
 
 const TERMINAL_STATUSES = new Set(["completed", "failed"]);
@@ -92,12 +94,12 @@ export function useCopilotDebug(encounterId: number) {
 
           try {
             const run = await getCopilotRun(runId);
-            const patches = await listCopilotPatches(runId);
+            const patchSets = await listCopilotPatchSets(runId);
             setState((current) => ({
               ...current,
               status: run.status,
               finalResponse: run.final_response ?? current.finalResponse,
-              patches,
+              patchSets,
             }));
           } catch {
             setState((current) => ({
@@ -112,6 +114,12 @@ export function useCopilotDebug(encounterId: number) {
   );
 
   const ensureSession = useCallback(async () => {
+    if (state.threadId) {
+      return {
+        thread_id: state.threadId,
+        capability: "read_only" as const,
+      };
+    }
     const session = await createCopilotSession(encounterId);
     setState((current) => ({
       ...current,
@@ -120,13 +128,13 @@ export function useCopilotDebug(encounterId: number) {
       lastError: null,
     }));
     return session;
-  }, [encounterId]);
+  }, [encounterId, state.threadId]);
 
   const runMessage = useCallback(
     async (payload: CopilotMessageRequest) => {
       const run = await sendCopilotMessage(payload);
-      const patches =
-        run.requires_human_review ? await listCopilotPatches(run.run_id) : [];
+      const patchSets =
+        run.requires_human_review ? await listCopilotPatchSets(run.run_id) : [];
       setState({
         threadId: run.thread_id,
         runId: run.run_id,
@@ -135,7 +143,7 @@ export function useCopilotDebug(encounterId: number) {
         lastError: null,
         finalResponse: run.final_response ?? null,
         events: [],
-        patches,
+        patchSets,
       });
       openStream(run.run_id);
       return run;
@@ -149,19 +157,20 @@ export function useCopilotDebug(encounterId: number) {
     }
 
     const run: CopilotRunResponse = await getCopilotRun(state.runId);
-    const patches = await listCopilotPatches(state.runId);
+    const patchSets = await listCopilotPatchSets(state.runId);
     setState((current) => ({
       ...current,
       status: run.status,
       finalResponse: run.final_response ?? current.finalResponse,
       lastError: null,
-      patches,
+      patchSets,
     }));
     return run;
   }, [state.runId]);
 
   const submitReview = useCallback(
     async (
+      patchSetId: string,
       patchId: string,
       decision: "approve" | "reject",
       comment?: string,
@@ -177,18 +186,32 @@ export function useCopilotDebug(encounterId: number) {
           .map((event) => event.sequence ?? 0)
           .filter((sequence) => Number.isFinite(sequence))
       );
-      const run = await reviewCopilotPatch(state.runId, {
-        patch_id: patchId,
-        decision,
-        comment,
-        document_version: documentVersion,
-      });
-      const patches = await listCopilotPatches(state.runId);
+
+      const run =
+        decision === "approve"
+          ? await (async () => {
+              await acceptCopilotPatch(patchSetId, {
+                patch_id: patchId,
+                comment,
+              });
+              return applyAcceptedCopilotPatchSet(patchSetId, {
+                comment,
+                document_version: documentVersion,
+              });
+            })()
+          : await reviewCopilotPatch(state.runId, {
+              patch_id: patchId,
+              decision,
+              comment,
+              document_version: documentVersion,
+            });
+
+      const patchSets = await listCopilotPatchSets(state.runId);
       setState((current) => ({
         ...current,
         status: run.status,
         finalResponse: run.final_response ?? current.finalResponse,
-        patches,
+        patchSets,
         lastError: null,
       }));
       openStream(state.runId, afterSequence);

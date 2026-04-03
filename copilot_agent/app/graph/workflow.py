@@ -1,59 +1,61 @@
 from __future__ import annotations
 
 from langgraph.graph import END, StateGraph
+from langgraph.prebuilt import ToolNode
 
 from app.graph.nodes import (
+    _route_after_model,
+    _route_after_tools,
     apply_patch,
-    accumulate_observation,
     finalize_response,
     interrupt_for_review,
-    make_call_tool_node,
-    make_plan_or_next_action_node,
+    make_call_model_node,
 )
 from app.graph.state import CopilotState
+from app.graph.tools import build_graph_tools
+
+
+def _tool_error_message(error: Exception) -> str:
+    return (
+        "La llamada de tool fallo por un problema corregible. "
+        f"Detalle: {error}. Ajusta el schema o el orden de las tools y reintenta."
+    )
 
 
 def build_clinical_copilot_graph(*, tools_client, planner, checkpointer=None):
     graph = StateGraph(CopilotState)
+    tools = build_graph_tools(
+        tools_client=tools_client,
+        planner=planner,
+    )
 
-    plan_or_next_action = make_plan_or_next_action_node(planner)
-    call_tool = make_call_tool_node(tools_client, planner)
-
-    graph.add_node("plan_or_next_action", plan_or_next_action)
-    graph.add_node("call_tool", call_tool)
-    graph.add_node("accumulate_observation", accumulate_observation)
+    graph.add_node("call_model", make_call_model_node(planner, tools))
+    graph.add_node(
+        "tools",
+        ToolNode(
+            tools,
+            handle_tool_errors=_tool_error_message,
+        ),
+    )
     graph.add_node("interrupt_for_review", interrupt_for_review)
     graph.add_node("apply_patch", apply_patch)
     graph.add_node("finalize_response", finalize_response)
 
-    graph.set_entry_point("plan_or_next_action")
+    graph.set_entry_point("call_model")
     graph.add_conditional_edges(
-        "plan_or_next_action",
-        lambda state: "call_tool"
-        if (state.get("pending_action") or {}).get("action_type") == "call_tool"
-        else "interrupt_for_review"
-        if state.get("requires_human_review") and state.get("patch_preview")
-        else "finalize_response"
-        if state.get("run_error")
-        else "finalize_response",
+        "call_model",
+        _route_after_model,
         {
-            "call_tool": "call_tool",
-            "finalize_response": "finalize_response",
+            "tools": "tools",
             "interrupt_for_review": "interrupt_for_review",
+            "finalize_response": "finalize_response",
         },
     )
-    graph.add_edge("call_tool", "accumulate_observation")
     graph.add_conditional_edges(
-        "accumulate_observation",
-        lambda state: "interrupt_for_review"
-        if state.get("requires_human_review") and state.get("patch_preview")
-        else "finalize_response"
-        if state.get("run_error")
-        else "finalize_response"
-        if state.get("final_response")
-        else "plan_or_next_action",
+        "tools",
+        _route_after_tools,
         {
-            "plan_or_next_action": "plan_or_next_action",
+            "call_model": "call_model",
             "interrupt_for_review": "interrupt_for_review",
             "finalize_response": "finalize_response",
         },

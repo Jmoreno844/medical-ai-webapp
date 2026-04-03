@@ -19,7 +19,8 @@ class StoredRun:
     status: str
     intent: str | None
     requires_human_review: bool
-    patch_preview: dict[str, Any] | None
+    active_patch_set_id: str | None
+    patch_set_preview: dict[str, Any] | None
     final_response: str | None
     trace_metadata: dict[str, Any]
 
@@ -48,12 +49,26 @@ class CopilotRunRepository:
                     status TEXT NOT NULL,
                     intent TEXT NULL,
                     requires_human_review BOOLEAN NOT NULL DEFAULT FALSE,
+                    active_patch_set_id TEXT NULL,
+                    patch_set_preview JSONB NULL,
                     patch_preview JSONB NULL,
                     final_response TEXT NULL,
                     trace_metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
+                """
+            )
+            cur.execute(
+                """
+                ALTER TABLE copilot_runs
+                ADD COLUMN IF NOT EXISTS active_patch_set_id TEXT NULL
+                """
+            )
+            cur.execute(
+                """
+                ALTER TABLE copilot_runs
+                ADD COLUMN IF NOT EXISTS patch_set_preview JSONB NULL
                 """
             )
             cur.execute(
@@ -88,10 +103,12 @@ class CopilotRunRepository:
                     status,
                     intent,
                     requires_human_review,
+                    active_patch_set_id,
+                    patch_set_preview,
                     patch_preview,
                     final_response,
                     trace_metadata
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s::jsonb)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s::jsonb)
                 """,
                 (
                     run.run_id,
@@ -102,7 +119,9 @@ class CopilotRunRepository:
                     run.status,
                     run.intent,
                     run.requires_human_review,
-                    json.dumps(run.patch_preview) if run.patch_preview else None,
+                    run.active_patch_set_id,
+                    json.dumps(run.patch_set_preview) if run.patch_set_preview else None,
+                    None,
                     run.final_response,
                     json.dumps(run.trace_metadata),
                 ),
@@ -117,6 +136,8 @@ class CopilotRunRepository:
                     status = %s,
                     intent = %s,
                     requires_human_review = %s,
+                    active_patch_set_id = %s,
+                    patch_set_preview = %s::jsonb,
                     patch_preview = %s::jsonb,
                     final_response = %s,
                     trace_metadata = %s::jsonb,
@@ -127,7 +148,9 @@ class CopilotRunRepository:
                     run.status,
                     run.intent,
                     run.requires_human_review,
-                    json.dumps(run.patch_preview) if run.patch_preview else None,
+                    run.active_patch_set_id,
+                    json.dumps(run.patch_set_preview) if run.patch_set_preview else None,
+                    None,
                     run.final_response,
                     json.dumps(run.trace_metadata),
                     run.run_id,
@@ -147,7 +170,8 @@ class CopilotRunRepository:
                     status,
                     intent,
                     requires_human_review,
-                    patch_preview,
+                    active_patch_set_id,
+                    patch_set_preview,
                     final_response,
                     trace_metadata
                 FROM copilot_runs
@@ -207,4 +231,3 @@ class CopilotRunRepository:
                 stored_events.append(StoredRunEvent(**cur.fetchone()))
 
         return stored_events
-

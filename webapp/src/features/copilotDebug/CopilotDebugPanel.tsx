@@ -2,24 +2,21 @@ import { FormEvent, useState } from "react";
 
 import {
   CopilotPanelController,
-  useCopilotPanelController,
 } from "@/features/copilotDebug/useCopilotPanelController";
 
 type CopilotDebugPanelProps = {
-  encounterId: number;
-  controller?: CopilotPanelController;
+  encounterId?: number;
+  controller: CopilotPanelController;
 };
 
 export default function CopilotDebugPanel({
-  encounterId,
   controller,
 }: CopilotDebugPanelProps) {
-  const internalController = useCopilotPanelController(encounterId);
   const [message, setMessage] = useState(
     "Hazme un resumen breve del encounter actual"
   );
   const [reviewComment, setReviewComment] = useState("");
-  const activeController = controller ?? internalController;
+  const activeController = controller;
   const {
     state,
     workspaceIndex,
@@ -73,7 +70,7 @@ export default function CopilotDebugPanel({
             onClick={handleInitSession}
             className="px-3 py-1.5 text-xs rounded border bg-white hover:bg-slate-100"
           >
-            Init session
+            Init chat
           </button>
           <button
             type="button"
@@ -181,55 +178,47 @@ export default function CopilotDebugPanel({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-700">
               <div>
                 <span className="font-medium">patch_id:</span>{" "}
-                {pendingPatch.patch_id}
+                {pendingPatch.id}
               </div>
               <div>
                 <span className="font-medium">target_document_id:</span>{" "}
-                {pendingPatch.target_document_id}
+                {pendingPatch.documentId}
               </div>
               <div>
-                <span className="font-medium">target_document_title:</span>{" "}
-                {pendingPatch.target_document_title ?? "—"}
+                <span className="font-medium">patch_set_id:</span>{" "}
+                {pendingPatch.patchSetId}
               </div>
               <div>
-                <span className="font-medium">base_version:</span>{" "}
-                {pendingPatch.base_version}
+                <span className="font-medium">resolved_range:</span>{" "}
+                {`${pendingPatch.resolvedRange.start}-${pendingPatch.resolvedRange.end}`}
               </div>
               <div>
-                <span className="font-medium">operation_type:</span>{" "}
-                {pendingPatch.operation_type}
+                <span className="font-medium">type:</span>{" "}
+                {pendingPatch.type}
+              </div>
+              <div>
+                <span className="font-medium">order_index:</span>{" "}
+                {pendingPatch.orderIndex}
               </div>
             </div>
             <div className="text-xs text-slate-700">
               <span className="font-medium">rationale:</span>{" "}
               {pendingPatch.rationale ?? "—"}
             </div>
-            <div className="text-xs text-slate-700">
-              <span className="font-medium">target_selection_reason:</span>{" "}
-              {pendingPatch.target_selection_reason ?? "—"}
-            </div>
             <div>
               <div className="text-xs font-medium text-slate-700 mb-2">
-                before_preview
+                old_text
               </div>
               <pre className="max-h-40 overflow-auto rounded border bg-slate-50 p-3 text-[11px] whitespace-pre-wrap text-slate-800">
-                {pendingPatch.before_preview ?? "—"}
+                {pendingPatch.oldText || "—"}
               </pre>
             </div>
             <div>
               <div className="text-xs font-medium text-slate-700 mb-2">
-                after_preview
+                new_text
               </div>
               <pre className="max-h-40 overflow-auto rounded border bg-slate-50 p-3 text-[11px] whitespace-pre-wrap text-slate-800">
-                {pendingPatch.after_preview ?? "—"}
-              </pre>
-            </div>
-            <div>
-              <div className="text-xs font-medium text-slate-700 mb-2">
-                document_preview_after
-              </div>
-              <pre className="max-h-48 overflow-auto rounded border bg-slate-50 p-3 text-[11px] whitespace-pre-wrap text-slate-800">
-                {pendingPatch.document_preview_after ?? pendingPatch.content_preview}
+                {pendingPatch.newText || "—"}
               </pre>
             </div>
             <div className="space-y-2">

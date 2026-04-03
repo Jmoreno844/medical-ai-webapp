@@ -54,6 +54,12 @@ variable "database_name" {
   type        = string
 }
 
+variable "additional_database_names" {
+  description = "Additional logical databases to create in the same Cloud SQL instance"
+  type        = list(string)
+  default     = []
+}
+
 variable "database_user" {
   description = "Name of the application database user"
   type        = string

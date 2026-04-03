@@ -1,121 +1,28 @@
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
-import re
-import unicodedata
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Callable, Literal, Mapping, Protocol, Sequence
+from xml.sax.saxutils import escape
 
-import vertexai
-from pydantic import BaseModel, Field, ValidationError
-from vertexai.generative_models import GenerationConfig, GenerativeModel
+from google.genai import types as genai_types
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.tools import BaseTool
+from langchain_google_genai import ChatGoogleGenerativeAI
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import Settings
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_TOOL_NAMES = {
-    "list_open_documents",
-    "list_encounter_documents",
-    "read_document_summary",
-    "read_document_span",
-    "search_documents",
-    "read_patch_history",
-    "build_context_view",
-    "propose_replace_span",
-    "propose_insert_after_span",
-    "propose_create_document",
-}
 
-EDIT_KEYWORDS = {
-    "edita",
-    "actualiza",
-    "reescribe",
-    "cambia",
-    "corrige",
-    "agrega",
-    "agregale",
-    "incluye",
-    "pon",
-    "modifica",
-    "anade",
-    "añade",
-}
-
-EDIT_PHRASES = {
-    "haz el egreso",
-    "haz la nota",
-    "haz nota",
-    "prepara el egreso",
-    "prepara la nota",
-    "completa el egreso",
-}
-
-DOCUMENT_TITLE_FAMILIES = {
-    "clinical_note": {"nota", "nota clinica", "historia clinica", "soap", "evolucion"},
-    "discharge_note": {"egreso", "epicrisis", "discharge"},
-    "transcription": {"transcripcion", "transcript"},
-    "context": {"contexto"},
-}
-
-EDIT_INTENT_HINTS = {
-    "edit",
-    "document",
-    "patch",
-    "rewrite",
-    "replace",
-    "insert",
-    "add_information",
-    "update",
-    "modify",
-}
-
-TOOL_ALLOWED_INPUT_KEYS = {
-    "list_open_documents": set(),
-    "list_encounter_documents": set(),
-    "read_document_summary": {"document_id"},
-    "read_document_span": {
-        "document_id",
-        "exact_text",
-        "prefix_text",
-        "suffix_text",
-        "start_offset",
-        "end_offset",
-        "max_chars",
-    },
-    "search_documents": {"query", "max_results", "allowed_document_types"},
-    "read_patch_history": {"document_id", "limit"},
-    "build_context_view": {
-        "active_document_id",
-        "include_document_ids",
-        "include_manual_context",
-    },
-    "propose_replace_span": {"target_document_id"},
-    "propose_insert_after_span": {"target_document_id"},
-    "propose_create_document": set(),
-}
-
-TOOL_INPUT_ALIASES = {
-    "build_context_view": {"document_id": "active_document_id"},
-    "read_document_span": {
-        "exactText": "exact_text",
-        "prefixText": "prefix_text",
-        "suffixText": "suffix_text",
-        "startOffset": "start_offset",
-        "endOffset": "end_offset",
-        "documentId": "document_id",
-    },
-    "search_documents": {
-        "topK": "max_results",
-        "allowedDocumentTypes": "allowed_document_types",
-    },
-    "read_document_summary": {"documentId": "document_id"},
-    "read_patch_history": {"documentId": "document_id"},
-    "propose_replace_span": {"targetDocumentId": "target_document_id"},
-    "propose_insert_after_span": {"targetDocumentId": "target_document_id"},
-}
+PatchOperationType = Literal[
+    "replace_span",
+    "insert_before",
+    "insert_after_span",
+    "delete_span",
+    "rewrite_document",
+]
 
 
 class PlannerDecision(BaseModel):
@@ -126,676 +33,613 @@ class PlannerDecision(BaseModel):
     response_content: str | None = None
     intent: str | None = None
     target_document_hint: str | None = None
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class DraftedPatchAnchor(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    exact_text: str = Field(
+        ...,
+        alias="exactText",
+        description="The exact textual match in the document. MANDATORY. CRITICAL RULE: NEVER include newlines (\\n) or attempt to match large paragraphs. Pick a VERY SHORT, unique phrase (3-8 words) from a single line. The backend performs a strict substring search and will fail if JSON whitespace normalization alters your text."
+    )
+    prefix_text: str | None = Field(
+        default=None, 
+        alias="prefixText",
+        description="A few words immediately BEFORE the exactText. CRITICAL: Do NOT include newlines (\\n) or invisible characters."
+    )
+    suffix_text: str | None = Field(
+        default=None, 
+        alias="suffixText",
+        description="A few words immediately AFTER the exactText. CRITICAL: Do NOT include newlines (\\n) or invisible characters."
+    )
+    start_offset: int | None = Field(
+        default=None, 
+        alias="startOffset",
+        description="The exact starting character index of the 'exact_text' in the document. Must always be provided if endOffset is provided."
+    )
+    end_offset: int | None = Field(
+        default=None, 
+        alias="endOffset",
+        description="The exact ending character index of the 'exact_text' in the document. Must always be provided if startOffset is provided."
+    )
+
+    def to_payload(self) -> dict[str, Any]:
+        return self.model_dump(mode="python", by_alias=True, exclude_none=True)
 
 
 class DraftedPatch(BaseModel):
-    operation_type: str
-    anchor: dict[str, Any] = Field(default_factory=dict)
+    operation_type: PatchOperationType = Field(
+        description=(
+            "Patch operation constant. Must be one of: replace_span, insert_before, "
+            "insert_after_span, delete_span, rewrite_document. Never use tool names like "
+            "propose_replace_span. If the entire document must be changed, use rewrite_document."
+        )
+    )
+    anchor: DraftedPatchAnchor = Field(default_factory=DraftedPatchAnchor)
     expected_hash: str | None = None
     before_preview: str | None = None
     after_preview: str | None = None
-    document_preview_after: str
+    document_preview_after: str | None = None
     content_preview: str
-    rationale: str
+    rationale: str = Field(
+        default="",
+        description=(
+            "Short clinical rationale for the patch. Leave empty only if the model "
+            "cannot provide a concise rationale safely."
+        ),
+    )
+    confidence: float | None = None
+
+
+class DraftedPatchPlan(BaseModel):
+    patches: list[DraftedPatch] = Field(default_factory=list)
+    rationale: str | None = None
+    document_preview_after: str | None = None
 
 
 class CopilotPlanner(Protocol):
-    def plan_next_action(self, state: dict[str, Any]) -> PlannerDecision: ...
+    def invoke_model(
+        self,
+        *,
+        state: Mapping[str, Any],
+        messages: Sequence[BaseMessage],
+        tools: Sequence[BaseTool | Callable[..., Any]],
+    ) -> AIMessage: ...
 
     def draft_patch_preview(
         self,
         *,
-        state: dict[str, Any],
-        target_document: dict[str, Any],
+        state: Mapping[str, Any],
+        target_document: Mapping[str, Any],
         target_document_content: str,
         supporting_context: list[dict[str, Any]],
-        span_payload: dict[str, Any] | None = None,
-    ) -> DraftedPatch: ...
+        span_payload: Mapping[str, Any] | None = None,
+        requested_tool_name: str | None = None,
+    ) -> DraftedPatchPlan: ...
 
 
-def _normalize_text(value: str) -> str:
-    normalized = unicodedata.normalize("NFKD", value)
-    return "".join(char for char in normalized if not unicodedata.combining(char))
+def _is_proposal_tool_name(tool_name: str | None) -> bool:
+    return str(tool_name or "").startswith("propose_")
 
 
-def _extract_json_object(value: str) -> str:
-    start = value.find("{")
-    end = value.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        raise ValueError("Planner response did not contain a JSON object")
-    return value[start : end + 1]
+def _filter_parallel_tool_calls(message: AIMessage) -> AIMessage:
+    tool_calls = list(message.tool_calls or [])
+    if len(tool_calls) <= 1:
+        return message
 
-
-def _shorten_text(value: str | None, max_length: int = 240) -> str:
-    if not value:
-        return ""
-    return " ".join(value.split())[:max_length]
-
-
-def _is_simple_greeting(message: str) -> bool:
-    normalized = _normalize_text(message.lower()).strip()
-    return normalized in {"hola", "buenas", "hello", "hi", "buen dia", "buenas tardes"}
-
-
-def _message_mentions_edit(message: str) -> bool:
-    normalized_message = _normalize_text(message.lower())
-    return any(keyword in normalized_message for keyword in EDIT_KEYWORDS) or any(
-        phrase in normalized_message for phrase in EDIT_PHRASES
-    )
-
-
-def _message_document_hint(message: str) -> str | None:
-    normalized_message = _normalize_text(message.lower())
-    for family_alias in DOCUMENT_TITLE_FAMILIES["clinical_note"]:
-        if family_alias in normalized_message:
-            return "nota"
-    for family_alias in DOCUMENT_TITLE_FAMILIES["discharge_note"]:
-        if family_alias in normalized_message:
-            return "egreso"
-    return None
-
-
-def _content_hash(content: str) -> str:
-    return hashlib.sha256(content.encode("utf-8")).hexdigest()
-
-
-def _canonical_intent(
-    *,
-    raw_intent: str | None,
-    action_type: str,
-    tool_name: str | None,
-    user_message: str,
-) -> str:
-    normalized_intent = _normalize_text((raw_intent or "").lower())
-    if any(hint in normalized_intent for hint in EDIT_INTENT_HINTS):
-        return "edit_document"
-    if tool_name and tool_name.startswith("propose_"):
-        return "edit_document"
-    if _message_mentions_edit(user_message):
-        return "edit_document"
-    if action_type == "respond":
-        return "answer_question"
-    return "answer_question"
-
-
-def _sanitize_tool_input(tool_name: str, raw_tool_input: Any) -> dict[str, Any]:
-    if not isinstance(raw_tool_input, dict):
-        raw_tool_input = {}
-
-    aliases = TOOL_INPUT_ALIASES.get(tool_name, {})
-    normalized_input: dict[str, Any] = {}
-    for raw_key, raw_value in raw_tool_input.items():
-        target_key = aliases.get(raw_key, raw_key)
-        normalized_input[target_key] = raw_value
-
-    allowed_keys = TOOL_ALLOWED_INPUT_KEYS[tool_name]
-    sanitized_input = {
-        key: value for key, value in normalized_input.items() if key in allowed_keys
-    }
-
-    if tool_name == "build_context_view":
-        include_document_ids = sanitized_input.get("include_document_ids")
-        if isinstance(include_document_ids, str):
-            sanitized_input["include_document_ids"] = [include_document_ids]
-        if "include_manual_context" in sanitized_input:
-            sanitized_input["include_manual_context"] = bool(
-                sanitized_input["include_manual_context"]
-            )
-    if tool_name == "search_documents" and "max_results" in sanitized_input:
-        sanitized_input["max_results"] = int(sanitized_input["max_results"])
-    if tool_name == "read_document_span" and "max_chars" in sanitized_input:
-        sanitized_input["max_chars"] = int(sanitized_input["max_chars"])
-    if tool_name == "read_patch_history" and "limit" in sanitized_input:
-        sanitized_input["limit"] = int(sanitized_input["limit"])
-
-    if tool_name in {"read_document_summary", "read_document_span", "read_patch_history"}:
-        if not sanitized_input.get("document_id"):
-            raise ValueError(f"{tool_name} requires document_id")
-    if tool_name in {"propose_replace_span", "propose_insert_after_span"}:
-        if not sanitized_input.get("target_document_id"):
-            raise ValueError(f"{tool_name} requires target_document_id")
-
-    return sanitized_input
-
-
-def _best_target_document(
-    state: dict[str, Any],
-    *,
-    preferred_hint: str | None = None,
-) -> dict[str, Any] | None:
-    documents = state.get("available_documents") or []
-    writable_documents = [
-        document
-        for document in documents
-        if document.get("ai_writable", True) and document.get("type") != "transcription"
+    # Allow parallel reads/searches, but keep proposal steps serialized. Proposal
+    # tools mutate the single pending patch-set slot of the runtime, so mixing them
+    # with reads or emitting several at once causes state races and speculative edits.
+    proposal_calls = [
+        tool_call for tool_call in tool_calls if _is_proposal_tool_name(tool_call.get("name"))
     ]
-    if not writable_documents:
-        return None
+    non_proposal_calls = [
+        tool_call for tool_call in tool_calls if not _is_proposal_tool_name(tool_call.get("name"))
+    ]
 
-    normalized_hint = _normalize_text((preferred_hint or "").lower())
-    active_document_id = str(state.get("active_document_id") or "")
+    if proposal_calls and non_proposal_calls:
+        logger.info(
+            "Planner returned mixed read/propose tool calls in one turn; dropping %s proposal call(s) and keeping %s non-proposal call(s).",
+            len(proposal_calls),
+            len(non_proposal_calls),
+        )
+        return message.model_copy(update={"tool_calls": non_proposal_calls})
 
-    def score(document: dict[str, Any]) -> int:
-        result = 0
-        title = _normalize_text(str(document.get("title") or "").lower())
-        doc_type = _normalize_text(str(document.get("type") or "").lower())
-        if normalized_hint and normalized_hint in title:
-            result += 100
-        if str(document.get("document_id")) == active_document_id:
-            result += 20
-        if doc_type == "note":
-            result += 12
-        if "nota" in title or "historia" in title:
-            result += 30
-        if "egreso" in title or "epicrisis" in title:
-            result += 28
-        if doc_type == "context":
-            result -= 30
-        return result
+    if len(proposal_calls) > 1:
+        logger.info(
+            "Planner returned %s proposal tool calls in one turn; keeping only the first to avoid patch_set_preview overwrites.",
+            len(proposal_calls),
+        )
+        return message.model_copy(update={"tool_calls": [proposal_calls[0]]})
 
-    return max(writable_documents, key=score)
+    return message
 
 
-def _extract_requested_addition(user_message: str) -> str | None:
-    date_match = re.search(
-        r"fecha(?: de hoy)?(?: es)?\s+(?P<date>.+)$",
-        user_message,
-        flags=re.IGNORECASE,
+def _shorten_text(value: Any, *, max_length: int = 320) -> str:
+    if value is None:
+        return ""
+    text = " ".join(str(value).split())
+    return text[:max_length]
+
+
+def _xml_line(tag: str, value: Any, *, max_length: int = 320) -> str:
+    return f"<{tag}>{escape(_shorten_text(value, max_length=max_length))}</{tag}>"
+
+
+def _render_documents(documents: Sequence[Mapping[str, Any]]) -> str:
+    if not documents:
+        return "<available_documents />"
+
+    lines = ["<available_documents>"]
+    for document in documents[:8]:
+        lines.extend(
+            [
+                "  <document>",
+                f"    {_xml_line('document_id', document.get('document_id'))}",
+                f"    {_xml_line('title', document.get('title'))}",
+                f"    {_xml_line('type', document.get('type'))}",
+                f"    {_xml_line('status', document.get('status'))}",
+                f"    {_xml_line('version', document.get('version'))}",
+                f"    {_xml_line('is_active', document.get('is_active'))}",
+                f"    {_xml_line('is_open', document.get('is_open'))}",
+                f"    {_xml_line('ai_writable', document.get('ai_writable'))}",
+                f"    {_xml_line('excerpt', document.get('excerpt'))}",
+                "  </document>",
+            ]
+        )
+    lines.append("</available_documents>")
+    return "\n".join(lines)
+
+
+def _render_document_summaries(document_summaries: Mapping[str, Mapping[str, Any]]) -> str:
+    if not document_summaries:
+        return "<document_summaries />"
+
+    lines = ["<document_summaries>"]
+    for document_id, summary in list(document_summaries.items())[:8]:
+        lines.extend(
+            [
+                "  <document_summary>",
+                f"    {_xml_line('document_id', document_id)}",
+                f"    {_xml_line('title', summary.get('title'))}",
+                f"    {_xml_line('type', summary.get('type'))}",
+                f"    {_xml_line('version', summary.get('version'))}",
+                f"    {_xml_line('short_summary', summary.get('short_summary'))}",
+                f"    {_xml_line('excerpt', summary.get('excerpt'))}",
+                "  </document_summary>",
+            ]
+        )
+    lines.append("</document_summaries>")
+    return "\n".join(lines)
+
+
+def _render_read_spans(read_spans: Sequence[Mapping[str, Any]]) -> str:
+    if not read_spans:
+        return "<read_spans />"
+
+    lines = ["<read_spans>"]
+    for span in read_spans[:4]:
+        lines.extend(
+            [
+                "  <read_span>",
+                f"    {_xml_line('document_id', span.get('document_id'))}",
+                f"    {_xml_line('title', span.get('title'))}",
+                f"    {_xml_line('start_offset', span.get('start_offset'))}",
+                f"    {_xml_line('end_offset', span.get('end_offset'))}",
+                f"    {_xml_line('content', span.get('content'), max_length=900)}",
+                "  </read_span>",
+            ]
+        )
+    lines.append("</read_spans>")
+    return "\n".join(lines)
+
+
+def _render_context_view(context_view: Mapping[str, Any] | None) -> str:
+    if not context_view:
+        return "<context_view />"
+
+    lines = ["<context_view>"]
+    for fact in (context_view.get("facts") or [])[:6]:
+        lines.extend(
+            [
+                "  <fact>",
+                f"    {_xml_line('category', fact.get('category'))}",
+                f"    {_xml_line('value', fact.get('value'))}",
+                f"    {_xml_line('source_document_id', fact.get('source_document_id'))}",
+                f"    {_xml_line('confidence', fact.get('confidence'))}",
+                "  </fact>",
+            ]
+        )
+    lines.append("</context_view>")
+    return "\n".join(lines)
+
+
+def _render_patch_history(patch_history: Mapping[str, list[Mapping[str, Any]]]) -> str:
+    if not patch_history:
+        return "<patch_history />"
+
+    lines = ["<patch_history>"]
+    for document_id, patches in list(patch_history.items())[:4]:
+        lines.append(f'  <document_patches document_id="{escape(str(document_id))}">')
+        for patch in patches[:4]:
+            lines.extend(
+                [
+                    "    <patch>",
+                    f"      {_xml_line('patch_id', patch.get('patch_id'))}",
+                    f"      {_xml_line('status', patch.get('status'))}",
+                    f"      {_xml_line('operation_type', patch.get('operation_type'))}",
+                    f"      {_xml_line('rationale', patch.get('rationale'))}",
+                    "    </patch>",
+                ]
+            )
+        lines.append("  </document_patches>")
+    lines.append("</patch_history>")
+    return "\n".join(lines)
+
+
+def _render_search_matches(search_matches: Sequence[Mapping[str, Any]]) -> str:
+    if not search_matches:
+        return "<search_matches />"
+
+    lines = ["<search_matches>"]
+    for match in search_matches[:4]:
+        lines.extend(
+            [
+                "  <match>",
+                f"    {_xml_line('document_id', match.get('document_id'))}",
+                f"    {_xml_line('title', match.get('title'))}",
+                f"    {_xml_line('score', match.get('score'))}",
+                f"    {_xml_line('snippet', match.get('snippet'))}",
+                "  </match>",
+            ]
+        )
+    lines.append("</search_matches>")
+    return "\n".join(lines)
+
+
+def _render_turn_context(state: Mapping[str, Any]) -> str:
+    workspace_index = state.get("workspace_index") or {}
+    return "\n".join(
+        [
+            "<copilot_turn_context>",
+            f"  {_xml_line('user_query', state.get('user_message'), max_length=1200)}",
+            "  <workspace_index>",
+            f"    {_xml_line('encounter_id', workspace_index.get('encounter_id'))}",
+            f"    {_xml_line('workspace_version', workspace_index.get('workspace_version'))}",
+            f"    {_xml_line('active_document_id', state.get('active_document_id'))}",
+            f"    {_xml_line('selected_document_ids', ', '.join(state.get('selected_document_ids') or []))}",
+            "  </workspace_index>",
+            _render_documents(state.get("available_documents") or []),
+            _render_document_summaries(state.get("document_summaries") or {}),
+            _render_read_spans(state.get("read_spans") or []),
+            _render_context_view(state.get("context_view")),
+            _render_search_matches(state.get("search_matches") or []),
+            _render_patch_history(state.get("patch_history") or {}),
+            "  <budgets>",
+            f"    {_xml_line('iteration_count', state.get('iteration_count'))}",
+            f"    {_xml_line('max_iterations', state.get('max_iterations'))}",
+            f"    {_xml_line('patch_operations_count', state.get('patch_operations_count'))}",
+            f"    {_xml_line('max_patch_operations', state.get('max_patch_operations'))}",
+            "  </budgets>",
+            f"  {_xml_line('last_tool_error', state.get('last_tool_error'))}",
+            f"  {_xml_line('last_planner_error', state.get('last_planner_error'))}",
+            "</copilot_turn_context>",
+        ]
     )
-    if date_match:
-        return f"Fecha: {date_match.group('date').strip(' .,:;')}"
 
-    content_match = re.search(
-        r"(?:agregale|agrega|incluye|pon|anade|añade)\s+(?P<content>.+)$",
-        user_message,
-        flags=re.IGNORECASE,
+
+def _render_intent_context(state: Mapping[str, Any]) -> str:
+    workspace_index = state.get("workspace_index") or {}
+    return "\n".join(
+        [
+            "<intent_classification_input>",
+            f"  {_xml_line('user_query', state.get('user_message'), max_length=1200)}",
+            "  <workspace>",
+            f"    {_xml_line('active_document_id', workspace_index.get('active_document_id'))}",
+            f"    {_xml_line('open_document_ids', ', '.join(workspace_index.get('open_document_ids') or []))}",
+            "  </workspace>",
+            _render_documents(state.get("available_documents") or []),
+            "</intent_classification_input>",
+        ]
     )
-    if not content_match:
-        return None
-    return content_match.group("content").strip(" .,:;")
 
 
-def _choose_anchor_span(content: str) -> tuple[int, int]:
-    paragraphs = [segment for segment in content.split("\n\n") if segment.strip()]
-    if paragraphs:
-        first_paragraph = paragraphs[0]
-        start = content.find(first_paragraph)
-        if start >= 0:
-            return start, start + len(first_paragraph)
-
-    lines = [segment for segment in content.splitlines() if segment.strip()]
-    if lines:
-        first_line = lines[0]
-        start = content.find(first_line)
-        if start >= 0:
-            return start, start + len(first_line)
-
-    return 0, len(content)
-
-
-def _build_insert_after_patch(
+def _render_patch_input(
     *,
+    state: Mapping[str, Any],
+    target_document: Mapping[str, Any],
     target_document_content: str,
-    insertion_text: str,
-) -> DraftedPatch:
-    base_content = target_document_content.strip()
-    if insertion_text.lower() in base_content.lower():
-        return DraftedPatch(
-            operation_type="replace_span",
-            anchor={
-                "exactText": base_content,
-                "prefixText": "",
-                "suffixText": "",
-                "startOffset": 0,
-                "endOffset": len(base_content),
-            },
-            expected_hash=_content_hash(base_content),
-            before_preview=base_content,
-            after_preview=base_content,
-            document_preview_after=base_content,
-            content_preview=base_content,
-            rationale="El contenido solicitado ya existe en el documento objetivo.",
-        )
-
-    start, end = _choose_anchor_span(base_content)
-    anchor_text = base_content[start:end]
-    prefix = base_content[max(0, start - 48) : start]
-    suffix = base_content[end : min(len(base_content), end + 48)]
-    insertion_block = f"\n\n{insertion_text.strip()}"
-    document_preview_after = f"{base_content[:end]}{insertion_block}{base_content[end:]}"
-    return DraftedPatch(
-        operation_type="insert_after_span",
-        anchor={
-            "exactText": anchor_text,
-            "prefixText": prefix,
-            "suffixText": suffix,
-            "startOffset": start,
-            "endOffset": end,
-        },
-        expected_hash=_content_hash(anchor_text),
-        before_preview=anchor_text,
-        after_preview=insertion_block,
-        document_preview_after=document_preview_after,
-        content_preview=document_preview_after,
-        rationale="Insertar contenido nuevo despues del primer bloque relevante del documento.",
-    )
-
-
-class HeuristicFallbackPlanner:
-    def plan_next_action(self, state: dict[str, Any]) -> PlannerDecision:
-        user_message = state["user_message"].strip()
-        available_documents = state.get("available_documents") or []
-        context_view = state.get("context_view")
-        search_matches = state.get("search_matches") or []
-        iteration_count = int(state.get("iteration_count") or 0)
-        is_edit = _message_mentions_edit(user_message)
-        target_hint = _message_document_hint(user_message)
-        max_iterations = int(state.get("max_iterations") or 6)
-        max_patch_operations = int(state.get("max_patch_operations") or 1)
-
-        if iteration_count >= max_iterations:
-            return PlannerDecision(
-                action_type="respond",
-                intent="answer_question",
-                response_content=(
-                    "No pude seguir iterando con seguridad dentro del limite del runtime. "
-                    "Intenta refinar la instruccion o revisar el documento objetivo."
-                ),
-                reasoning_summary="iteration_limit_reached",
-            )
-
-        if _is_simple_greeting(user_message):
-            return PlannerDecision(
-                action_type="respond",
-                intent="answer_question",
-                response_content=(
-                    "Hola. Puedo responder preguntas del encounter o proponer patches "
-                    "pequenos sobre una nota cuando me indiques el objetivo."
-                ),
-                reasoning_summary="simple_greeting_without_context",
-            )
-
-        if not available_documents:
-            return PlannerDecision(
-                action_type="call_tool",
-                tool_name="list_open_documents",
-                intent="edit_document" if is_edit else "answer_question",
-                reasoning_summary="need_open_documents",
-                target_document_hint=target_hint,
-            )
-
-        if not context_view:
-            return PlannerDecision(
-                action_type="call_tool",
-                tool_name="build_context_view",
-                tool_input={
-                    "active_document_id": state.get("active_document_id"),
-                    "include_document_ids": state.get("selected_document_ids", []),
-                    "include_manual_context": True,
-                },
-                intent="edit_document" if is_edit else "answer_question",
-                reasoning_summary="need_context_view_first",
-                target_document_hint=target_hint,
-            )
-
-        if is_edit:
-            if int(state.get("patch_operations_count") or 0) >= max_patch_operations:
-                return PlannerDecision(
-                    action_type="respond",
-                    intent="edit_document",
-                    response_content=(
-                        "Ya consumi el presupuesto de propuestas de patch de este run. "
-                        "Prueba una instruccion mas especifica."
-                    ),
-                    reasoning_summary="patch_budget_reached",
-                    target_document_hint=target_hint,
-                )
-
-            target_document = _best_target_document(state, preferred_hint=target_hint)
-            if not target_document:
-                return PlannerDecision(
-                    action_type="respond",
-                    intent="edit_document",
-                    response_content=(
-                        "No encontre un documento editable adecuado dentro del workspace actual."
-                    ),
-                    reasoning_summary="no_editable_target_document",
-                    target_document_hint=target_hint,
-                )
-
-            target_document_id = str(target_document["document_id"])
-            document_summaries = state.get("document_summaries") or {}
-            read_spans = state.get("read_spans") or []
-            patch_history = state.get("patch_history") or {}
-
-            if target_document_id not in document_summaries:
-                return PlannerDecision(
-                    action_type="call_tool",
-                    tool_name="read_document_summary",
-                    tool_input={"document_id": target_document_id},
-                    intent="edit_document",
-                    reasoning_summary="need_target_document_summary",
-                    target_document_hint=target_hint,
-                )
-
-            if target_document_id not in patch_history:
-                return PlannerDecision(
-                    action_type="call_tool",
-                    tool_name="read_patch_history",
-                    tool_input={"document_id": target_document_id, "limit": 5},
-                    intent="edit_document",
-                    reasoning_summary="need_patch_history_context",
-                    target_document_hint=target_hint,
-                )
-
-            has_target_span = any(
-                str(read_span.get("document_id")) == target_document_id
-                for read_span in read_spans
-            )
-            if not has_target_span:
-                return PlannerDecision(
-                    action_type="call_tool",
-                    tool_name="read_document_span",
-                    tool_input={
-                        "document_id": target_document_id,
-                        "max_chars": 1200,
-                    },
-                    intent="edit_document",
-                    reasoning_summary="need_target_span_before_patch",
-                    target_document_hint=target_hint,
-                )
-
-            proposal_tool = (
-                "propose_insert_after_span"
-                if _extract_requested_addition(user_message)
-                else "propose_replace_span"
-            )
-            return PlannerDecision(
-                action_type="call_tool",
-                tool_name=proposal_tool,
-                tool_input={"target_document_id": target_document_id},
-                intent="edit_document",
-                reasoning_summary="ready_to_propose_anchored_patch",
-                target_document_hint=target_hint,
-            )
-
-        if search_matches:
-            top_match = search_matches[0]
-            return PlannerDecision(
-                action_type="call_tool",
-                tool_name="read_document_span",
-                tool_input={
-                    "document_id": str(top_match["document_id"]),
-                    "exact_text": (top_match.get("anchor") or {}).get("exactText"),
-                    "prefix_text": (top_match.get("anchor") or {}).get("prefixText"),
-                    "suffix_text": (top_match.get("anchor") or {}).get("suffixText"),
-                    "max_chars": 500,
-                },
-                intent="answer_question",
-                reasoning_summary="need_focused_span_from_search_hit",
-            )
-
-        if not (state.get("read_spans") or state.get("read_documents")):
-            return PlannerDecision(
-                action_type="call_tool",
-                tool_name="search_documents",
-                tool_input={
-                    "query": user_message,
-                    "max_results": 3,
-                    "allowed_document_types": ["note", "context", "transcription"],
-                },
-                intent="answer_question",
-                reasoning_summary="need_search_after_context_view",
-            )
-
-        return PlannerDecision(
-            action_type="respond",
-            intent="answer_question",
-            response_content=self._build_fallback_response(state),
-            reasoning_summary="enough_context_to_respond",
-        )
-
-    def draft_patch_preview(
-        self,
-        *,
-        state: dict[str, Any],
-        target_document: dict[str, Any],
-        target_document_content: str,
-        supporting_context: list[dict[str, Any]],
-        span_payload: dict[str, Any] | None = None,
-    ) -> DraftedPatch:
-        del target_document, supporting_context
-        addition = _extract_requested_addition(state["user_message"])
-        if addition:
-            return _build_insert_after_patch(
-                target_document_content=target_document_content,
-                insertion_text=addition,
-            )
-
-        if span_payload and span_payload.get("content"):
-            before_preview = str(span_payload["content"])
-            anchor = span_payload.get("anchor") or {}
-            rewritten_span = f"{before_preview}\n\n[Ajuste sugerido]: {state['user_message'].strip()}"
-            document_preview_after = target_document_content.replace(before_preview, rewritten_span, 1)
-            return DraftedPatch(
-                operation_type="replace_span",
-                anchor=anchor,
-                expected_hash=_content_hash(before_preview),
-                before_preview=before_preview,
-                after_preview=rewritten_span,
-                document_preview_after=document_preview_after,
-                content_preview=document_preview_after,
-                rationale="Reemplazar un span focalizado del documento con una version ajustada.",
-            )
-
-        base_content = target_document_content.strip()
-        return DraftedPatch(
-            operation_type="rewrite_document",
-            anchor={
-                "exactText": base_content,
-                "prefixText": "",
-                "suffixText": "",
-                "startOffset": 0,
-                "endOffset": len(base_content),
-            },
-            expected_hash=_content_hash(base_content),
-            before_preview=base_content,
-            after_preview=base_content,
-            document_preview_after=base_content,
-            content_preview=base_content,
-            rationale="Fallback seguro sin cambios semanticos por falta de span focalizado.",
-        )
-
-    def _build_fallback_response(self, state: dict[str, Any]) -> str:
-        context_view = state.get("context_view") or {}
-        read_spans = state.get("read_spans") or []
-        facts = context_view.get("facts") or []
-        lines: list[str] = []
-        if facts:
-            rendered_facts = [
-                f"{fact['value']}" for fact in facts[:2] if fact.get("value")
+    supporting_context: list[dict[str, Any]],
+    span_payload: Mapping[str, Any] | None,
+    requested_tool_name: str | None,
+) -> str:
+    lines = [
+        "<patch_drafting_input>",
+        f"  {_xml_line('user_query', state.get('user_message'), max_length=1400)}",
+        f"  {_xml_line('requested_tool_name', requested_tool_name)}",
+        "  <target_document>",
+        f"    {_xml_line('document_id', target_document.get('document_id'))}",
+        f"    {_xml_line('title', target_document.get('title'))}",
+        f"    {_xml_line('type', target_document.get('type'))}",
+        f"    {_xml_line('version', target_document.get('version'))}",
+        "  </target_document>",
+        f"  {_xml_line('target_document_content', target_document_content, max_length=4000)}",
+    ]
+    if span_payload:
+        lines.extend(
+            [
+                "  <selected_span>",
+                f"    {_xml_line('start_offset', span_payload.get('start_offset'))}",
+                f"    {_xml_line('end_offset', span_payload.get('end_offset'))}",
+                f"    {_xml_line('content_hash', span_payload.get('content_hash'))}",
+                "  </selected_span>",
             ]
-            if rendered_facts:
-                lines.append("Contexto sintetizado: " + " | ".join(rendered_facts))
-        if read_spans:
-            rendered_spans = [
-                f"{span.get('title')}: {_shorten_text(span.get('content'), 160)}"
-                for span in read_spans[:2]
+        )
+    lines.append("  <supporting_context>")
+    for item in supporting_context[:8]:
+        lines.extend(
+            [
+                "    <context_item>",
+                f"      {_xml_line('document_id', item.get('document_id'))}",
+                f"      {_xml_line('title', item.get('title'))}",
+                f"      {_xml_line('type', item.get('type'))}",
+                f"      {_xml_line('read_mode', item.get('read_mode'))}",
+                f"      {_xml_line('excerpt', item.get('excerpt'), max_length=800)}",
+                "    </context_item>",
             ]
-            lines.append("Lectura focalizada: " + " | ".join(rendered_spans))
-        if not lines:
-            lines.append("No encontre suficiente contexto relevante para responder con precision.")
-        return " ".join(lines)
+        )
+    lines.extend(["  </supporting_context>", "</patch_drafting_input>"])
+    return "\n".join(lines)
 
 
 @dataclass
-class VertexToolPlanner:
+class LangChainCopilotPlanner:
     settings: Settings
-    fallback: HeuristicFallbackPlanner
 
-    _initialized: bool = False
-    _model: GenerativeModel | None = None
+    _planner_model: ChatGoogleGenerativeAI | None = None
+    _patch_model: ChatGoogleGenerativeAI | None = None
 
-    def plan_next_action(self, state: dict[str, Any]) -> PlannerDecision:
-        try:
-            response_text = self._model_instance().generate_content(
-                self._build_planner_prompt(state),
-                generation_config=GenerationConfig(
-                    temperature=0.1,
-                    candidate_count=1,
-                    response_mime_type="application/json",
-                ),
-            ).text
-            return self._parse_decision(response_text, state)
-        except Exception as error:
-            logger.warning("Vertex planner failed, using fallback: %s", error)
-            return self.fallback.plan_next_action(state)
+    @staticmethod
+    def _provider_runtime_kwargs() -> dict[str, Any]:
+        # Keep the tool loop in our LangGraph runtime. Google AFC adds provider-side
+        # orchestration for function calls, which we do not want in this clinical flow.
+        return {
+            "automatic_function_calling": genai_types.AutomaticFunctionCallingConfig(
+                disable=True
+            )
+        }
+
+    def invoke_model(
+        self,
+        *,
+        state: Mapping[str, Any],
+        messages: Sequence[BaseMessage],
+        tools: Sequence[BaseTool | Callable[..., Any]],
+    ) -> AIMessage:
+        runnable = self._planner_model_instance().bind_tools(tools)
+        response = self._invoke_with_retry(
+            "planner tool calling",
+            lambda: runnable.invoke(
+                [
+                    SystemMessage(content=self._planner_system_instruction()),
+                    HumanMessage(content=_render_turn_context(state)),
+                    *messages,
+                ],
+                **self._provider_runtime_kwargs(),
+            ),
+        )
+        if not isinstance(response, AIMessage):
+            raise RuntimeError("Planner did not return an AIMessage")
+        return _filter_parallel_tool_calls(response)
 
     def draft_patch_preview(
         self,
         *,
-        state: dict[str, Any],
-        target_document: dict[str, Any],
+        state: Mapping[str, Any],
+        target_document: Mapping[str, Any],
         target_document_content: str,
         supporting_context: list[dict[str, Any]],
-        span_payload: dict[str, Any] | None = None,
-    ) -> DraftedPatch:
-        try:
-            response_text = self._model_instance().generate_content(
-                self._build_patch_prompt(
+        span_payload: Mapping[str, Any] | None = None,
+        requested_tool_name: str | None = None,
+    ) -> DraftedPatchPlan:
+        messages = [
+            SystemMessage(
+                content=self._patch_system_instruction(
+                    requested_tool_name=requested_tool_name,
+                )
+            ),
+            HumanMessage(
+                content=_render_patch_input(
                     state=state,
                     target_document=target_document,
                     target_document_content=target_document_content,
                     supporting_context=supporting_context,
                     span_payload=span_payload,
-                ),
-                generation_config=GenerationConfig(
-                    temperature=0.2,
-                    candidate_count=1,
-                    response_mime_type="application/json",
-                ),
-            ).text
-            return DraftedPatch.model_validate_json(_extract_json_object(response_text))
-        except Exception as error:
-            logger.warning("Vertex patch drafting failed, using fallback: %s", error)
-            return self.fallback.draft_patch_preview(
-                state=state,
-                target_document=target_document,
-                target_document_content=target_document_content,
-                supporting_context=supporting_context,
-                span_payload=span_payload,
-            )
+                    requested_tool_name=requested_tool_name,
+                )
+            ),
+        ]
+        result = self._invoke_patch_drafting(messages=messages)
+        return self._normalize_patch_plan(self._validate_patch_plan_result(result))
 
-    def _model_instance(self) -> GenerativeModel:
-        if self._model is not None:
-            return self._model
-        if not self._initialized:
-            vertexai.init(
-                project=self.settings.gcp_project_id,
-                location=self.settings.gcp_region,
-            )
-            self._initialized = True
-        self._model = GenerativeModel(self.settings.vertex_model)
-        return self._model
+    def _invoke_with_retry(
+        self,
+        label: str,
+        operation: Callable[[], Any],
+        *,
+        attempts: int = 2,
+    ) -> Any:
+        last_error: Exception | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                return operation()
+            except Exception as error:  # pragma: no cover - provider edge
+                last_error = error
+                logger.warning(
+                    "LLM %s attempt %s/%s failed: %s",
+                    label,
+                    attempt,
+                    attempts,
+                    error,
+                )
+        assert last_error is not None
+        raise RuntimeError(f"{label} failed after {attempts} attempts: {last_error}")
 
-    def _build_planner_prompt(self, state: dict[str, Any]) -> str:
-        payload = {
-            "user_message": state["user_message"],
-            "active_document_id": state.get("active_document_id"),
-            "available_documents": (state.get("available_documents") or [])[:8],
-            "context_view": state.get("context_view"),
-            "document_summaries": state.get("document_summaries"),
-            "search_matches": (state.get("search_matches") or [])[:4],
-            "read_spans": (state.get("read_spans") or [])[:4],
-            "iteration_count": state.get("iteration_count"),
-            "max_iterations": state.get("max_iterations"),
-            "max_patch_operations": state.get("max_patch_operations"),
-            "patch_operations_count": state.get("patch_operations_count"),
-        }
-        return (
-            "Eres el planner del copiloto clinico. Debes decidir el siguiente paso "
-            "dentro de un bounded tool loop por capas. Solo puedes devolver JSON valido "
-            "con llaves: action_type, tool_name, tool_input, reasoning_summary, response_content, intent, target_document_hint. "
-            "action_type solo puede ser call_tool o respond. "
-            "tool_name solo puede ser: list_open_documents, list_encounter_documents, read_document_summary, "
-            "read_document_span, search_documents, read_patch_history, build_context_view, "
-            "propose_replace_span, propose_insert_after_span, propose_create_document. "
-            "tool_input valido por tool: build_context_view solo admite active_document_id, include_document_ids, include_manual_context; "
-            "read_document_summary y read_document_span usan document_id; propose_replace_span y propose_insert_after_span usan target_document_id. "
-            "Reglas: saludos simples responden sin leer documentos; preguntas usan build_context_view antes de buscar spans; "
-            "ediciones nunca terminan en respond y siempre deben pasar por read_document_summary/read_document_span antes de una tool propose_*; "
-            "build_context_view no reemplaza la lectura del documento objetivo para editar. "
-            "No uses markdown ni texto fuera del JSON.\n\n"
-            f"STATE:\n{json.dumps(payload, ensure_ascii=False)}"
-        )
-
-    def _build_patch_prompt(
+    def _invoke_patch_drafting(
         self,
         *,
-        state: dict[str, Any],
-        target_document: dict[str, Any],
-        target_document_content: str,
-        supporting_context: list[dict[str, Any]],
-        span_payload: dict[str, Any] | None = None,
-    ) -> str:
-        payload = {
-            "user_message": state["user_message"],
-            "target_document": {
-                "document_id": str(target_document.get("document_id")),
-                "title": target_document.get("title"),
-                "type": target_document.get("type"),
-            },
-            "target_document_content": target_document_content,
-            "span_payload": span_payload,
-            "supporting_context": supporting_context[:4],
-        }
-        return (
-            "Eres un redactor clinico que propone patches pequenos y anclados. "
-            "Devuelve SOLO JSON valido con llaves: operation_type, anchor, expected_hash, before_preview, after_preview, "
-            "document_preview_after, content_preview, rationale. "
-            "operation_type debe ser replace_span, insert_after_span o rewrite_document. "
-            "anchor debe usar exactText, prefixText, suffixText, startOffset y endOffset. "
-            "content_preview puede repetir document_preview_after para compatibilidad. "
-            "No agregues texto fuera del JSON.\n\n"
-            f"PATCH_INPUT:\n{json.dumps(payload, ensure_ascii=False)}"
+        messages: Sequence[BaseMessage],
+    ) -> Any:
+        # Keep patch drafting on json_schema only. The provider-side function_calling
+        # fallback proved noisier here: it increased remote calls, reintroduced AFC-like
+        # behavior, and made Gemini more likely to echo tool names instead of patch enums.
+        structured = self._patch_model_instance().with_structured_output(
+            DraftedPatchPlan,
+            method="json_schema",
+        )
+        try:
+            return self._invoke_with_retry(
+                "patch drafting via json_schema",
+                lambda: structured.invoke(
+                    messages,
+                    **self._provider_runtime_kwargs(),
+                ),
+                attempts=1,
+            )
+        except Exception as error:  # pragma: no cover - provider edge
+            raise RuntimeError(
+                "patch drafting failed with json_schema structured output: "
+                f"{error}"
+            ) from error
+
+    @staticmethod
+    def _validate_patch_plan_result(result: Any) -> DraftedPatchPlan:
+        # Fail closed with a clear runtime error instead of crashing later on
+        # `result.patches` when the provider returns no structured payload.
+        if result is None:
+            raise RuntimeError(
+                "El LLM no devolvio un DraftedPatchPlan estructurado en patch drafting."
+            )
+        if isinstance(result, DraftedPatchPlan):
+            return result
+        try:
+            return DraftedPatchPlan.model_validate(result)
+        except Exception as error:
+            raise RuntimeError(
+                "El LLM devolvio un DraftedPatchPlan invalido en patch drafting: "
+                f"{error}"
+            ) from error
+
+    def _planner_model_instance(self) -> ChatGoogleGenerativeAI:
+        if self._planner_model is None:
+            self._planner_model = self._build_chat_model(
+                temperature=0.1,
+                max_tokens=700,
+            )
+        return self._planner_model
+
+    def _patch_model_instance(self) -> ChatGoogleGenerativeAI:
+        if self._patch_model is None:
+            self._patch_model = self._build_chat_model(
+                temperature=0.0,
+                max_tokens=1600,
+            )
+        return self._patch_model
+
+    def _build_chat_model(
+        self,
+        *,
+        temperature: float,
+        max_tokens: int,
+    ) -> ChatGoogleGenerativeAI:
+        return ChatGoogleGenerativeAI(
+            model=self.settings.vertex_model,
+            vertexai=True,
+            project=self.settings.gcp_project_id,
+            location=self.settings.gcp_region,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            retries=0,
+            disable_streaming="tool_calling",
         )
 
-    def _parse_decision(self, response_text: str, state: dict[str, Any]) -> PlannerDecision:
-        try:
-            raw_payload = json.loads(_extract_json_object(response_text))
-            if raw_payload.get("tool_input") is None:
-                raw_payload["tool_input"] = {}
-            action_type = str(raw_payload.get("action_type") or "")
-            tool_name = raw_payload.get("tool_name")
-            if action_type == "call_tool":
-                if tool_name not in ALLOWED_TOOL_NAMES:
-                    raise ValueError("Planner returned unsupported tool_name")
-                raw_payload["tool_input"] = _sanitize_tool_input(
-                    tool_name,
-                    raw_payload.get("tool_input"),
-                )
-            else:
-                raw_payload["tool_input"] = {}
-            raw_payload["intent"] = _canonical_intent(
-                raw_intent=raw_payload.get("intent"),
-                action_type=action_type,
-                tool_name=tool_name,
-                user_message=state["user_message"],
-            )
-            decision = PlannerDecision.model_validate(raw_payload)
-        except (ValidationError, ValueError) as error:
-            raise ValueError(f"Invalid planner response: {error}") from error
+    @staticmethod
+    def _planner_system_instruction() -> str:
+        return (
+            "Eres el planner del copiloto clinico en un bounded tool loop. "
+            "Debes responder directamente si no hacen falta tools. "
+            "REGLA DE ORO: eres un agente secuencial estricto. "
+            "Si necesitas herramientas, usa tool calling nativo. "
+            "Puedes pedir varias herramientas de lectura o busqueda en paralelo solo cuando sean "
+            "independientes entre si. "
+            "No puedes anticipar resultados de herramientas futuras ni emitir varias herramientas "
+            "dependientes en la misma respuesta. "
+            "Si una edicion requiere leer y luego proponer, primero debes llamar una tool de lectura, "
+            "esperar su resultado en el siguiente turno y solo entonces llamar la tool de proposal. "
+            "Pedir read_* y propose_* en el mismo turno para el mismo documento es un error. "
+            "Solo puedes proponer una edicion por turno y solo sobre un documento target a la vez. "
+            "Minimiza lecturas redundantes. "
+            "Antes de proponer un patch debes leer el documento target con read_document_summary "
+            "y read_document_span en turnos previos ya completados. "
+            "No escribas directamente el documento canonico. "
+            "Si una tool devuelve un error, corrige la llamada o pide mas contexto; no inventes "
+            "patches ni cierres una edicion con respuesta engañosa. "
+            "Para saludos simples como 'hola', responde sin tools."
+        )
 
-        if decision.action_type not in {"call_tool", "respond"}:
-            raise ValueError("Planner returned unsupported action_type")
-        if decision.action_type == "respond":
-            if decision.intent == "edit_document":
-                raise ValueError("Planner cannot finish an edit request with respond")
-            if not decision.response_content:
-                raise ValueError("Planner respond action requires response_content")
-        return decision
+    @staticmethod
+    def _patch_system_instruction(*, requested_tool_name: str | None) -> str:
+        requested_operation = requested_tool_name or "propose_replace_span"
+        return (
+            "Eres un redactor clinico que prepara patch sets revisables sobre un unico "
+            "documento target. "
+            "Debes producir un DraftedPatchPlan estructurado y seguro. "
+            f"La tool solicitada fue {requested_operation}. "
+            "La tool solicitada NO es el valor de operation_type. "
+            "operation_type debe ser exactamente una de estas constantes: "
+            "replace_span, insert_before, insert_after_span, delete_span. "
+            "Nunca uses nombres de tools como propose_replace_span o "
+            "propose_insert_after_span dentro del DraftedPatchPlan. "
+            "Si el usuario pidio cambios en partes distintas del documento, devuelve varios "
+            "patches ordenados de arriba hacia abajo. "
+            "No copies literalmente la instruccion del medico dentro del documento. "
+            "No uses placeholders como '[Ajuste sugerido]'. "
+            "Cada patch debe incluir content_preview y, si es posible, una rationale breve. "
+            "Si no puedes materializar cambios clinicamente seguros con el contexto disponible, "
+            "devuelve patches vacio y explica el motivo en rationale. "
+            "Mantén la redaccion medica fiel al documento y al pedido."
+        )
+
+    @staticmethod
+    def _normalize_patch_plan(result: DraftedPatchPlan) -> DraftedPatchPlan:
+        patches: list[DraftedPatch] = []
+        for patch in result.patches:
+            normalized_preview_after = (
+                patch.document_preview_after or patch.content_preview or None
+            )
+            patches.append(
+                patch.model_copy(
+                    update={
+                        "document_preview_after": normalized_preview_after,
+                        "content_preview": patch.content_preview
+                        or normalized_preview_after
+                        or "",
+                    }
+                )
+            )
+        document_preview_after = result.document_preview_after
+        if not document_preview_after and patches:
+            document_preview_after = (
+                patches[-1].document_preview_after or patches[-1].content_preview
+            )
+        return DraftedPatchPlan(
+            patches=patches,
+            rationale=result.rationale,
+            document_preview_after=document_preview_after,
+        )
 
 
 def build_planner(settings: Settings) -> CopilotPlanner:
-    fallback = HeuristicFallbackPlanner()
-    return VertexToolPlanner(settings=settings, fallback=fallback)
+    return LangChainCopilotPlanner(settings=settings)

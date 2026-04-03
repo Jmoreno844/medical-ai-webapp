@@ -15,6 +15,7 @@ IaC: `infra/` en la raíz del repo.
 | Recurso | Patrón | Ejemplo (stg) |
 |---|---|---|
 | Cloud Run service | `vexthealth-backend` | `vexthealth-backend` |
+| Cloud Run copilot | `vexthealth-copilot-agent` | `vexthealth-copilot-agent` |
 | Cloud Function | `<nombre-funcional>` | `transcription-endpoint`, `document-workflow` |
 | Cloud SQL instance | `vexthealth-db-<env>` | `vexthealth-db-stg` |
 | GCS audio | `<project>-audio` | `vext-stg-audio` |
@@ -36,8 +37,19 @@ IaC: `infra/` en la raíz del repo.
 | `roles/storage.objectAdmin` sobre `*-audio` | Subir/firmar URLs de audio en GCS |
 | `roles/cloudtrace.agent` | Enviar trazas a Cloud Trace |
 | `roles/cloudtasks.enqueuer` | Encolar tareas de transcripción |
+| `roles/run.invoker` | Invocar el copilot agent service por contrato interno |
 | `roles/iam.serviceAccountUser` sobre `cloud-tasks-invoker` | Crear tasks autenticadas con OIDC |
 | `roles/iam.serviceAccountTokenCreator` sobre `cloud-tasks-invoker` | Permitir que Cloud Tasks use la identidad del invoker SA |
+
+### copilot-agent-runner (Cloud Run)
+
+| Rol | Justificación |
+|---|---|
+| `roles/cloudsql.client` | Conexión vía Cloud SQL Auth Proxy |
+| `roles/cloudsql.instanceUser` | IAM DB auth contra Cloud SQL |
+| `roles/aiplatform.user` | Llamar a Gemini/Vertex AI |
+| `roles/secretmanager.secretAccessor` | Leer secret compartido del broker |
+| `roles/cloudtrace.agent` | Enviar trazas a Cloud Trace |
 
 ### cloud-functions-runner (Cloud Functions)
 
@@ -77,6 +89,7 @@ echo -n "VALOR" | gcloud secrets versions add SECRET_ID --data-file=-
 | `django-secret-key` | Cloud Run | Django `SECRET_KEY` |
 | `jwt-secret-key` | Cloud Run | Firmado de JWTs (SSE, service) |
 | `service-account-json` | Cloud Run | Opcional; solo si se fuerza una SA key en lugar de ADC |
+| `copilot-service-shared-jwt` | Copilot Agent | JWT compartido para broker interno Django -> agent runtime |
 
 ### Rotación de secrets
 
@@ -111,6 +124,16 @@ El bucket `*-audio` también necesita CORS para subida directa desde el navegado
 | `vpc-egress` | `PRIVATE_RANGES_ONLY` | Solo la base de datos viaja por VPC |
 | `Cloud SQL` | Private IP + IAM DB auth | PostgreSQL no queda expuesto por IP pública |
 
+### Copilot Agent Cloud Run — configuración inicial
+
+| Parámetro | Valor (stg) | Nota |
+|---|---|---|
+| `allow-unauthenticated` | `false` | No es un endpoint público |
+| `max-instances` | 2 | Runtime separado del backend |
+| `max-concurrency` | 20 | Más bajo por carga del grafo |
+| `session-affinity` | `false` | No depende del hub SSE actual |
+| `Cloud SQL` | misma instancia, DB separada | Checkpoints y memoria lógica del agente |
+
 ## Cloud Functions — IAM auth
 
 Ambas funciones (`transcription-endpoint`, `document-workflow`) están desplegadas con `--no-allow-unauthenticated`.
@@ -142,10 +165,13 @@ Después de `terraform apply`, configurar las mismas claves como **variables del
 | `WIF_PROVIDER` | `projects/<num>/locations/global/workloadIdentityPools/github-actions-pool/providers/github-oidc-provider` |
 | `GH_DEPLOYER_SA` | `github-actions-deployer@vext-stg.iam.gserviceaccount.com` |
 | `BACKEND_SERVICE_ACCOUNT` | `backend-runner@vext-stg.iam.gserviceaccount.com` |
+| `COPILOT_AGENT_SERVICE_ACCOUNT` | `copilot-agent-runner@vext-stg.iam.gserviceaccount.com` |
+| `COPILOT_AGENT_DB_NAME` | `vext-stg-copilot` |
 | `GCS_BUCKET_NAME` | `vext-stg-audio` |
 | `FRONTEND_BUCKET_NAME` | `vext-stg-frontend-spa` |
 | `CF_SOURCE_BUCKET` | output Terraform `cf_source_bucket` |
 | `VITE_API_URL` | URL de Cloud Run (output) |
+| `COPILOT_AGENT_URL` | URL del copilot agent service (output) |
 | *(build)* `VITE_BASE_URL` | El workflow de frontend la deriva de `FRONTEND_BUCKET_NAME` (`/{bucket}/`) para que los assets carguen bajo `storage.googleapis.com/{bucket}/`. |
 | `CF_SOURCE_OBJECT` | *(opcional)* Objeto del zip; por defecto `cloud-functions.zip` (igual que `cf_source_object` en Terraform) |
 | `LANDING_BUCKET_NAME` | Bucket del workflow de landing page si se usa ese deploy |
@@ -170,8 +196,9 @@ Así el artefacto en GCS queda alineado con Terraform, pero el runtime de las fu
 
 | Requisito | Workflows afectados |
 |---|---|
-| Variables `GCP_PROJECT_ID`, `WIF_PROVIDER`, `GH_DEPLOYER_SA` definidas y WIF creado en GCP | Backend, Cloud Functions, Frontend |
+| Variables `GCP_PROJECT_ID`, `WIF_PROVIDER`, `GH_DEPLOYER_SA` definidas y WIF creado en GCP | Backend, Copilot Agent, Cloud Functions, Frontend |
 | `BACKEND_SERVICE_ACCOUNT`, `GCS_BUCKET_NAME`, `VITE_API_URL` | Backend deploy |
+| `COPILOT_AGENT_SERVICE_ACCOUNT`, `COPILOT_AGENT_DB_NAME`, `VITE_API_URL` | Copilot Agent deploy |
 | `FRONTEND_BUCKET_NAME` | Frontend deploy |
 | `LANDING_BUCKET_NAME` | Landing page deploy |
 | SA `github-actions-deployer` con los roles del módulo Terraform (p. ej. `cloudfunctions.developer`, `storage.objectAdmin` sobre los buckets usados) | Todos los despliegues |

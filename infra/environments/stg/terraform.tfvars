@@ -2,30 +2,36 @@
 # Staging environment (vext-stg) — fill in values before running terraform apply
 # =============================================================================
 
-project_id  = "vext-stg"
-region      = "us-east1"
-environment = "stg"
+project_id           = "vext-stg"
+region               = "us-east1"
+environment          = "stg"
 billing_account_name = "billingAccounts/01C163-A52891-471F1D"
 
 # GitHub (owner/repo) — must match WIF attribute_condition in Terraform
 github_repo = "Jmoreno844/medical-ai-webapp"
 
 # Cloud SQL
-db_instance_name = "vexthealth-db-stg"
-db_tier          = "db-f1-micro"
-db_name          = "vext-stg"
+db_instance_name      = "vexthealth-db-stg"
+db_tier               = "db-f1-micro"
+db_name               = "vext-stg"
+copilot_agent_db_name = "vext-stg-copilot"
 
 # Cloud Run
-cloud_run_service_name = "vexthealth-backend"
+cloud_run_service_name     = "vexthealth-backend"
+copilot_agent_service_name = "vexthealth-copilot-agent"
 # Bootstrap with a public image; CI later replaces it with the app image.
-cloud_run_image                 = "us-docker.pkg.dev/cloudrun/container/hello"
-cloud_run_max_instances         = 1
-cloud_run_max_concurrency       = 250
-cloud_run_use_secret_manager    = false
-cloud_run_allow_unauthenticated = true # Set false if org policy blocks allUsers on Cloud Run
+cloud_run_image                     = "us-docker.pkg.dev/cloudrun/container/hello"
+copilot_agent_image                 = "us-docker.pkg.dev/cloudrun/container/hello"
+cloud_run_max_instances             = 1
+cloud_run_max_concurrency           = 250
+copilot_agent_max_instances         = 2
+copilot_agent_max_concurrency       = 20
+cloud_run_use_secret_manager        = false
+cloud_run_allow_unauthenticated     = true # Set false if org policy blocks allUsers on Cloud Run
+copilot_agent_allow_unauthenticated = false
 
 # Cloud Functions source (deploy from GCS)
-cf_source_bucket = "vext-stg-cf-source"   # TODO: create this bucket or use a deploy script
+cf_source_bucket = "vext-stg-cf-source"  # TODO: create this bucket or use a deploy script
 cf_source_object = "cloud-functions.zip" # TODO: zip and upload before first apply
 
 # Storage buckets

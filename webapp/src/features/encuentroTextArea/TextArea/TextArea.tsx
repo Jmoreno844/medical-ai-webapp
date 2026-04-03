@@ -6,6 +6,7 @@ import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
 import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import { TRANSFORMERS } from "@lexical/markdown";
+import { PatchSetEditorView } from "./PatchSetEditorView";
 
 // Import custom plugins
 import {
@@ -22,7 +23,7 @@ import { useGenerationContext } from "../../../contexts/GenerationContext";
 import { useTranscriptionContext } from "../../../contexts/TranscriptionContext";
 import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
 import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
-import { usePatchStore } from "@/workspace/stores/patchStore";
+import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
 
 // Import utilities
 import { createEditorConfig } from "./utils/editorConfig";
@@ -49,9 +50,11 @@ const TextArea: React.FC = () => {
   const derivedByDocumentId = useDocumentDerivedStore(
     (state) => state.derivedByDocumentId
   );
-  const previewContentByDocumentId = usePatchStore(
-    (state) => state.previewContentByDocumentId
-  );
+  // Keep patch review subscriptions stable; object selectors here can loop with
+  // useSyncExternalStore/Zustand when the editor is already rerendering often.
+  const activePatchSetId = usePatchSetStore((state) => state.activePatchSetId);
+  const patchSets = usePatchSetStore((state) => state.patchSets);
+  const selectedPatchId = usePatchSetStore((state) => state.selectedPatchId);
 
   // Local state & refs
   const [showGenerationSuccess, setShowGenerationSuccess] = useState(false);
@@ -177,9 +180,18 @@ const TextArea: React.FC = () => {
   const initialConfig = createEditorConfig(onError);
 
   const activeDerivedState = derivedByDocumentId[String(activeDocument.id)] ?? null;
-  const patchPreviewContent =
-    previewContentByDocumentId[String(activeDocument.id)] ??
-    activeDerivedState?.patchPreviewContent;
+
+  const activePatchSet = activePatchSetId ? patchSets[activePatchSetId] : null;
+  const hasPatchReviewForDocument = 
+    selectedPatchId &&
+    activePatchSet &&
+    activePatchSet.patches.some(
+      (p) => p.id === selectedPatchId && p.documentId === String(activeDocument.id)
+    );
+
+  const patchPreviewContent = hasPatchReviewForDocument
+    ? activeDerivedState?.patchPreviewContent
+    : null;
 
   const editorMode =
     patchPreviewContent !== null && patchPreviewContent !== undefined
@@ -285,58 +297,65 @@ const TextArea: React.FC = () => {
       )}
 
       {/* Editor */}
-      <div className="border rounded-md flex-1 bg-white">
-        <LexicalComposer
-          key={`editor-${activeDocumentId}-refresh-${editorRefreshTrigger}`}
-          initialConfig={initialConfig}
-        >
-          <div className="editor-container h-full">
-            <RichTextPlugin
-              contentEditable={
-                <ContentEditable className="h-full px-4 py-3 focus:outline-none overflow-auto" />
-              }
-              placeholder={
-                <div className="text-gray-400 absolute top-3 left-4 pointer-events-none">
-                  {activeDocument.kind === "transcription"
-                    ? ""
-                    : "Start typing..."}
-                </div>
-              }
-              ErrorBoundary={LexicalErrorBoundary}
-            />
+      <div className="border rounded-md flex-1 bg-white overflow-hidden">
+        {isPatchPreviewMode ? (
+          <PatchSetEditorView 
+            content={documentContent} 
+            patches={activePatchSet?.patches.filter(p => p.documentId === String(activeDocument.id)) ?? []} 
+          />
+        ) : (
+          <LexicalComposer
+            key={`editor-${activeDocumentId}-refresh-${editorRefreshTrigger}`}
+            initialConfig={initialConfig}
+          >
+            <div className="editor-container h-full">
+              <RichTextPlugin
+                contentEditable={
+                  <ContentEditable className="h-full px-4 py-3 focus:outline-none overflow-auto" />
+                }
+                placeholder={
+                  <div className="text-gray-400 absolute top-3 left-4 pointer-events-none">
+                    {activeDocument.kind === "transcription"
+                      ? ""
+                      : "Start typing..."}
+                  </div>
+                }
+                ErrorBoundary={LexicalErrorBoundary}
+              />
 
-            {/* Core plugins */}
-            <HistoryPlugin />
-            <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
-            <DocumentContentPlugin
-              documentId={activeDocument.id}
-              content={documentContent}
-              isLoading={isLoadingContent}
-              refreshTrigger={editorRefreshTrigger}
-              forceRefresh={false}
-              derivedContent={derivedContent}
-              documentType={activeDocument.kind}
-            />
-            <ReadOnlyPlugin
-              isReadOnly={editorMode !== "edit"}
-            />
+              {/* Core plugins */}
+              <HistoryPlugin />
+              <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
+              <DocumentContentPlugin
+                documentId={activeDocument.id}
+                content={documentContent}
+                isLoading={isLoadingContent}
+                refreshTrigger={editorRefreshTrigger}
+                forceRefresh={false}
+                derivedContent={derivedContent}
+                documentType={activeDocument.kind}
+              />
+              <ReadOnlyPlugin
+                isReadOnly={editorMode !== "edit"}
+              />
 
-            {/* Conditional plugins for edit mode */}
-            {editorMode === "edit" && (
-              <>
-                <AutoFocusPlugin />
-                {/* Generated note content is owned by GenerationContext while
-                    SSE is active, so autosave should wait until streaming ends. */}
-                <AutoSavePlugin
-                  onSave={handleSave}
-                  onDraftChange={handleDraftChange}
-                  documentId={activeDocument.id}
-                  hasInitialContent={contentLoadedSuccessfully}
-                />
-              </>
-            )}
-          </div>
-        </LexicalComposer>
+              {/* Conditional plugins for edit mode */}
+              {editorMode === "edit" && (
+                <>
+                  <AutoFocusPlugin />
+                  {/* Generated note content is owned by GenerationContext while
+                      SSE is active, so autosave should wait until streaming ends. */}
+                  <AutoSavePlugin
+                    onSave={handleSave}
+                    onDraftChange={handleDraftChange}
+                    documentId={activeDocument.id}
+                    hasInitialContent={contentLoadedSuccessfully}
+                  />
+                </>
+              )}
+            </div>
+          </LexicalComposer>
+        )}
       </div>
     </div>
   );
