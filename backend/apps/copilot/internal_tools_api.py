@@ -122,7 +122,7 @@ def _build_excerpt(content: str, *, query: str | None = None, max_length: int = 
 
 
 def _document_version(document: Document) -> int:
-    return max(int(document.id), 1)
+    return 1
 
 
 def _content_hash(content: str) -> str:

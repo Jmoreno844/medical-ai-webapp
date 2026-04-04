@@ -52,10 +52,12 @@ firmado con `COPILOT_SERVICE_SHARED_JWT`.
 
 - El runtime actual usa `langgraph` + `ToolNode` con `ChatGoogleGenerativeAI(vertexai=True, ...)` y tools nativas contra Django; ya no depende de JSON prompting manual ni de `vertexai.GenerativeModel`.
 - El estado del grafo persiste mensajes LangChain reales (`HumanMessage / AIMessage / ToolMessage`) y renderiza el contexto clínico con bloques XML por turno para mantener el contexto auditable y compacto.
+- `planner.py` actua como fachada ligera del runtime del LLM; los renderers XML y las instrucciones viven en `app/llm/` para que el hardening de prompts y el armado del contexto se puedan probar por separado sin tocar la orquestacion.
 - Las tools del graph en `app/graph/tools.py` ya usan `ToolRuntime` para recibir `state` y `tool_call_id` sin exponer ese contexto interno al modelo; esto deja el schema público de cada tool limitado a sus argumentos clínicos reales.
 - Aunque el modelo usa tool calling y structured output nativos, las invocaciones hacia Google llevan `automatic_function_calling.disable=true`; así evitamos que el proveedor orchestre tools por su cuenta y mantenemos el loop clínico dentro de nuestro runtime LangGraph.
 - El planner se instruye como agente secuencial estricto: puede emitir varias `read_*`/`search_*` independientes en paralelo, pero nunca mezcla lecturas dependientes con `propose_*` en el mismo turno y solo conserva una proposal de edición por vez.
 - El patch drafter usa solo `json_schema` structured output y falla cerrado si Gemini no devuelve un `DraftedPatchPlan` válido; no hay fallback a `function_calling` en esa etapa para mantener el control del loop y reducir llamadas redundantes al proveedor.
+- El planner y el drafter tratan transcripciones, notas, spans y facts recuperados como datos clinicos, no como instrucciones ejecutables; si el contenido recuperado es ambiguo o insuficiente, el runtime debe pedir mas contexto o fallar cerrado en vez de inventar cambios.
 - Un run `edit_document` puede terminar sin patch si el modelo devuelve una pregunta aclaratoria legítima; en ese caso el turno se completa con `final_response` y el siguiente mensaje del usuario continúa el mismo chat.
 - El `thread_id` ya representa una conversación real del sidechat. Django crea uno nuevo al iniciar chat y LangGraph lo usa directamente como clave del checkpoint para preservar contexto entre mensajes del mismo hilo.
 - El sidechat actual crea ese `thread_id` en el primer mensaje o cuando el usuario resetea el panel; un reload de página abre un chat nuevo.

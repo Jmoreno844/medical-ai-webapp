@@ -48,8 +48,18 @@ En el sidechat actual, `thread_id` ya identifica una conversación real: Django 
 - **Owner:** `backend/` + arquitectura de producto.
 - **Trigger para pagarla:** si el producto introduce tenants/clinics reales o memory namespace multi-tenant.
 
+### 5. Explicit context caching diferido para un futuro QA helper
+
+- **Impacto:** el runtime actual del `document helper` no persiste ni reutiliza `cached_content` explícito de Vertex entre chats/superficies. Se apoya en continuidad del hilo y `implicit caching` del proveedor.
+- **Por qué se aceptó:** en el slice actual, el médico normalmente usa una sola conversación continua para editar o consultar sobre el documento del encounter; ahí conviene priorizar payloads append-only, orden determinista del contexto y continuidad del chat antes de sumar lifecycle de caches explícitos con PHI.
+- **Casos donde sí podría valer la pena luego:** reuso del mismo pack de PDFs/historia en una nueva superficie de chat, conversaciones muy largas que requieran summarization/reinicio, o consultas pausadas y retomadas horas después con el mismo contexto pesado.
+- **Regla de producto para el futuro:** si se introduce, el `explicit caching` debe aplicarse a un `stable context pack` (PDFs, historia longitudinal, labs previos, documentos históricos seleccionados), no a la transcripción realtime que sigue llegando por chunks.
+- **Owner:** `copilot_agent/` + `backend/apps/copilot/` + diseño de producto del QA helper.
+- **Trigger para pagarla:** cuando exista un QA helper longitudinal o multi-superficie que reutilice contexto pesado fuera del mismo hilo conversacional.
+
 ## Referencias
 
 - [`../architecture/ai-agent-workspace.md`](../architecture/ai-agent-workspace.md)
 - [`../architecture/system-overview.md`](../architecture/system-overview.md)
 - [`../../implementation_plan_ai_agent_service.md`](../../implementation_plan_ai_agent_service.md)
+- [`../decisions/0006-explicit-context-caching-futuro-qa-helper.md`](../decisions/0006-explicit-context-caching-futuro-qa-helper.md)

@@ -584,7 +584,11 @@ def build_graph_tools(
     def list_open_documents(
         runtime: ToolRuntime,
     ) -> Command:
-        """List the currently open workspace documents."""
+        """
+        Lista los documentos del workspace que el doctor tiene actualmente abiertos en pantalla.
+        Útil para saber qué contexto está viendo el usuario ahora mismo o para inferir el
+        documento destino si el doctor dice 'agrega esto al documento actual'.
+        """
         state, tool_call_id = _runtime_parts(
             runtime,
             tool_name="list_open_documents",
@@ -620,7 +624,12 @@ def build_graph_tools(
     def list_encounter_documents(
         runtime: ToolRuntime,
     ) -> Command:
-        """List every document available for the encounter."""
+        """
+        Lista absolutamente todos los documentos disponibles (fuentes, notas, historia clínica) en la consulta actual.
+        Úsalo como primer paso SIEMPRE que te pidan leer o extraer información y NO sepas qué documentos existen,
+        o para investigar cuál documento contiene el contexto vital que solicita el doctor. 
+        Te devuelve los IDs, títulos y tipos de documentos. Úsalos para decidir qué documento leer o editar después.
+        """
         state, tool_call_id = _runtime_parts(
             runtime,
             tool_name="list_encounter_documents",
@@ -787,7 +796,16 @@ def build_graph_tools(
         max_results: int = 3,
         allowed_document_types: list[str] | None = None,
     ) -> Command:
-        """Search across encounter documents for relevant snippets."""
+        """
+        Búsqueda semántica (vectorial) de fragmentos relevantes en los documentos de la consulta médica.
+        USO CORRECTO: Buscar términos médicos altamente específicos, especialidades, síntomas, medicamentos
+        o años muy puntuales (ej. "hipertensión", "losartán 50mg", "cirugía de rodilla", "2015").
+        ERROR GRAVE: Usarla para intenciones generales, buscar tipos documentales, metadatos estructurados
+        o palabras abstractas como "nombre", "edad", "paciente", "datos", "resumen", "historia clínica".
+        Si necesitas extraer el motivo general, el nombre del paciente, los datos demográficos o el
+        contexto completo, NO uses esta herramienta; DEBES aprovechar directamente `build_context_view`, 
+        `read_document_summary` o `read_document_span` para leer la consulta en sí misma.
+        """
         state, tool_call_id = _runtime_parts(
             runtime,
             tool_name="search_documents",
@@ -869,7 +887,12 @@ def build_graph_tools(
         include_document_ids: list[str] | None = None,
         include_manual_context: bool = True,
     ) -> Command:
-        """Build a synthesized context view from the current workspace."""
+        """
+        Construye una vista completa del contexto actual del paciente y la consulta, incluyendo contexto manual del médico.
+        Esencial para arrancar el entendimiento si no tienes idea de qué problema se está tratando,
+        o para obtener un panorama rápido antes de decidirte por leer documentos más a fondo.
+        Incluye tanto IDs abiertos como contexto global, ideal para saber qué documentos o IDs necesitas examinar.
+        """
         state, tool_call_id = _runtime_parts(
             runtime,
             tool_name="build_context_view",
@@ -1051,9 +1074,10 @@ def build_graph_tools(
     ) -> Command:
         """Draft a reviewable patch set centered on span replacement.
 
-        Sequential precondition: call this only after `read_document_summary` and
-        `read_document_span` have already completed for the same target document in
-        earlier turns. Never call this in the same turn as read tools.
+        CRITICAL PRECONDITION: You MUST NOT call this tool unless you have ALREADY called 
+        both `read_document_summary` AND `read_document_span` for this target document in 
+        PREVIOUS TURNS. If you try to call this first, it will fail.
+        Do NOT call this and a read tool in the same turn.
         """
         state, tool_call_id = _runtime_parts(
             runtime,
@@ -1074,9 +1098,10 @@ def build_graph_tools(
     ) -> Command:
         """Draft a reviewable patch set centered on anchored insertion.
 
-        Sequential precondition: call this only after `read_document_summary` and
-        `read_document_span` have already completed for the same target document in
-        earlier turns. Never call this in the same turn as read tools.
+        CRITICAL PRECONDITION: You MUST NOT call this tool unless you have ALREADY called 
+        both `read_document_summary` AND `read_document_span` for this target document in 
+        PREVIOUS TURNS. If you try to call this first, it will fail.
+        Do NOT call this and a read tool in the same turn.
         """
         state, tool_call_id = _runtime_parts(
             runtime,

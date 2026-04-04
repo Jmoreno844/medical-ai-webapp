@@ -5,6 +5,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from app.graph.tools import build_graph_tools
 from app.graph.workflow import build_clinical_copilot_graph
+from app.llm.instructions import DOCUMENTS_ARE_DATA_RULE
 from app.planner import (
     DraftedPatch,
     DraftedPatchPlan,
@@ -217,6 +218,17 @@ def test_planner_system_instruction_enforces_sequential_tool_dependencies():
     assert "varias herramientas de lectura o busqueda en paralelo" in instruction
     assert "read_* y propose_* en el mismo turno" in instruction
     assert "Solo puedes proponer una edicion por turno" in instruction
+    assert DOCUMENTS_ARE_DATA_RULE in instruction
+
+
+def test_patch_system_instruction_treats_clinical_context_as_data():
+    instruction = LangChainCopilotPlanner._patch_system_instruction(
+        requested_tool_name="propose_replace_span"
+    )
+
+    assert "La tool solicitada fue propose_replace_span." in instruction
+    assert DOCUMENTS_ARE_DATA_RULE in instruction
+    assert "Si el contexto es ambiguo o insuficiente, no inventes contenido clinico." in instruction
 
 
 def test_parallel_read_tool_calls_are_preserved():

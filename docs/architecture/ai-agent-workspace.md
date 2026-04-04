@@ -19,7 +19,7 @@ El Copiloto Clínico no es un servicio monolítico frontend. Responde a una arqu
 3. **Agent Runtime (LangGraph / Cloud Run):**
    - **Responsabilidad:** Orquestación, memoria de sesión, toma de decisiones (Tools) y generación de respuestas/patches.
    - **Boundary:** no es público al navegador; Django consume sus contratos internos.
-   - **Estado actual:** usa PostgreSQL como checkpointer, persiste `runs`/`events`, lee documentos/contexto reales desde Django y ya corre con `ToolNode` + tool calling nativo de LangChain sobre Gemini/Vertex (`ChatGoogleGenerativeAI`). El planner mantiene mensajes LangChain reales y renderiza el contexto por turno con bloques XML, mientras el drafter usa `json_schema` structured output para construir `patch_set_preview` de un solo documento target. El `safe apply` final sigue en Django. El `thread_id` público identifica la conversación activa del sidechat y LangGraph lo usa directamente como checkpoint key para conservar contexto entre mensajes del mismo chat. Aunque usemos function/tool calling nativo, el runtime desactiva `Automatic Function Calling` del SDK de Google para que la orquestación siga ocurriendo dentro de LangGraph y no en el proveedor; en patch drafting no hay fallback a `function_calling`.
+   - **Estado actual:** usa PostgreSQL como checkpointer, persiste `runs`/`events`, lee documentos/contexto reales desde Django y ya corre con `ToolNode` + tool calling nativo de LangChain sobre Gemini/Vertex (`ChatGoogleGenerativeAI`). El planner mantiene mensajes LangChain reales y renderiza el contexto por turno con bloques XML, mientras el drafter usa `json_schema` structured output para construir `patch_set_preview` de un solo documento target. El `safe apply` final sigue en Django. El `thread_id` público identifica la conversación activa del sidechat y LangGraph lo usa directamente como checkpoint key para conservar contexto entre mensajes del mismo chat. Aunque usemos function/tool calling nativo, el runtime desactiva `Automatic Function Calling` del SDK de Google para que la orquestación siga ocurriendo dentro de LangGraph y no en el proveedor; en patch drafting no hay fallback a `function_calling`. El planner y el drafter tratan transcripciones, notas, spans y facts recuperados como datos clinicos, no como instrucciones ejecutables.
 
 ---
 
@@ -57,8 +57,9 @@ El frontend no habla directo con LangGraph.
 ### Context Caching (Vertex AI / Gemini)
 
 - **El Problema:** Leer una transcripción en 10 interacciones de chat costaría 150,000 tokens de input.
-- **La Solución:** Cuando la transcripción del encuentro entra en un estado "estable", el Backend crea un **Context Cache**.
-- El Agente invoca al LLM pasando simplemente el `cache_id` y el prompt variable del usuario (además de la nota). Esto proporciona ahorros superiores al 60% en input cost y drástica reducción de latencia (TTFT) manteniendo **100% de la precisión**.
+- **La Solución objetivo:** cuando exista un corpus estable y pesado reutilizable entre varias preguntas, el sistema puede crear un **Context Cache** explicito.
+- En el slice actual del `document helper`, el runtime no usa explicit caching; depende del patrón `index first`, lecturas progresivas y continuidad del chat.
+- La decisión de introducir explicit caching futuro para QA longitudinal o documentos pesados queda registrada en la deuda técnica y en ADR dedicada, no como comportamiento actual del writer flow.
 
 ---
 
@@ -66,7 +67,7 @@ El frontend no habla directo con LangGraph.
 
 ### Lectura Longitudinal vs. Activa
 
-- **Encuentro Actual:** Se lee la transcripción completa mediante Context Caching.
+- **Encuentro Actual:** El runtime usa `index first` y lecturas progresivas desde Django para leer la transcripción y el contexto real del encounter dentro del mismo chat; no depende hoy de explicit caching para el `document helper`.
 - **Historia Clínica Pasada:** Jamás se envían decenas de audios crudos al agente. El Agente usa herramientas de resumen (`mode: summary`) sobre la tabla de metadatos/resúmenes derivados en PostgreSQL `document_summaries`.
 
 ### El Sistema de Patches (Escritura Segura)
