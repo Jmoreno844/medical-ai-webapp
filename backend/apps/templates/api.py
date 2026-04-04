@@ -5,7 +5,7 @@ from ninja.security import django_auth
 from django.db.models import F
 from ninja.errors import HttpError
 from django.utils import timezone
-from .models import BaseTemplate, DoctorTemplate, TemplateUsage
+from .models import DoctorTemplate, TemplateUsage
 from .schemas import (
     DoctorTemplateCreate,
     DoctorTemplateResponse,
@@ -46,7 +46,9 @@ def create_doctor_template(request, data: DoctorTemplateCreate):
     }
 
 
-@router.get("/doctor-templates/short", response=List[DoctorTemplateListItem], auth=django_auth)
+@router.get(
+    "/doctor-templates/short", response=List[DoctorTemplateListItem], auth=django_auth
+)
 def list_doctor_templates_short(request):
     user = request.user
 
@@ -57,7 +59,9 @@ def list_doctor_templates_short(request):
         try:
             usage = TemplateUsage.objects.get(doctor_template=t, doctor=user)
             use_count = usage.use_count
-            last_used_at = usage.last_used_at.isoformat() if usage.last_used_at else None
+            last_used_at = (
+                usage.last_used_at.isoformat() if usage.last_used_at else None
+            )
         except TemplateUsage.DoesNotExist:
             use_count = 0
             last_used_at = None

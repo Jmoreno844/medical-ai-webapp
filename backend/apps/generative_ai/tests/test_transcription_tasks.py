@@ -43,7 +43,11 @@ class TranscriptionTaskQueueTests(SimpleTestCase):
     def test_enqueue_transcription_task_uses_invoker_service_account(self):
         client = _FakeTasksClient()
         task_name = enqueue_transcription_task(
-            {"document_id": 42, "audio_uri": "gs://bucket/file.webm", "auth_token": "jwt"},
+            {
+                "document_id": 42,
+                "audio_uri": "gs://bucket/file.webm",
+                "auth_token": "jwt",
+            },
             task_client=client,
         )
 
@@ -73,7 +77,9 @@ class TranscriptionTaskQueueTests(SimpleTestCase):
     )
     def test_enqueue_transcription_task_fails_clearly_when_configuration_missing(self):
         with self.assertRaises(TranscriptionTaskConfigurationError) as ctx:
-            enqueue_transcription_task({"document_id": 1}, task_client=_FakeTasksClient())
+            enqueue_transcription_task(
+                {"document_id": 1}, task_client=_FakeTasksClient()
+            )
 
         self.assertIn("not fully configured", str(ctx.exception))
 
@@ -112,8 +118,13 @@ class TranscriptionFlowTests(TestCase):
         JWT_SECRET_KEY="jwt-secret",
         SECRET_KEY="django-secret",
     )
-    @patch("apps.generative_ai.api.enqueue_transcription_task", return_value="tasks/transcription-123")
-    def test_start_transcription_queues_task_without_marking_encounter_complete(self, enqueue_mock):
+    @patch(
+        "apps.generative_ai.api.enqueue_transcription_task",
+        return_value="tasks/transcription-123",
+    )
+    def test_start_transcription_queues_task_without_marking_encounter_complete(
+        self, enqueue_mock
+    ):
         request = SimpleNamespace(user=self.doctor)
         payload = TranscriptionRequest(
             encounter_id=self.encounter.id,

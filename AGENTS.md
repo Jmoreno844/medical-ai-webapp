@@ -20,6 +20,7 @@ Priorities, in order:
 4. `docs/backend/auth-and-jwt.md` before auth, SSE, callback, or token changes
 5. `docs/backend/database.md` before model or migration changes
 6. `docs/architecture/gcp-infrastructure.md` and `infra/README.md` before deploy, IAM, secrets, or Terraform changes
+7. `docs/agent/RUNTIME.md` before changes to the copilot agent runtime, tools, graph, or writer flow
 
 ## Repo Map
 
@@ -136,6 +137,7 @@ Do not treat these as source of truth unless the task is specifically about gene
   - architecture or ownership boundaries -> `docs/architecture/`
   - auth, security, SSE, callbacks, or tokens -> `docs/backend/auth-and-jwt.md`
   - data model or migration-impacting changes -> `docs/backend/database.md`
+  - copilot agent runtime, tools, graph, or writer flow -> `docs/agent/RUNTIME.md`
   - service-specific behavior -> local `README.md` or `AGENTS.md` near that code
 - Prefer leaving high-signal comments inside the relevant file when the context is local to that code path.
 - Create a new local `README.md` only when the explanation spans multiple files or would be awkward to keep inside code comments.

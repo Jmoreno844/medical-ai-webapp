@@ -80,7 +80,6 @@ def _render_workspace_documents(
                 f"    {xml_line('is_active', document.get('is_active'))}",
                 f"    {xml_line('is_open', document.get('is_open'))}",
                 f"    {xml_line('ai_writable', document.get('ai_writable'))}",
-                f"    {xml_line('excerpt', document.get('excerpt'))}",
                 f"    {xml_line('short_summary', document.get('short_summary'))}",
                 "  </workspace_document>",
             ]
@@ -112,6 +111,11 @@ def _render_document_summaries(document_summaries: Mapping[str, Mapping[str, Any
 
 
 def _render_read_documents(read_documents: Sequence[Mapping[str, Any]]) -> str:
+    # excerpt here is intentionally capped at 900 chars. This block appears in the
+    # turn context header which is rebuilt and injected on EVERY planner iteration.
+    # The full document content is already visible to the LLM via the ToolMessage
+    # history (capped at 12000). Repeating the full text here would bloat the
+    # context window across multi-turn runs with multiple document reads.
     if not read_documents:
         return "<read_documents />"
 
@@ -222,6 +226,11 @@ def _render_search_results(
     return "\n".join(lines)
 
 
+# Context is rendered as XML rather than JSON for two reasons:
+# 1. Clinical text contains colons, braces, and quotes that require escaping in JSON,
+#    which increases token count and parser ambiguity.
+# 2. LLMs parse tagged XML structures with better fidelity when the content contains
+#    medical abbreviations, nested lists, and multi-line prose.
 def render_turn_context(state: Mapping[str, Any]) -> str:
     workspace_index = state.get("workspace_index") or {}
     selected_document_ids = list(state.get("selected_document_ids") or [])
@@ -312,5 +321,23 @@ def render_patch_input(
                 "    </context_item>",
             ]
         )
-    lines.extend(["  </supporting_context>", "</patch_drafting_input>"])
+    lines.append("  </supporting_context>")
+    # Inyectar el plan clínico del planner cuando está disponible.
+    # El drafter usa <edit_plan> para saber exactamente qué secciones tocar y a qué nivel
+    # de impacto clínico, sin necesidad de reinterpretar el historial de la conversación.
+    clinical_plan = dict(state.get("clinical_plan") or {})
+    if clinical_plan:
+        sections_str = ", ".join(clinical_plan.get("affected_sections") or [])
+        lines.extend(
+            [
+                "  <edit_plan>",
+                f"    {xml_line('edit_scope', clinical_plan.get('edit_scope'))}",
+                f"    {xml_line('clinical_impact_level', clinical_plan.get('clinical_impact_level'))}",
+                f"    {xml_line('affected_sections', sections_str)}",
+                f"    {xml_line('needs_full_note', clinical_plan.get('needs_full_note'))}",
+                f"    {xml_line('should_propagate_to_analysis_and_plan', clinical_plan.get('should_propagate_to_analysis_and_plan'))}",
+                "  </edit_plan>",
+            ]
+        )
+    lines.append("</patch_drafting_input>")
     return "\n".join(lines)

@@ -4,29 +4,41 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Encounter',
+            name="Encounter",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('patient_connected', models.BooleanField(default=False)),
-                ('encounter_name', models.CharField(blank=True, max_length=255, null=True)),
-                ('occurred_at', models.DateTimeField()),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('audio_file_name', models.CharField(blank=True, max_length=255, null=True)),
-                ('audio_uploaded_at', models.DateTimeField(blank=True, null=True)),
-                ('audio_expires_at', models.DateTimeField(blank=True, null=True)),
-                ('audio_duration_seconds', models.IntegerField(blank=True, null=True)),
-                ('has_been_transcribed', models.BooleanField(default=False)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("patient_connected", models.BooleanField(default=False)),
+                (
+                    "encounter_name",
+                    models.CharField(blank=True, max_length=255, null=True),
+                ),
+                ("occurred_at", models.DateTimeField()),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "audio_file_name",
+                    models.CharField(blank=True, max_length=255, null=True),
+                ),
+                ("audio_uploaded_at", models.DateTimeField(blank=True, null=True)),
+                ("audio_expires_at", models.DateTimeField(blank=True, null=True)),
+                ("audio_duration_seconds", models.IntegerField(blank=True, null=True)),
+                ("has_been_transcribed", models.BooleanField(default=False)),
             ],
             options={
-                'ordering': ['-created_at'],
+                "ordering": ["-created_at"],
             },
         ),
     ]

@@ -17,12 +17,22 @@ export default function CopilotSideChatPanel({
   const {
     state,
     chatMessages,
-    pendingPatch,
+    reviewPatchSet,
+    reviewPatches,
+    selectedReviewPatch,
+    selectedReviewPatchId,
+    pendingPatchCount,
+    acceptedPatchCount,
+    canFinalizeAccepted,
+    canFinalizeRejected,
     patchFlowError,
     ensureSession,
     syncRunStatus,
     sendMessage,
-    submitPatchReview,
+    selectReviewPatch,
+    submitPatchDecision,
+    submitPatchSetDecision,
+    finalizeReview,
   } = controller;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -97,33 +107,58 @@ export default function CopilotSideChatPanel({
               </div>
             )}
 
-            {pendingPatch && (
+            {reviewPatchSet && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 space-y-3">
                 <div>
                   <div className="text-[11px] font-medium uppercase tracking-wide text-amber-700">
                     Review required
                   </div>
                   <div className="mt-1 font-medium">
-                    {`Documento ${pendingPatch.documentId}`}
+                    {`Documento ${reviewPatchSet.target_document_id}`}
                   </div>
                   <div className="mt-1 text-xs text-amber-800">
-                    {pendingPatch.rationale ?? "Patch pendiente de revision humana."}
+                    {`${pendingPatchCount} pendientes, ${acceptedPatchCount} aceptados.`}
                   </div>
                 </div>
-                <div className="grid gap-2 text-xs md:grid-cols-2">
-                  <div>
-                    <div className="mb-1 font-medium">Before</div>
-                    <pre className="max-h-32 overflow-auto rounded border border-amber-200 bg-white p-2 whitespace-pre-wrap">
-                      {pendingPatch.oldText || "—"}
-                    </pre>
-                  </div>
-                  <div>
-                    <div className="mb-1 font-medium">After</div>
-                    <pre className="max-h-32 overflow-auto rounded border border-amber-200 bg-white p-2 whitespace-pre-wrap">
-                      {pendingPatch.newText || "—"}
-                    </pre>
-                  </div>
+                <div className="space-y-2">
+                  {reviewPatches.map((patch) => (
+                    <button
+                      key={patch.id}
+                      type="button"
+                      onClick={() => selectReviewPatch(patch.id)}
+                      className={[
+                        "w-full rounded border px-3 py-2 text-left text-xs",
+                        patch.id === (selectedReviewPatchId ?? selectedReviewPatch?.id)
+                          ? "border-amber-400 bg-white"
+                          : "border-amber-200 bg-amber-50/60 hover:bg-white",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium">Patch {patch.orderIndex + 1}</span>
+                        <span className="uppercase text-[11px] text-amber-700">{patch.status}</span>
+                      </div>
+                      <div className="mt-1 text-amber-800">
+                        {patch.rationale ?? patch.type}
+                      </div>
+                    </button>
+                  ))}
                 </div>
+                {selectedReviewPatch && (
+                  <div className="grid gap-2 text-xs md:grid-cols-2">
+                    <div>
+                      <div className="mb-1 font-medium">Before</div>
+                      <pre className="max-h-32 overflow-auto rounded border border-red-200 bg-white p-2 whitespace-pre-wrap">
+                        {selectedReviewPatch.oldText || "—"}
+                      </pre>
+                    </div>
+                    <div>
+                      <div className="mb-1 font-medium">After</div>
+                      <pre className="max-h-32 overflow-auto rounded border border-green-200 bg-white p-2 whitespace-pre-wrap">
+                        {selectedReviewPatch.newText || "—"}
+                      </pre>
+                    </div>
+                  </div>
+                )}
                 <textarea
                   value={reviewComment}
                   onChange={(event) => setReviewComment(event.target.value)}
@@ -135,16 +170,61 @@ export default function CopilotSideChatPanel({
                   <Button
                     size="sm"
                     className="bg-green-700 text-white hover:bg-green-600"
-                    onClick={() => void submitPatchReview("approve", reviewComment)}
+                    disabled={!selectedReviewPatch || selectedReviewPatch.status !== "pending"}
+                    onClick={async () => {
+                      await submitPatchDecision("approve", reviewComment);
+                      setReviewComment("");
+                    }}
                   >
-                    Approve
+                    Approve patch
                   </Button>
                   <Button
                     size="sm"
                     variant="destructive"
-                    onClick={() => void submitPatchReview("reject", reviewComment)}
+                    disabled={!selectedReviewPatch || selectedReviewPatch.status !== "pending"}
+                    onClick={async () => {
+                      await submitPatchDecision("reject", reviewComment);
+                      setReviewComment("");
+                    }}
                   >
-                    Reject
+                    Reject patch
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={pendingPatchCount === 0}
+                    onClick={async () => {
+                      await submitPatchSetDecision("approve", reviewComment);
+                      setReviewComment("");
+                    }}
+                  >
+                    Accept all
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={pendingPatchCount === 0}
+                    onClick={async () => {
+                      await submitPatchSetDecision("reject", reviewComment);
+                      setReviewComment("");
+                    }}
+                  >
+                    Reject all
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!canFinalizeAccepted && !canFinalizeRejected}
+                    onClick={async () => {
+                      await finalizeReview(reviewComment);
+                      setReviewComment("");
+                    }}
+                  >
+                    {canFinalizeAccepted
+                      ? "Apply accepted"
+                      : canFinalizeRejected
+                        ? "Finish rejection"
+                        : "Finalize"}
                   </Button>
                 </div>
               </div>

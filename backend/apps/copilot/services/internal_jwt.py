@@ -26,4 +26,3 @@ def encode_copilot_internal_jwt(
     if extra_claims:
         payload.update(extra_claims)
     return jwt.encode(payload, settings.COPILOT_SERVICE_SHARED_JWT, algorithm="HS256")
-

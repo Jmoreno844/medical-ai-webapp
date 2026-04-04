@@ -8,8 +8,6 @@ from ninja.security import django_auth
 from typing import List
 from datetime import datetime, timedelta
 import jwt
-import os
-from django.conf import settings
 from django.middleware.csrf import get_token
 import logging
 from apps.templates.models import BaseTemplate, DoctorTemplate, TemplateUsage

@@ -6,30 +6,43 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('documents', '0001_initial'),
-        ('encounters', '0001_initial'),
-        ('templates', '0001_initial'),
+        ("documents", "0001_initial"),
+        ("encounters", "0001_initial"),
+        ("templates", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='document',
-            name='doctor',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='documents', to=settings.AUTH_USER_MODEL),
+            model_name="document",
+            name="doctor",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="documents",
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
         migrations.AddField(
-            model_name='document',
-            name='doctor_template',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='documents', to='templates.doctortemplate'),
+            model_name="document",
+            name="doctor_template",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="documents",
+                to="templates.doctortemplate",
+            ),
         ),
         migrations.AddField(
-            model_name='document',
-            name='encounter',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='documents', to='encounters.encounter'),
+            model_name="document",
+            name="encounter",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="documents",
+                to="encounters.encounter",
+            ),
         ),
     ]

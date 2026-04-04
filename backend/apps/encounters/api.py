@@ -13,7 +13,7 @@ from .schemas import (
     AudioExistsResponse,
     EmptyPayload,
 )
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from apps.documents.models import Document
 from django.conf import settings
 import uuid
@@ -87,7 +87,9 @@ def create_empty_encounter(request, payload: EmptyPayload = None):
     return {"id": enc.id}
 
 
-@router.patch("/encounters/{encounter_id}", response=EncounterDetailOut, auth=django_auth)
+@router.patch(
+    "/encounters/{encounter_id}", response=EncounterDetailOut, auth=django_auth
+)
 def update_encounter(request, encounter_id: int, payload: EncounterUpdate):
     enc = get_object_or_404(Encounter, id=encounter_id)
 
@@ -172,6 +174,7 @@ def generate_upload_url(request, encounter_id: int, payload: AudioUploadRequest)
 
     except Exception as e:
         import logging
+
         logging.getLogger(__name__).error("Error generating signed URL", exc_info=True)
         return {"success": False, "error": str(e)}
 

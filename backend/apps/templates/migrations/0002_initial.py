@@ -6,52 +6,73 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('templates', '0001_initial'),
+        ("templates", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='doctortemplate',
-            name='doctor',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='doctor_templates', to=settings.AUTH_USER_MODEL),
+            model_name="doctortemplate",
+            name="doctor",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="doctor_templates",
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
         migrations.AddField(
-            model_name='templateusage',
-            name='doctor',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='template_usages', to=settings.AUTH_USER_MODEL),
+            model_name="templateusage",
+            name="doctor",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="template_usages",
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
         migrations.AddField(
-            model_name='templateusage',
-            name='doctor_template',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='usage_records', to='templates.doctortemplate'),
+            model_name="templateusage",
+            name="doctor_template",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="usage_records",
+                to="templates.doctortemplate",
+            ),
         ),
         migrations.AddIndex(
-            model_name='doctortemplate',
-            index=models.Index(fields=['doctor'], name='templates_d_doctor__dbb177_idx'),
+            model_name="doctortemplate",
+            index=models.Index(
+                fields=["doctor"], name="templates_d_doctor__dbb177_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='doctortemplate',
-            index=models.Index(fields=['document_kind'], name='templates_d_documen_4f6178_idx'),
+            model_name="doctortemplate",
+            index=models.Index(
+                fields=["document_kind"], name="templates_d_documen_4f6178_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='doctortemplate',
-            index=models.Index(fields=['base_template'], name='templates_d_base_te_7b540d_idx'),
+            model_name="doctortemplate",
+            index=models.Index(
+                fields=["base_template"], name="templates_d_base_te_7b540d_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='templateusage',
-            index=models.Index(fields=['doctor_template'], name='templates_t_doctor__fd160e_idx'),
+            model_name="templateusage",
+            index=models.Index(
+                fields=["doctor_template"], name="templates_t_doctor__fd160e_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='templateusage',
-            index=models.Index(fields=['doctor'], name='templates_t_doctor__523c11_idx'),
+            model_name="templateusage",
+            index=models.Index(
+                fields=["doctor"], name="templates_t_doctor__523c11_idx"
+            ),
         ),
         migrations.AlterUniqueTogether(
-            name='templateusage',
-            unique_together={('doctor_template', 'doctor')},
+            name="templateusage",
+            unique_together={("doctor_template", "doctor")},
         ),
     ]

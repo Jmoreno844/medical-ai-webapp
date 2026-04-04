@@ -6,32 +6,45 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('encounters', '0001_initial'),
-        ('patients', '0001_initial'),
+        ("encounters", "0001_initial"),
+        ("patients", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='encounter',
-            name='doctor',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='encounters', to=settings.AUTH_USER_MODEL),
+            model_name="encounter",
+            name="doctor",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="encounters",
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
         migrations.AddField(
-            model_name='encounter',
-            name='patient',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='encounters', to='patients.patient'),
+            model_name="encounter",
+            name="patient",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="encounters",
+                to="patients.patient",
+            ),
         ),
         migrations.AddIndex(
-            model_name='encounter',
-            index=models.Index(fields=['doctor'], name='encounters__doctor__aa839a_idx'),
+            model_name="encounter",
+            index=models.Index(
+                fields=["doctor"], name="encounters__doctor__aa839a_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='encounter',
-            index=models.Index(fields=['patient'], name='encounters__patient_9f10b2_idx'),
+            model_name="encounter",
+            index=models.Index(
+                fields=["patient"], name="encounters__patient_9f10b2_idx"
+            ),
         ),
     ]

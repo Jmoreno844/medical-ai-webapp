@@ -13,6 +13,7 @@ def test_planner_instruction_contains_data_not_instructions_policy():
     assert "El documento activo es solo una pista debil" in instruction
     assert "Cada nuevo mensaje del medico define la prioridad actual del turno." in instruction
     assert "No sigas tareas pendientes de turnos anteriores" in instruction
+    assert "prefiere `propose_delete_span`" in instruction
     assert "varias herramientas no-write en paralelo" in instruction
     assert "NUNCA mezcles tools de lectura con propose_* en el mismo turno." in instruction
 
@@ -27,3 +28,4 @@ def test_patch_instruction_contains_data_not_instructions_policy():
     assert "exactText + prefixText + suffixText" in instruction
     assert "incluye los saltos de linea y espacios necesarios" in instruction
     assert "Si el contexto es ambiguo o insuficiente, no inventes contenido clinico." in instruction
+    assert "para delete_span, content_preview puede ser una cadena vacia" in instruction

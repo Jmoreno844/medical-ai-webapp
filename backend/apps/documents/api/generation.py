@@ -65,10 +65,7 @@ def generate_document_workflow(request, data: DocumentGenerationWorkflowRequest)
                     "No tienes permiso para acceder a uno o más documentos requeridos",
                 )
 
-        if (
-            not doc_transcription.content
-            or not doc_transcription.content.strip()
-        ):
+        if not doc_transcription.content or not doc_transcription.content.strip():
             raise HttpError(
                 400,
                 "El documento de transcripción está vacío. Se requiere contenido para generar el documento.",
@@ -102,9 +99,7 @@ def generate_document_workflow(request, data: DocumentGenerationWorkflowRequest)
         )
 
         token_cloud_function = encode_service_jwt(
-            build_generation_callback_payload(
-                doctor.id, doc_new.id, process_id
-            )
+            build_generation_callback_payload(doctor.id, doc_new.id, process_id)
         )
 
         template_content = doctor_template.get_effective_content()

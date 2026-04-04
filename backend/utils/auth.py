@@ -1,6 +1,5 @@
 from ninja.security import HttpBearer
 import jwt
-from django.conf import settings
 from typing import Optional
 import logging
 
@@ -23,9 +22,7 @@ class JWTAuth(HttpBearer):
             return None
 
         try:
-            payload = jwt.decode(
-                token, get_jwt_signing_key(), algorithms=["HS256"]
-            )
+            payload = jwt.decode(token, get_jwt_signing_key(), algorithms=["HS256"])
             logger.debug(
                 "JWTAuth: decoded token purpose=%s keys=%s",
                 payload.get("purpose"),
@@ -35,9 +32,7 @@ class JWTAuth(HttpBearer):
             purpose = payload.get("purpose")
             if purpose == "sse_connection":
                 if "document_id" not in payload or "user_id" not in payload:
-                    logger.warning(
-                        "JWTAuth: SSE token missing document_id or user_id"
-                    )
+                    logger.warning("JWTAuth: SSE token missing document_id or user_id")
             return payload
         except jwt.ExpiredSignatureError:
             logger.warning("JWTAuth: token expired")

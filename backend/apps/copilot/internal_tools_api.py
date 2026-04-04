@@ -11,8 +11,6 @@ from ninja.errors import HttpError
 
 from apps.copilot.models import CopilotPatch
 from apps.copilot.schemas import (
-    CopilotBuildContextViewIn,
-    CopilotBuildContextViewOut,
     CopilotEncounterContextOut,
     CopilotListEncounterDocumentsIn,
     CopilotListEncounterDocumentsOut,
@@ -93,13 +91,17 @@ def _get_owned_encounter(*, encounter_id: int, user_id: int) -> Encounter:
 
 
 def _get_encounter_documents(*, encounter_id: int, user_id: int) -> QuerySet[Document]:
-    return Document.objects.filter(encounter_id=encounter_id, doctor_id=user_id).order_by(
+    return Document.objects.filter(
+        encounter_id=encounter_id, doctor_id=user_id
+    ).order_by(
         "created_on",
         "id",
     )
 
 
-def _get_owned_document(*, document_id: int, encounter_id: int, user_id: int) -> Document:
+def _get_owned_document(
+    *, document_id: int, encounter_id: int, user_id: int
+) -> Document:
     document = get_object_or_404(Document, id=document_id)
     if document.encounter_id != encounter_id or document.doctor_id != user_id:
         raise HttpError(403, "No tienes permiso para acceder a este documento")
@@ -110,7 +112,9 @@ def _document_title(kind: str, document_id: int) -> str:
     return DOCUMENT_TITLES.get(kind, f"Documento {document_id}")
 
 
-def _build_excerpt(content: str, *, query: str | None = None, max_length: int = 240) -> str:
+def _build_excerpt(
+    content: str, *, query: str | None = None, max_length: int = 240
+) -> str:
     if not content.strip():
         return ""
 
@@ -185,11 +189,14 @@ def _find_anchor_span(
             prefix_match = True
             suffix_match = True
             if prefix_text is not None:
-                prefix_match = content[max(0, index - len(prefix_text)) : index] == prefix_text
+                prefix_match = (
+                    content[max(0, index - len(prefix_text)) : index] == prefix_text
+                )
             if suffix_text is not None:
                 suffix_start = index + len(exact_text)
                 suffix_match = (
-                    content[suffix_start : suffix_start + len(suffix_text)] == suffix_text
+                    content[suffix_start : suffix_start + len(suffix_text)]
+                    == suffix_text
                 )
             if prefix_match and suffix_match:
                 narrowed.append(index)
@@ -211,7 +218,9 @@ def _serialize_workspace_documents(
 ) -> list[CopilotToolDocumentOut]:
     serialized_documents: list[CopilotToolDocumentOut] = []
     for document in documents:
-        if not document.get("ai_readable", True) or document.get("hidden_from_agent", False):
+        if not document.get("ai_readable", True) or document.get(
+            "hidden_from_agent", False
+        ):
             continue
 
         serialized_documents.append(
@@ -239,7 +248,9 @@ def _match_score(content: str, query: str) -> float:
     count = lowered_content.count(lowered_query)
     if count <= 0:
         return 0.0
-    return round(min(1.0, 0.25 + ((count * len(lowered_query)) / max(len(content), 1))), 3)
+    return round(
+        min(1.0, 0.25 + ((count * len(lowered_query)) / max(len(content), 1))), 3
+    )
 
 
 def _document_type_allowed(document: Document, allowed_types: list[str]) -> bool:
@@ -449,10 +460,9 @@ def search_documents_tool(request, payload: CopilotSearchDocumentsIn):
     if not query:
         raise HttpError(400, "La busqueda no puede estar vacia")
 
-    documents = (
-        _get_encounter_documents(encounter_id=payload.encounter_id, user_id=payload.user_id)
-        .filter(content__icontains=query)
-    )
+    documents = _get_encounter_documents(
+        encounter_id=payload.encounter_id, user_id=payload.user_id
+    ).filter(content__icontains=query)
 
     matches: list[CopilotSearchDocumentMatchOut] = []
     allowed_document_types = list(getattr(payload, "allowed_document_types", []) or [])
@@ -505,8 +515,7 @@ def read_patch_history_tool(request, payload: CopilotReadPatchHistoryIn):
             target_document_id=payload.document_id,
             encounter_id=payload.encounter_id,
             doctor_id=payload.user_id,
-        )
-        .order_by("-created_at")[: payload.limit]
+        ).order_by("-created_at")[: payload.limit]
     )
     return {
         "document_id": str(payload.document_id),
@@ -536,71 +545,17 @@ def read_encounter_context_tool(request, payload: CopilotReadEncounterContextIn)
         encounter_id=payload.encounter_id,
         user_id=payload.user_id,
     )
-    encounter = _get_owned_encounter(encounter_id=payload.encounter_id, user_id=payload.user_id)
+    encounter = _get_owned_encounter(
+        encounter_id=payload.encounter_id, user_id=payload.user_id
+    )
 
     return {
         "encounter_id": str(encounter.id),
         "encounter_name": encounter.encounter_name,
-        "occurred_at": encounter.occurred_at.isoformat() if encounter.occurred_at else None,
+        "occurred_at": encounter.occurred_at.isoformat()
+        if encounter.occurred_at
+        else None,
         "has_been_transcribed": encounter.has_been_transcribed,
         "patient_id": str(encounter.patient_id) if encounter.patient_id else None,
         "patient_summary": encounter.patient.summary if encounter.patient else None,
-    }
-
-
-@router.post(
-    "/internal/copilot/tools/build-context-view",
-    response=CopilotBuildContextViewOut,
-    auth=CopilotToolsJWTAuth(),
-)
-def build_context_view_tool(request, payload: CopilotBuildContextViewIn):
-    _validate_tool_request(
-        request,
-        run_id=payload.run_id,
-        thread_id=payload.thread_id,
-        encounter_id=payload.encounter_id,
-        user_id=payload.user_id,
-    )
-    _get_owned_encounter(encounter_id=payload.encounter_id, user_id=payload.user_id)
-
-    include_ids = {int(document_id) for document_id in payload.include_document_ids if int(document_id)}
-    if payload.active_document_id:
-        include_ids.add(int(payload.active_document_id))
-
-    documents = list(
-        _get_encounter_documents(encounter_id=payload.encounter_id, user_id=payload.user_id)
-    )
-    selected_documents = [
-        document for document in documents if not include_ids or document.id in include_ids
-    ][:4]
-
-    facts: list[dict[str, Any]] = []
-    source_document_ids: list[str] = []
-    for document in selected_documents:
-        excerpt = _build_excerpt(document.content, max_length=220)
-        if not excerpt:
-            continue
-        source_document_ids.append(str(document.id))
-        facts.append(
-            {
-                "category": _context_category_for_document(document.kind),
-                "value": excerpt,
-                "source_document_id": str(document.id),
-                "source_anchor": _anchor_for_span(
-                    document.content,
-                    0,
-                    min(len(document.content), max(1, len(excerpt))),
-                ),
-                "confidence": 0.65 if document.kind == "transcription" else 0.82,
-            }
-        )
-
-    ambiguities = []
-    if not facts:
-        ambiguities.append("No hay contexto suficiente para sintetizar el encounter.")
-
-    return {
-        "facts": facts,
-        "ambiguities": ambiguities,
-        "source_document_ids": source_document_ids,
     }

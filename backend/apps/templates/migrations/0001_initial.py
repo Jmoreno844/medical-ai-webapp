@@ -5,44 +5,101 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='TemplateUsage',
+            name="TemplateUsage",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('use_count', models.PositiveIntegerField(default=0)),
-                ('last_used_at', models.DateTimeField(blank=True, null=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("use_count", models.PositiveIntegerField(default=0)),
+                ("last_used_at", models.DateTimeField(blank=True, null=True)),
             ],
         ),
         migrations.CreateModel(
-            name='BaseTemplate',
+            name="BaseTemplate",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255)),
-                ('document_kind', models.CharField(choices=[('note', 'Nota'), ('document', 'Documento'), ('other', 'Otros')], default='other', max_length=50)),
-                ('content', models.TextField()),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                (
+                    "document_kind",
+                    models.CharField(
+                        choices=[
+                            ("note", "Nota"),
+                            ("document", "Documento"),
+                            ("other", "Otros"),
+                        ],
+                        default="other",
+                        max_length=50,
+                    ),
+                ),
+                ("content", models.TextField()),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
             ],
             options={
-                'indexes': [models.Index(fields=['document_kind'], name='templates_b_documen_2e7919_idx')],
+                "indexes": [
+                    models.Index(
+                        fields=["document_kind"], name="templates_b_documen_2e7919_idx"
+                    )
+                ],
             },
         ),
         migrations.CreateModel(
-            name='DoctorTemplate',
+            name="DoctorTemplate",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255)),
-                ('document_kind', models.CharField(choices=[('note', 'Nota'), ('document', 'Documento'), ('other', 'Otros')], default='other', max_length=50)),
-                ('uses_base_content', models.BooleanField(default=False)),
-                ('content', models.TextField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('base_template', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='derived_templates', to='templates.basetemplate')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                (
+                    "document_kind",
+                    models.CharField(
+                        choices=[
+                            ("note", "Nota"),
+                            ("document", "Documento"),
+                            ("other", "Otros"),
+                        ],
+                        default="other",
+                        max_length=50,
+                    ),
+                ),
+                ("uses_base_content", models.BooleanField(default=False)),
+                ("content", models.TextField(blank=True, null=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "base_template",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="derived_templates",
+                        to="templates.basetemplate",
+                    ),
+                ),
             ],
         ),
     ]

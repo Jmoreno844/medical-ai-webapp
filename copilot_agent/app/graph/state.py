@@ -6,6 +6,10 @@ from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
 from typing_extensions import Annotated
 
+# RESET_MARKER signals list/dict reducers to discard the accumulated value from
+# the prior checkpoint and start fresh. Without this, tool reads, spans, and
+# proposals from a previous run would bleed into the next run on the same thread.
+# LangGraph checkpoints are thread-scoped, so there is no automatic per-run flush.
 RESET_MARKER = "__reset__"
 
 
@@ -108,6 +112,10 @@ def _merge_document_pair(
     return merged
 
 
+# Score-based merge instead of last-write-wins: list_encounter_documents and
+# list_open_documents may be called in different turns and return overlapping
+# records with different levels of metadata completeness. The scorer keeps the
+# richer record rather than silently dropping fields from the first call.
 def merge_available_documents(
     current: list[dict[str, Any]] | None,
     updates: list[dict[str, Any]] | None,
@@ -339,3 +347,7 @@ class CopilotState(TypedDict):
     review_result: NotRequired[Literal["approve", "reject", "edit"] | None]
     review_comment: NotRequired[str | None]
     trace_metadata: dict[str, Any]
+    # Plan clínico estructurado emitido por el planner vía set_edit_plan antes de proponer patches.
+    # None cuando el planner hace una edición local simple sin llamar set_edit_plan.
+    # El drafter lo consume para saber qué secciones tocar y a qué nivel de impacto.
+    clinical_plan: NotRequired[dict[str, Any] | None]

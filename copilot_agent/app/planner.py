@@ -39,6 +39,62 @@ class PlannerDecision(BaseModel):
     tool_calls: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class ClinicalPlan(BaseModel):
+    """Señales estructuradas de alcance clínico emitidas por el planner antes de redactar patches.
+
+    El planner llama `set_edit_plan` con estos campos cuando detecta que el cambio
+    es de propagación o reinterpretación clínica. La tool escribe el plan al state y
+    levanta `max_patch_operations` dinámicamente según `edit_scope`.
+
+    Para ediciones simples (local edit: typo, inserción corta, borrado puntual), el planner
+    puede ir directo a propose_* sin llamar set_edit_plan. El drafter operará con un solo patch.
+    """
+
+    edit_scope: Literal["local", "propagation", "reinterpretation"] = Field(
+        description=(
+            "Alcance del cambio. "
+            "'local' = typo, inserción corta, borrado puntual sobre una sección. "
+            "'propagation' = nuevo dato clínico que debe reflejarse en varias secciones. "
+            "'reinterpretation' = el dato cambia análisis, impresión diagnóstica, riesgo o plan."
+        )
+    )
+    clinical_impact_level: Literal["cosmetic", "factual", "clinical"] = Field(
+        description=(
+            "'cosmetic' = estilo, formato, traducción sin cambio de datos. "
+            "'factual' = agrega o corrige un dato documentado (EG edad gestacional). "
+            "'clinical' = cambia diagnóstico, análisis, riesgo o plan de manejo."
+        )
+    )
+    affected_sections: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Secciones semánticas del documento que el drafter debe tocar. "
+            "Usa nombres en snake_case del español clínico, por ejemplo: "
+            "'enfermedad_actual', 'antecedentes_relevantes', 'impresion_diagnostica', "
+            "'analisis_clinico', 'plan', 'revision_por_sistemas'. "
+            "El drafter debe emitir al menos un patch por cada sección listada aquí."
+        ),
+    )
+    needs_full_note: bool = Field(
+        description=(
+            "True si el cambio requiere leer la nota completa antes de proponer patches. "
+            "Siempre True para propagation y reinterpretation. "
+            "El runtime rechazará propose_* si este campo es True y no hay lectura 'full' previa."
+        )
+    )
+    needs_external_knowledge: bool = Field(
+        description=(
+            "True si el cambio requiere conocimiento externo (guías clínicas, farmacología) "
+            "que no está presente en la nota del encuentro. Señal para RAG futuro."
+        )
+    )
+    should_propagate_to_analysis_and_plan: bool = Field(
+        description=(
+            "True si el nuevo dato clínico debe reflejarse en análisis clínico y/o plan de manejo."
+        )
+    )
+
+
 class DraftedPatchAnchor(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -94,6 +150,17 @@ class DraftedPatch(BaseModel):
         ),
     )
     confidence: float | None = None
+    # Sección semántica del documento a la que pertenece este patch.
+    # Debe coincidir con uno de los valores en ClinicalPlan.affected_sections.
+    # Permite al frontend y al auditor clínico entender qué parte de la nota se está tocando.
+    section: str | None = Field(
+        default=None,
+        description=(
+            "Sección semántica del documento a la que pertenece este patch. "
+            "Debe coincidir con uno de los valores de affected_sections del plan clínico. "
+            "Ejemplos: 'antecedentes_relevantes', 'plan', 'impresion_diagnostica'."
+        ),
+    )
 
 
 class DraftedPatchPlan(BaseModel):
@@ -132,13 +199,19 @@ def _tool_call_identity(tool_call: dict[str, Any]) -> tuple[str, str]:
     if tool_name in {
         "list_open_documents",
         "list_encounter_documents",
-        "build_context_view",
     }:
         return tool_name, "__singleton__"
     return tool_name, json.dumps(tool_call.get("args") or {}, sort_keys=True, separators=(",", ":"))
 
 
 def _filter_parallel_tool_calls(message: AIMessage) -> AIMessage:
+    # Gemini sometimes proposes writes (propose_*) to multiple documents in one
+    # turn when the planner is given a broad instruction. Parallel clinical writes
+    # are unsafe here: each propose_* call drafts a full patch set, and running
+    # two propose_* in the same batch would produce two independent patch sets
+    # with no ordering guarantee. We keep only the first proposal; the doctor can
+    # request subsequent edits in the next turn.
+    # Read-only calls (list_*, read_*) are safe to parallelize and are not filtered.
     tool_calls = list(message.tool_calls or [])
     if len(tool_calls) <= 1:
         return message
@@ -202,8 +275,10 @@ class LangChainCopilotPlanner:
 
     @staticmethod
     def _provider_runtime_kwargs() -> dict[str, Any]:
-        # Keep the tool loop in our LangGraph runtime. Google AFC adds provider-side
-        # orchestration for function calls, which we do not want in this clinical flow.
+        # Google AFC (Automatic Function Calling) would re-enter its own tool loop
+        # server-side, bypassing our LangGraph state machine. That means tool results
+        # would never reach our state reducers, streaming events would be missing, and
+        # our per-turn budgets (max_iterations, max_patch_operations) would not apply.
         return {
             "automatic_function_calling": genai_types.AutomaticFunctionCallingConfig(
                 disable=True
@@ -243,6 +318,9 @@ class LangChainCopilotPlanner:
             if has_tools or has_text:
                 return _filter_parallel_tool_calls(response)
                 
+            # Gemini occasionally returns an empty AIMessage (no text, no tool calls)
+            # on complex tool schemas, especially after a large tool result in context.
+            # Injecting an explicit error forces it to generate a non-empty turn.
             logger.warning("El planner devolvio una respuesta vacia en el intento %d. Forzando reintento.", attempt)
             current_messages.extend([
                 response,
@@ -314,9 +392,11 @@ class LangChainCopilotPlanner:
         *,
         messages: Sequence[BaseMessage],
     ) -> Any:
-        # Keep patch drafting on json_schema only. The provider-side function_calling
-        # fallback proved noisier here: it increased remote calls, reintroduced AFC-like
-        # behavior, and made Gemini more likely to echo tool names instead of patch enums.
+        # json_schema forces the model to return a typed DraftedPatchPlan in one shot.
+        # function_calling was tried and dropped: it caused Gemini to echo tool names
+        # (propose_replace_span) as operation_type values instead of the patch enum
+        # constants (replace_span), and re-introduced AFC-like multi-turn behavior
+        # that bypassed our structured output contract.
         structured = self._patch_model_instance().with_structured_output(
             DraftedPatchPlan,
             method="json_schema",
@@ -358,7 +438,11 @@ class LangChainCopilotPlanner:
         if self._planner_model is None:
             self._planner_model = self._build_chat_model(
                 temperature=0.1,
-                max_tokens=700,
+                # 1400 tokens permiten al planner generar resúmenes clínicos completos
+                # cuando action_type='respond' (ej. resumir una nota de 11 secciones).
+                # 700 era suficiente para routing y tool calls cortos pero cortaba
+                # respuestas textuales largas sin ningún error explícito.
+                max_tokens=1400,
             )
         return self._planner_model
 
@@ -366,7 +450,10 @@ class LangChainCopilotPlanner:
         if self._patch_model is None:
             self._patch_model = self._build_chat_model(
                 temperature=0.0,
-                max_tokens=1600,
+                # 3200 tokens para dar espacio al drafter cuando emite 5-8 patches en un solo
+                # structured-output call (propagation/reinterpretation). 1600 era suficiente
+                # para un solo patch pero insuficiente para planes multi-sección.
+                max_tokens=3200,
             )
         return self._patch_model
 

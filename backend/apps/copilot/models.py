@@ -88,6 +88,13 @@ class CopilotPatchSet(models.Model):
     target_selection_reason = models.TextField(blank=True, null=True)
     document_preview_after = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
+    # Campos del plan clínico estructurado emitidos por el copiloto vía set_edit_plan.
+    # edit_scope: 'local', 'propagation', 'reinterpretation'
+    # clinical_impact_level: 'cosmetic', 'factual', 'clinical'
+    # affected_sections: lista de secciones semánticas que el drafter tocó.
+    edit_scope = models.CharField(max_length=32, blank=True, null=True)
+    clinical_impact_level = models.CharField(max_length=32, blank=True, null=True)
+    affected_sections = models.JSONField(default=list, blank=True)
     review_comment = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -171,6 +178,9 @@ class CopilotPatch(models.Model):
     source_context_document_ids = models.JSONField(default=list, blank=True)
     target_document_title = models.CharField(max_length=255, blank=True, null=True)
     target_selection_reason = models.TextField(blank=True, null=True)
+    # Sección semántica de la nota clínica a la que pertenece este patch.
+    # Deriva del campo 'section' del DraftedPatch emitido por el drafter.
+    section = models.CharField(max_length=128, blank=True, null=True)
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
     review_comment = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

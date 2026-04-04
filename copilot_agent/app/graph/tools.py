@@ -50,15 +50,6 @@ class LayeredToolsClient(Protocol):
 
     def read_patch_history(self, document_id: str, *, limit: int = 5) -> dict[str, Any]: ...
 
-    def build_context_view(
-        self,
-        *,
-        active_document_id: str | None = None,
-        include_document_ids: list[str] | None = None,
-        include_manual_context: bool = True,
-    ) -> dict[str, Any]: ...
-
-
 PATCH_REQUIRED_FIELDS = {
     "patch_id",
     "target_document_id",
@@ -68,6 +59,27 @@ PATCH_REQUIRED_FIELDS = {
     "operation_type",
     "content_preview",
 }
+
+# Presupuesto máximo de patches permitido por scope clínico.
+# local: una sección, un cambio delimitado.
+# propagation: el mismo dato clínico debe reflejarse en varias secciones (hasta 5).
+# reinterpretation: el dato cambia diagnóstico, análisis, riesgo o plan (hasta 8).
+_MAX_PATCH_OPERATIONS_BY_SCOPE: dict[str, int] = {
+    "local": 1,
+    "propagation": 5,
+    "reinterpretation": 8,
+}
+
+
+def _patch_field_is_present(patch_preview: dict[str, Any], field_name: str) -> bool:
+    if field_name == "content_preview":
+        if str(patch_preview.get("operation_type") or "") == "delete_span":
+            return "content_preview" in patch_preview
+        value = patch_preview.get(field_name)
+        return value is not None and str(value) != ""
+
+    value = patch_preview.get(field_name)
+    return value is not None and str(value) != ""
 
 
 class ListOpenDocumentsInput(BaseModel):
@@ -108,12 +120,6 @@ class ReadPatchHistoryInput(BaseModel):
     limit: int = Field(default=5, ge=1, le=10)
 
 
-class BuildContextViewInput(BaseModel):
-    active_document_id: str | None = None
-    include_document_ids: list[str] | None = None
-    include_manual_context: bool = True
-
-
 class ProposePatchInput(BaseModel):
     target_document_id: str = Field(..., min_length=1)
 
@@ -151,8 +157,15 @@ def _summarize_tool_result(tool_name: str, payload: dict[str, Any]) -> str:
         return f"{len(payload.get('matches', []))} coincidencia(s) relevantes"
     if tool_name == "read_patch_history":
         return f"Historial de {len(payload.get('patches', []))} patch(es)"
-    if tool_name == "build_context_view":
-        return f"Vista de contexto con {len(payload.get('facts', []))} fact(s)"
+    if tool_name == "set_edit_plan":
+        # Resumen de la clasificación clínica registrada por el planner.
+        scope = payload.get("edit_scope", "local")
+        sections = payload.get("affected_sections") or []
+        max_ops = payload.get("max_patch_operations", 1)
+        return (
+            f"Plan clínico registrado: scope={scope}, "
+            f"{len(sections)} sección(es) afectada(s), max_patches={max_ops}"
+        )
     if tool_name.startswith("propose_"):
         return f"Patch set listo para {payload.get('target_document_id')}"
     return "resultado de tool procesado"
@@ -179,7 +192,10 @@ def _build_retrieved_context(
             "type": document.get("type", "document"),
             "document_id": document["document_id"],
             "title": document.get("title"),
-            "excerpt": _shorten_text(document.get("content") or document.get("excerpt")),
+            "excerpt": _shorten_text(
+                document.get("content"),
+                max_length=12000,
+            ),
             "read_mode": document.get("mode"),
         }
         for document in read_documents
@@ -189,7 +205,7 @@ def _build_retrieved_context(
             "type": span.get("type", "document_span"),
             "document_id": span["document_id"],
             "title": span.get("title"),
-            "excerpt": _shorten_text(span.get("content"), max_length=480),
+            "excerpt": _shorten_text(span.get("content"), max_length=12000),
             "read_mode": "span",
         }
         for span in read_spans
@@ -278,7 +294,13 @@ def _tool_observation_content(
         lines.append(f"  {_xml_line('title', payload.get('title'))}")
         if tool_name == "read_document":
             lines.append(f"  {_xml_line('mode', payload.get('mode'))}")
-        lines.append(f"  {_xml_line('excerpt', payload.get('excerpt') or payload.get('content'), max_length=900)}")
+        # read_document_summary devuelve solo metadatos + excerpt corto (backend ya lo acota).
+        # read_document(mode="full") y read_document_span pueden ser documentos largos;
+        # usamos un límite alto para que el LLM los reciba completos.
+        if tool_name == "read_document_summary":
+            lines.append(f"  {_xml_line('excerpt', payload.get('excerpt') or payload.get('content'))}")
+        else:
+            lines.append(f"  {_xml_line('excerpt', payload.get('excerpt') or payload.get('content'), max_length=12000)}")
     elif tool_name in {"list_open_documents", "list_encounter_documents"}:
         for document in (payload.get("documents") or [])[:6]:
             lines.append("  <document>")
@@ -294,13 +316,6 @@ def _tool_observation_content(
             lines.append(f"    {_xml_line('title', match.get('title'))}")
             lines.append(f"    {_xml_line('snippet', match.get('snippet'))}")
             lines.append("  </match>")
-    elif tool_name == "build_context_view":
-        for fact in (payload.get("facts") or [])[:6]:
-            lines.append("  <fact>")
-            lines.append(f"    {_xml_line('category', fact.get('category'))}")
-            lines.append(f"    {_xml_line('value', fact.get('value'))}")
-            lines.append(f"    {_xml_line('source_document_id', fact.get('source_document_id'))}")
-            lines.append("  </fact>")
     elif tool_name == "read_patch_history":
         for patch in (payload.get("patches") or [])[:5]:
             lines.append("  <patch>")
@@ -308,6 +323,18 @@ def _tool_observation_content(
             lines.append(f"    {_xml_line('status', patch.get('status'))}")
             lines.append(f"    {_xml_line('operation_type', patch.get('operation_type'))}")
             lines.append("  </patch>")
+    elif tool_name == "set_edit_plan":
+        # Confirma al planner qué plan clínico registró y cuántos patches puede emitir.
+        lines.append(f"  {_xml_line('edit_scope', payload.get('edit_scope'))}")
+        lines.append(f"  {_xml_line('clinical_impact_level', payload.get('clinical_impact_level'))}")
+        lines.append(
+            f"  {_xml_line('affected_sections', ', '.join(payload.get('affected_sections') or []))}"
+        )
+        lines.append(f"  {_xml_line('needs_full_note', payload.get('needs_full_note'))}")
+        lines.append(
+            f"  {_xml_line('needs_external_knowledge', payload.get('needs_external_knowledge'))}"
+        )
+        lines.append(f"  {_xml_line('max_patch_operations', payload.get('max_patch_operations'))}")
     elif tool_name.startswith("propose_"):
         lines.append(f"  {_xml_line('patch_set_id', payload.get('patch_set_id'))}")
         lines.append(f"  {_xml_line('target_document_id', payload.get('target_document_id'))}")
@@ -513,7 +540,7 @@ def _selection_reason(state: CopilotState, *, target_document_id: str) -> str:
 def _is_valid_patch_preview(patch_preview: dict[str, Any] | None) -> bool:
     if not isinstance(patch_preview, dict):
         return False
-    return all(patch_preview.get(field_name) for field_name in PATCH_REQUIRED_FIELDS)
+    return all(_patch_field_is_present(patch_preview, field_name) for field_name in PATCH_REQUIRED_FIELDS)
 
 
 def _is_valid_patch_set_preview(patch_set_preview: dict[str, Any] | None) -> bool:
@@ -588,6 +615,10 @@ def _build_patch_set_preview_payload(
                 "content_preview": patch.content_preview,
                 "rationale": patch.rationale,
                 "confidence": patch.confidence,
+                # Sección semántica indicada por el drafter, derivada del clinical_plan.
+                # Permite al frontend agrupar patches por sección y al auditor clínico
+                # validar que el cambio quedó registrado en el lugar correcto.
+                "section": patch.section,
                 "target_document_id": target_document_id,
                 "target_document_title": target_document_title,
                 "target_selection_reason": selection_reason,
@@ -596,6 +627,10 @@ def _build_patch_set_preview_payload(
             }
         )
 
+    # Adjuntar los campos del clinical_plan al patch_set_preview para que el backend
+    # Django los persista en CopilotPatchSet y el frontend los pueda mostrar en la
+    # tarjeta de revisión (ej. badge de alcance clínico).
+    clinical_plan = state.get("clinical_plan") or {}
     return {
         "patch_set_id": str(uuid.uuid4()),
         "target_document_id": target_document_id,
@@ -607,6 +642,9 @@ def _build_patch_set_preview_payload(
         "rationale": drafted_plan.rationale,
         "document_preview_after": drafted_plan.document_preview_after,
         "source_context_document_ids": source_context_document_ids,
+        "edit_scope": clinical_plan.get("edit_scope"),
+        "clinical_impact_level": clinical_plan.get("clinical_impact_level"),
+        "affected_sections": list(clinical_plan.get("affected_sections") or []),
         "patches": patches,
     }
 
@@ -843,8 +881,8 @@ def build_graph_tools(
         ERROR GRAVE: Usarla para intenciones generales, buscar tipos documentales, metadatos estructurados
         o palabras abstractas como "nombre", "edad", "paciente", "datos", "resumen", "historia clínica".
         Si necesitas extraer el motivo general, el nombre del paciente, los datos demográficos o el
-        contexto completo, NO uses esta herramienta; DEBES aprovechar directamente `build_context_view`, 
-        `read_document` o `read_document_span` para leer la consulta en sí misma.
+        contexto completo, NO uses esta herramienta; DEBES aprovechar directamente `read_document` 
+        o `read_document_span` para leer la consulta en sí misma.
         """
         state, tool_call_id = _runtime_parts(
             runtime,
@@ -926,54 +964,6 @@ def build_graph_tools(
             },
         )
 
-    @tool
-    def build_context_view(
-        runtime: ToolRuntime,
-        active_document_id: str | None = None,
-        include_document_ids: list[str] | None = None,
-        include_manual_context: bool = True,
-    ) -> Command:
-        """
-        Construye una vista completa del contexto actual del paciente y la consulta, incluyendo contexto manual del médico.
-        Esencial para arrancar el entendimiento si no tienes idea de qué problema se está tratando,
-        o para obtener un panorama rápido antes de decidirte por leer documentos más a fondo.
-        Incluye tanto IDs abiertos como contexto global, ideal para saber qué documentos o IDs necesitas examinar.
-        """
-        state, tool_call_id = _runtime_parts(
-            runtime,
-            tool_name="build_context_view",
-        )
-        validated = BuildContextViewInput(
-            active_document_id=active_document_id,
-            include_document_ids=include_document_ids,
-            include_manual_context=include_manual_context,
-        )
-        try:
-            payload = tools_client.build_context_view(
-                active_document_id=validated.active_document_id
-                or state.get("active_document_id"),
-                include_document_ids=validated.include_document_ids
-                or state.get("selected_document_ids", []),
-                include_manual_context=validated.include_manual_context,
-            )
-        except Exception as error:
-            return _error_command(
-                state=state,
-                tool_name="build_context_view",
-                tool_call_id=tool_call_id,
-                error_message=f"No pude construir la vista de contexto: {error}",
-            )
-
-        return _success_command(
-            state=state,
-            tool_name="build_context_view",
-            tool_call_id=tool_call_id,
-            payload=payload,
-            updates={
-                "context_view": payload,
-            },
-        )
-
     def _propose_patch(
         *,
         state: CopilotState,
@@ -1042,6 +1032,24 @@ def build_graph_tools(
                 error_message=(
                     "Antes de proponer un patch debes leer un span focalizado con "
                     "read_document_span o el documento completo con read_document(mode='full')."
+                ),
+            )
+
+        # Si el plan clínico requiere lectura completa (propagation/reinterpretation) y el planner
+        # no la ejecutó, rechazar el propose para forzar la lectura completa primero.
+        # Esto garantiza que el drafter tenga visibilidad de todas las secciones antes de
+        # emitir patches multi-sección coherentes.
+        clinical_plan = state.get("clinical_plan") or {}
+        if clinical_plan.get("needs_full_note") and not full_document_payload:
+            affected = ", ".join(clinical_plan.get("affected_sections") or []) or "varias"
+            return _error_command(
+                state=state,
+                tool_name=tool_name,
+                tool_call_id=tool_call_id,
+                error_message=(
+                    f"El plan clínico (edit_scope='{clinical_plan.get('edit_scope')}') "
+                    f"requiere leer la nota completa antes de proponer patches en: {affected}. "
+                    f"Usa read_document(document_id='{target_document_id}', mode='full') primero."
                 ),
             )
 
@@ -1121,6 +1129,79 @@ def build_graph_tools(
                 "final_response": None,
                 "patch_operations_count": int(state.get("patch_operations_count") or 0)
                 + 1,
+            },
+        )
+
+    @tool
+    def set_edit_plan(
+        edit_scope: str,
+        clinical_impact_level: str,
+        affected_sections: list[str],
+        needs_full_note: bool,
+        needs_external_knowledge: bool,
+        should_propagate_to_analysis_and_plan: bool,
+        runtime: ToolRuntime,
+    ) -> Command:
+        """Registra el plan de edición clínica ANTES de proponer patches.
+
+        Llama esta tool cuando el pedido del médico implica un cambio de propagación clínica
+        (nuevo dato que debe reflejarse en varias secciones) o reinterpretación clínica
+        (el dato cambia análisis, impresión diagnóstica, riesgo o plan de manejo).
+
+        NO es necesario para ediciones simples (typos, inserciones cortas, borrados puntuales).
+        Para esos casos ve directamente a propose_*.
+
+        Esta tool NO hace ninguna llamada externa. Solo escribe el plan al estado del runtime
+        y eleva `max_patch_operations` según `edit_scope`:
+          - local          → max 1 patch
+          - propagation    → max 5 patches
+          - reinterpretation → max 8 patches
+
+        REGLAS de uso:
+        - Llama set_edit_plan ANTES de propose_*, nunca en el mismo turno.
+        - No llames set_edit_plan más de una vez por run.
+        - Si needs_full_note=True, el runtime rechazará propose_* hasta que hagas
+          read_document(mode='full') en el documento target.
+
+        Valores válidos para edit_scope: 'local', 'propagation', 'reinterpretation'.
+        Valores válidos para clinical_impact_level: 'cosmetic', 'factual', 'clinical'.
+        affected_sections: lista snake_case, ej ['enfermedad_actual', 'plan'].
+        """
+        state, tool_call_id = _runtime_parts(runtime, tool_name="set_edit_plan")
+
+        # Normalizar scope y calcular presupuesto de patches.
+        # Un scope inválido se trata como 'local' para no bloquear el run.
+        safe_scope = edit_scope if edit_scope in _MAX_PATCH_OPERATIONS_BY_SCOPE else "local"
+        max_ops = _MAX_PATCH_OPERATIONS_BY_SCOPE[safe_scope]
+        safe_impact = (
+            clinical_impact_level
+            if clinical_impact_level in ("cosmetic", "factual", "clinical")
+            else "factual"
+        )
+
+        plan = {
+            "edit_scope": safe_scope,
+            "clinical_impact_level": safe_impact,
+            "affected_sections": list(affected_sections or []),
+            "needs_full_note": bool(needs_full_note),
+            "needs_external_knowledge": bool(needs_external_knowledge),
+            "should_propagate_to_analysis_and_plan": bool(should_propagate_to_analysis_and_plan),
+        }
+        payload = {**plan, "max_patch_operations": max_ops}
+
+        return _success_command(
+            state=state,
+            tool_name="set_edit_plan",
+            tool_call_id=tool_call_id,
+            payload=payload,
+            updates={
+                # Escribir el plan al state para que render_patch_input lo inyecte
+                # en el contexto del drafter en el siguiente turno de proposición.
+                "clinical_plan": plan,
+                # Levantar dinámicamente el presupuesto de patches según el alcance clínico.
+                # Esto permite al drafter emitir un patch set coherente multi-sección en
+                # una sola llamada LLM, en lugar de forzar múltiples turnos de propose_*.
+                "max_patch_operations": max_ops,
             },
         )
 
@@ -1247,7 +1328,7 @@ def build_graph_tools(
         read_document_span,
         search_documents,
         read_patch_history,
-        build_context_view,
+        set_edit_plan,
         propose_replace_span,
         propose_insert_after_span,
         propose_insert_before,

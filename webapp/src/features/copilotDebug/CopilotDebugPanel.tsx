@@ -27,14 +27,25 @@ export default function CopilotDebugPanel({
     latestToolResults,
     searchQueryFromRun,
     searchQueriesFromRun,
-    pendingPatch,
+    reviewPatchSet,
+    reviewPatches,
+    selectedReviewPatchId,
+    selectedReviewPatch,
+    pendingPatchCount,
+    acceptedPatchCount,
+    rejectedPatchCount,
+    canFinalizeAccepted,
+    canFinalizeRejected,
     patchFlowError,
     readMode,
     ensureSession,
     syncRunStatus,
     reset,
     sendMessage,
-    submitPatchReview,
+    selectReviewPatch,
+    submitPatchDecision,
+    submitPatchSetDecision,
+    finalizeReview,
   } = activeController;
 
   const handleInitSession = async () => {
@@ -46,11 +57,27 @@ export default function CopilotDebugPanel({
     await sendMessage(message);
   };
 
-  const handleReview = async (decision: "approve" | "reject") => {
-    if (!pendingPatch) {
+  const handlePatchDecision = async (decision: "approve" | "reject") => {
+    if (!selectedReviewPatch) {
       return;
     }
-    await submitPatchReview(decision, reviewComment.trim() || undefined);
+    await submitPatchDecision(decision, reviewComment.trim() || undefined);
+    setReviewComment("");
+  };
+
+  const handlePatchSetDecision = async (decision: "approve" | "reject") => {
+    if (!reviewPatchSet) {
+      return;
+    }
+    await submitPatchSetDecision(decision, reviewComment.trim() || undefined);
+    setReviewComment("");
+  };
+
+  const handleFinalizeReview = async () => {
+    if (!reviewPatchSet) {
+      return;
+    }
+    await finalizeReview(reviewComment.trim() || undefined);
     setReviewComment("");
   };
 
@@ -174,56 +201,118 @@ export default function CopilotDebugPanel({
         <div className="text-xs font-medium text-slate-700">
           Patch review
         </div>
-        {pendingPatch ? (
+        {reviewPatchSet ? (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-700">
               <div>
-                <span className="font-medium">patch_id:</span>{" "}
-                {pendingPatch.id}
+                <span className="font-medium">patch_set_id:</span>{" "}
+                {reviewPatchSet.id}
               </div>
               <div>
                 <span className="font-medium">target_document_id:</span>{" "}
-                {pendingPatch.documentId}
+                {reviewPatchSet.target_document_id}
               </div>
               <div>
-                <span className="font-medium">patch_set_id:</span>{" "}
-                {pendingPatch.patchSetId}
+                <span className="font-medium">status:</span>{" "}
+                {reviewPatchSet.status}
               </div>
               <div>
-                <span className="font-medium">resolved_range:</span>{" "}
-                {pendingPatch.resolvedRange
-                  ? `${pendingPatch.resolvedRange.start}-${pendingPatch.resolvedRange.end}`
-                  : "—"}
-              </div>
-              <div>
-                <span className="font-medium">type:</span>{" "}
-                {pendingPatch.type}
-              </div>
-              <div>
-                <span className="font-medium">order_index:</span>{" "}
-                {pendingPatch.orderIndex}
+                <span className="font-medium">patches:</span>{" "}
+                {reviewPatches.length}
               </div>
             </div>
-            <div className="text-xs text-slate-700">
-              <span className="font-medium">rationale:</span>{" "}
-              {pendingPatch.rationale ?? "—"}
-            </div>
-            <div>
-              <div className="text-xs font-medium text-slate-700 mb-2">
-                old_text
+            <div className="grid grid-cols-3 gap-3 text-xs text-slate-700">
+              <div className="rounded border bg-slate-50 p-2">
+                <span className="font-medium">pending:</span> {pendingPatchCount}
               </div>
-              <pre className="max-h-40 overflow-auto rounded border bg-slate-50 p-3 text-[11px] whitespace-pre-wrap text-slate-800">
-                {pendingPatch.oldText || "—"}
-              </pre>
-            </div>
-            <div>
-              <div className="text-xs font-medium text-slate-700 mb-2">
-                new_text
+              <div className="rounded border bg-green-50 p-2">
+                <span className="font-medium">accepted:</span> {acceptedPatchCount}
               </div>
-              <pre className="max-h-40 overflow-auto rounded border bg-slate-50 p-3 text-[11px] whitespace-pre-wrap text-slate-800">
-                {pendingPatch.newText || "—"}
-              </pre>
+              <div className="rounded border bg-red-50 p-2">
+                <span className="font-medium">rejected:</span> {rejectedPatchCount}
+              </div>
             </div>
+            <div className="space-y-2">
+              <div className="text-xs font-medium text-slate-700">
+                Patches del set
+              </div>
+              <div className="space-y-2">
+                {reviewPatches.map((patch) => {
+                  const isSelected = patch.id === (selectedReviewPatchId ?? selectedReviewPatch?.id);
+                  return (
+                    <button
+                      key={patch.id}
+                      type="button"
+                      onClick={() => selectReviewPatch(patch.id)}
+                      className={[
+                        "w-full rounded border px-3 py-2 text-left text-xs",
+                        isSelected
+                          ? "border-slate-900 bg-slate-100"
+                          : "border-slate-200 bg-white hover:bg-slate-50",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium">
+                          Patch {patch.orderIndex + 1}
+                        </span>
+                        <span className="text-[11px] uppercase text-slate-500">
+                          {patch.status}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-slate-600">
+                        {patch.rationale ?? patch.type}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {selectedReviewPatch ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-700">
+                  <div>
+                    <span className="font-medium">patch_id:</span>{" "}
+                    {selectedReviewPatch.id}
+                  </div>
+                  <div>
+                    <span className="font-medium">resolved_range:</span>{" "}
+                    {selectedReviewPatch.resolvedRange
+                      ? `${selectedReviewPatch.resolvedRange.start}-${selectedReviewPatch.resolvedRange.end}`
+                      : "—"}
+                  </div>
+                  <div>
+                    <span className="font-medium">type:</span>{" "}
+                    {selectedReviewPatch.type}
+                  </div>
+                  <div>
+                    <span className="font-medium">order_index:</span>{" "}
+                    {selectedReviewPatch.orderIndex}
+                  </div>
+                </div>
+                <div className="text-xs text-slate-700">
+                  <span className="font-medium">rationale:</span>{" "}
+                  {selectedReviewPatch.rationale ?? "—"}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs font-medium text-red-700 mb-2">
+                      old_text
+                    </div>
+                    <pre className="max-h-40 overflow-auto rounded border border-red-200 bg-red-50 p-3 text-[11px] whitespace-pre-wrap text-slate-800">
+                      {selectedReviewPatch.oldText || "—"}
+                    </pre>
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-green-700 mb-2">
+                      new_text
+                    </div>
+                    <pre className="max-h-40 overflow-auto rounded border border-green-200 bg-green-50 p-3 text-[11px] whitespace-pre-wrap text-slate-800">
+                      {selectedReviewPatch.newText || "—"}
+                    </pre>
+                  </div>
+                </div>
+              </>
+            ) : null}
             <div className="space-y-2">
               <label className="block text-xs font-medium text-slate-700">
                 Review comment
@@ -235,20 +324,50 @@ export default function CopilotDebugPanel({
                 className="w-full rounded border p-3 text-sm bg-white"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => void handleReview("approve")}
+                onClick={() => void handlePatchDecision("approve")}
+                disabled={!selectedReviewPatch || selectedReviewPatch.status !== "pending"}
                 className="px-3 py-2 text-sm rounded bg-green-700 text-white hover:bg-green-600"
               >
-                Approve
+                Approve patch
               </button>
               <button
                 type="button"
-                onClick={() => void handleReview("reject")}
+                onClick={() => void handlePatchDecision("reject")}
+                disabled={!selectedReviewPatch || selectedReviewPatch.status !== "pending"}
                 className="px-3 py-2 text-sm rounded bg-red-700 text-white hover:bg-red-600"
               >
-                Reject
+                Reject patch
+              </button>
+              <button
+                type="button"
+                onClick={() => void handlePatchSetDecision("approve")}
+                disabled={pendingPatchCount === 0}
+                className="px-3 py-2 text-sm rounded border bg-white hover:bg-slate-100 disabled:opacity-50"
+              >
+                Accept all
+              </button>
+              <button
+                type="button"
+                onClick={() => void handlePatchSetDecision("reject")}
+                disabled={pendingPatchCount === 0}
+                className="px-3 py-2 text-sm rounded border bg-white hover:bg-slate-100 disabled:opacity-50"
+              >
+                Reject all
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleFinalizeReview()}
+                disabled={!canFinalizeAccepted && !canFinalizeRejected}
+                className="px-3 py-2 text-sm rounded bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
+              >
+                {canFinalizeAccepted
+                  ? "Apply accepted"
+                  : canFinalizeRejected
+                    ? "Finish rejection"
+                    : "Finalize review"}
               </button>
             </div>
           </>

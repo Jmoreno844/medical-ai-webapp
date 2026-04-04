@@ -1,6 +1,5 @@
 from ninja import Router
 from ninja.security import django_auth
-from ninja.errors import HttpError
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.http import Http404
@@ -8,7 +7,6 @@ from apps.encounters.models import Encounter
 from apps.documents.models import Document
 import logging
 import requests
-from typing import Dict, Any
 
 from apps.generative_ai.services.transcription_tasks import (
     TranscriptionTaskConfigurationError,

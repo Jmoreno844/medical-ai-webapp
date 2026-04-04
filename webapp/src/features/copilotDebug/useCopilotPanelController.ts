@@ -5,6 +5,7 @@ import {
   CopilotChatMessage,
   CopilotMessageRequest,
   CopilotPatchResponse,
+  CopilotPatchSetResponse,
 } from "@/features/copilotDebug/types";
 import { buildWorkspaceIndex } from "@/workspace/builders/workspaceIndex";
 import { applyCopilotPatchToWorkspace } from "@/workspace/adapters/applyCopilotPatchToWorkspace";
@@ -23,17 +24,31 @@ type UseCopilotPanelControllerResult = {
   latestToolResults: Array<Record<string, unknown>>;
   searchQueryFromRun: string | null;
   searchQueriesFromRun: string[];
-  pendingPatch: CopilotPatchResponse | null;
+  reviewPatchSet: CopilotPatchSetResponse | null;
+  reviewPatches: CopilotPatchResponse[];
+  selectedReviewPatchId: string | null;
+  selectedReviewPatch: CopilotPatchResponse | null;
+  pendingPatchCount: number;
+  acceptedPatchCount: number;
+  rejectedPatchCount: number;
+  canFinalizeAccepted: boolean;
+  canFinalizeRejected: boolean;
   patchFlowError: string | null;
   readMode: ReturnType<typeof useAiSessionStore.getState>["readMode"];
   ensureSession: () => Promise<unknown>;
   syncRunStatus: () => Promise<unknown>;
   reset: () => void;
   sendMessage: (message: string) => Promise<unknown>;
-  submitPatchReview: (
+  selectReviewPatch: (patchId: string | null) => void;
+  submitPatchDecision: (
     decision: "approve" | "reject",
     comment?: string
   ) => Promise<unknown>;
+  submitPatchSetDecision: (
+    decision: "approve" | "reject",
+    comment?: string
+  ) => Promise<unknown>;
+  finalizeReview: (comment?: string) => Promise<unknown>;
 };
 
 function buildChatMessage(
@@ -65,11 +80,21 @@ export function useCopilotPanelController(
   const readMode = useAiSessionStore((state) => state.readMode);
   useWorkspaceStore();
 
-  const { state, ensureSession, runMessage, syncRunStatus, submitReview, reset } =
+  const {
+    state,
+    ensureSession,
+    runMessage,
+    syncRunStatus,
+    submitPatchDecision: submitPatchDecisionRequest,
+    submitPatchSetDecision: submitPatchSetDecisionRequest,
+    finalizePatchSetReview,
+    reset,
+  } =
     useCopilotDebug(encounterId);
   const [chatMessages, setChatMessages] = useState<CopilotChatMessage[]>([]);
+  const [selectedReviewPatchId, setSelectedReviewPatchId] = useState<string | null>(null);
   const lastAssistantResponseRef = useRef<string | null>(null);
-  const lastReviewPatchIdRef = useRef<string | null>(null);
+  const lastReviewPatchSetIdRef = useRef<string | null>(null);
   const didAutoRefreshWaitingReviewRef = useRef<string | null>(null);
   const lastPatchSetSyncSignatureRef = useRef<string>("");
 
@@ -204,33 +229,50 @@ export function useCopilotPanelController(
     } satisfies CopilotPatchResponse;
   }, [latestPatchProposedEvent, state.status]);
 
-  const persistedPendingPatch = useMemo(() => {
-    if (!Array.isArray(state.patchSets)) {
+  const reviewPatchSet = useMemo(() => {
+    if (!Array.isArray(state.patchSets) || state.patchSets.length === 0) {
       return null;
     }
-    for (const patchSet of state.patchSets) {
-      if (!Array.isArray(patchSet.patches)) {
-        continue;
-      }
-      const pending = patchSet.patches.find((patch) => patch.status === "pending");
-      if (pending) {
-        return pending;
-      }
-    }
-    return null;
+    return state.patchSets[0] ?? null;
   }, [state.patchSets]);
 
-  const pendingPatchBaseVersion = useMemo(() => {
-    if (!persistedPendingPatch || !Array.isArray(state.patchSets)) {
-      return null;
+  const reviewPatches = useMemo(
+    () => reviewPatchSet?.patches ?? [],
+    [reviewPatchSet]
+  );
+  const selectedReviewPatch = useMemo(() => {
+    if (reviewPatches.length === 0) {
+      return eventDerivedPendingPatch;
     }
-    const owner = state.patchSets.find((patchSet) =>
-      patchSet.patches.some((patch) => patch.id === persistedPendingPatch.id)
+    if (selectedReviewPatchId) {
+      const selectedPatch = reviewPatches.find((patch) => patch.id === selectedReviewPatchId);
+      if (selectedPatch) {
+        return selectedPatch;
+      }
+    }
+    return (
+      reviewPatches.find((patch) => patch.status === "pending") ??
+      reviewPatches[0] ??
+      eventDerivedPendingPatch
     );
-    return owner?.base_version ?? null;
-  }, [persistedPendingPatch, state.patchSets]);
+  }, [eventDerivedPendingPatch, reviewPatches, selectedReviewPatchId]);
 
-  const pendingPatch = persistedPendingPatch ?? eventDerivedPendingPatch;
+  const pendingPatchCount = useMemo(
+    () => reviewPatches.filter((patch) => patch.status === "pending").length,
+    [reviewPatches]
+  );
+  const acceptedPatchCount = useMemo(
+    () => reviewPatches.filter((patch) => patch.status === "accepted").length,
+    [reviewPatches]
+  );
+  const rejectedPatchCount = useMemo(
+    () => reviewPatches.filter((patch) => patch.status === "rejected").length,
+    [reviewPatches]
+  );
+  const canFinalizeAccepted =
+    !!reviewPatchSet && pendingPatchCount === 0 && acceptedPatchCount > 0;
+  const canFinalizeRejected =
+    !!reviewPatchSet && pendingPatchCount === 0 && acceptedPatchCount === 0 && rejectedPatchCount > 0;
 
   const patchSetSyncSignature = useMemo(
     () =>
@@ -252,7 +294,7 @@ export function useCopilotPanelController(
     if (
       latestPatchProposedEvent &&
       state.status === "completed" &&
-      !persistedPendingPatch &&
+      !reviewPatchSet &&
       !latestReviewRequiredEvent &&
       !latestReviewResolvedEvent
     ) {
@@ -264,7 +306,7 @@ export function useCopilotPanelController(
     return null;
   }, [
     latestPatchProposedEvent,
-    persistedPendingPatch,
+    reviewPatchSet,
     state.lastError,
     state.status,
     latestReviewRequiredEvent,
@@ -313,10 +355,12 @@ export function useCopilotPanelController(
     }
 
     const activePatchSet = state.patchSets[0];
-    const pendingInActiveSet = activePatchSet.patches.find(
-      (patch) => patch.status === "pending"
-    );
-    const nextSelectedPatchId = pendingInActiveSet?.id ?? null;
+    const patchIds = new Set(activePatchSet.patches.map((patch) => patch.id));
+    const pendingInActiveSet = activePatchSet.patches.find((patch) => patch.status === "pending");
+    const nextSelectedPatchId =
+      selectedReviewPatchId && patchIds.has(selectedReviewPatchId)
+        ? selectedReviewPatchId
+        : pendingInActiveSet?.id ?? activePatchSet.patches[0]?.id ?? null;
 
     usePatchSetStore.setState((storeState) => {
       const existingPatchSet = storeState.patchSets[activePatchSet.id];
@@ -350,7 +394,8 @@ export function useCopilotPanelController(
         selectedPatchId: nextSelectedPatchId,
       };
     });
-  }, [patchSetSyncSignature, state.patchSets]);
+    setSelectedReviewPatchId(nextSelectedPatchId);
+  }, [patchSetSyncSignature, selectedReviewPatchId, state.patchSets]);
 
   useEffect(() => {
     if (
@@ -366,21 +411,21 @@ export function useCopilotPanelController(
   }, [state.finalResponse, state.runId]);
 
   useEffect(() => {
-    if (pendingPatch && pendingPatch.id !== lastReviewPatchIdRef.current) {
+    if (reviewPatchSet && reviewPatchSet.id !== lastReviewPatchSetIdRef.current) {
       setChatMessages((current) => [
         ...current,
         buildChatMessage(
           "system",
-          `Patch pendiente para documento ${pendingPatch.documentId}. Requiere review humana.`,
+          `Patch set pendiente para documento ${reviewPatchSet.target_document_id}. Requiere review humana.`,
           state.runId
         ),
       ]);
-      lastReviewPatchIdRef.current = pendingPatch.id;
+      lastReviewPatchSetIdRef.current = reviewPatchSet.id;
     }
-    if (!pendingPatch) {
-      lastReviewPatchIdRef.current = null;
+    if (!reviewPatchSet) {
+      lastReviewPatchSetIdRef.current = null;
     }
-  }, [pendingPatch, state.runId]);
+  }, [reviewPatchSet, state.runId]);
 
   const sendMessage = useCallback(
     async (message: string) => {
@@ -423,33 +468,83 @@ export function useCopilotPanelController(
     [encounterId, ensureSession, runMessage, state.runId, syncWorkingSetFromWorkspace]
   );
 
-  const submitPatchReview = useCallback(
+  const submitPatchDecision = useCallback(
     async (decision: "approve" | "reject", comment?: string) => {
-      if (!pendingPatch) {
+      if (!reviewPatchSet || !selectedReviewPatch) {
+        return null;
+      }
+
+      const patchSet = await submitPatchDecisionRequest(
+        reviewPatchSet.id,
+        selectedReviewPatch.id,
+        decision,
+        comment?.trim() || undefined
+      );
+
+      setChatMessages((current) => [
+        ...current,
+        buildChatMessage(
+          "system",
+          decision === "approve"
+            ? `Patch ${selectedReviewPatch.orderIndex + 1} aprobado.`
+            : `Patch ${selectedReviewPatch.orderIndex + 1} rechazado.`,
+          state.runId
+        ),
+      ]);
+
+      return patchSet;
+    },
+    [reviewPatchSet, selectedReviewPatch, state.runId, submitPatchDecisionRequest]
+  );
+
+  const submitPatchSetDecision = useCallback(
+    async (decision: "approve" | "reject", comment?: string) => {
+      if (!reviewPatchSet) {
+        return null;
+      }
+
+      const patchSet = await submitPatchSetDecisionRequest(
+        reviewPatchSet.id,
+        decision,
+        comment?.trim() || undefined
+      );
+      setChatMessages((current) => [
+        ...current,
+        buildChatMessage(
+          "system",
+          decision === "approve" ? "Todos los patches fueron aprobados." : "Todos los patches fueron rechazados.",
+          state.runId
+        ),
+      ]);
+      return patchSet;
+    },
+    [reviewPatchSet, state.runId, submitPatchSetDecisionRequest]
+  );
+
+  const finalizeReview = useCallback(
+    async (comment?: string) => {
+      if (!reviewPatchSet) {
         return null;
       }
 
       const currentWorkspaceIndex = buildWorkspaceIndex();
       const currentDocument = currentWorkspaceIndex.documents.find(
-        (document) => document.documentId === pendingPatch.documentId
+        (document) => document.documentId === reviewPatchSet.target_document_id
       );
-      const run = await submitReview(
-        pendingPatch.patchSetId,
-        pendingPatch.id,
-        decision,
+      const run = await finalizePatchSetReview(
+        reviewPatchSet.id,
         comment?.trim() || undefined,
         currentDocument?.version
       );
 
       if (
-        decision === "approve" &&
         run?.applied_document_id &&
         typeof run.applied_content === "string"
       ) {
         applyCopilotPatchToWorkspace({
           documentId: run.applied_document_id,
           content: run.applied_content,
-          baseVersion: pendingPatchBaseVersion ?? currentDocument?.version ?? 1,
+          baseVersion: reviewPatchSet.base_version ?? currentDocument?.version ?? 1,
           appliedVersion: run.applied_version,
           appliedPatchId: run.applied_patch_id,
         });
@@ -459,20 +554,21 @@ export function useCopilotPanelController(
         ...current,
         buildChatMessage(
           "system",
-          decision === "approve" ? "Patch aprobado." : "Patch rechazado.",
+          acceptedPatchCount > 0 ? "Cambios aplicados al documento." : "Revision cerrada sin aplicar cambios.",
           run?.run_id ?? state.runId
         ),
       ]);
 
       return run;
     },
-    [pendingPatch, pendingPatchBaseVersion, state.runId, submitReview]
+    [acceptedPatchCount, finalizePatchSetReview, reviewPatchSet, state.runId]
   );
 
   const wrappedReset = useCallback(() => {
     lastAssistantResponseRef.current = null;
-    lastReviewPatchIdRef.current = null;
+    lastReviewPatchSetIdRef.current = null;
     lastPatchSetSyncSignatureRef.current = "";
+    setSelectedReviewPatchId(null);
     setChatMessages([]);
     usePatchSetStore.setState({
       patchSets: {},
@@ -493,14 +589,25 @@ export function useCopilotPanelController(
     latestToolResults,
     searchQueryFromRun,
     searchQueriesFromRun,
-    pendingPatch,
+    reviewPatchSet,
+    reviewPatches,
+    selectedReviewPatchId,
+    selectedReviewPatch,
+    pendingPatchCount,
+    acceptedPatchCount,
+    rejectedPatchCount,
+    canFinalizeAccepted,
+    canFinalizeRejected,
     patchFlowError,
     readMode,
     ensureSession,
     syncRunStatus,
     reset: wrappedReset,
     sendMessage,
-    submitPatchReview,
+    selectReviewPatch: setSelectedReviewPatchId,
+    submitPatchDecision,
+    submitPatchSetDecision,
+    finalizeReview,
   };
 }
 

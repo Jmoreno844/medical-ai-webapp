@@ -46,6 +46,7 @@ api.add_router("/", generative_ai_router)
 api.add_router("/", copilot_router)
 api.add_router("/", copilot_internal_tools_router)
 
+
 def _health(_request):
     """Lightweight liveness check for load balancers and Docker HEALTHCHECK."""
     return HttpResponse("ok", content_type="text/plain")

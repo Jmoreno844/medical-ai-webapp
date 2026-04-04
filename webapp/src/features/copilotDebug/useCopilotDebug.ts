@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   acceptCopilotPatch,
-  applyAcceptedCopilotPatchSet,
+  acceptAllCopilotPatches,
   createCopilotSession,
+  finalizeCopilotPatchSetReview as finalizeCopilotPatchSetReviewApi,
   getCopilotRun,
   listCopilotPatchSets,
-  reviewCopilotPatch,
+  rejectAllCopilotPatches,
+  rejectCopilotPatch,
   sendCopilotMessage,
   streamCopilotRun,
 } from "@/features/copilotDebug/api";
@@ -168,11 +170,69 @@ export function useCopilotDebug(encounterId: number) {
     return run;
   }, [state.runId]);
 
-  const submitReview = useCallback(
+  const submitPatchDecision = useCallback(
     async (
       patchSetId: string,
       patchId: string,
       decision: "approve" | "reject",
+      comment?: string
+    ) => {
+      if (!state.runId) {
+        return null;
+      }
+
+      const patchSet =
+        decision === "approve"
+          ? await acceptCopilotPatch(patchSetId, {
+              patch_id: patchId,
+              comment,
+            })
+          : await rejectCopilotPatch(patchSetId, {
+              patch_id: patchId,
+              comment,
+            });
+
+      const patchSets = await listCopilotPatchSets(state.runId);
+      setState((current) => ({
+        ...current,
+        status: current.status,
+        patchSets,
+        lastError: null,
+      }));
+      return patchSet;
+    },
+    [state.runId]
+  );
+
+  const submitPatchSetDecision = useCallback(
+    async (
+      patchSetId: string,
+      decision: "approve" | "reject",
+      comment?: string
+    ) => {
+      if (!state.runId) {
+        return null;
+      }
+
+      const patchSet =
+        decision === "approve"
+          ? await acceptAllCopilotPatches(patchSetId, { comment })
+          : await rejectAllCopilotPatches(patchSetId, { comment });
+
+      const patchSets = await listCopilotPatchSets(state.runId);
+      setState((current) => ({
+        ...current,
+        patchSets,
+        lastError: null,
+      }));
+      return patchSet;
+    },
+    [state.runId]
+  );
+
+  const finalizePatchSetReview = useCallback(
+    async (
+      patchSetId: string,
       comment?: string,
       documentVersion?: number
     ) => {
@@ -187,24 +247,10 @@ export function useCopilotDebug(encounterId: number) {
           .filter((sequence) => Number.isFinite(sequence))
       );
 
-      const run =
-        decision === "approve"
-          ? await (async () => {
-              await acceptCopilotPatch(patchSetId, {
-                patch_id: patchId,
-                comment,
-              });
-              return applyAcceptedCopilotPatchSet(patchSetId, {
-                comment,
-                document_version: documentVersion,
-              });
-            })()
-          : await reviewCopilotPatch(state.runId, {
-              patch_id: patchId,
-              decision,
-              comment,
-              document_version: documentVersion,
-            });
+      const run = await finalizeCopilotPatchSetReviewApi(patchSetId, {
+        comment,
+        document_version: documentVersion,
+      });
 
       const patchSets = await listCopilotPatchSets(state.runId);
       setState((current) => ({
@@ -231,7 +277,9 @@ export function useCopilotDebug(encounterId: number) {
     ensureSession,
     runMessage,
     syncRunStatus,
-    submitReview,
+    submitPatchDecision,
+    submitPatchSetDecision,
+    finalizePatchSetReview,
     reset,
   };
 }

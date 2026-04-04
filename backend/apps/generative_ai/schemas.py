@@ -1,5 +1,5 @@
 from ninja import Schema
-from typing import Dict, Optional, List, Any
+from typing import Optional
 
 
 class AudioDownloadResponse(Schema):

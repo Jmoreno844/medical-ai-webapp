@@ -4,35 +4,34 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('copilot', '0004_copilotpatch_anchor_fields'),
+        ("copilot", "0004_copilotpatch_anchor_fields"),
     ]
 
     operations = [
         migrations.RenameIndex(
-            model_name='copilotpatch',
-            new_name='copilot_cop_run_id_468f25_idx',
-            old_name='copilot_pat_run_id_7b4750_idx',
+            model_name="copilotpatch",
+            new_name="copilot_cop_run_id_468f25_idx",
+            old_name="copilot_pat_run_id_7b4750_idx",
         ),
         migrations.RenameIndex(
-            model_name='copilotpatch',
-            new_name='copilot_cop_doctor__6f0cd0_idx',
-            old_name='copilot_pat_doctor__7d2b7d_idx',
+            model_name="copilotpatch",
+            new_name="copilot_cop_doctor__6f0cd0_idx",
+            old_name="copilot_pat_doctor__7d2b7d_idx",
         ),
         migrations.RenameIndex(
-            model_name='copilotpatch',
-            new_name='copilot_cop_target__1321e5_idx',
-            old_name='copilot_pat_target__95b0e8_idx',
+            model_name="copilotpatch",
+            new_name="copilot_cop_target__1321e5_idx",
+            old_name="copilot_pat_target__95b0e8_idx",
         ),
         migrations.RenameIndex(
-            model_name='copilotrun',
-            new_name='copilot_cop_doctor__553b6b_idx',
-            old_name='copilot_run_doctor__3ca49a_idx',
+            model_name="copilotrun",
+            new_name="copilot_cop_doctor__553b6b_idx",
+            old_name="copilot_run_doctor__3ca49a_idx",
         ),
         migrations.RenameIndex(
-            model_name='copilotrun',
-            new_name='copilot_cop_thread__60ab29_idx',
-            old_name='copilot_run_thread__6fa655_idx',
+            model_name="copilotrun",
+            new_name="copilot_cop_thread__60ab29_idx",
+            old_name="copilot_run_thread__6fa655_idx",
         ),
     ]

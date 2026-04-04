@@ -169,34 +169,6 @@ class FakeToolsClient:
         del limit
         return {"document_id": document_id, "patches": []}
 
-    def build_context_view(
-        self,
-        *,
-        active_document_id: str | None = None,
-        include_document_ids: list[str] | None = None,
-        include_manual_context: bool = True,
-    ):
-        del active_document_id, include_document_ids, include_manual_context
-        return {
-            "facts": [
-                {
-                    "category": "diagnosis",
-                    "value": "Paciente con dolor abdominal.",
-                    "source_document_id": "12",
-                    "source_anchor": {
-                        "exactText": "Paciente con dolor abdominal.",
-                        "prefixText": "",
-                        "suffixText": "",
-                        "startOffset": 0,
-                        "endOffset": 29,
-                    },
-                    "confidence": 0.8,
-                }
-            ],
-            "ambiguities": [],
-            "source_document_ids": ["12"],
-        }
-
 
 class ScriptedPlanner:
     def __init__(

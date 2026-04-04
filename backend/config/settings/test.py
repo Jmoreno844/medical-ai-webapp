@@ -13,6 +13,7 @@ from .base import *  # noqa: F403, F401
 
 globals().pop("LOGGING", None)
 
+
 # Initialize logging configuration first to capture any startup errors
 def configure_json_logging():
     """
@@ -212,6 +213,7 @@ DEBUG = True
 # In your Django settings
 ALLOWED_HOSTS = ["*"]
 
+
 def _postgres_options_for_host(host: str) -> dict:
     """Cloud SQL Unix socket under /cloudsql/ does not use TLS like a public IP."""
     if host.startswith("/cloudsql/"):
@@ -278,9 +280,7 @@ try:
                     "USER": db_user,
                     "PASSWORD": db_password,
                     "HOST": db_host,
-                    "PORT": (
-                        "" if db_host.startswith("/cloudsql/") else "5432"
-                    ),
+                    "PORT": ("" if db_host.startswith("/cloudsql/") else "5432"),
                     "OPTIONS": _postgres_options_for_host(db_host),
                 }
             }

@@ -4,20 +4,37 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Document',
+            name="Document",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('kind', models.CharField(choices=[('context', 'Context'), ('transcription', 'Transcription'), ('template', 'Template'), ('note', 'Note')], max_length=20)),
-                ('content', models.TextField()),
-                ('created_on', models.DateField(auto_now_add=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "kind",
+                    models.CharField(
+                        choices=[
+                            ("context", "Context"),
+                            ("transcription", "Transcription"),
+                            ("template", "Template"),
+                            ("note", "Note"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
+                ("content", models.TextField()),
+                ("created_on", models.DateField(auto_now_add=True)),
             ],
         ),
     ]

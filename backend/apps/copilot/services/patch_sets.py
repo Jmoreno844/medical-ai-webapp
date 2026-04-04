@@ -57,7 +57,9 @@ def resolve_anchor_span(content: str, anchor: dict[str, Any]) -> tuple[int, int]
             return start_offset, end_offset
 
     if not exact_text:
-        raise CopilotPatchSetConflictError("El patch no tiene exactText para resolver el anchor")
+        raise CopilotPatchSetConflictError(
+            "El patch no tiene exactText para resolver el anchor"
+        )
 
     occurrences: list[int] = []
     cursor = 0
@@ -69,7 +71,9 @@ def resolve_anchor_span(content: str, anchor: dict[str, Any]) -> tuple[int, int]
         cursor = index + 1
 
     if not occurrences:
-        raise CopilotPatchSetConflictError("El anchor ya no coincide con el documento actual")
+        raise CopilotPatchSetConflictError(
+            "El anchor ya no coincide con el documento actual"
+        )
 
     if len(occurrences) == 1:
         start = occurrences[0]
@@ -80,7 +84,9 @@ def resolve_anchor_span(content: str, anchor: dict[str, Any]) -> tuple[int, int]
         prefix_match = True
         suffix_match = True
         if isinstance(prefix_text, str):
-            prefix_match = content[max(0, index - len(prefix_text)) : index] == prefix_text
+            prefix_match = (
+                content[max(0, index - len(prefix_text)) : index] == prefix_text
+            )
         if isinstance(suffix_text, str):
             suffix_start = index + len(exact_text)
             suffix_match = (
@@ -116,7 +122,9 @@ def _normalize_patch_type(value: str | None) -> str:
 
 def _normalize_patch_preview(preview: dict[str, Any]) -> dict[str, Any]:
     patch_type = _normalize_patch_type(
-        preview.get("patch_type") or preview.get("type") or preview.get("operation_type")
+        preview.get("patch_type")
+        or preview.get("type")
+        or preview.get("operation_type")
     )
     operation_type = str(preview.get("operation_type") or patch_type)
     return {
@@ -208,7 +216,9 @@ def _detect_internal_conflicts(patches: list[dict[str, Any]]) -> list[dict[str, 
         left_start = left_patch.get("resolved_start")
         left_end = left_patch.get("resolved_end")
         if left_start is None or left_end is None:
-            normalized[left_index] = _mark_patch_conflict(left_patch, "missing_resolved_range")
+            normalized[left_index] = _mark_patch_conflict(
+                left_patch, "missing_resolved_range"
+            )
             continue
         for right_index, right_patch in indexed[cursor + 1 :]:
             if right_patch.get("status") == "conflicted":
@@ -347,7 +357,9 @@ def persist_patch_set_preview(
 ) -> CopilotPatchSet:
     patch_previews = list(patch_set_preview.get("patches") or [])
     if not patch_previews:
-        raise CopilotPatchSetConflictError("El patch set no contiene patches revisables")
+        raise CopilotPatchSetConflictError(
+            "El patch set no contiene patches revisables"
+        )
     if len(patch_previews) > MAX_PATCHES_PER_SET:
         raise CopilotPatchSetConflictError(
             f"El patch set excede el maximo permitido de {MAX_PATCHES_PER_SET} patches"
@@ -371,13 +383,20 @@ def persist_patch_set_preview(
             "rationale": patch_set_preview.get("rationale"),
             "source_context_document_ids": [
                 str(document_id)
-                for document_id in patch_set_preview.get("source_context_document_ids", [])
+                for document_id in patch_set_preview.get(
+                    "source_context_document_ids", []
+                )
             ],
             "target_document_title": patch_set_preview.get("target_document_title"),
             "target_selection_reason": patch_set_preview.get("target_selection_reason"),
             "document_preview_after": patch_set_preview.get("document_preview_after"),
             "status": patch_set_status,
             "review_comment": None,
+            # Campos del plan clínico. Pueden ser None para ediciones simples que no
+            # llamaron set_edit_plan. El frontend los usa para badges de alcance clínico.
+            "edit_scope": patch_set_preview.get("edit_scope"),
+            "clinical_impact_level": patch_set_preview.get("clinical_impact_level"),
+            "affected_sections": list(patch_set_preview.get("affected_sections") or []),
         },
     )
 
@@ -399,9 +418,12 @@ def persist_patch_set_preview(
         resolved_patches.append(resolved)
 
     resolved_patches = _detect_internal_conflicts(resolved_patches)
-    document_preview_after = patch_set.document_preview_after or _preview_document_after(
-        document_content=current_content,
-        patches=resolved_patches,
+    document_preview_after = (
+        patch_set.document_preview_after
+        or _preview_document_after(
+            document_content=current_content,
+            patches=resolved_patches,
+        )
     )
     if document_preview_after != patch_set.document_preview_after:
         patch_set.document_preview_after = document_preview_after
@@ -438,6 +460,9 @@ def persist_patch_set_preview(
                 "source_context_document_ids": patch_set.source_context_document_ids,
                 "target_document_title": patch_set.target_document_title,
                 "target_selection_reason": patch_set.target_selection_reason,
+                # Sección semántica derivada del clinical_plan del copiloto.
+                # None para patches de ediciones simples sin set_edit_plan.
+                "section": resolved.get("section"),
                 "status": resolved["status"],
                 "review_comment": None,
             },
@@ -469,7 +494,8 @@ def ensure_patch_set_for_legacy_patch(patch: CopilotPatch) -> CopilotPatchSet:
             "source_context_document_ids": patch.source_context_document_ids,
             "target_document_title": patch.target_document_title,
             "target_selection_reason": patch.target_selection_reason,
-            "document_preview_after": patch.document_preview_after or patch.content_preview,
+            "document_preview_after": patch.document_preview_after
+            or patch.content_preview,
             "status": "pending",
         },
     )
@@ -509,13 +535,24 @@ def ensure_patch_set_for_legacy_patch(patch: CopilotPatch) -> CopilotPatchSet:
     return patch_set
 
 
-def accept_patch(*, patch_set: CopilotPatchSet, patch: CopilotPatch, review_comment: str | None = None) -> CopilotPatch:
+def accept_patch(
+    *,
+    patch_set: CopilotPatchSet,
+    patch: CopilotPatch,
+    review_comment: str | None = None,
+) -> CopilotPatch:
     if patch_set.status in {"stale", "applied"}:
-        raise CopilotPatchSetConflictError("El patch set ya no admite cambios de review")
+        raise CopilotPatchSetConflictError(
+            "El patch set ya no admite cambios de review"
+        )
     if patch.patch_set_id != patch_set.id:
-        raise CopilotPatchSetConflictError("El patch no pertenece al patch set indicado")
+        raise CopilotPatchSetConflictError(
+            "El patch no pertenece al patch set indicado"
+        )
     if patch.status in {"conflicted", "applied", "stale"}:
-        raise CopilotPatchSetConflictError("El patch no puede aceptarse en su estado actual")
+        raise CopilotPatchSetConflictError(
+            "El patch no puede aceptarse en su estado actual"
+        )
     patch.status = "accepted"
     patch.review_comment = review_comment
     patch.save(update_fields=["status", "review_comment", "updated_at"])
@@ -525,13 +562,24 @@ def accept_patch(*, patch_set: CopilotPatchSet, patch: CopilotPatch, review_comm
     return patch
 
 
-def reject_patch(*, patch_set: CopilotPatchSet, patch: CopilotPatch, review_comment: str | None = None) -> CopilotPatch:
+def reject_patch(
+    *,
+    patch_set: CopilotPatchSet,
+    patch: CopilotPatch,
+    review_comment: str | None = None,
+) -> CopilotPatch:
     if patch_set.status in {"stale", "applied"}:
-        raise CopilotPatchSetConflictError("El patch set ya no admite cambios de review")
+        raise CopilotPatchSetConflictError(
+            "El patch set ya no admite cambios de review"
+        )
     if patch.patch_set_id != patch_set.id:
-        raise CopilotPatchSetConflictError("El patch no pertenece al patch set indicado")
+        raise CopilotPatchSetConflictError(
+            "El patch no pertenece al patch set indicado"
+        )
     if patch.status in {"applied", "stale"}:
-        raise CopilotPatchSetConflictError("El patch no puede rechazarse en su estado actual")
+        raise CopilotPatchSetConflictError(
+            "El patch no puede rechazarse en su estado actual"
+        )
     patch.status = "rejected"
     patch.review_comment = review_comment
     patch.save(update_fields=["status", "review_comment", "updated_at"])
@@ -541,9 +589,13 @@ def reject_patch(*, patch_set: CopilotPatchSet, patch: CopilotPatch, review_comm
     return patch
 
 
-def accept_all_patches(*, patch_set: CopilotPatchSet, review_comment: str | None = None) -> CopilotPatchSet:
+def accept_all_patches(
+    *, patch_set: CopilotPatchSet, review_comment: str | None = None
+) -> CopilotPatchSet:
     if patch_set.status in {"stale", "applied"}:
-        raise CopilotPatchSetConflictError("El patch set ya no admite cambios de review")
+        raise CopilotPatchSetConflictError(
+            "El patch set ya no admite cambios de review"
+        )
     patch_set.patches.filter(status="pending").exclude(status="conflicted").update(
         status="accepted",
         review_comment=review_comment,
@@ -554,9 +606,13 @@ def accept_all_patches(*, patch_set: CopilotPatchSet, review_comment: str | None
     return patch_set
 
 
-def reject_all_patches(*, patch_set: CopilotPatchSet, review_comment: str | None = None) -> CopilotPatchSet:
+def reject_all_patches(
+    *, patch_set: CopilotPatchSet, review_comment: str | None = None
+) -> CopilotPatchSet:
     if patch_set.status in {"stale", "applied"}:
-        raise CopilotPatchSetConflictError("El patch set ya no admite cambios de review")
+        raise CopilotPatchSetConflictError(
+            "El patch set ya no admite cambios de review"
+        )
     patch_set.patches.exclude(status__in=["applied", "stale", "conflicted"]).update(
         status="rejected",
         review_comment=review_comment,
@@ -651,9 +707,9 @@ def apply_accepted_patch_set(
     ).exclude(pk=patch_set.pk)
     stale_patch_set_ids = list(stale_patch_sets.values_list("patch_set_id", flat=True))
     stale_patch_ids = list(
-        CopilotPatch.objects.filter(patch_set__in=stale_patch_sets).exclude(
-            status__in=["rejected", "applied"]
-        ).values_list("patch_id", flat=True)
+        CopilotPatch.objects.filter(patch_set__in=stale_patch_sets)
+        .exclude(status__in=["rejected", "applied"])
+        .values_list("patch_id", flat=True)
     )
     stale_patch_sets.update(status="stale")
     CopilotPatch.objects.filter(patch_set__in=stale_patch_sets).exclude(
@@ -664,14 +720,22 @@ def apply_accepted_patch_set(
     patch_set.review_comment = review_comment
     patch_set.document_preview_after = next_content
     patch_set.save(
-        update_fields=["status", "review_comment", "document_preview_after", "updated_at"]
+        update_fields=[
+            "status",
+            "review_comment",
+            "document_preview_after",
+            "updated_at",
+        ]
     )
 
     return CopilotPatchSetApplyResult(
         patch_set_id=patch_set.patch_set_id,
         document_id=str(document.id),
         content=document.content,
-        applied_version=max(document_version or patch_set.base_version, patch_set.base_version) + 1,
+        applied_version=max(
+            document_version or patch_set.base_version, patch_set.base_version
+        )
+        + 1,
         applied_patch_ids=applied_patch_ids,
         stale_patch_set_ids=stale_patch_set_ids,
         stale_patch_ids=stale_patch_ids,

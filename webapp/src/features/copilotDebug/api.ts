@@ -265,6 +265,34 @@ export async function rejectCopilotPatch(
   return normalizePatchSets([response.data])[0];
 }
 
+export async function acceptAllCopilotPatches(
+  patchSetId: string,
+  payload: {
+    comment?: string | null;
+  }
+) {
+  const response = await axiosInstance.post<CopilotPatchSetResponse>(
+    `/api/copilot/patch-sets/${patchSetId}/accept-all`,
+    payload
+  );
+
+  return normalizePatchSets([response.data])[0];
+}
+
+export async function rejectAllCopilotPatches(
+  patchSetId: string,
+  payload: {
+    comment?: string | null;
+  }
+) {
+  const response = await axiosInstance.post<CopilotPatchSetResponse>(
+    `/api/copilot/patch-sets/${patchSetId}/reject-all`,
+    payload
+  );
+
+  return normalizePatchSets([response.data])[0];
+}
+
 export async function applyAcceptedCopilotPatchSet(
   patchSetId: string,
   payload: {
@@ -274,6 +302,21 @@ export async function applyAcceptedCopilotPatchSet(
 ) {
   const response = await axiosInstance.post<CopilotRunResponse>(
     `/api/copilot/patch-sets/${patchSetId}/apply-accepted`,
+    payload
+  );
+
+  return response.data;
+}
+
+export async function finalizeCopilotPatchSetReview(
+  patchSetId: string,
+  payload: {
+    comment?: string | null;
+    document_version?: number;
+  }
+) {
+  const response = await axiosInstance.post<CopilotRunResponse>(
+    `/api/copilot/patch-sets/${patchSetId}/finalize-review`,
     payload
   );
 

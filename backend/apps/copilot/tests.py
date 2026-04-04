@@ -11,6 +11,7 @@ from apps.copilot.api import (
     apply_copilot_patch_set,
     create_copilot_message,
     create_copilot_session,
+    finalize_copilot_patch_set_review,
     get_copilot_run,
     list_copilot_patches,
     list_copilot_patch_sets,
@@ -72,15 +73,18 @@ class CopilotBrokerTests(SimpleTestCase):
     def test_create_session_returns_new_scoped_thread_id(self):
         request = SimpleNamespace(user=self.doctor)
 
-        with patch(
-            "apps.copilot.api._get_owned_encounter",
-            return_value=self.encounter,
-        ), patch(
-            "apps.copilot.services.threads.uuid.uuid4",
-            side_effect=[
-                "11111111-1111-4111-8111-111111111111",
-                "22222222-2222-4222-8222-222222222222",
-            ],
+        with (
+            patch(
+                "apps.copilot.api._get_owned_encounter",
+                return_value=self.encounter,
+            ),
+            patch(
+                "apps.copilot.services.threads.uuid.uuid4",
+                side_effect=[
+                    "11111111-1111-4111-8111-111111111111",
+                    "22222222-2222-4222-8222-222222222222",
+                ],
+            ),
         ):
             response = create_copilot_session(
                 request,
@@ -114,36 +118,41 @@ class CopilotBrokerTests(SimpleTestCase):
             selected_document_ids=["99"],
         )
 
-        with patch(
-            "apps.copilot.api._get_owned_encounter",
-            return_value=self.encounter,
-        ), patch(
-            "apps.copilot.api.transaction.atomic",
-            return_value=nullcontext(),
-        ), patch(
-            "apps.copilot.api.CopilotAgentClient.create_run",
-            return_value={
-                "run": {
-                    "run_id": "run-123",
-                    "thread_id": self.thread_id,
-                    "status": "completed",
-                    "intent": "answer_question",
-                    "requires_human_review": False,
-                    "final_response": "Resumen listo",
-                    "trace_metadata": {},
-                },
-                "events": [],
-            },
-        ) as agent_create_run_mock, patch(
-            "apps.copilot.api.CopilotRun.objects.create",
-            return_value=SimpleNamespace(
-                run_id="run-123",
-                thread_id=self.thread_id,
-                status="completed",
-                intent="answer_question",
-                requires_human_review=False,
+        with (
+            patch(
+                "apps.copilot.api._get_owned_encounter",
+                return_value=self.encounter,
             ),
-        ) as create_run_mock:
+            patch(
+                "apps.copilot.api.transaction.atomic",
+                return_value=nullcontext(),
+            ),
+            patch(
+                "apps.copilot.api.CopilotAgentClient.create_run",
+                return_value={
+                    "run": {
+                        "run_id": "run-123",
+                        "thread_id": self.thread_id,
+                        "status": "completed",
+                        "intent": "answer_question",
+                        "requires_human_review": False,
+                        "final_response": "Resumen listo",
+                        "trace_metadata": {},
+                    },
+                    "events": [],
+                },
+            ) as agent_create_run_mock,
+            patch(
+                "apps.copilot.api.CopilotRun.objects.create",
+                return_value=SimpleNamespace(
+                    run_id="run-123",
+                    thread_id=self.thread_id,
+                    status="completed",
+                    intent="answer_question",
+                    requires_human_review=False,
+                ),
+            ) as create_run_mock,
+        ):
             response = create_copilot_message(request, payload)
 
         agent_create_run_mock.assert_called_once()
@@ -175,56 +184,63 @@ class CopilotBrokerTests(SimpleTestCase):
             requires_human_review=True,
         )
 
-        with patch(
-            "apps.copilot.api._get_owned_encounter",
-            return_value=self.encounter,
-        ), patch(
-            "apps.copilot.api.transaction.atomic",
-            return_value=nullcontext(),
-        ), patch(
-            "apps.copilot.api.CopilotAgentClient.create_run",
-            return_value={
-                "run": {
-                    "run_id": "run-456",
-                    "thread_id": run_instance.thread_id,
-                    "status": "waiting_review",
-                    "intent": "edit_document",
-                    "requires_human_review": True,
-                    "active_patch_set_id": "pset-123",
-                    "patch_set_preview": {
-                        "patch_set_id": "pset-123",
-                        "target_document_id": "99",
-                        "base_version": 3,
-                        "base_hash": "hash-123",
-                        "target_document_title": "Note",
-                        "target_selection_reason": "title_family_match:clinical_note; score=72",
-                        "rationale": "Actualizar el documento activo",
-                        "document_preview_after": "## Propuesta",
-                        "patches": [
-                            {
-                                "patch_id": "patch-123",
-                                "patch_type": "replace_span",
-                                "operation_type": "rewrite_document",
-                                "order_index": 0,
-                                "anchor": {"exactText": "Texto"},
-                                "content_preview": "## Propuesta",
-                            }
-                        ],
+        with (
+            patch(
+                "apps.copilot.api._get_owned_encounter",
+                return_value=self.encounter,
+            ),
+            patch(
+                "apps.copilot.api.transaction.atomic",
+                return_value=nullcontext(),
+            ),
+            patch(
+                "apps.copilot.api.CopilotAgentClient.create_run",
+                return_value={
+                    "run": {
+                        "run_id": "run-456",
+                        "thread_id": run_instance.thread_id,
+                        "status": "waiting_review",
+                        "intent": "edit_document",
+                        "requires_human_review": True,
+                        "active_patch_set_id": "pset-123",
+                        "patch_set_preview": {
+                            "patch_set_id": "pset-123",
+                            "target_document_id": "99",
+                            "base_version": 3,
+                            "base_hash": "hash-123",
+                            "target_document_title": "Note",
+                            "target_selection_reason": "title_family_match:clinical_note; score=72",
+                            "rationale": "Actualizar el documento activo",
+                            "document_preview_after": "## Propuesta",
+                            "patches": [
+                                {
+                                    "patch_id": "patch-123",
+                                    "patch_type": "replace_span",
+                                    "operation_type": "rewrite_document",
+                                    "order_index": 0,
+                                    "anchor": {"exactText": "Texto"},
+                                    "content_preview": "## Propuesta",
+                                }
+                            ],
+                        },
+                        "trace_metadata": {},
                     },
-                    "trace_metadata": {},
+                    "events": [],
                 },
-                "events": [],
-            },
-        ), patch(
-            "apps.copilot.api.CopilotRun.objects.create",
-            return_value=run_instance,
-        ), patch(
-            "apps.copilot.api.get_object_or_404",
-            side_effect=[SimpleNamespace(id=99, encounter_id=12, doctor_id=7)],
-        ), patch(
-            "apps.copilot.api.persist_patch_set_preview",
-            return_value=Mock(),
-        ) as persist_patch_set_mock:
+            ),
+            patch(
+                "apps.copilot.api.CopilotRun.objects.create",
+                return_value=run_instance,
+            ),
+            patch(
+                "apps.copilot.api.get_object_or_404",
+                side_effect=[SimpleNamespace(id=99, encounter_id=12, doctor_id=7)],
+            ),
+            patch(
+                "apps.copilot.api.persist_patch_set_preview",
+                return_value=Mock(),
+            ) as persist_patch_set_mock,
+        ):
             response = create_copilot_message(request, payload)
 
         persist_patch_set_mock.assert_called_once()
@@ -244,40 +260,43 @@ class CopilotBrokerTests(SimpleTestCase):
             selected_document_ids=["99"],
         )
 
-        with patch(
-            "apps.copilot.api._get_owned_encounter",
-            return_value=self.encounter,
-        ), patch(
-            "apps.copilot.api.CopilotAgentClient.create_run",
-            return_value={
-                "run": {
-                    "run_id": "run-456",
-                    "thread_id": self.thread_id,
-                    "status": "completed",
-                    "intent": "edit_document",
-                    "requires_human_review": False,
-                    "patch_set_preview": {
-                        "patch_set_id": "pset-123",
-                        "target_document_id": "99",
-                        "base_version": 3,
-                        "base_hash": "hash-123",
-                        "target_document_title": "Note",
-                        "target_selection_reason": "title_family_match:clinical_note; score=72",
-                        "patches": [
-                            {
-                                "patch_id": "patch-123",
-                                "patch_type": "replace_span",
-                                "operation_type": "rewrite_document",
-                                "order_index": 0,
-                                "anchor": {"exactText": "Texto"},
-                                "content_preview": "## Propuesta",
-                            }
-                        ],
+        with (
+            patch(
+                "apps.copilot.api._get_owned_encounter",
+                return_value=self.encounter,
+            ),
+            patch(
+                "apps.copilot.api.CopilotAgentClient.create_run",
+                return_value={
+                    "run": {
+                        "run_id": "run-456",
+                        "thread_id": self.thread_id,
+                        "status": "completed",
+                        "intent": "edit_document",
+                        "requires_human_review": False,
+                        "patch_set_preview": {
+                            "patch_set_id": "pset-123",
+                            "target_document_id": "99",
+                            "base_version": 3,
+                            "base_hash": "hash-123",
+                            "target_document_title": "Note",
+                            "target_selection_reason": "title_family_match:clinical_note; score=72",
+                            "patches": [
+                                {
+                                    "patch_id": "patch-123",
+                                    "patch_type": "replace_span",
+                                    "operation_type": "rewrite_document",
+                                    "order_index": 0,
+                                    "anchor": {"exactText": "Texto"},
+                                    "content_preview": "## Propuesta",
+                                }
+                            ],
+                        },
+                        "trace_metadata": {},
                     },
-                    "trace_metadata": {},
+                    "events": [],
                 },
-                "events": [],
-            },
+            ),
         ):
             with self.assertRaises(HttpError) as ctx:
                 create_copilot_message(request, payload)
@@ -344,7 +363,9 @@ class CopilotClientTests(SimpleTestCase):
 
         with patch(
             "apps.copilot.api._get_owned_encounter",
-            side_effect=HttpError(403, "No tienes permiso para acceder a este encuentro"),
+            side_effect=HttpError(
+                403, "No tienes permiso para acceder a este encuentro"
+            ),
         ):
             with self.assertRaises(HttpError) as ctx:
                 create_copilot_message(request, payload)
@@ -387,17 +408,20 @@ class CopilotClientTests(SimpleTestCase):
         )
         request = SimpleNamespace(user=self.doctor)
 
-        with patch("apps.copilot.api.get_object_or_404", return_value=run), patch(
-            "apps.copilot.api.CopilotAgentClient.get_run",
-            return_value={
-                "run_id": run.run_id,
-                "thread_id": run.thread_id,
-                "status": "completed",
-                "intent": "answer_question",
-                "requires_human_review": False,
-                "final_response": "Resumen listo",
-                "trace_metadata": {},
-            },
+        with (
+            patch("apps.copilot.api.get_object_or_404", return_value=run),
+            patch(
+                "apps.copilot.api.CopilotAgentClient.get_run",
+                return_value={
+                    "run_id": run.run_id,
+                    "thread_id": run.thread_id,
+                    "status": "completed",
+                    "intent": "answer_question",
+                    "requires_human_review": False,
+                    "final_response": "Resumen listo",
+                    "trace_metadata": {},
+                },
+            ),
         ):
             response = get_copilot_run(request, run.run_id)
 
@@ -416,23 +440,26 @@ class CopilotClientTests(SimpleTestCase):
         )
         request = SimpleNamespace(user=self.doctor)
 
-        with patch("apps.copilot.api.get_object_or_404", return_value=run), patch(
-            "apps.copilot.api.CopilotAgentClient.list_run_events",
-            return_value={
-                "events": [
-                    {
-                        "sequence": 1,
-                        "event": "response_chunk",
-                        "run_id": "run-123",
-                        "thread_id": run.thread_id,
-                        "created_at": "2026-04-02T10:00:00Z",
-                        "payload": {"content": "Resumen listo"},
-                    }
-                ],
-                "status": "completed",
-                "next_after_sequence": 1,
-                "done": True,
-            },
+        with (
+            patch("apps.copilot.api.get_object_or_404", return_value=run),
+            patch(
+                "apps.copilot.api.CopilotAgentClient.list_run_events",
+                return_value={
+                    "events": [
+                        {
+                            "sequence": 1,
+                            "event": "response_chunk",
+                            "run_id": "run-123",
+                            "thread_id": run.thread_id,
+                            "created_at": "2026-04-02T10:00:00Z",
+                            "payload": {"content": "Resumen listo"},
+                        }
+                    ],
+                    "status": "completed",
+                    "next_after_sequence": 1,
+                    "done": True,
+                },
+            ),
         ):
             response = stream_copilot_run(request, "run-123")
             chunks = b"".join(response.streaming_content).decode()
@@ -476,10 +503,13 @@ class CopilotClientTests(SimpleTestCase):
             updated_at="2026-04-02T10:00:00Z",
         )
 
-        with patch("apps.copilot.api.get_object_or_404", return_value=run), patch(
-            "apps.copilot.api.CopilotPatch.objects.filter",
-            return_value=SimpleNamespace(
-                select_related=lambda *args, **kwargs: [patch_instance]
+        with (
+            patch("apps.copilot.api.get_object_or_404", return_value=run),
+            patch(
+                "apps.copilot.api.CopilotPatch.objects.filter",
+                return_value=SimpleNamespace(
+                    select_related=lambda *args, **kwargs: [patch_instance]
+                ),
             ),
         ):
             response = list_copilot_patches(request, "run-123")
@@ -510,29 +540,35 @@ class CopilotClientTests(SimpleTestCase):
             patches=SimpleNamespace(count=lambda: 1),
         )
 
-        with patch(
-            "apps.copilot.api.get_object_or_404",
-            side_effect=[run, patch_instance],
-        ), patch(
-            "apps.copilot.api.transaction.atomic",
-            return_value=nullcontext(),
-        ), patch(
-            "apps.copilot.api.ensure_patch_set_for_legacy_patch",
-            return_value=patch_set,
-        ), patch(
-            "apps.copilot.api.reject_patch",
-        ), patch(
-            "apps.copilot.api.CopilotAgentClient.resume_run",
-            return_value={
-                "run_id": "run-123",
-                "thread_id": "copilot:encounter:12:doctor:7:chat:11111111-1111-4111-8111-111111111111",
-                "status": "completed",
-                "intent": "edit_document",
-                "requires_human_review": False,
-                "active_patch_set_id": None,
-                "final_response": "Patch rechazado",
-                "trace_metadata": {},
-            },
+        with (
+            patch(
+                "apps.copilot.api.get_object_or_404",
+                side_effect=[run, patch_instance],
+            ),
+            patch(
+                "apps.copilot.api.transaction.atomic",
+                return_value=nullcontext(),
+            ),
+            patch(
+                "apps.copilot.api.ensure_patch_set_for_legacy_patch",
+                return_value=patch_set,
+            ),
+            patch(
+                "apps.copilot.api.reject_patch",
+            ),
+            patch(
+                "apps.copilot.api.CopilotAgentClient.resume_run",
+                return_value={
+                    "run_id": "run-123",
+                    "thread_id": "copilot:encounter:12:doctor:7:chat:11111111-1111-4111-8111-111111111111",
+                    "status": "completed",
+                    "intent": "edit_document",
+                    "requires_human_review": False,
+                    "active_patch_set_id": None,
+                    "final_response": "Patch rechazado",
+                    "trace_metadata": {},
+                },
+            ),
         ):
             response = review_copilot_patch(request, "run-123", payload)
 
@@ -563,47 +599,54 @@ class CopilotClientTests(SimpleTestCase):
             patches=SimpleNamespace(count=lambda: 1),
         )
 
-        with patch(
-            "apps.copilot.api.get_object_or_404",
-            side_effect=[run, patch_instance],
-        ), patch(
-            "apps.copilot.api.transaction.atomic",
-            return_value=nullcontext(),
-        ), patch(
-            "apps.copilot.api.ensure_patch_set_for_legacy_patch",
-            return_value=patch_set,
-        ), patch(
-            "apps.copilot.api.accept_patch",
-        ), patch(
-            "apps.copilot.api.apply_copilot_patch",
-            return_value=SimpleNamespace(
-                patch_id="patch-123",
-                document_id="99",
-                content="Contenido aplicado",
-                applied_version=4,
-                stale_patch_ids=["patch-old"],
+        with (
+            patch(
+                "apps.copilot.api.get_object_or_404",
+                side_effect=[run, patch_instance],
             ),
-        ) as apply_patch_mock, patch(
-            "apps.copilot.api.CopilotAgentClient.resume_run",
-            return_value={
-                "run_id": "run-123",
-                "thread_id": "copilot:encounter:12:doctor:7:chat:11111111-1111-4111-8111-111111111111",
-                "status": "completed",
-                "intent": "edit_document",
-                "requires_human_review": False,
-                "active_patch_set_id": None,
-                "applied_patch_set_id": "pset-123",
-                "final_response": "Patch aplicado",
-                "applied_patch_id": "patch-123",
-                "applied_document_id": "99",
-                "applied_content": "Contenido aplicado",
-                "applied_version": 4,
-                "trace_metadata": {
+            patch(
+                "apps.copilot.api.transaction.atomic",
+                return_value=nullcontext(),
+            ),
+            patch(
+                "apps.copilot.api.ensure_patch_set_for_legacy_patch",
+                return_value=patch_set,
+            ),
+            patch(
+                "apps.copilot.api.accept_patch",
+            ),
+            patch(
+                "apps.copilot.api.apply_copilot_patch",
+                return_value=SimpleNamespace(
+                    patch_id="patch-123",
+                    document_id="99",
+                    content="Contenido aplicado",
+                    applied_version=4,
+                    stale_patch_ids=["patch-old"],
+                ),
+            ) as apply_patch_mock,
+            patch(
+                "apps.copilot.api.CopilotAgentClient.resume_run",
+                return_value={
+                    "run_id": "run-123",
+                    "thread_id": "copilot:encounter:12:doctor:7:chat:11111111-1111-4111-8111-111111111111",
+                    "status": "completed",
+                    "intent": "edit_document",
+                    "requires_human_review": False,
+                    "active_patch_set_id": None,
+                    "applied_patch_set_id": "pset-123",
+                    "final_response": "Patch aplicado",
                     "applied_patch_id": "patch-123",
                     "applied_document_id": "99",
+                    "applied_content": "Contenido aplicado",
+                    "applied_version": 4,
+                    "trace_metadata": {
+                        "applied_patch_id": "patch-123",
+                        "applied_document_id": "99",
+                    },
                 },
-            },
-        ) as resume_run_mock:
+            ) as resume_run_mock,
+        ):
             response = review_copilot_patch(request, "run-123", payload)
 
         apply_patch_mock.assert_called_once_with(
@@ -638,18 +681,23 @@ class CopilotClientTests(SimpleTestCase):
             document_version=9,
         )
 
-        with patch(
-            "apps.copilot.api.get_object_or_404",
-            side_effect=[run, patch_instance],
-        ), patch(
-            "apps.copilot.api.transaction.atomic",
-            return_value=nullcontext(),
-        ), patch(
-            "apps.copilot.api.apply_copilot_patch",
-            side_effect=CopilotPatchConflictError(
-                "El patch quedo stale porque el documento cambio desde que se propuso"
+        with (
+            patch(
+                "apps.copilot.api.get_object_or_404",
+                side_effect=[run, patch_instance],
             ),
-        ), patch("apps.copilot.api.CopilotAgentClient.resume_run") as resume_run_mock:
+            patch(
+                "apps.copilot.api.transaction.atomic",
+                return_value=nullcontext(),
+            ),
+            patch(
+                "apps.copilot.api.apply_copilot_patch",
+                side_effect=CopilotPatchConflictError(
+                    "El patch quedo stale porque el documento cambio desde que se propuso"
+                ),
+            ),
+            patch("apps.copilot.api.CopilotAgentClient.resume_run") as resume_run_mock,
+        ):
             with self.assertRaises(HttpError) as ctx:
                 review_copilot_patch(request, "run-123", payload)
 
@@ -681,13 +729,17 @@ class CopilotClientTests(SimpleTestCase):
             ),
         )
 
-        with patch("apps.copilot.api.get_object_or_404", return_value=run), patch(
-            "apps.copilot.api.CopilotPatch.objects.filter",
-            return_value=[],
-        ), patch(
-            "apps.copilot.api.CopilotPatchSet.objects.filter",
-            return_value=SimpleNamespace(
-                select_related=lambda *args, **kwargs: [patch_set]
+        with (
+            patch("apps.copilot.api.get_object_or_404", return_value=run),
+            patch(
+                "apps.copilot.api.CopilotPatch.objects.filter",
+                return_value=[],
+            ),
+            patch(
+                "apps.copilot.api.CopilotPatchSet.objects.filter",
+                return_value=SimpleNamespace(
+                    select_related=lambda *args, **kwargs: [patch_set]
+                ),
             ),
         ):
             response = list_copilot_patch_sets(request, "run-123")
@@ -705,42 +757,59 @@ class CopilotClientTests(SimpleTestCase):
             requires_human_review=True,
             save=Mock(),
         )
+        pending_qs = Mock()
+        pending_qs.exists.return_value = False
+        accepted_qs = Mock()
+        accepted_qs.exists.return_value = True
         patch_set = SimpleNamespace(
             patch_set_id="pset-123",
             run=run,
             doctor_id=self.doctor.id,
+            patches=SimpleNamespace(
+                filter=lambda **kwargs: (
+                    pending_qs
+                    if kwargs == {"status": "pending"}
+                    else accepted_qs
+                    if kwargs == {"status": "accepted"}
+                    else Mock()
+                )
+            ),
         )
 
-        with patch(
-            "apps.copilot.api._get_owned_patch_set",
-            return_value=patch_set,
-        ), patch(
-            "apps.copilot.api.apply_accepted_patch_set",
-            return_value=SimpleNamespace(
-                patch_set_id="pset-123",
-                document_id="99",
-                content="Contenido aplicado",
-                applied_version=4,
-                applied_patch_ids=["patch-1"],
-                stale_patch_set_ids=["pset-old"],
-                stale_patch_ids=["patch-old"],
+        with (
+            patch(
+                "apps.copilot.api._get_owned_patch_set",
+                return_value=patch_set,
             ),
-        ), patch(
-            "apps.copilot.api.CopilotAgentClient.resume_run",
-            return_value={
-                "run_id": "run-123",
-                "thread_id": "copilot:encounter:12:doctor:7:chat:11111111-1111-4111-8111-111111111111",
-                "status": "completed",
-                "intent": "edit_document",
-                "requires_human_review": False,
-                "active_patch_set_id": None,
-                "applied_patch_set_id": "pset-123",
-                "applied_patch_id": "patch-1",
-                "applied_document_id": "99",
-                "applied_content": "Contenido aplicado",
-                "applied_version": 4,
-                "trace_metadata": {"applied_patch_set_id": "pset-123"},
-            },
+            patch(
+                "apps.copilot.api.apply_accepted_patch_set",
+                return_value=SimpleNamespace(
+                    patch_set_id="pset-123",
+                    document_id="99",
+                    content="Contenido aplicado",
+                    applied_version=4,
+                    applied_patch_ids=["patch-1"],
+                    stale_patch_set_ids=["pset-old"],
+                    stale_patch_ids=["patch-old"],
+                ),
+            ),
+            patch(
+                "apps.copilot.api.CopilotAgentClient.resume_run",
+                return_value={
+                    "run_id": "run-123",
+                    "thread_id": "copilot:encounter:12:doctor:7:chat:11111111-1111-4111-8111-111111111111",
+                    "status": "completed",
+                    "intent": "edit_document",
+                    "requires_human_review": False,
+                    "active_patch_set_id": None,
+                    "applied_patch_set_id": "pset-123",
+                    "applied_patch_id": "patch-1",
+                    "applied_document_id": "99",
+                    "applied_content": "Contenido aplicado",
+                    "applied_version": 4,
+                    "trace_metadata": {"applied_patch_set_id": "pset-123"},
+                },
+            ),
         ):
             response = apply_copilot_patch_set(
                 request,
@@ -750,6 +819,72 @@ class CopilotClientTests(SimpleTestCase):
 
         self.assertEqual(response["applied_patch_set_id"], "pset-123")
         self.assertEqual(response["applied_document_id"], "99")
+
+    def test_finalize_patch_set_review_rejects_when_no_accepted_patches_remain(self):
+        request = SimpleNamespace(user=self.doctor)
+        run = SimpleNamespace(
+            run_id="run-123",
+            thread_id="copilot:encounter:12:doctor:7:chat:11111111-1111-4111-8111-111111111111",
+            doctor_id=self.doctor.id,
+            status="waiting_review",
+            intent="edit_document",
+            requires_human_review=True,
+            save=Mock(),
+        )
+        pending_qs = Mock()
+        pending_qs.exists.return_value = False
+        accepted_qs = Mock()
+        accepted_qs.exists.return_value = False
+        patch_set = SimpleNamespace(
+            patch_set_id="pset-123",
+            run=run,
+            doctor_id=self.doctor.id,
+            patches=SimpleNamespace(
+                filter=lambda **kwargs: (
+                    pending_qs
+                    if kwargs == {"status": "pending"}
+                    else accepted_qs
+                    if kwargs == {"status": "accepted"}
+                    else Mock()
+                )
+            ),
+        )
+
+        with (
+            patch(
+                "apps.copilot.api._get_owned_patch_set",
+                return_value=patch_set,
+            ),
+            patch(
+                "apps.copilot.api.apply_accepted_patch_set",
+            ) as apply_mock,
+            patch(
+                "apps.copilot.api.CopilotAgentClient.resume_run",
+                return_value={
+                    "run_id": "run-123",
+                    "thread_id": "copilot:encounter:12:doctor:7:chat:11111111-1111-4111-8111-111111111111",
+                    "status": "completed",
+                    "intent": "edit_document",
+                    "requires_human_review": False,
+                    "active_patch_set_id": None,
+                    "final_response": "Patch rechazado",
+                    "trace_metadata": {},
+                },
+            ) as resume_mock,
+        ):
+            response = finalize_copilot_patch_set_review(
+                request,
+                "pset-123",
+                SimpleNamespace(comment="No aplicar", document_version=3),
+            )
+
+        apply_mock.assert_not_called()
+        resume_mock.assert_called_once()
+        self.assertEqual(
+            resume_mock.call_args.args[1]["review_result"],
+            "reject",
+        )
+        self.assertEqual(response["status"], "completed")
 
 
 class _WorkspaceDocumentStub:
@@ -856,7 +991,9 @@ class CopilotInternalToolsTests(SimpleTestCase):
         ):
             response = list_open_documents_tool(self.request, payload)
 
-        self.assertEqual([document.document_id for document in response["documents"]], ["99"])
+        self.assertEqual(
+            [document.document_id for document in response["documents"]], ["99"]
+        )
 
     def test_read_document_tool_returns_excerpt_for_owned_document(self):
         payload = SimpleNamespace(
@@ -915,12 +1052,15 @@ class CopilotInternalToolsTests(SimpleTestCase):
             ),
         ]
 
-        with patch(
-            "apps.copilot.internal_tools_api._get_owned_encounter",
-            return_value=self.encounter,
-        ), patch(
-            "apps.copilot.internal_tools_api._get_encounter_documents",
-            return_value=documents,
+        with (
+            patch(
+                "apps.copilot.internal_tools_api._get_owned_encounter",
+                return_value=self.encounter,
+            ),
+            patch(
+                "apps.copilot.internal_tools_api._get_encounter_documents",
+                return_value=documents,
+            ),
         ):
             response = list_encounter_documents_tool(self.request, payload)
 
@@ -945,29 +1085,38 @@ class CopilotInternalToolsTests(SimpleTestCase):
                     id=10,
                     kind="note",
                     content="Dolor lumbar con irradiacion leve.",
-                    created_on=SimpleNamespace(isoformat=lambda: "2026-04-02T10:00:00Z"),
+                    created_on=SimpleNamespace(
+                        isoformat=lambda: "2026-04-02T10:00:00Z"
+                    ),
                 ),
                 SimpleNamespace(
                     id=11,
                     kind="context",
                     content="Dolor abdominal posterior a comida.",
-                    created_on=SimpleNamespace(isoformat=lambda: "2026-04-02T11:00:00Z"),
+                    created_on=SimpleNamespace(
+                        isoformat=lambda: "2026-04-02T11:00:00Z"
+                    ),
                 ),
                 SimpleNamespace(
                     id=12,
                     kind="note",
                     content="Sin coincidencias relevantes.",
-                    created_on=SimpleNamespace(isoformat=lambda: "2026-04-02T12:00:00Z"),
+                    created_on=SimpleNamespace(
+                        isoformat=lambda: "2026-04-02T12:00:00Z"
+                    ),
                 ),
             ]
         )
 
-        with patch(
-            "apps.copilot.internal_tools_api._get_owned_encounter",
-            return_value=self.encounter,
-        ), patch(
-            "apps.copilot.internal_tools_api._get_encounter_documents",
-            return_value=documents,
+        with (
+            patch(
+                "apps.copilot.internal_tools_api._get_owned_encounter",
+                return_value=self.encounter,
+            ),
+            patch(
+                "apps.copilot.internal_tools_api._get_encounter_documents",
+                return_value=documents,
+            ),
         ):
             response = search_documents_tool(self.request, payload)
 
@@ -985,19 +1134,22 @@ class CopilotPatchApplyServiceTests(SimpleTestCase):
         )
         patch_set = Mock()
 
-        with patch(
-            "apps.copilot.services.patch_apply.ensure_patch_set_for_legacy_patch",
-            return_value=patch_set,
-        ), patch(
-            "apps.copilot.services.patch_apply.apply_accepted_patch_set",
-            return_value=SimpleNamespace(
-                patch_set_id="pset-123",
-                document_id="99",
-                content="Contenido aplicado",
-                applied_version=4,
-                applied_patch_ids=["patch-123"],
-                stale_patch_set_ids=["pset-old"],
-                stale_patch_ids=["patch-old"],
+        with (
+            patch(
+                "apps.copilot.services.patch_apply.ensure_patch_set_for_legacy_patch",
+                return_value=patch_set,
+            ),
+            patch(
+                "apps.copilot.services.patch_apply.apply_accepted_patch_set",
+                return_value=SimpleNamespace(
+                    patch_set_id="pset-123",
+                    document_id="99",
+                    content="Contenido aplicado",
+                    applied_version=4,
+                    applied_patch_ids=["patch-123"],
+                    stale_patch_set_ids=["pset-old"],
+                    stale_patch_ids=["patch-old"],
+                ),
             ),
         ):
             result = apply_copilot_patch(
@@ -1019,12 +1171,15 @@ class CopilotPatchApplyServiceTests(SimpleTestCase):
             status="pending",
         )
 
-        with patch(
-            "apps.copilot.services.patch_apply.ensure_patch_set_for_legacy_patch",
-            return_value=Mock(),
-        ), patch(
-            "apps.copilot.services.patch_apply.apply_accepted_patch_set",
-            side_effect=CopilotPatchConflictError("conflict"),
+        with (
+            patch(
+                "apps.copilot.services.patch_apply.ensure_patch_set_for_legacy_patch",
+                return_value=Mock(),
+            ),
+            patch(
+                "apps.copilot.services.patch_apply.apply_accepted_patch_set",
+                side_effect=CopilotPatchConflictError("conflict"),
+            ),
         ):
             with self.assertRaises(CopilotPatchConflictError):
                 apply_copilot_patch(

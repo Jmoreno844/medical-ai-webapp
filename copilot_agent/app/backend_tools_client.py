@@ -58,6 +58,10 @@ class CopilotBackendToolsClient:
 
     def read_document(self, document_id: str, *, mode: str = "excerpt") -> dict[str, Any]:
         if mode == "summary":
+            # Route summary mode through read_document_summary to avoid duplicating
+            # the backend endpoint. The summary payload is a strict subset of the full
+            # document payload; adding mode="summary" makes the mode explicit for the
+            # state reducer that de-dupes reads by (document_id, mode).
             summary_payload = self.read_document_summary(document_id)
             return {
                 **summary_payload,
@@ -134,25 +138,6 @@ class CopilotBackendToolsClient:
         return self._request(
             "/api/internal/copilot/tools/read-encounter-context",
             self._base_payload(),
-        )
-
-    def build_context_view(
-        self,
-        *,
-        active_document_id: str | None = None,
-        include_document_ids: list[str] | None = None,
-        include_manual_context: bool = True,
-    ) -> dict[str, Any]:
-        return self._request(
-            "/api/internal/copilot/tools/build-context-view",
-            {
-                **self._base_payload(),
-                "active_document_id": int(active_document_id)
-                if active_document_id
-                else None,
-                "include_document_ids": [int(document_id) for document_id in include_document_ids or []],
-                "include_manual_context": include_manual_context,
-            },
         )
 
     def _base_payload(self) -> dict[str, Any]:

@@ -25,9 +25,7 @@ class Document(models.Model):
     )
     content = models.TextField()
     created_on = models.DateField(auto_now_add=True)
-    doctor = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="documents"
-    )
+    doctor = models.ForeignKey(User, on_delete=models.CASCADE, related_name="documents")
 
     def __str__(self):
         return f"{self.kind} - Encounter {self.encounter_id} - {self.created_on}"

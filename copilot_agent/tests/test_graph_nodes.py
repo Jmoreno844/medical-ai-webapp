@@ -4,6 +4,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
 from app.graph.tools import build_graph_tools
+from app.graph.tools import _is_valid_patch_preview as tool_patch_preview_is_valid
 from app.graph.workflow import build_clinical_copilot_graph
 from app.graph.state import materialize_state_snapshot, reset_dict_state, reset_list_state
 from app.llm.instructions import DOCUMENTS_ARE_DATA_RULE
@@ -13,6 +14,7 @@ from app.planner import (
     LangChainCopilotPlanner,
     _filter_parallel_tool_calls,
 )
+from app.graph.nodes import _is_valid_patch_preview as node_patch_preview_is_valid
 from tests.fixtures_copilot import (
     FakeToolsClient,
     ScriptedPlanner,
@@ -264,6 +266,21 @@ def test_patch_system_instruction_treats_clinical_context_as_data():
     assert "Si el contexto es ambiguo o insuficiente, no inventes contenido clinico." in instruction
 
 
+def test_delete_patch_preview_allows_empty_content_preview():
+    preview = {
+        "patch_id": "patch-1",
+        "target_document_id": "7",
+        "target_document_title": "Nota clinica",
+        "target_selection_reason": "llm_target_document_id",
+        "base_version": 1,
+        "operation_type": "delete_span",
+        "content_preview": "",
+    }
+
+    assert tool_patch_preview_is_valid(preview) is True
+    assert node_patch_preview_is_valid(preview) is True
+
+
 def test_parallel_read_tool_calls_are_preserved():
     message = make_ai_response("")
     message = message.model_copy(
@@ -331,14 +348,14 @@ def test_duplicate_singleton_tool_calls_are_deduped():
                 {"name": "list_open_documents", "args": {}, "id": "call-1", "type": "tool_call"},
                 {"name": "list_open_documents", "args": {}, "id": "call-2", "type": "tool_call"},
                 {
-                    "name": "build_context_view",
-                    "args": {"active_document_id": "99"},
+                    "name": "list_encounter_documents",
+                    "args": {},
                     "id": "call-3",
                     "type": "tool_call",
                 },
                 {
-                    "name": "build_context_view",
-                    "args": {"active_document_id": "12"},
+                    "name": "list_encounter_documents",
+                    "args": {},
                     "id": "call-4",
                     "type": "tool_call",
                 },
@@ -350,7 +367,7 @@ def test_duplicate_singleton_tool_calls_are_deduped():
 
     assert [tool_call["name"] for tool_call in filtered.tool_calls] == [
         "list_open_documents",
-        "build_context_view",
+        "list_encounter_documents",
     ]
 
 
@@ -689,10 +706,10 @@ def test_summary_request_uses_tool_loop_with_minimal_reads():
                 content="Necesito ver los documentos abiertos primero.",
             ),
             make_ai_tool_call(
-                tool_name="build_context_view",
-                args={"active_document_id": "99", "include_document_ids": ["99", "12"]},
+                tool_name="list_encounter_documents",
+                args={},
                 tool_call_id="call-2",
-                content="Necesito una vista de contexto sintetizada.",
+                content="Necesito una vista de todos los documentos.",
             ),
             make_ai_tool_call(
                 tool_name="search_documents",
@@ -722,7 +739,7 @@ def test_summary_request_uses_tool_loop_with_minimal_reads():
     assert next_state["final_response"] == "Resumen listo del encounter demo."
     assert [call["tool_name"] for call in next_state["tool_calls"]] == [
         "list_open_documents",
-        "build_context_view",
+        "list_encounter_documents",
         "search_documents",
         "read_document_span",
     ]
@@ -738,8 +755,8 @@ def test_parallel_non_write_batch_updates_state_without_graph_race():
                 tool_calls=[
                     {"name": "list_open_documents", "args": {}, "id": "call-1", "type": "tool_call"},
                     {
-                        "name": "build_context_view",
-                        "args": {"active_document_id": "99", "include_document_ids": ["99", "12"]},
+                        "name": "list_encounter_documents",
+                        "args": {},
                         "id": "call-2",
                         "type": "tool_call",
                     },
@@ -785,7 +802,7 @@ def test_parallel_non_write_batch_updates_state_without_graph_race():
     assert next_state["final_response"] == "Resumen listo del encounter demo."
     assert [call["tool_name"] for call in next_state["tool_calls"]] == [
         "list_open_documents",
-        "build_context_view",
+        "list_encounter_documents",
         "read_document_summary",
         "read_document_span",
         "search_documents",
@@ -1077,12 +1094,8 @@ def test_regression_edit_note_request_stays_in_waiting_review_path():
                 content="Necesito ver los documentos abiertos.",
             ),
             make_ai_tool_call(
-                tool_name="build_context_view",
-                args={
-                    "active_document_id": "7",
-                    "include_document_ids": ["3", "4", "7"],
-                    "include_manual_context": True,
-                },
+                tool_name="list_encounter_documents",
+                args={},
                 tool_call_id="call-2",
                 content="Construiré una vista de contexto.",
             ),

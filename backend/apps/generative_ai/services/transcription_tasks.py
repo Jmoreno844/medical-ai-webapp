@@ -24,12 +24,18 @@ def is_transcription_queue_configured() -> bool:
         getattr(settings, "TRANSCRIPTION_CLOUD_FUNCTION_URL", ""),
         getattr(settings, "CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT", ""),
     ]
-    return all(bool(str(value).strip()) and str(value).strip() != "not-loaded" for value in required_values)
+    return all(
+        bool(str(value).strip()) and str(value).strip() != "not-loaded"
+        for value in required_values
+    )
 
 
 def should_use_cloud_tasks() -> bool:
     environment = str(getattr(settings, "ENVIRONMENT", "") or "").strip().lower()
-    return environment in {"stg", "staging", "prod", "production"} or is_transcription_queue_configured()
+    return (
+        environment in {"stg", "staging", "prod", "production"}
+        or is_transcription_queue_configured()
+    )
 
 
 def enqueue_transcription_task(

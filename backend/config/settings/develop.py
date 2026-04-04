@@ -18,6 +18,8 @@ def _env_bool(name: str, default: bool) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = (
     os.environ.get("DJANGO_SECRET_KEY")

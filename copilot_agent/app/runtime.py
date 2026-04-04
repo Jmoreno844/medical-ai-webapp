@@ -118,9 +118,11 @@ class CopilotRuntime:
                     planner=self._planner,
                     checkpointer=checkpointer,
                 )
-                # The public thread_id is the sidechat conversation identity. Each
-                # new HTTP run reuses that checkpoint so the model keeps prior turns,
-                # while the graph itself clears run-scoped tool/review state on turn 0.
+                # thread_id is the sidechat conversation identity. Reusing it as the
+                # LangGraph checkpoint key gives the model persistent memory across
+                # HTTP requests (prior messages stay visible). Per-run transient state
+                # (reads, proposals, iteration counters) is cleared by call_model on
+                # the first iteration (iteration_count == 0). See _reset_transient_run_state.
                 next_state = graph.invoke(
                     state,
                     config={"configurable": {"thread_id": request.thread_id}},

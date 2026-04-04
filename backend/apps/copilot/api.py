@@ -39,7 +39,11 @@ from apps.copilot.services.patch_sets import (
     reject_all_patches,
     reject_patch,
 )
-from apps.copilot.services.threads import build_thread_id, parse_thread_id, thread_belongs_to_scope
+from apps.copilot.services.threads import (
+    build_thread_id,
+    parse_thread_id,
+    thread_belongs_to_scope,
+)
 from apps.documents.models import Document
 from apps.encounters.models import Encounter
 
@@ -58,7 +62,9 @@ PATCH_SET_PREVIEW_REQUIRED_FIELDS = {
 }
 
 
-def _serialize_run(run: CopilotRun, remote_run: dict[str, Any] | None = None) -> dict[str, Any]:
+def _serialize_run(
+    run: CopilotRun, remote_run: dict[str, Any] | None = None
+) -> dict[str, Any]:
     active_patch_set_id = None
     applied_patch_set_id = None
     applied_patch_id = None
@@ -76,7 +82,9 @@ def _serialize_run(run: CopilotRun, remote_run: dict[str, Any] | None = None) ->
         applied_version = remote_run.get("applied_version")
     if active_patch_set_id is None and hasattr(run, "patch_sets"):
         active_patch_set_id = (
-            run.patch_sets.order_by("-created_at").values_list("patch_set_id", flat=True).first()
+            run.patch_sets.order_by("-created_at")
+            .values_list("patch_set_id", flat=True)
+            .first()
         )
 
     return {
@@ -188,7 +196,77 @@ def _sync_run_from_remote(run: CopilotRun, remote_run: dict[str, Any]) -> Copilo
     return run
 
 
-def _normalize_legacy_patch_set_preview(remote_run: dict[str, Any]) -> dict[str, Any] | None:
+def _finalize_patch_set_review(
+    *,
+    request,
+    patch_set: CopilotPatchSet,
+    payload: CopilotPatchSetDecisionIn,
+    allow_reject_when_no_accepted: bool,
+) -> dict[str, Any]:
+    run = patch_set.run
+    if run.status != "waiting_review":
+        raise HttpError(409, "El run no esta esperando revision humana")
+
+    if patch_set.patches.filter(status="pending").exists():
+        raise HttpError(
+            409, "Aun hay patches pendientes de decision dentro del patch set"
+        )
+
+    client = CopilotAgentClient()
+    accepted_exists = patch_set.patches.filter(status="accepted").exists()
+
+    if accepted_exists:
+        try:
+            apply_result = apply_accepted_patch_set(
+                patch_set=patch_set,
+                document_version=payload.document_version,
+                review_comment=payload.comment,
+            )
+        except CopilotPatchSetConflictError as error:
+            raise HttpError(409, str(error)) from error
+
+        resume_payload = {
+            "patch_set_id": patch_set.patch_set_id,
+            "review_result": "approve",
+            "reviewer_id": str(request.user.id),
+            "comment": payload.comment,
+            "trace_metadata": {
+                "applied_patch_set_id": apply_result.patch_set_id,
+                "applied_patch_id": apply_result.applied_patch_ids[0]
+                if apply_result.applied_patch_ids
+                else None,
+                "applied_document_id": apply_result.document_id,
+                "applied_content": apply_result.content,
+                "applied_version": apply_result.applied_version,
+                "stale_patch_set_ids": apply_result.stale_patch_set_ids,
+                "stale_patch_ids": apply_result.stale_patch_ids,
+            },
+        }
+    else:
+        if not allow_reject_when_no_accepted:
+            raise HttpError(
+                409, "No hay patches aceptados para aplicar en este patch set"
+            )
+        resume_payload = {
+            "patch_set_id": patch_set.patch_set_id,
+            "review_result": "reject",
+            "reviewer_id": str(request.user.id),
+            "comment": payload.comment,
+            "trace_metadata": {},
+        }
+
+    try:
+        remote_run = client.resume_run(run.run_id, resume_payload)
+    except CopilotServiceError as error:
+        raise HttpError(502, f"Copilot agent unavailable: {error}") from error
+
+    run = _sync_run_from_remote(run, remote_run)
+    return _serialize_run(run, remote_run)
+
+
+def _normalize_legacy_patch_set_preview(
+    remote_run: dict[str, Any],
+) -> dict[str, Any] | None:
     patch_preview = remote_run.get("patch_preview")
     if not patch_preview:
         return None
@@ -199,9 +277,13 @@ def _normalize_legacy_patch_set_preview(remote_run: dict[str, Any]) -> dict[str,
         "target_document_title": patch_preview.get("target_document_title"),
         "target_selection_reason": patch_preview.get("target_selection_reason"),
         "base_version": patch_preview.get("base_version") or 1,
-        "base_hash": patch_preview.get("base_hash") or patch_preview.get("expected_hash") or "",
+        "base_hash": patch_preview.get("base_hash")
+        or patch_preview.get("expected_hash")
+        or "",
         "rationale": patch_preview.get("rationale"),
-        "source_context_document_ids": patch_preview.get("source_context_document_ids", []),
+        "source_context_document_ids": patch_preview.get(
+            "source_context_document_ids", []
+        ),
         "document_preview_after": patch_preview.get("document_preview_after")
         or patch_preview.get("content_preview"),
         "patches": [
@@ -227,13 +309,20 @@ def _normalize_legacy_patch_set_preview(remote_run: dict[str, Any]) -> dict[str,
 
 
 def _get_remote_patch_set_preview(remote_run: dict[str, Any]) -> dict[str, Any] | None:
-    return remote_run.get("patch_set_preview") or _normalize_legacy_patch_set_preview(remote_run)
+    return remote_run.get("patch_set_preview") or _normalize_legacy_patch_set_preview(
+        remote_run
+    )
 
 
-def _validate_remote_patch_set_preview(remote_run: dict[str, Any]) -> dict[str, Any] | None:
+def _validate_remote_patch_set_preview(
+    remote_run: dict[str, Any],
+) -> dict[str, Any] | None:
     patch_set_preview = _get_remote_patch_set_preview(remote_run)
     if not patch_set_preview:
-        if remote_run.get("requires_human_review") or remote_run.get("status") == "waiting_review":
+        if (
+            remote_run.get("requires_human_review")
+            or remote_run.get("status") == "waiting_review"
+        ):
             raise HttpError(
                 502,
                 "Copilot agent devolvio waiting_review sin un patch_set_preview valido.",
@@ -383,7 +472,9 @@ def get_copilot_run(request, run_id: str):
     return _serialize_run(run, remote_run)
 
 
-@router.get("/copilot/runs/{run_id}/patches", response=list[CopilotPatchOut], auth=django_auth)
+@router.get(
+    "/copilot/runs/{run_id}/patches", response=list[CopilotPatchOut], auth=django_auth
+)
 def list_copilot_patches(request, run_id: str):
     run = get_object_or_404(CopilotRun, run_id=run_id)
     if run.doctor_id != request.user.id:
@@ -409,10 +500,14 @@ def list_copilot_patch_sets(request, run_id: str):
     if run.doctor_id != request.user.id:
         raise HttpError(403, "No tienes permiso para acceder a este run")
 
-    for patch in CopilotPatch.objects.filter(run=run, doctor=request.user, patch_set__isnull=True):
+    for patch in CopilotPatch.objects.filter(
+        run=run, doctor=request.user, patch_set__isnull=True
+    ):
         ensure_patch_set_for_legacy_patch(patch)
 
-    patch_sets = CopilotPatchSet.objects.filter(run=run, doctor=request.user).select_related(
+    patch_sets = CopilotPatchSet.objects.filter(
+        run=run, doctor=request.user
+    ).select_related(
         "run",
         "target_document",
     )
@@ -474,7 +569,9 @@ def reject_copilot_patch(request, patch_set_id: str, payload: CopilotPatchDecisi
     response=CopilotPatchSetOut,
     auth=django_auth,
 )
-def accept_all_copilot_patches(request, patch_set_id: str, payload: CopilotPatchSetDecisionIn):
+def accept_all_copilot_patches(
+    request, patch_set_id: str, payload: CopilotPatchSetDecisionIn
+):
     patch_set = _get_owned_patch_set(patch_set_id=patch_set_id, user_id=request.user.id)
     try:
         accept_all_patches(patch_set=patch_set, review_comment=payload.comment)
@@ -488,7 +585,9 @@ def accept_all_copilot_patches(request, patch_set_id: str, payload: CopilotPatch
     response=CopilotPatchSetOut,
     auth=django_auth,
 )
-def reject_all_copilot_patches(request, patch_set_id: str, payload: CopilotPatchSetDecisionIn):
+def reject_all_copilot_patches(
+    request, patch_set_id: str, payload: CopilotPatchSetDecisionIn
+):
     patch_set = _get_owned_patch_set(patch_set_id=patch_set_id, user_id=request.user.id)
     try:
         reject_all_patches(patch_set=patch_set, review_comment=payload.comment)
@@ -502,48 +601,33 @@ def reject_all_copilot_patches(request, patch_set_id: str, payload: CopilotPatch
     response=CopilotRunOut,
     auth=django_auth,
 )
-def apply_copilot_patch_set(request, patch_set_id: str, payload: CopilotPatchSetDecisionIn):
+def apply_copilot_patch_set(
+    request, patch_set_id: str, payload: CopilotPatchSetDecisionIn
+):
     patch_set = _get_owned_patch_set(patch_set_id=patch_set_id, user_id=request.user.id)
-    run = patch_set.run
-    if run.status != "waiting_review":
-        raise HttpError(409, "El run no esta esperando revision humana")
+    return _finalize_patch_set_review(
+        request=request,
+        patch_set=patch_set,
+        payload=payload,
+        allow_reject_when_no_accepted=False,
+    )
 
-    try:
-        apply_result = apply_accepted_patch_set(
-            patch_set=patch_set,
-            document_version=payload.document_version,
-            review_comment=payload.comment,
-        )
-    except CopilotPatchSetConflictError as error:
-        raise HttpError(409, str(error)) from error
 
-    client = CopilotAgentClient()
-    try:
-        remote_run = client.resume_run(
-            run.run_id,
-            {
-                "patch_set_id": patch_set.patch_set_id,
-                "review_result": "approve",
-                "reviewer_id": str(request.user.id),
-                "comment": payload.comment,
-                "trace_metadata": {
-                    "applied_patch_set_id": apply_result.patch_set_id,
-                    "applied_patch_id": apply_result.applied_patch_ids[0]
-                    if apply_result.applied_patch_ids
-                    else None,
-                    "applied_document_id": apply_result.document_id,
-                    "applied_content": apply_result.content,
-                    "applied_version": apply_result.applied_version,
-                    "stale_patch_set_ids": apply_result.stale_patch_set_ids,
-                    "stale_patch_ids": apply_result.stale_patch_ids,
-                },
-            },
-        )
-    except CopilotServiceError as error:
-        raise HttpError(502, f"Copilot agent unavailable: {error}") from error
-
-    run = _sync_run_from_remote(run, remote_run)
-    return _serialize_run(run, remote_run)
+@router.post(
+    "/copilot/patch-sets/{patch_set_id}/finalize-review",
+    response=CopilotRunOut,
+    auth=django_auth,
+)
+def finalize_copilot_patch_set_review(
+    request, patch_set_id: str, payload: CopilotPatchSetDecisionIn
+):
+    patch_set = _get_owned_patch_set(patch_set_id=patch_set_id, user_id=request.user.id)
+    return _finalize_patch_set_review(
+        request=request,
+        patch_set=patch_set,
+        payload=payload,
+        allow_reject_when_no_accepted=True,
+    )
 
 
 @router.post("/copilot/runs/{run_id}/review", response=CopilotRunOut, auth=django_auth)
@@ -642,7 +726,9 @@ def stream_copilot_run(request, run_id: str, after_sequence: int = 0):
                     after_sequence=next_after_sequence,
                 )
             except CopilotServiceError as error:
-                logger.error("Copilot stream polling failed for run %s: %s", run_id, error)
+                logger.error(
+                    "Copilot stream polling failed for run %s: %s", run_id, error
+                )
                 run.status = "failed"
                 run.save(update_fields=["status", "updated_at"])
                 yield (
@@ -661,10 +747,7 @@ def stream_copilot_run(request, run_id: str, after_sequence: int = 0):
                     "created_at": event["created_at"],
                     **event["payload"],
                 }
-                yield (
-                    f"event: {event['event']}\n"
-                    f"data: {json.dumps(payload)}\n\n"
-                )
+                yield (f"event: {event['event']}\ndata: {json.dumps(payload)}\n\n")
 
             run.status = response.get("status", run.status)
             run.save(update_fields=["status", "updated_at"])

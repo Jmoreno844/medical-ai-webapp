@@ -6,35 +6,42 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('patients', '0001_initial'),
+        ("patients", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='patientdoctor',
-            name='doctor',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL),
+            model_name="patientdoctor",
+            name="doctor",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL
+            ),
         ),
         migrations.AddField(
-            model_name='patientdoctor',
-            name='patient',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='patients.patient'),
+            model_name="patientdoctor",
+            name="patient",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE, to="patients.patient"
+            ),
         ),
         migrations.AddIndex(
-            model_name='patientdoctor',
-            index=models.Index(fields=['doctor'], name='patients_pa_doctor__a46108_idx'),
+            model_name="patientdoctor",
+            index=models.Index(
+                fields=["doctor"], name="patients_pa_doctor__a46108_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='patientdoctor',
-            index=models.Index(fields=['patient'], name='patients_pa_patient_b340a5_idx'),
+            model_name="patientdoctor",
+            index=models.Index(
+                fields=["patient"], name="patients_pa_patient_b340a5_idx"
+            ),
         ),
         migrations.AlterUniqueTogether(
-            name='patientdoctor',
-            unique_together={('doctor', 'patient')},
+            name="patientdoctor",
+            unique_together={("doctor", "patient")},
         ),
     ]

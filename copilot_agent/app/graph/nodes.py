@@ -28,6 +28,17 @@ PATCH_REQUIRED_FIELDS = {
 }
 
 
+def _patch_field_is_present(patch_preview: dict[str, Any], field_name: str) -> bool:
+    if field_name == "content_preview":
+        if str(patch_preview.get("operation_type") or "") == "delete_span":
+            return "content_preview" in patch_preview
+        value = patch_preview.get(field_name)
+        return value is not None and str(value) != ""
+
+    value = patch_preview.get(field_name)
+    return value is not None and str(value) != ""
+
+
 def _append_state_items(
     current: Sequence[dict[str, Any]] | None,
     updates: Sequence[dict[str, Any]] | None,
@@ -37,7 +48,10 @@ def _append_state_items(
 
 def _reset_transient_run_state() -> dict[str, Any]:
     # LangGraph checkpoints are thread-scoped, so a new run on the same thread
-    # must clear review/proposal leftovers before the next planner turn starts.
+    # inherits the full prior checkpoint (tool reads, proposals, counters).
+    # This function clears all per-run transient state so each new HTTP request
+    # starts clean without losing conversational history from the messages list.
+    # Called only when iteration_count == 0 (first call_model invocation per run).
     return {
         "available_documents": reset_list_state(),
         "context_view": None,
@@ -72,6 +86,9 @@ def _reset_transient_run_state() -> dict[str, Any]:
         "base_version": None,
         "last_planner_error": None,
         "last_tool_error": None,
+        # clinical_plan se resetea con cada run para que un plan de propagación
+        # no contamine el siguiente turno del planner.
+        "clinical_plan": None,
     }
 
 
@@ -86,7 +103,7 @@ def _mark_run_error(message: str) -> dict[str, Any]:
 def _is_valid_patch_preview(patch_preview: dict[str, Any] | None) -> bool:
     if not isinstance(patch_preview, dict):
         return False
-    return all(patch_preview.get(field_name) for field_name in PATCH_REQUIRED_FIELDS)
+    return all(_patch_field_is_present(patch_preview, field_name) for field_name in PATCH_REQUIRED_FIELDS)
 
 
 def _is_valid_patch_set_preview(patch_set_preview: dict[str, Any] | None) -> bool:
@@ -184,6 +201,9 @@ def _current_messages(state: CopilotState) -> Sequence[BaseMessage]:
 
 
 def _tool_batch_size(state: CopilotState) -> int:
+    # LangGraph delivers all results from a parallel tool batch as a single state
+    # update. Counting the tool_calls on the latest AIMessage tells us exactly
+    # how many tool_results belong to the current batch vs. prior turns.
     messages = state.get("messages") or []
     for message in reversed(messages):
         if isinstance(message, AIMessage) and (message.tool_calls or []):
@@ -212,6 +232,10 @@ def _derive_last_tool_error(state: CopilotState) -> str | None:
 
 
 def _derive_read_documents(state: CopilotState) -> list[dict[str, Any]]:
+    # Consolidates three state buckets (document_reads, document_summaries,
+    # read_spans) into one normalized list keyed by (document_id, mode).
+    # Each bucket may hold the same document at different granularities.
+    # This unified view is what the planner context and the patch drafter receive.
     by_key: dict[tuple[str, str], dict[str, Any]] = {}
     for document in state.get("document_reads") or []:
         key = (str(document.get("document_id") or ""), str(document.get("mode") or ""))
@@ -280,6 +304,11 @@ def _derive_search_legacy_fields(state: CopilotState) -> tuple[str | None, list[
 
 
 def consolidate_tool_state(state: CopilotState) -> dict[str, Any]:
+    # Dedicated reconciliation node between the tools node and call_model.
+    # When the planner emits parallel tool calls each ToolNode write lands in state
+    # independently. Without this node the next call_model turn would see a
+    # partially written snapshot. Running consolidation here gives the planner a
+    # single stable, de-duplicated view of all reads before the next decision.
     read_documents = _derive_read_documents(state)
     search_query, search_matches = _derive_search_legacy_fields(state)
     return {
@@ -408,11 +437,16 @@ def make_call_model_node(
 
 
 def interrupt_for_review(state: CopilotState) -> dict[str, Any]:
+    # No-op node. LangGraph pauses graph execution here when review_result is None.
+    # The run is stored as waiting_review; the frontend resumes it via /resume.
     del state
     return {}
 
 
 def apply_patch(state: CopilotState) -> dict[str, Any]:
+    # Intentional stub. Django owns the actual clinical write and audit trail.
+    # This node exists to keep the graph edge explicit and auditable in traces.
+    # If the copilot ever gets direct write authority, this is the right place.
     del state
     return {}
 

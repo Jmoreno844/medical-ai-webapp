@@ -108,7 +108,9 @@ def get_documents_by_encounter(request, encounter_id: int):
 @router.patch(
     "/documents/by-editor/{document_id}", response=SuccessResponse, auth=django_auth
 )
-def update_document_by_editor(request, document_id: int, payload: DocumentContentUpdateIn):
+def update_document_by_editor(
+    request, document_id: int, payload: DocumentContentUpdateIn
+):
     doctor = request.user
 
     try:
@@ -119,9 +121,7 @@ def update_document_by_editor(request, document_id: int, payload: DocumentConten
 
         doc.content = payload.content
         doc.save()
-        logger.info(
-            f"Successfully updated document {document_id} by user {doctor.id}"
-        )
+        logger.info(f"Successfully updated document {document_id} by user {doctor.id}")
 
         return {
             "success": True,

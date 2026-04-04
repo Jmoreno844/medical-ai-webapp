@@ -98,6 +98,9 @@ class CopilotPatchOut(Schema):
     target_selection_reason: Optional[str] = None
     status: Literal["pending", "accepted", "rejected", "conflicted", "applied", "stale"]
     review_comment: Optional[str] = None
+    # Sección semántica dentro de la nota clínica a la que pertenece este patch.
+    # Derivada del clinical_plan del copiloto (ej. 'antecedentes_relevantes', 'plan').
+    section: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -123,6 +126,12 @@ class CopilotPatchSetOut(Schema):
     ]
     review_comment: Optional[str] = None
     patches: list[CopilotPatchOut] = Field(default_factory=list)
+    # Campos del plan clínico emitidos por el copiloto vía set_edit_plan.
+    # Persisten desde el agente para que el frontend muestre badge de alcance
+    # y para que el auditor clínico pueda filtrar revisiones por impacto.
+    edit_scope: Optional[str] = None
+    clinical_impact_level: Optional[str] = None
+    affected_sections: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -304,30 +313,3 @@ class CopilotEncounterContextOut(Schema):
     has_been_transcribed: bool = False
     patient_id: Optional[str] = None
     patient_summary: Optional[str] = None
-
-
-class CopilotBuildContextViewIn(CopilotInternalToolRequest):
-    active_document_id: Optional[int] = None
-    include_document_ids: list[int] = Field(default_factory=list)
-    include_manual_context: bool = True
-
-
-class CopilotContextFactOut(Schema):
-    category: Literal[
-        "symptom",
-        "medication",
-        "allergy",
-        "diagnosis",
-        "plan",
-        "lab",
-    ]
-    value: str
-    source_document_id: str
-    source_anchor: dict[str, Any] = Field(default_factory=dict)
-    confidence: float
-
-
-class CopilotBuildContextViewOut(Schema):
-    facts: list[CopilotContextFactOut] = Field(default_factory=list)
-    ambiguities: list[str] = Field(default_factory=list)
-    source_document_ids: list[str] = Field(default_factory=list)

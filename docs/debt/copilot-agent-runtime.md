@@ -71,3 +71,4 @@ En el sidechat actual, `thread_id` ya identifica una conversación real: Django 
 - [`../../implementation_plan_ai_agent_service.md`](../../implementation_plan_ai_agent_service.md)
 - [`../decisions/0006-explicit-context-caching-futuro-qa-helper.md`](../decisions/0006-explicit-context-caching-futuro-qa-helper.md)
 - [`../decisions/0007-writer-flow-anchors-y-lectura-completa.md`](../decisions/0007-writer-flow-anchors-y-lectura-completa.md)
+- [`../notes/copilot-clinical-writer-direction.md`](../notes/copilot-clinical-writer-direction.md)

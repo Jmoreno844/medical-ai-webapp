@@ -7,7 +7,10 @@ class Migration(migrations.Migration):
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ("documents", "0002_initial"),
         ("encounters", "0002_initial"),
-        ("copilot", "0005_rename_copilot_pat_run_id_7b4750_idx_copilot_cop_run_id_468f25_idx_and_more"),
+        (
+            "copilot",
+            "0005_rename_copilot_pat_run_id_7b4750_idx_copilot_cop_run_id_468f25_idx_and_more",
+        ),
     ]
 
     operations = [
@@ -27,8 +30,14 @@ class Migration(migrations.Migration):
                 ("base_version", models.IntegerField(default=1)),
                 ("base_hash", models.CharField(max_length=128)),
                 ("rationale", models.TextField(blank=True, null=True)),
-                ("source_context_document_ids", models.JSONField(blank=True, default=list)),
-                ("target_document_title", models.CharField(blank=True, max_length=255, null=True)),
+                (
+                    "source_context_document_ids",
+                    models.JSONField(blank=True, default=list),
+                ),
+                (
+                    "target_document_title",
+                    models.CharField(blank=True, max_length=255, null=True),
+                ),
                 ("target_selection_reason", models.TextField(blank=True, null=True)),
                 ("document_preview_after", models.TextField(blank=True, null=True)),
                 (

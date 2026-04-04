@@ -63,11 +63,14 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="copilotrun",
-            index=models.Index(fields=["doctor", "encounter"], name="copilot_run_doctor__3ca49a_idx"),
+            index=models.Index(
+                fields=["doctor", "encounter"], name="copilot_run_doctor__3ca49a_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="copilotrun",
-            index=models.Index(fields=["thread_id"], name="copilot_run_thread__6fa655_idx"),
+            index=models.Index(
+                fields=["thread_id"], name="copilot_run_thread__6fa655_idx"
+            ),
         ),
     ]
-

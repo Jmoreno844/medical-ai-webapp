@@ -1,5 +1,4 @@
 import pytest
-from django.urls import reverse
 from datetime import date
 from apps.medico.models import Medico
 from apps.paciente.models import Paciente

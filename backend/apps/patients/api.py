@@ -2,10 +2,9 @@ from ninja import Router
 from typing import List
 from django.shortcuts import get_object_or_404
 from django.http import HttpRequest
-from django.db.models import Q
 from .schemas import PatientCreate, PatientResponse, PatientUpdate
 from .models import Patient, PatientDoctor
-from apps.users.models import User, UserRole
+from apps.users.models import UserRole
 from ninja.security import django_auth
 
 router = Router(tags=["patients"])
