@@ -36,3 +36,5 @@ webapp/dist/
 landing-page/node_modules/
 landing-page/.next/
 landing-page/out/
+copilot_agent/copilot_runtime.db
+copilot_agent/test_*.py

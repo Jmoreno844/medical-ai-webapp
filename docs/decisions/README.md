@@ -30,3 +30,5 @@ Cada ADR deberia incluir al menos estas secciones:
 - [0003. Procesamiento asincrono de audio](0003-procesamiento-asincrono-de-audio.md)
 - [0004. Procesamiento asincrono de agentes de IA](0004-procesamiento-asincrono-agentes-ia.md)
 - [0005. Aislamiento de cargas de trabajo IA (LangGraph)](0005-aislamiento-cargas-trabajo-ia-langgraph.md)
+- [0006. Diferir explicit context caching para un futuro QA helper clínico](0006-explicit-context-caching-futuro-qa-helper.md)
+- [0007. Anchors por contenido y lectura completa explícita en el writer flow](0007-writer-flow-anchors-y-lectura-completa.md)

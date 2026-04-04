@@ -57,9 +57,17 @@ En el sidechat actual, `thread_id` ya identifica una conversación real: Django 
 - **Owner:** `copilot_agent/` + `backend/apps/copilot/` + diseño de producto del QA helper.
 - **Trigger para pagarla:** cuando exista un QA helper longitudinal o multi-superficie que reutilice contexto pesado fuera del mismo hilo conversacional.
 
+### 6. Heurística fina para lectura global del documento aún pragmática
+
+- **Impacto:** el runtime ya expone `read_document(mode="full")` para casos como inserts al inicio/final o cambios amplios, pero todavía no tiene una optimización más fina para leer solo la región terminal/inicial cuando eso bastaría.
+- **Por qué se aceptó:** destraba ya mismo los casos clínicos donde un span inicial no alcanza y mantiene simple la surface del agente mientras se estabiliza la estrategia de anchors por contenido.
+- **Owner:** `copilot_agent/` + `backend/apps/copilot/`.
+- **Trigger para pagarla:** cuando el costo de `mode="full"` en notas largas empiece a notarse o aparezcan suficientes casos de edición donde leer solo el final del documento sea claramente mejor.
+
 ## Referencias
 
 - [`../architecture/ai-agent-workspace.md`](../architecture/ai-agent-workspace.md)
 - [`../architecture/system-overview.md`](../architecture/system-overview.md)
 - [`../../implementation_plan_ai_agent_service.md`](../../implementation_plan_ai_agent_service.md)
 - [`../decisions/0006-explicit-context-caching-futuro-qa-helper.md`](../decisions/0006-explicit-context-caching-futuro-qa-helper.md)
+- [`../decisions/0007-writer-flow-anchors-y-lectura-completa.md`](../decisions/0007-writer-flow-anchors-y-lectura-completa.md)

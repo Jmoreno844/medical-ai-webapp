@@ -7,6 +7,7 @@ from app.graph.nodes import (
     _route_after_model,
     _route_after_tools,
     apply_patch,
+    consolidate_tool_state,
     finalize_response,
     interrupt_for_review,
     make_call_model_node,
@@ -37,6 +38,7 @@ def build_clinical_copilot_graph(*, tools_client, planner, checkpointer=None):
             handle_tool_errors=_tool_error_message,
         ),
     )
+    graph.add_node("consolidate_tool_state", consolidate_tool_state)
     graph.add_node("interrupt_for_review", interrupt_for_review)
     graph.add_node("apply_patch", apply_patch)
     graph.add_node("finalize_response", finalize_response)
@@ -51,8 +53,9 @@ def build_clinical_copilot_graph(*, tools_client, planner, checkpointer=None):
             "finalize_response": "finalize_response",
         },
     )
+    graph.add_edge("tools", "consolidate_tool_state")
     graph.add_conditional_edges(
-        "tools",
+        "consolidate_tool_state",
         _route_after_tools,
         {
             "call_model": "call_model",

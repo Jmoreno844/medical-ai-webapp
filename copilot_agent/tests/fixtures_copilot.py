@@ -35,6 +35,34 @@ class FakeToolsClient:
     def list_encounter_documents(self):
         return self.list_open_documents({})
 
+    def read_document(self, document_id: str, *, mode: str = "excerpt"):
+        summary_payload = self.read_document_summary(document_id)
+        if mode == "summary":
+            return {
+                **summary_payload,
+                "mode": "summary",
+                "content": None,
+            }
+
+        content = {
+            "99": "Paciente estable y con mejoria.",
+            "12": "Paciente con dolor abdominal.",
+            "77": "Paciente egresa estable.",
+            "55": "Coincidencia de busqueda.",
+        }[document_id]
+        return {
+            "document_id": document_id,
+            "encounter_id": "12",
+            "title": summary_payload["title"],
+            "type": summary_payload["type"],
+            "version": 3,
+            "content_hash": "hash-demo",
+            "updated_at": "2026-04-02T10:00:00Z",
+            "mode": mode,
+            "content": content if mode == "full" else None,
+            "excerpt": content,
+        }
+
     def read_document_summary(self, document_id: str):
         title = {
             "99": "Nota clinica",
@@ -269,12 +297,14 @@ def build_state(user_message: str = "Hazme un resumen") -> dict:
         "available_documents": [],
         "context_view": None,
         "document_summaries": {},
+        "document_reads": [],
         "read_spans": [],
         "retrieved_context": [],
         "read_documents": [],
         "encounter_context": None,
         "search_matches": [],
         "search_query": None,
+        "search_results": [],
         "patch_history": {},
         "tool_calls": [],
         "tool_results": [],

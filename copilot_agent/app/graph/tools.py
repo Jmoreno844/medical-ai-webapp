@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Protocol, Sequence
+from typing import Any, Literal, Protocol, Sequence
 from xml.sax.saxutils import escape
 
 from langchain_core.messages import ToolMessage
@@ -18,6 +18,13 @@ class LayeredToolsClient(Protocol):
     def list_open_documents(self, workspace_index: dict[str, Any]) -> dict[str, Any]: ...
 
     def list_encounter_documents(self) -> dict[str, Any]: ...
+
+    def read_document(
+        self,
+        document_id: str,
+        *,
+        mode: str = "excerpt",
+    ) -> dict[str, Any]: ...
 
     def read_document_summary(self, document_id: str) -> dict[str, Any]: ...
 
@@ -75,6 +82,11 @@ class ReadDocumentSummaryInput(BaseModel):
     document_id: str = Field(..., min_length=1)
 
 
+class ReadDocumentInput(BaseModel):
+    document_id: str = Field(..., min_length=1)
+    mode: Literal["summary", "excerpt", "full"] = "excerpt"
+
+
 class ReadDocumentSpanInput(BaseModel):
     document_id: str = Field(..., min_length=1)
     exact_text: str | None = None
@@ -126,6 +138,11 @@ def _summarize_tool_result(tool_name: str, payload: dict[str, Any]) -> str:
         return f"{len(payload.get('documents', []))} document(s) abiertos disponibles"
     if tool_name == "list_encounter_documents":
         return f"{len(payload.get('documents', []))} document(s) totales del encounter"
+    if tool_name == "read_document":
+        return (
+            f"Documento {payload.get('document_id')} leido en modo "
+            f"{payload.get('mode')}"
+        )
     if tool_name == "read_document_summary":
         return f"Resumen del documento {payload.get('document_id')} cargado"
     if tool_name == "read_document_span":
@@ -222,13 +239,6 @@ def _upsert_read_span(
     return [*remaining, span]
 
 
-def _append_state_items(
-    current: Sequence[dict[str, Any]] | None,
-    updates: Sequence[dict[str, Any]] | None,
-) -> list[dict[str, Any]]:
-    return [*(current or []), *(updates or [])]
-
-
 def _default_selected_document_ids(state: CopilotState) -> list[str]:
     available_documents = state.get("available_documents") or []
     available_ids = {str(document["document_id"]) for document in available_documents}
@@ -263,9 +273,11 @@ def _tool_observation_content(
     ]
     if is_error:
         lines.append(f"  {_xml_line('error', payload.get('error'))}")
-    elif tool_name in {"read_document_summary", "read_document_span"}:
+    elif tool_name in {"read_document", "read_document_summary", "read_document_span"}:
         lines.append(f"  {_xml_line('document_id', payload.get('document_id'))}")
         lines.append(f"  {_xml_line('title', payload.get('title'))}")
+        if tool_name == "read_document":
+            lines.append(f"  {_xml_line('mode', payload.get('mode'))}")
         lines.append(f"  {_xml_line('excerpt', payload.get('excerpt') or payload.get('content'), max_length=900)}")
     elif tool_name in {"list_open_documents", "list_encounter_documents"}:
         for document in (payload.get("documents") or [])[:6]:
@@ -322,17 +334,13 @@ def _success_command(
     return Command(
         update={
             **updates,
-            "last_tool_error": None,
-            "tool_results": _append_state_items(
-                state.get("tool_results"),
-                [
-                    {
-                        "tool_name": tool_name,
-                        "summary": summary,
-                        "payload": payload,
-                    }
-                ],
-            ),
+            "tool_results": [
+                {
+                    "tool_name": tool_name,
+                    "summary": summary,
+                    "payload": payload,
+                }
+            ],
             "messages": [
                 ToolMessage(
                     tool_call_id=tool_call_id,
@@ -358,17 +366,13 @@ def _error_command(
     return Command(
         update={
             **(updates or {}),
-            "last_tool_error": error_message,
-            "tool_results": _append_state_items(
-                state.get("tool_results"),
-                [
-                    {
-                        "tool_name": tool_name,
-                        "summary": error_message,
-                        "payload": payload,
-                    }
-                ],
-            ),
+            "tool_results": [
+                {
+                    "tool_name": tool_name,
+                    "summary": error_message,
+                    "payload": payload,
+                }
+            ],
             "messages": [
                 ToolMessage(
                     tool_call_id=tool_call_id,
@@ -422,6 +426,21 @@ def _find_document(
             "is_active": str(state.get("active_document_id") or "") == str(document_id),
         }
 
+    document_read = _current_document_read(
+        state,
+        document_id=document_id,
+        modes=("summary", "excerpt", "full"),
+    )
+    if document_read:
+        return {
+            "document_id": str(document_read.get("document_id") or document_id),
+            "title": document_read.get("title"),
+            "type": document_read.get("type"),
+            "version": document_read.get("version"),
+            "ai_writable": True,
+            "is_active": str(state.get("active_document_id") or "") == str(document_id),
+        }
+
     span = _current_span(state, document_id=document_id)
     if span:
         return {
@@ -456,6 +475,22 @@ def _current_summary(
 ) -> dict[str, Any] | None:
     summaries = state.get("document_summaries") or {}
     return summaries.get(str(document_id))
+
+
+def _current_document_read(
+    state: CopilotState,
+    *,
+    document_id: str,
+    modes: Sequence[str] | None = None,
+) -> dict[str, Any] | None:
+    allowed_modes = {str(mode) for mode in (modes or [])}
+    for document in state.get("document_reads") or []:
+        if str(document.get("document_id")) != str(document_id):
+            continue
+        if allowed_modes and str(document.get("mode") or "") not in allowed_modes:
+            continue
+        return document
+    return None
 
 
 def _current_span(
@@ -506,7 +541,7 @@ def _build_patch_set_preview_payload(
     drafted_plan: DraftedPatchPlan,
     target_document: dict[str, Any],
     summary_payload: dict[str, Any],
-    span_payload: dict[str, Any],
+    span_payload: dict[str, Any] | None,
 ) -> dict[str, Any]:
     target_document_id = str(target_document["document_id"])
     target_document_title = str(
@@ -525,7 +560,7 @@ def _build_patch_set_preview_payload(
     )
     base_version = int(
         summary_payload.get("version")
-        or span_payload.get("version")
+        or (span_payload or {}).get("version")
         or target_document.get("version")
         or 1
     )
@@ -567,7 +602,8 @@ def _build_patch_set_preview_payload(
         "target_document_title": target_document_title,
         "target_selection_reason": selection_reason,
         "base_version": base_version,
-        "base_hash": summary_payload.get("content_hash") or span_payload.get("content_hash"),
+        "base_hash": summary_payload.get("content_hash")
+        or (span_payload or {}).get("content_hash"),
         "rationale": drafted_plan.rationale,
         "document_preview_after": drafted_plan.document_preview_after,
         "source_context_document_ids": source_context_document_ids,
@@ -611,12 +647,6 @@ def build_graph_tools(
             payload=payload,
             updates={
                 "available_documents": documents,
-                "selected_document_ids": _default_selected_document_ids(
-                    {
-                        **state,
-                        "available_documents": documents,
-                    }
-                ),
             },
         )
 
@@ -654,6 +684,55 @@ def build_graph_tools(
         )
 
     @tool
+    def read_document(
+        document_id: str,
+        runtime: ToolRuntime,
+        mode: Literal["summary", "excerpt", "full"] = "excerpt",
+    ) -> Command:
+        """
+        Lee un documento completo o una version resumida/excerpt segun la necesidad.
+        Usa `mode="summary"` para orientarte rapido, `mode="excerpt"` para una lectura
+        ligera y `mode="full"` cuando necesites verificar estructura global, insertar
+        al inicio/final o redactar cambios amplios sin depender de un span parcial.
+        """
+        state, tool_call_id = _runtime_parts(
+            runtime,
+            tool_name="read_document",
+        )
+        validated = ReadDocumentInput(document_id=document_id, mode=mode)
+        try:
+            payload = tools_client.read_document(
+                validated.document_id,
+                mode=validated.mode,
+            )
+        except Exception as error:
+            return _error_command(
+                state=state,
+                tool_name="read_document",
+                tool_call_id=tool_call_id,
+                error_message=(
+                    f"No pude leer el documento {validated.document_id} en modo "
+                    f"{validated.mode}: {error}"
+                ),
+            )
+
+        updates: dict[str, Any] = {
+            "document_reads": [payload],
+        }
+        if payload.get("mode") == "summary":
+            updates["document_summaries"] = {
+                str(payload["document_id"]): payload,
+            }
+
+        return _success_command(
+            state=state,
+            tool_name="read_document",
+            tool_call_id=tool_call_id,
+            payload=payload,
+            updates=updates,
+        )
+
+    @tool
     def read_document_summary(
         document_id: str,
         runtime: ToolRuntime,
@@ -676,35 +755,15 @@ def build_graph_tools(
                 ),
             )
 
-        summary_map = {
-            **(state.get("document_summaries") or {}),
-            str(payload["document_id"]): payload,
-        }
-        read_documents = _upsert_read_document(
-            state.get("read_documents") or [],
-            {
-                "document_id": payload["document_id"],
-                "title": payload.get("title"),
-                "type": payload.get("type"),
-                "mode": "summary",
-                "excerpt": payload.get("excerpt"),
-                "content": None,
-                "content_hash": payload.get("content_hash"),
-            },
-        )
         return _success_command(
             state=state,
             tool_name="read_document_summary",
             tool_call_id=tool_call_id,
             payload=payload,
             updates={
-                "document_summaries": summary_map,
-                "read_documents": read_documents,
-                "retrieved_context": _build_retrieved_context(
-                    context_view=state.get("context_view"),
-                    read_documents=read_documents,
-                    read_spans=state.get("read_spans") or [],
-                ),
+                "document_summaries": {
+                    str(payload["document_id"]): payload,
+                },
             },
         )
 
@@ -760,32 +819,13 @@ def build_graph_tools(
             "title": payload.get("title") or summary_payload.get("title"),
             "type": payload.get("type") or summary_payload.get("type"),
         }
-        read_spans = _upsert_read_span(state.get("read_spans") or [], span_payload)
-        read_documents = _upsert_read_document(
-            state.get("read_documents") or [],
-            {
-                "document_id": span_payload["document_id"],
-                "title": span_payload.get("title"),
-                "type": span_payload.get("type"),
-                "mode": "span",
-                "content": span_payload.get("content"),
-                "excerpt": _shorten_text(span_payload.get("content"), max_length=480),
-                "content_hash": span_payload.get("content_hash"),
-            },
-        )
         return _success_command(
             state=state,
             tool_name="read_document_span",
             tool_call_id=tool_call_id,
             payload=span_payload,
             updates={
-                "read_spans": read_spans,
-                "read_documents": read_documents,
-                "retrieved_context": _build_retrieved_context(
-                    context_view=state.get("context_view"),
-                    read_documents=read_documents,
-                    read_spans=read_spans,
-                ),
+                "read_spans": [span_payload],
             },
         )
 
@@ -804,7 +844,7 @@ def build_graph_tools(
         o palabras abstractas como "nombre", "edad", "paciente", "datos", "resumen", "historia clínica".
         Si necesitas extraer el motivo general, el nombre del paciente, los datos demográficos o el
         contexto completo, NO uses esta herramienta; DEBES aprovechar directamente `build_context_view`, 
-        `read_document_summary` o `read_document_span` para leer la consulta en sí misma.
+        `read_document` o `read_document_span` para leer la consulta en sí misma.
         """
         state, tool_call_id = _runtime_parts(
             runtime,
@@ -835,8 +875,14 @@ def build_graph_tools(
             tool_call_id=tool_call_id,
             payload=payload,
             updates={
-                "search_query": payload.get("query"),
-                "search_matches": payload.get("matches", []),
+                "search_results": [
+                    {
+                        "query": payload.get("query"),
+                        "max_results": validated.max_results,
+                        "allowed_document_types": validated.allowed_document_types or [],
+                        "matches": payload.get("matches", []),
+                    }
+                ],
             },
         )
 
@@ -925,11 +971,6 @@ def build_graph_tools(
             payload=payload,
             updates={
                 "context_view": payload,
-                "retrieved_context": _build_retrieved_context(
-                    context_view=payload,
-                    read_documents=state.get("read_documents") or [],
-                    read_spans=state.get("read_spans") or [],
-                ),
             },
         )
 
@@ -972,34 +1013,50 @@ def build_graph_tools(
                 ),
             )
 
-        summary_payload = _current_summary(state, document_id=target_document_id)
+        summary_payload = _current_summary(state, document_id=target_document_id) or _current_document_read(
+            state,
+            document_id=target_document_id,
+            modes=("summary", "excerpt", "full"),
+        )
         if not summary_payload:
             return _error_command(
                 state=state,
                 tool_name=tool_name,
                 tool_call_id=tool_call_id,
                 error_message=(
-                    "Antes de proponer un patch debes leer el resumen del documento target "
-                    "con read_document_summary."
+                    "Antes de proponer un patch debes leer el documento target con "
+                    "read_document(mode='summary'|'excerpt'|'full')."
                 ),
             )
         span_payload = _current_span(state, document_id=target_document_id)
-        if not span_payload:
+        full_document_payload = _current_document_read(
+            state,
+            document_id=target_document_id,
+            modes=("full",),
+        )
+        if not span_payload and not full_document_payload:
             return _error_command(
                 state=state,
                 tool_name=tool_name,
                 tool_call_id=tool_call_id,
                 error_message=(
-                    "Antes de proponer un patch debes leer un span del documento target "
-                    "con read_document_span."
+                    "Antes de proponer un patch debes leer un span focalizado con "
+                    "read_document_span o el documento completo con read_document(mode='full')."
                 ),
             )
+
+        target_document_content = str(
+            (full_document_payload or {}).get("content")
+            or (span_payload or {}).get("content")
+            or (summary_payload or {}).get("excerpt")
+            or ""
+        )
 
         try:
             drafted_plan = planner.draft_patch_preview(
                 state=state,
                 target_document=target_document,
-                target_document_content=str(span_payload.get("content") or ""),
+                target_document_content=target_document_content,
                 supporting_context=_build_retrieved_context(
                     context_view=state.get("context_view"),
                     read_documents=state.get("read_documents") or [],
@@ -1074,10 +1131,10 @@ def build_graph_tools(
     ) -> Command:
         """Draft a reviewable patch set centered on span replacement.
 
-        CRITICAL PRECONDITION: You MUST NOT call this tool unless you have ALREADY called 
-        both `read_document_summary` AND `read_document_span` for this target document in 
-        PREVIOUS TURNS. If you try to call this first, it will fail.
-        Do NOT call this and a read tool in the same turn.
+        Sequential precondition: You MUST NOT call this tool unless you have ALREADY called
+        `read_document` para este documento target, y ademas `read_document_span` o
+        `read_document(mode="full")` en PREVIOUS TURNS. Si intentas llamarla antes, fallara.
+        Never call this in the same turn as read tools.
         """
         state, tool_call_id = _runtime_parts(
             runtime,
@@ -1098,10 +1155,10 @@ def build_graph_tools(
     ) -> Command:
         """Draft a reviewable patch set centered on anchored insertion.
 
-        CRITICAL PRECONDITION: You MUST NOT call this tool unless you have ALREADY called 
-        both `read_document_summary` AND `read_document_span` for this target document in 
-        PREVIOUS TURNS. If you try to call this first, it will fail.
-        Do NOT call this and a read tool in the same turn.
+        Sequential precondition: You MUST NOT call this tool unless you have ALREADY called
+        `read_document` para este documento target, y ademas `read_document_span` o
+        `read_document(mode="full")` en PREVIOUS TURNS. Si intentas llamarla antes, fallara.
+        Never call this in the same turn as read tools.
         """
         state, tool_call_id = _runtime_parts(
             runtime,
@@ -1112,6 +1169,54 @@ def build_graph_tools(
             state=state,
             tool_call_id=tool_call_id,
             tool_name="propose_insert_after_span",
+            target_document_id=validated.target_document_id,
+        )
+
+    @tool
+    def propose_insert_before(
+        target_document_id: str,
+        runtime: ToolRuntime,
+    ) -> Command:
+        """Draft a reviewable patch set centered on anchored insertion before a span.
+
+        Sequential precondition: You MUST NOT call this tool unless you have ALREADY called
+        `read_document` para este documento target, y ademas `read_document_span` o
+        `read_document(mode="full")` en PREVIOUS TURNS. Si intentas llamarla antes, fallara.
+        Never call this in the same turn as read tools.
+        """
+        state, tool_call_id = _runtime_parts(
+            runtime,
+            tool_name="propose_insert_before",
+        )
+        validated = ProposePatchInput(target_document_id=target_document_id)
+        return _propose_patch(
+            state=state,
+            tool_call_id=tool_call_id,
+            tool_name="propose_insert_before",
+            target_document_id=validated.target_document_id,
+        )
+
+    @tool
+    def propose_delete_span(
+        target_document_id: str,
+        runtime: ToolRuntime,
+    ) -> Command:
+        """Draft a reviewable patch set centered on deleting an anchored span.
+
+        Sequential precondition: You MUST NOT call this tool unless you have ALREADY called
+        `read_document` para este documento target, y ademas `read_document_span` o
+        `read_document(mode="full")` en PREVIOUS TURNS. Si intentas llamarla antes, fallara.
+        Never call this in the same turn as read tools.
+        """
+        state, tool_call_id = _runtime_parts(
+            runtime,
+            tool_name="propose_delete_span",
+        )
+        validated = ProposePatchInput(target_document_id=target_document_id)
+        return _propose_patch(
+            state=state,
+            tool_call_id=tool_call_id,
+            tool_name="propose_delete_span",
             target_document_id=validated.target_document_id,
         )
 
@@ -1137,6 +1242,7 @@ def build_graph_tools(
     return [
         list_open_documents,
         list_encounter_documents,
+        read_document,
         read_document_summary,
         read_document_span,
         search_documents,
@@ -1144,5 +1250,7 @@ def build_graph_tools(
         build_context_view,
         propose_replace_span,
         propose_insert_after_span,
+        propose_insert_before,
+        propose_delete_span,
         propose_create_document,
     ]

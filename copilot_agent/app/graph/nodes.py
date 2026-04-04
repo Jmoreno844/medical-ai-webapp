@@ -1,12 +1,21 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Sequence
 
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.tools import BaseTool
 
-from app.graph.state import CopilotState
+from app.graph.state import (
+    CopilotState,
+    materialize_state_snapshot,
+    reset_dict_state,
+    reset_list_state,
+)
+from app.graph.tools import _build_retrieved_context, _default_selected_document_ids
 from app.planner import CopilotPlanner
+
+logger = logging.getLogger(__name__)
 
 PATCH_REQUIRED_FIELDS = {
     "patch_id",
@@ -30,18 +39,20 @@ def _reset_transient_run_state() -> dict[str, Any]:
     # LangGraph checkpoints are thread-scoped, so a new run on the same thread
     # must clear review/proposal leftovers before the next planner turn starts.
     return {
-        "available_documents": [],
+        "available_documents": reset_list_state(),
         "context_view": None,
-        "document_summaries": {},
-        "read_spans": [],
+        "document_summaries": reset_dict_state(),
+        "document_reads": reset_list_state(),
+        "read_spans": reset_list_state(),
         "retrieved_context": [],
         "read_documents": [],
         "encounter_context": None,
         "search_matches": [],
         "search_query": None,
-        "patch_history": {},
+        "search_results": reset_list_state(),
+        "patch_history": reset_dict_state(),
         "tool_calls": [],
-        "tool_results": [],
+        "tool_results": reset_list_state(),
         "planner_decisions": [],
         "current_plan_step": "start",
         "iteration_count": 0,
@@ -172,6 +183,122 @@ def _current_messages(state: CopilotState) -> Sequence[BaseMessage]:
     return tuple(state.get("messages") or [])
 
 
+def _tool_batch_size(state: CopilotState) -> int:
+    messages = state.get("messages") or []
+    for message in reversed(messages):
+        if isinstance(message, AIMessage) and (message.tool_calls or []):
+            return len(message.tool_calls or [])
+    return 0
+
+
+def _current_batch_tool_results(state: CopilotState) -> list[dict[str, Any]]:
+    batch_size = _tool_batch_size(state)
+    if batch_size <= 0:
+        return []
+    return list((state.get("tool_results") or [])[-batch_size:])
+
+
+def _derive_last_tool_error(state: CopilotState) -> str | None:
+    errors: list[str] = []
+    for result in _current_batch_tool_results(state):
+        payload = result.get("payload") or {}
+        error = str(payload.get("error") or "").strip()
+        if error:
+            errors.append(error)
+
+    if not errors:
+        return None
+    return " | ".join(dict.fromkeys(errors))
+
+
+def _derive_read_documents(state: CopilotState) -> list[dict[str, Any]]:
+    by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    for document in state.get("document_reads") or []:
+        key = (str(document.get("document_id") or ""), str(document.get("mode") or ""))
+        if not key[0] or not key[1]:
+            continue
+        by_key[key] = {
+            "document_id": key[0],
+            "title": document.get("title"),
+            "type": document.get("type"),
+            "mode": key[1],
+            "short_summary": document.get("short_summary"),
+            "excerpt": document.get("excerpt")
+            or " ".join(str(document.get("content") or "").split())[:480],
+            "content": document.get("content"),
+            "content_hash": document.get("content_hash"),
+        }
+
+    for document_id, summary in (state.get("document_summaries") or {}).items():
+        key = (str(document_id), "summary")
+        by_key.setdefault(
+            key,
+            {
+                "document_id": str(document_id),
+                "title": summary.get("title"),
+                "type": summary.get("type"),
+                "mode": "summary",
+                "short_summary": summary.get("short_summary"),
+                "excerpt": summary.get("excerpt"),
+                "content": None,
+                "content_hash": summary.get("content_hash"),
+            },
+        )
+
+    for span in state.get("read_spans") or []:
+        key = (str(span.get("document_id") or ""), "span")
+        candidate = {
+            "document_id": str(span.get("document_id") or ""),
+            "title": span.get("title"),
+            "type": span.get("type"),
+            "mode": "span",
+            "content": span.get("content"),
+            "excerpt": " ".join(str(span.get("content") or "").split())[:480],
+            "content_hash": span.get("content_hash"),
+        }
+        existing = by_key.get(key)
+        if existing is None or len(str(candidate.get("content") or "")) >= len(
+            str(existing.get("content") or "")
+        ):
+            by_key[key] = candidate
+
+    return list(by_key.values())
+
+
+def _derive_selected_document_ids(state: CopilotState) -> list[str]:
+    if state.get("available_documents"):
+        return _default_selected_document_ids(state)
+    return [str(document_id) for document_id in state.get("selected_document_ids", [])]
+
+
+def _derive_search_legacy_fields(state: CopilotState) -> tuple[str | None, list[dict[str, Any]]]:
+    search_results = state.get("search_results") or []
+    if len(search_results) != 1:
+        return None, []
+    only_result = search_results[0]
+    return only_result.get("query"), list(only_result.get("matches") or [])
+
+
+def consolidate_tool_state(state: CopilotState) -> dict[str, Any]:
+    read_documents = _derive_read_documents(state)
+    search_query, search_matches = _derive_search_legacy_fields(state)
+    return {
+        "read_documents": read_documents,
+        "retrieved_context": _build_retrieved_context(
+            context_view=state.get("context_view"),
+            read_documents=read_documents,
+            read_spans=state.get("read_spans") or [],
+        ),
+        "selected_document_ids": _derive_selected_document_ids(state),
+        "last_tool_error": _derive_last_tool_error(state),
+        "search_query": search_query,
+        "search_matches": search_matches,
+        # Recompute after selection/read consolidation so later planner turns always
+        # see a stable post-batch snapshot instead of partial concurrent tool writes.
+        "current_plan_step": state.get("current_plan_step"),
+    }
+
+
 def _route_after_model(state: CopilotState) -> str:
     if state.get("run_error"):
         return "finalize_response"
@@ -216,7 +343,7 @@ def make_call_model_node(
                 ),
             }
 
-        current_state = {**state, **updates}
+        current_state = materialize_state_snapshot({**state, **updates})
         try:
             ai_message = planner.invoke_model(
                 state=current_state,
@@ -224,6 +351,7 @@ def make_call_model_node(
                 tools=tools,
             )
         except Exception as error:
+            logger.exception("Falla real al invocar planner con tools paralelas")
             last_tool_error = str(current_state.get("last_tool_error") or "").strip()
             return {
                 **updates,
@@ -311,6 +439,7 @@ def finalize_response(state: CopilotState) -> dict[str, Any]:
 
 __all__ = [
     "apply_patch",
+    "consolidate_tool_state",
     "finalize_response",
     "interrupt_for_review",
     "make_call_model_node",

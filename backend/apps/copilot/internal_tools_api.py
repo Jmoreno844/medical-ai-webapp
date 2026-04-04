@@ -46,6 +46,12 @@ DOCUMENT_TITLES = {
 }
 
 
+def _document_ai_writable(document_kind: str) -> bool:
+    # Internal encounter listings must mirror the copilot write contract:
+    # transcriptions are read-only, while clinician-facing editable docs stay writable.
+    return document_kind != "transcription"
+
+
 def _normalize_auth_claims(request) -> dict[str, str]:
     auth_payload = getattr(request, "auth", None)
     if not isinstance(auth_payload, dict):
@@ -306,6 +312,7 @@ def list_encounter_documents_tool(request, payload: CopilotListEncounterDocument
                 type=document.kind,
                 status="final" if document.kind == "transcription" else "draft",
                 source="transcription" if document.kind == "transcription" else "user",
+                ai_writable=_document_ai_writable(document.kind),
                 version=_document_version(document),
                 updated_at=document.created_on.isoformat(),
                 excerpt=_build_excerpt(document.content),

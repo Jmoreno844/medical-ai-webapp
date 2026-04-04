@@ -2,13 +2,21 @@ from contextlib import nullcontext
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
+from langchain_core.messages import AIMessage
+
 from app.repository import StoredRun, StoredRunEvent
 from app.runtime import CopilotRuntime
 from app.schemas import RunCreateRequest, RunResumeRequest, WorkspaceIndexPayload
 
 
 def test_resume_run_completes_waiting_review_run(monkeypatch):
-    runtime = CopilotRuntime(settings=SimpleNamespace(database_url="postgresql://unused"))
+    runtime = CopilotRuntime(
+        settings=SimpleNamespace(
+            database_url="postgresql://unused",
+            backend_internal_base_url="http://backend.test",
+            copilot_service_shared_jwt="secret",
+        )
+    )
     stored_run = StoredRun(
         run_id="run-123",
         thread_id="copilot:encounter:12:doctor:7:chat:test",
@@ -66,6 +74,29 @@ def test_resume_run_completes_waiting_review_run(monkeypatch):
             for index, event in enumerate(events, start=1)
         ],
     )
+    class _FakeGraph:
+        def __init__(self):
+            self.updated = None
+
+        def update_state(self, config, values, as_node=None):
+            self.updated = {
+                "config": config,
+                "values": values,
+                "as_node": as_node,
+            }
+            return config
+
+    fake_graph = _FakeGraph()
+
+    class _FakeCheckpointer:
+        def __enter__(self):
+            return object()
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr("app.runtime.PostgresSaver.from_conn_string", lambda _dsn: _FakeCheckpointer())
+    monkeypatch.setattr("app.runtime.build_clinical_copilot_graph", lambda **_kwargs: fake_graph)
 
     updated_run, events = runtime.resume_run(
         "run-123",
@@ -94,6 +125,16 @@ def test_resume_run_completes_waiting_review_run(monkeypatch):
         "response_chunk",
         "run_completed",
     ]
+    assert fake_graph.updated is not None
+    assert fake_graph.updated["config"] == {
+        "configurable": {"thread_id": "copilot:encounter:12:doctor:7:chat:test"}
+    }
+    assert fake_graph.updated["as_node"] == "finalize_response"
+    thread_messages = fake_graph.updated["values"]["messages"]
+    assert len(thread_messages) == 1
+    assert isinstance(thread_messages[0], AIMessage)
+    assert "aprobado y aplicado" in thread_messages[0].content
+    assert "ya quedo resuelto" in thread_messages[0].content
 
 
 def test_runtime_marks_inconsistent_edit_flow_as_failed():
@@ -189,6 +230,44 @@ def test_runtime_omits_intent_classified_event_when_intent_is_unknown():
     event_names = [event["event"] for event in events]
     assert "intent_classified" not in event_names
     assert "agent_decision" in event_names
+
+
+def test_runtime_retrieval_progress_exposes_plural_search_results():
+    runtime = CopilotRuntime(settings=SimpleNamespace(database_url="postgresql://unused"))
+
+    events = runtime._build_events(
+        run_id="run-123",
+        state={
+            "encounter_id": "12",
+            "selected_document_ids": ["99"],
+            "available_documents": [],
+            "retrieved_context": [],
+            "tool_calls": [],
+            "tool_results": [],
+            "intent": "answer_question",
+            "iteration_count": 1,
+            "planner_decisions": [],
+            "requires_human_review": False,
+            "final_response": "Hola.",
+            "run_error": None,
+            "search_results": [
+                {"query": "abdomen", "matches": []},
+                {"query": "egreso", "matches": []},
+            ],
+            "search_query": None,
+            "search_matches": [],
+        },
+        status="completed",
+        patch_set_preview=None,
+    )
+
+    retrieval_event = next(
+        event for event in events if event["event"] == "retrieval_progress"
+    )
+
+    assert retrieval_event["payload"]["search_query"] is None
+    assert retrieval_event["payload"]["search_queries"] == ["abdomen", "egreso"]
+    assert len(retrieval_event["payload"]["search_results"]) == 2
 
 
 def test_create_run_uses_public_thread_id_for_checkpoint(monkeypatch):

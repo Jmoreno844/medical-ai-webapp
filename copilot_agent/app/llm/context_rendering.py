@@ -40,6 +40,55 @@ def _render_documents(documents: Sequence[Mapping[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _render_workspace_documents(
+    workspace_index: Mapping[str, Any],
+    *,
+    active_document_id: str | None,
+    selected_document_ids: Sequence[str],
+) -> str:
+    documents = list(workspace_index.get("documents") or [])
+    if not documents:
+        return "<workspace_documents />"
+
+    relevant_ids: list[str] = []
+    for candidate in [
+        active_document_id,
+        *(selected_document_ids or []),
+        *(workspace_index.get("open_document_ids") or []),
+    ]:
+        candidate_id = str(candidate or "").strip()
+        if candidate_id and candidate_id not in relevant_ids:
+            relevant_ids.append(candidate_id)
+
+    rendered_documents = [
+        document
+        for document in documents
+        if not relevant_ids or str(document.get("document_id") or "") in relevant_ids
+    ]
+    if not rendered_documents:
+        return "<workspace_documents />"
+
+    lines = ["<workspace_documents>"]
+    for document in rendered_documents[:8]:
+        lines.extend(
+            [
+                "  <workspace_document>",
+                f"    {xml_line('document_id', document.get('document_id'))}",
+                f"    {xml_line('title', document.get('title'))}",
+                f"    {xml_line('type', document.get('type'))}",
+                f"    {xml_line('status', document.get('status'))}",
+                f"    {xml_line('is_active', document.get('is_active'))}",
+                f"    {xml_line('is_open', document.get('is_open'))}",
+                f"    {xml_line('ai_writable', document.get('ai_writable'))}",
+                f"    {xml_line('excerpt', document.get('excerpt'))}",
+                f"    {xml_line('short_summary', document.get('short_summary'))}",
+                "  </workspace_document>",
+            ]
+        )
+    lines.append("</workspace_documents>")
+    return "\n".join(lines)
+
+
 def _render_document_summaries(document_summaries: Mapping[str, Mapping[str, Any]]) -> str:
     if not document_summaries:
         return "<document_summaries />"
@@ -59,6 +108,28 @@ def _render_document_summaries(document_summaries: Mapping[str, Mapping[str, Any
             ]
         )
     lines.append("</document_summaries>")
+    return "\n".join(lines)
+
+
+def _render_read_documents(read_documents: Sequence[Mapping[str, Any]]) -> str:
+    if not read_documents:
+        return "<read_documents />"
+
+    lines = ["<read_documents>"]
+    for document in read_documents[:6]:
+        lines.extend(
+            [
+                "  <read_document>",
+                f"    {xml_line('document_id', document.get('document_id'))}",
+                f"    {xml_line('title', document.get('title'))}",
+                f"    {xml_line('type', document.get('type'))}",
+                f"    {xml_line('mode', document.get('mode'))}",
+                f"    {xml_line('short_summary', document.get('short_summary'))}",
+                f"    {xml_line('excerpt', document.get('excerpt'), max_length=900)}",
+                "  </read_document>",
+            ]
+        )
+    lines.append("</read_documents>")
     return "\n".join(lines)
 
 
@@ -126,28 +197,42 @@ def _render_patch_history(patch_history: Mapping[str, list[Mapping[str, Any]]]) 
     return "\n".join(lines)
 
 
-def _render_search_matches(search_matches: Sequence[Mapping[str, Any]]) -> str:
-    if not search_matches:
-        return "<search_matches />"
+def _render_search_results(
+    search_results: Sequence[Mapping[str, Any]],
+) -> str:
+    if not search_results:
+        return "<search_results />"
 
-    lines = ["<search_matches>"]
-    for match in search_matches[:4]:
-        lines.extend(
-            [
-                "  <match>",
-                f"    {xml_line('document_id', match.get('document_id'))}",
-                f"    {xml_line('title', match.get('title'))}",
-                f"    {xml_line('score', match.get('score'))}",
-                f"    {xml_line('snippet', match.get('snippet'))}",
-                "  </match>",
-            ]
-        )
-    lines.append("</search_matches>")
+    lines = ["<search_results>"]
+    for result in search_results[:4]:
+        lines.append(f'  <search_result query="{escape(str(result.get("query") or ""))}">')
+        for match in (result.get("matches") or [])[:4]:
+            lines.extend(
+                [
+                    "    <match>",
+                    f"      {xml_line('document_id', match.get('document_id'))}",
+                    f"      {xml_line('title', match.get('title'))}",
+                    f"      {xml_line('score', match.get('score'))}",
+                    f"      {xml_line('snippet', match.get('snippet'))}",
+                    "    </match>",
+                ]
+            )
+        lines.append("  </search_result>")
+    lines.append("</search_results>")
     return "\n".join(lines)
 
 
 def render_turn_context(state: Mapping[str, Any]) -> str:
     workspace_index = state.get("workspace_index") or {}
+    selected_document_ids = list(state.get("selected_document_ids") or [])
+    search_results = list(state.get("search_results") or [])
+    if not search_results and state.get("search_matches"):
+        search_results = [
+            {
+                "query": state.get("search_query"),
+                "matches": state.get("search_matches") or [],
+            }
+        ]
     return "\n".join(
         [
             "<copilot_turn_context>",
@@ -156,13 +241,19 @@ def render_turn_context(state: Mapping[str, Any]) -> str:
             f"    {xml_line('encounter_id', workspace_index.get('encounter_id'))}",
             f"    {xml_line('workspace_version', workspace_index.get('workspace_version'))}",
             f"    {xml_line('active_document_id', state.get('active_document_id'))}",
-            f"    {xml_line('selected_document_ids', ', '.join(state.get('selected_document_ids') or []))}",
+            f"    {xml_line('selected_document_ids', ', '.join(selected_document_ids))}",
             "  </workspace_index>",
+            _render_workspace_documents(
+                workspace_index,
+                active_document_id=state.get("active_document_id"),
+                selected_document_ids=selected_document_ids,
+            ),
             _render_documents(state.get("available_documents") or []),
             _render_document_summaries(state.get("document_summaries") or {}),
+            _render_read_documents(state.get("read_documents") or []),
             _render_read_spans(state.get("read_spans") or []),
             _render_context_view(state.get("context_view")),
-            _render_search_matches(state.get("search_matches") or []),
+            _render_search_results(search_results),
             _render_patch_history(state.get("patch_history") or {}),
             "  <budgets>",
             f"    {xml_line('iteration_count', state.get('iteration_count'))}",

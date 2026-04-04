@@ -22,6 +22,7 @@ type UseCopilotPanelControllerResult = {
   latestToolCalls: Array<Record<string, unknown>>;
   latestToolResults: Array<Record<string, unknown>>;
   searchQueryFromRun: string | null;
+  searchQueriesFromRun: string[];
   pendingPatch: CopilotPatchResponse | null;
   patchFlowError: string | null;
   readMode: ReturnType<typeof useAiSessionStore.getState>["readMode"];
@@ -110,6 +111,15 @@ export function useCopilotPanelController(
     typeof latestRetrievalEvent?.payload.search_query === "string"
       ? latestRetrievalEvent.payload.search_query
       : null;
+  const searchQueriesFromRun = Array.isArray(
+    latestRetrievalEvent?.payload.search_queries
+  )
+    ? latestRetrievalEvent.payload.search_queries
+        .map((value) => String(value))
+        .filter((value) => value.length > 0)
+    : searchQueryFromRun
+      ? [searchQueryFromRun]
+      : [];
 
   const latestPatchProposedEvent = [...state.events]
     .reverse()
@@ -117,12 +127,15 @@ export function useCopilotPanelController(
   const latestReviewRequiredEvent = [...state.events]
     .reverse()
     .find((event) => event.event === "review_required");
+  const latestReviewResolvedEvent = [...state.events]
+    .reverse()
+    .find((event) => event.event === "review_resolved");
 
   const eventDerivedPendingPatch = useMemo(() => {
     if (!latestPatchProposedEvent) {
       return null;
     }
-    if (state.status !== "waiting_review" && !latestReviewRequiredEvent) {
+    if (state.status !== "waiting_review") {
       return null;
     }
 
@@ -139,18 +152,20 @@ export function useCopilotPanelController(
         ? (payload.resolved_range as { start?: unknown; end?: unknown })
         : null;
 
-    const resolvedStart =
-      resolvedRangePayload && typeof resolvedRangePayload.start === "number"
-        ? resolvedRangePayload.start
+    const resolvedRange =
+      resolvedRangePayload &&
+      typeof resolvedRangePayload.start === "number" &&
+      typeof resolvedRangePayload.end === "number"
+        ? { start: resolvedRangePayload.start, end: resolvedRangePayload.end }
         : typeof payload.resolved_start === "number"
-          ? payload.resolved_start
-          : 0;
-    const resolvedEnd =
-      resolvedRangePayload && typeof resolvedRangePayload.end === "number"
-        ? resolvedRangePayload.end
-        : typeof payload.resolved_end === "number"
-          ? payload.resolved_end
-          : resolvedStart;
+          ? {
+              start: payload.resolved_start,
+              end:
+                typeof payload.resolved_end === "number"
+                  ? payload.resolved_end
+                  : payload.resolved_start,
+            }
+          : null;
 
     return {
       id: patchId,
@@ -181,13 +196,13 @@ export function useCopilotPanelController(
             : typeof payload.content_preview === "string"
               ? payload.content_preview
               : "",
-      resolvedRange: { start: resolvedStart, end: resolvedEnd },
+      resolvedRange,
       orderIndex: typeof payload.order_index === "number" ? payload.order_index : 0,
       status: "pending",
       rationale: typeof payload.rationale === "string" ? payload.rationale : null,
       confidence: typeof payload.confidence === "number" ? payload.confidence : null,
     } satisfies CopilotPatchResponse;
-  }, [latestPatchProposedEvent, latestReviewRequiredEvent, state.status]);
+  }, [latestPatchProposedEvent, state.status]);
 
   const persistedPendingPatch = useMemo(() => {
     if (!Array.isArray(state.patchSets)) {
@@ -237,7 +252,9 @@ export function useCopilotPanelController(
     if (
       latestPatchProposedEvent &&
       state.status === "completed" &&
-      !persistedPendingPatch
+      !persistedPendingPatch &&
+      !latestReviewRequiredEvent &&
+      !latestReviewResolvedEvent
     ) {
       return (
         "El run emitio patch_proposed pero termino en completed sin review_required " +
@@ -250,6 +267,8 @@ export function useCopilotPanelController(
     persistedPendingPatch,
     state.lastError,
     state.status,
+    latestReviewRequiredEvent,
+    latestReviewResolvedEvent,
   ]);
 
   useEffect(() => {
@@ -473,6 +492,7 @@ export function useCopilotPanelController(
     latestToolCalls,
     latestToolResults,
     searchQueryFromRun,
+    searchQueriesFromRun,
     pendingPatch,
     patchFlowError,
     readMode,

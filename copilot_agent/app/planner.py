@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Literal, Mapping, Protocol, Sequence
@@ -7,6 +8,7 @@ from typing import Any, Callable, Literal, Mapping, Protocol, Sequence
 from google.genai import types as genai_types
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.tools import BaseTool
+from langchain_core.utils.function_calling import convert_to_openai_tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -43,27 +45,27 @@ class DraftedPatchAnchor(BaseModel):
     exact_text: str = Field(
         ...,
         alias="exactText",
-        description="The exact textual match in the document. MANDATORY. CRITICAL RULE: NEVER include newlines (\\n) or attempt to match large paragraphs. Pick a VERY SHORT, unique phrase (3-8 words) from a single line. The backend performs a strict substring search and will fail if JSON whitespace normalization alters your text."
+        description="The exact textual match in the document. MANDATORY. Primary anchor signal. NEVER include newlines (\\n) or large paragraphs. Pick a VERY SHORT, unique phrase (3-8 words) from a single line. The backend performs a strict substring search and will fail if JSON whitespace normalization alters your text."
     )
     prefix_text: str | None = Field(
         default=None,
         alias="prefixText",
-        description="A few words immediately BEFORE the exactText. CRITICAL: Do NOT include newlines (\\n) or invisible characters."
+        description="A few words immediately BEFORE the exactText. Strongly recommended when the text could repeat. Do NOT include newlines (\\n) or invisible characters."
     )
     suffix_text: str | None = Field(
         default=None,
         alias="suffixText",
-        description="A few words immediately AFTER the exactText. CRITICAL: Do NOT include newlines (\\n) or invisible characters."
+        description="A few words immediately AFTER the exactText. Strongly recommended when the text could repeat. Do NOT include newlines (\\n) or invisible characters."
     )
     start_offset: int | None = Field(
         default=None,
         alias="startOffset",
-        description="The exact starting character index of the 'exact_text' in the document. Must always be provided if endOffset is provided."
+        description="Optional secondary hint. The exact starting character index of the 'exact_text' in the document. Must always be provided if endOffset is provided."
     )
     end_offset: int | None = Field(
         default=None,
         alias="endOffset",
-        description="The exact ending character index of the 'exact_text' in the document. Must always be provided if startOffset is provided."
+        description="Optional secondary hint. The exact ending character index of the 'exact_text' in the document. Must always be provided if startOffset is provided."
     )
 
     def to_payload(self) -> dict[str, Any]:
@@ -125,18 +127,70 @@ def _is_proposal_tool_name(tool_name: str | None) -> bool:
     return str(tool_name or "").startswith("propose_")
 
 
+def _tool_call_identity(tool_call: dict[str, Any]) -> tuple[str, str]:
+    tool_name = str(tool_call.get("name") or "")
+    if tool_name in {
+        "list_open_documents",
+        "list_encounter_documents",
+        "build_context_view",
+    }:
+        return tool_name, "__singleton__"
+    return tool_name, json.dumps(tool_call.get("args") or {}, sort_keys=True, separators=(",", ":"))
+
+
 def _filter_parallel_tool_calls(message: AIMessage) -> AIMessage:
     tool_calls = list(message.tool_calls or [])
     if len(tool_calls) <= 1:
         return message
 
-    # To avoid INVALID_CONCURRENT_GRAPH_UPDATE on unannotated CopilotState lists,
-    # we strictly serialize all tool calls one per turn.
+    proposal_calls = [
+        tool_call for tool_call in tool_calls if _is_proposal_tool_name(tool_call.get("name"))
+    ]
+    non_write_calls = [
+        tool_call for tool_call in tool_calls if not _is_proposal_tool_name(tool_call.get("name"))
+    ]
+
+    if non_write_calls:
+        candidate_calls = non_write_calls
+    else:
+        candidate_calls = proposal_calls[:1]
+
+    deduped_calls: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for tool_call in candidate_calls:
+        identity = _tool_call_identity(tool_call)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        deduped_calls.append(tool_call)
+
+    if deduped_calls == tool_calls:
+        return message
+
     logger.info(
-        "Planner returned %s tool calls in one turn; keeping only the first to avoid graph race conditions.",
+        "Planner returned %s tool calls in one turn; normalized batch to %s safe call(s).",
         len(tool_calls),
+        len(deduped_calls),
     )
-    return message.model_copy(update={"tool_calls": [tool_calls[0]]})
+    return message.model_copy(update={"tool_calls": deduped_calls})
+
+
+def _provider_tool_spec(tool: BaseTool | Callable[..., Any]) -> Any:
+    if not isinstance(tool, BaseTool):
+        return tool
+
+    schema = tool.tool_call_schema.model_json_schema()
+    return convert_to_openai_tool(
+        {
+            "name": tool.name,
+            "description": tool.description or schema.get("description") or "",
+            "parameters": {
+                "type": "object",
+                "properties": schema.get("properties", {}),
+                "required": schema.get("required", []),
+            },
+        }
+    )
 
 
 @dataclass
@@ -163,7 +217,9 @@ class LangChainCopilotPlanner:
         messages: Sequence[BaseMessage],
         tools: Sequence[BaseTool | Callable[..., Any]],
     ) -> AIMessage:
-        runnable = self._planner_model_instance().bind_tools(tools)
+        runnable = self._planner_model_instance().bind_tools(
+            [_provider_tool_spec(tool) for tool in tools]
+        )
         
         current_messages = list(messages)
         for attempt in range(1, 4):

@@ -19,7 +19,7 @@ El Copiloto Clínico no es un servicio monolítico frontend. Responde a una arqu
 3. **Agent Runtime (LangGraph / Cloud Run):**
    - **Responsabilidad:** Orquestación, memoria de sesión, toma de decisiones (Tools) y generación de respuestas/patches.
    - **Boundary:** no es público al navegador; Django consume sus contratos internos.
-   - **Estado actual:** usa PostgreSQL como checkpointer, persiste `runs`/`events`, lee documentos/contexto reales desde Django y ya corre con `ToolNode` + tool calling nativo de LangChain sobre Gemini/Vertex (`ChatGoogleGenerativeAI`). El planner mantiene mensajes LangChain reales y renderiza el contexto por turno con bloques XML, mientras el drafter usa `json_schema` structured output para construir `patch_set_preview` de un solo documento target. El `safe apply` final sigue en Django. El `thread_id` público identifica la conversación activa del sidechat y LangGraph lo usa directamente como checkpoint key para conservar contexto entre mensajes del mismo chat. Aunque usemos function/tool calling nativo, el runtime desactiva `Automatic Function Calling` del SDK de Google para que la orquestación siga ocurriendo dentro de LangGraph y no en el proveedor; en patch drafting no hay fallback a `function_calling`. El planner y el drafter tratan transcripciones, notas, spans y facts recuperados como datos clinicos, no como instrucciones ejecutables.
+   - **Estado actual:** usa PostgreSQL como checkpointer, persiste `runs`/`events`, lee documentos/contexto reales desde Django y ya corre con `ToolNode` + tool calling nativo de LangChain sobre Gemini/Vertex (`ChatGoogleGenerativeAI`). El planner mantiene mensajes LangChain reales y renderiza el contexto por turno con bloques XML, mientras el drafter usa `json_schema` structured output para construir `patch_set_preview` de un solo documento target. El `safe apply` final sigue en Django. El `thread_id` público identifica la conversación activa del sidechat y LangGraph lo usa directamente como checkpoint key para conservar contexto entre mensajes del mismo chat. Aunque usemos function/tool calling nativo, el runtime desactiva `Automatic Function Calling` del SDK de Google para que la orquestación siga ocurriendo dentro de LangGraph y no en el proveedor; en patch drafting no hay fallback a `function_calling`. El planner y el drafter tratan transcripciones, notas, spans y facts recuperados como datos clinicos, no como instrucciones ejecutables. La surface de lectura ya distingue entre `read_document(mode=summary|excerpt|full)` y `read_document_span`, y la surface de edición expone reemplazos, inserciones y borrados anclados.
 
 ---
 
@@ -32,10 +32,12 @@ Para resolver el problema de contexto masivo (ej. transcripciones de 30 minutos 
 - El Frontend nunca sube archivos largos en los payloads de chat.
 - El Frontend expone un `WorkspaceIndex` ligero construido desde el workspace state layer, no desde JSX o estado local del editor.
 - Ese `WorkspaceIndex` contiene metadatos como documento activo, `version`, `hasDirtyDraft`, `hasStreamingState`, `aiReadable` y working set.
+- El planner recibe desde el primer turno una vista ligera de los documentos abiertos/seleccionados (`document_id`, `title`, `type`, `is_active`, `is_open`, `ai_writable`) para no depender solo de IDs crudos ni del recuerdo del turno anterior al elegir documento target.
 - Django entrega ese `WorkspaceIndex` al agent runtime.
 - El Agente usa el `WorkspaceIndex` para decidir qué leer y luego llama a tools internas read-only para obtener documentos y contexto reales desde Django.
 - El broker Django persiste `CopilotRun`, consulta el estado del runtime y reemite SSE al frontend.
 - En el sidechat actual, Django crea un `thread_id` nuevo por conversación; el frontend lo conserva solo en memoria del panel y lo reusa en mensajes siguientes hasta resetear el chat.
+- Cuando una revisión se aprueba o rechaza, el runtime refleja ese cierre dentro del mismo thread checkpoint con un mensaje sintético del asistente; así el siguiente turno sabe que el flujo anterior ya quedó resuelto.
 
 ### Regla del frontend actual
 
@@ -79,6 +81,7 @@ El agente de IA **tiene prohibido escribir o sobreescribir** el contenido canón
    - El runtime de producción ya no usa fallback heurístico para decidir tools ni para redactar cambios.
    - El loop principal usa tool calling nativo (`AIMessage.tool_calls -> ToolNode -> ToolMessage`) y devuelve observaciones corregibles a la conversación cuando una tool falla o recibe un schema inválido.
    - Si Vertex falla o no materializa cambios reales, el writer flow falla cerrado en vez de abrir un review con placeholders.
+   - La estrategia primaria de anclaje es por contenido (`exactText + prefixText + suffixText`); los offsets son solo ayudas secundarias durante apply/rebase.
 2. Django resuelve anchors a rangos reales, persiste un `CopilotPatchSet` y marca cada `CopilotPatch` como `pending` o `conflicted`.
 3. El frontend renderiza la propuesta desde el patch set y sus patches hijos.
 4. El médico audita: acepta o rechaza cambios individuales, o el set completo.
@@ -87,6 +90,21 @@ El agente de IA **tiene prohibido escribir o sobreescribir** el contenido canón
 El debug panel y la futura UI lateral no dependen únicamente de la lista persistida de patches: si el stream ya emitió `patch_set_proposed` y el run está en `waiting_review`, el frontend puede derivar un estado efectivo temporal hasta que Django termine de reflejarlo en `GET /patch-sets`.
 
 Lo que sigue pendiente ya no es el apply básico, sino el audit trail clínico fuerte, versionado robusto, rebase seguro sobre documentos cambiados y la UX final fuera del debug panel. La deuda canónica está en [`../debt/copilot-agent-runtime.md`](../debt/copilot-agent-runtime.md).
+
+### Surface de lectura actual
+
+- `read_document(mode="summary")`
+  - orientación rápida sobre un documento target o fuente
+- `read_document(mode="excerpt")`
+  - lectura ligera cuando aún no hace falta el contenido completo
+- `read_document(mode="full")`
+  - lectura global para cambios amplios, inserts al inicio/final o verificación de estructura
+- `read_document_span`
+  - lectura focalizada y resolución de anchors para cambios locales
+
+En el writer flow, `read_document(mode="full")` no debe ser la lectura por defecto de todo. Se reserva para casos donde un summary o span no bastan para redactar un patch seguro.
+El documento activo del workspace ayuda como pista de intención, pero no debe ganar automáticamente cuando el médico menciona explícitamente otro documento como la nota clínica, el contexto o la transcripción.
+Cada nuevo mensaje del médico define la prioridad actual del turno. Si cambia de objetivo, el planner no debe seguir tareas pendientes previas salvo que el usuario las retome explícitamente.
 
 ## 4. Checklist para Escalabilidad
 

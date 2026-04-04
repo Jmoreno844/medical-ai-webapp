@@ -59,15 +59,16 @@ type CopilotPatchSetApi = {
 function normalizePatch(apiPatch: CopilotPatchApi, parentPatchSetId: string): CopilotPatchResponse {
   const resolvedRange =
     apiPatch.resolvedRange ??
-    apiPatch.resolved_range ?? {
-      start: typeof apiPatch.resolved_start === "number" ? apiPatch.resolved_start : 0,
-      end:
-        typeof apiPatch.resolved_end === "number"
-          ? apiPatch.resolved_end
-          : typeof apiPatch.resolved_start === "number"
-            ? apiPatch.resolved_start
-            : 0,
-    };
+    apiPatch.resolved_range ??
+    (typeof apiPatch.resolved_start === "number"
+      ? {
+          start: apiPatch.resolved_start,
+          end:
+            typeof apiPatch.resolved_end === "number"
+              ? apiPatch.resolved_end
+              : apiPatch.resolved_start,
+        }
+      : null);
 
   return {
     id: String(apiPatch.id ?? apiPatch.patch_id ?? ""),

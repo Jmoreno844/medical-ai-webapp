@@ -4,6 +4,47 @@ from tests.fixtures_copilot import build_state
 
 def test_render_turn_context_keeps_workspace_and_budget_sections():
     state = build_state("resume el encounter actual")
+    state["workspace_index"]["documents"] = [
+        {
+            "document_id": "99",
+            "title": "Nota clinica",
+            "type": "note",
+            "status": "draft",
+            "source": "user",
+            "ai_readable": True,
+            "ai_writable": True,
+            "version": 3,
+            "updated_at": "2026-04-02",
+            "is_active": True,
+            "is_open": True,
+            "has_dirty_draft": False,
+            "has_streaming_state": False,
+            "hidden_from_agent": False,
+            "pinned_for_agent": False,
+            "excerpt": "Paciente estable.",
+            "short_summary": "Paciente estable.",
+        },
+        {
+            "document_id": "12",
+            "title": "Contexto del encuentro",
+            "type": "context",
+            "status": "draft",
+            "source": "user",
+            "ai_readable": True,
+            "ai_writable": True,
+            "version": 1,
+            "updated_at": "2026-04-02",
+            "is_active": False,
+            "is_open": True,
+            "has_dirty_draft": False,
+            "has_streaming_state": False,
+            "hidden_from_agent": False,
+            "pinned_for_agent": False,
+            "excerpt": "Dolor abdominal previo.",
+            "short_summary": "Dolor abdominal previo.",
+        },
+    ]
+    state["selected_document_ids"] = ["99", "12"]
     state["available_documents"] = [
         {
             "document_id": "99",
@@ -26,6 +67,17 @@ def test_render_turn_context_keeps_workspace_and_budget_sections():
             "excerpt": "Paciente estable.",
         }
     }
+    state["read_documents"] = [
+        {
+            "document_id": "99",
+            "title": "Nota clinica",
+            "type": "note",
+            "mode": "full",
+            "short_summary": None,
+            "excerpt": "Paciente estable.",
+            "content": "Paciente estable.",
+        }
+    ]
     state["read_spans"] = [
         {
             "document_id": "99",
@@ -55,12 +107,17 @@ def test_render_turn_context_keeps_workspace_and_budget_sections():
             }
         ]
     }
-    state["search_matches"] = [
+    state["search_results"] = [
         {
-            "document_id": "77",
-            "title": "Epicrisis",
-            "score": 0.8,
-            "snippet": "Coincidencia relevante.",
+            "query": "abdomen",
+            "matches": [
+                {
+                    "document_id": "77",
+                    "title": "Epicrisis",
+                    "score": 0.8,
+                    "snippet": "Coincidencia relevante.",
+                }
+            ],
         }
     ]
 
@@ -68,11 +125,16 @@ def test_render_turn_context_keeps_workspace_and_budget_sections():
 
     assert "<copilot_turn_context>" in rendered
     assert "<workspace_index>" in rendered
+    assert "<workspace_documents>" in rendered
+    assert "<title>Nota clinica</title>" in rendered
+    assert "<type>context</type>" in rendered
     assert "<available_documents>" in rendered
     assert "<document_summaries>" in rendered
+    assert "<read_documents>" in rendered
     assert "<read_spans>" in rendered
     assert "<context_view>" in rendered
-    assert "<search_matches>" in rendered
+    assert "<search_results>" in rendered
+    assert 'search_result query="abdomen"' in rendered
     assert "<patch_history>" in rendered
     assert "<budgets>" in rendered
 

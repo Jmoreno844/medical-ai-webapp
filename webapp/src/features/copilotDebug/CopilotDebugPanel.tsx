@@ -26,6 +26,7 @@ export default function CopilotDebugPanel({
     latestToolCalls,
     latestToolResults,
     searchQueryFromRun,
+    searchQueriesFromRun,
     pendingPatch,
     patchFlowError,
     readMode,
@@ -190,7 +191,9 @@ export default function CopilotDebugPanel({
               </div>
               <div>
                 <span className="font-medium">resolved_range:</span>{" "}
-                {`${pendingPatch.resolvedRange.start}-${pendingPatch.resolvedRange.end}`}
+                {pendingPatch.resolvedRange
+                  ? `${pendingPatch.resolvedRange.start}-${pendingPatch.resolvedRange.end}`
+                  : "—"}
               </div>
               <div>
                 <span className="font-medium">type:</span>{" "}
@@ -285,11 +288,15 @@ export default function CopilotDebugPanel({
               ))
             )}
           </div>
-          {searchQueryFromRun && (
+          {searchQueriesFromRun.length > 0 ? (
+            <div className="mt-2 text-[11px] text-slate-500">
+              search_queries: {searchQueriesFromRun.join(", ")}
+            </div>
+          ) : searchQueryFromRun ? (
             <div className="mt-2 text-[11px] text-slate-500">
               search_query: {searchQueryFromRun}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 

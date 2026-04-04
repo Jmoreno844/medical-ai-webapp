@@ -48,7 +48,7 @@ export type CopilotPatchResponse = {
   anchor: Record<string, unknown>;
   oldText: string;
   newText: string;
-  resolvedRange: { start: number; end: number };
+  resolvedRange: { start: number; end: number } | null;
   orderIndex: number;
   status: CopilotPatchStatus;
   rationale?: string | null;

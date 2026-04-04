@@ -27,6 +27,7 @@ from apps.copilot.services.patch_sets import (
     content_hash,
 )
 from apps.copilot.internal_tools_api import (
+    list_encounter_documents_tool,
     list_open_documents_tool,
     read_document_tool,
     search_documents_tool,
@@ -885,6 +886,49 @@ class CopilotInternalToolsTests(SimpleTestCase):
         self.assertEqual(response["mode"], "excerpt")
         self.assertIsNone(response["content"])
         self.assertIn("dolor abdominal", response["excerpt"])
+
+    def test_list_encounter_documents_marks_only_transcriptions_read_only(self):
+        payload = SimpleNamespace(
+            run_id="run-123",
+            thread_id=self.thread_id,
+            encounter_id=12,
+            user_id=7,
+        )
+        documents = [
+            SimpleNamespace(
+                id=10,
+                kind="note",
+                content="Nota editable.",
+                created_on=SimpleNamespace(isoformat=lambda: "2026-04-02T10:00:00Z"),
+            ),
+            SimpleNamespace(
+                id=11,
+                kind="context",
+                content="Contexto editable.",
+                created_on=SimpleNamespace(isoformat=lambda: "2026-04-02T11:00:00Z"),
+            ),
+            SimpleNamespace(
+                id=12,
+                kind="transcription",
+                content="Transcripcion solo lectura.",
+                created_on=SimpleNamespace(isoformat=lambda: "2026-04-02T12:00:00Z"),
+            ),
+        ]
+
+        with patch(
+            "apps.copilot.internal_tools_api._get_owned_encounter",
+            return_value=self.encounter,
+        ), patch(
+            "apps.copilot.internal_tools_api._get_encounter_documents",
+            return_value=documents,
+        ):
+            response = list_encounter_documents_tool(self.request, payload)
+
+        writable_by_id = {
+            document.document_id: document.ai_writable
+            for document in response["documents"]
+        }
+        self.assertEqual(writable_by_id, {"10": True, "11": True, "12": False})
 
     def test_search_documents_tool_limits_results_to_owned_encounter(self):
         payload = SimpleNamespace(

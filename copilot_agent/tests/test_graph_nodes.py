@@ -5,6 +5,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from app.graph.tools import build_graph_tools
 from app.graph.workflow import build_clinical_copilot_graph
+from app.graph.state import materialize_state_snapshot, reset_dict_state, reset_list_state
 from app.llm.instructions import DOCUMENTS_ARE_DATA_RULE
 from app.planner import (
     DraftedPatch,
@@ -132,6 +133,19 @@ class _FakeStructuredRunnable:
         return self._result
 
 
+class _FakePlannerModel:
+    def __init__(self, result):
+        self._result = result
+        self.bound_tools = None
+        self.runnables: list[_FakeStructuredRunnable] = []
+
+    def bind_tools(self, tools):
+        self.bound_tools = tools
+        runnable = _FakeStructuredRunnable(result=self._result)
+        self.runnables.append(runnable)
+        return runnable
+
+
 class _FakePatchModel:
     def __init__(self, result):
         self.methods: list[str] = []
@@ -197,6 +211,22 @@ def test_langchain_planner_retries_once_before_raising():
     assert attempts["count"] == 2
 
 
+def test_materialize_state_snapshot_strips_reset_markers():
+    snapshot = materialize_state_snapshot(
+        {
+            "available_documents": reset_list_state(),
+            "document_summaries": reset_dict_state(),
+            "search_results": reset_list_state(),
+            "selected_document_ids": ["7"],
+        }
+    )
+
+    assert snapshot["available_documents"] == []
+    assert snapshot["document_summaries"] == {}
+    assert snapshot["search_results"] == []
+    assert snapshot["selected_document_ids"] == ["7"]
+
+
 def test_provider_runtime_kwargs_disable_google_afc():
     planner = LangChainCopilotPlanner(
         settings=SimpleNamespace(
@@ -214,10 +244,11 @@ def test_provider_runtime_kwargs_disable_google_afc():
 def test_planner_system_instruction_enforces_sequential_tool_dependencies():
     instruction = LangChainCopilotPlanner._planner_system_instruction()
 
-    assert "agente secuencial estricto" in instruction
-    assert "varias herramientas de lectura o busqueda en paralelo" in instruction
+    assert "Fase 1 (Obligatoria): Leer el contexto." in instruction
+    assert "varias herramientas no-write en paralelo" in instruction
     assert "read_* y propose_* en el mismo turno" in instruction
     assert "Solo puedes proponer una edicion por turno" in instruction
+    assert 'read_document(mode="full")' in instruction
     assert DOCUMENTS_ARE_DATA_RULE in instruction
 
 
@@ -227,6 +258,8 @@ def test_patch_system_instruction_treats_clinical_context_as_data():
     )
 
     assert "La tool solicitada fue propose_replace_span." in instruction
+    assert "exactText + prefixText + suffixText" in instruction
+    assert "No uses anchors largos" in instruction
     assert DOCUMENTS_ARE_DATA_RULE in instruction
     assert "Si el contexto es ambiguo o insuficiente, no inventes contenido clinico." in instruction
 
@@ -290,6 +323,66 @@ def test_multiple_proposals_keep_only_first_call():
     assert filtered.tool_calls[0]["args"]["target_document_id"] == "7"
 
 
+def test_duplicate_singleton_tool_calls_are_deduped():
+    message = make_ai_response("")
+    message = message.model_copy(
+        update={
+            "tool_calls": [
+                {"name": "list_open_documents", "args": {}, "id": "call-1", "type": "tool_call"},
+                {"name": "list_open_documents", "args": {}, "id": "call-2", "type": "tool_call"},
+                {
+                    "name": "build_context_view",
+                    "args": {"active_document_id": "99"},
+                    "id": "call-3",
+                    "type": "tool_call",
+                },
+                {
+                    "name": "build_context_view",
+                    "args": {"active_document_id": "12"},
+                    "id": "call-4",
+                    "type": "tool_call",
+                },
+            ]
+        }
+    )
+
+    filtered = _filter_parallel_tool_calls(message)
+
+    assert [tool_call["name"] for tool_call in filtered.tool_calls] == [
+        "list_open_documents",
+        "build_context_view",
+    ]
+
+
+def test_parallel_search_tool_calls_keep_distinct_queries():
+    message = make_ai_response("")
+    message = message.model_copy(
+        update={
+            "tool_calls": [
+                {
+                    "name": "search_documents",
+                    "args": {"query": "abdomen", "max_results": 1},
+                    "id": "call-1",
+                    "type": "tool_call",
+                },
+                {
+                    "name": "search_documents",
+                    "args": {"query": "egreso", "max_results": 1},
+                    "id": "call-2",
+                    "type": "tool_call",
+                },
+            ]
+        }
+    )
+
+    filtered = _filter_parallel_tool_calls(message)
+
+    assert [tool_call["args"]["query"] for tool_call in filtered.tool_calls] == [
+        "abdomen",
+        "egreso",
+    ]
+
+
 def test_patch_drafting_uses_only_json_schema():
     planner = LangChainCopilotPlanner(
         settings=SimpleNamespace(
@@ -346,6 +439,37 @@ def test_patch_drafting_uses_only_json_schema():
     )
 
 
+def test_planner_binds_sanitized_tool_specs_without_runtime_field():
+    planner = LangChainCopilotPlanner(
+        settings=SimpleNamespace(
+            gcp_project_id="demo",
+            gcp_region="us-central1",
+            vertex_model="gemini-2.5-flash",
+        ),
+    )
+    fake_model = _FakePlannerModel(make_ai_response("Listo."))
+    planner._planner_model = fake_model
+
+    planner.invoke_model(
+        state=build_state("resume el encounter"),
+        messages=[HumanMessage(content="resume el encounter")],
+        tools=build_graph_tools(
+            tools_client=FakeToolsClient(),
+            planner=ScriptedPlanner(responses=[]),
+        ),
+    )
+
+    assert isinstance(fake_model.bound_tools, list)
+    read_summary_tool = next(
+        tool
+        for tool in fake_model.bound_tools
+        if tool.get("function", {}).get("name") == "read_document_summary"
+    )
+    parameters = read_summary_tool["function"]["parameters"]
+    assert "runtime" not in parameters.get("properties", {})
+    assert "document_id" in parameters.get("properties", {})
+
+
 def test_patch_drafting_fails_closed_without_function_calling_fallback():
     planner = LangChainCopilotPlanner(
         settings=SimpleNamespace(
@@ -394,6 +518,9 @@ def test_drafted_patch_schema_rejects_tool_names_and_defaults_rationale():
             "patches": [
                 {
                     "operation_type": "insert_after_span",
+                    "anchor": {
+                        "exactText": "Paciente estable.",
+                    },
                     "content_preview": "Fecha: 24/07/2024\n",
                 }
             ]
@@ -408,6 +535,9 @@ def test_drafted_patch_schema_rejects_tool_names_and_defaults_rationale():
                 "patches": [
                     {
                         "operation_type": "propose_insert_after_span",
+                        "anchor": {
+                            "exactText": "Paciente estable.",
+                        },
                         "content_preview": "Fecha: 24/07/2024\n",
                     }
                 ]
@@ -600,6 +730,115 @@ def test_summary_request_uses_tool_loop_with_minimal_reads():
     assert any(document["document_id"] == "55" for document in next_state["read_documents"])
 
 
+def test_parallel_non_write_batch_updates_state_without_graph_race():
+    planner = ScriptedPlanner(
+        responses=[
+            AIMessage(
+                content="Leeré varias fuentes en paralelo antes de responder.",
+                tool_calls=[
+                    {"name": "list_open_documents", "args": {}, "id": "call-1", "type": "tool_call"},
+                    {
+                        "name": "build_context_view",
+                        "args": {"active_document_id": "99", "include_document_ids": ["99", "12"]},
+                        "id": "call-2",
+                        "type": "tool_call",
+                    },
+                    {
+                        "name": "read_document_summary",
+                        "args": {"document_id": "99"},
+                        "id": "call-3",
+                        "type": "tool_call",
+                    },
+                    {
+                        "name": "read_document_span",
+                        "args": {"document_id": "55", "max_chars": 500},
+                        "id": "call-4",
+                        "type": "tool_call",
+                    },
+                    {
+                        "name": "search_documents",
+                        "args": {"query": "abdomen", "max_results": 1},
+                        "id": "call-5",
+                        "type": "tool_call",
+                    },
+                    {
+                        "name": "search_documents",
+                        "args": {"query": "egreso", "max_results": 1},
+                        "id": "call-6",
+                        "type": "tool_call",
+                    },
+                ],
+            ),
+            make_ai_response("Resumen listo del encounter demo."),
+        ],
+    )
+    graph = build_clinical_copilot_graph(
+        tools_client=FakeToolsClient(),
+        planner=planner,
+    )
+
+    next_state = graph.invoke(
+        build_state("Hazme un resumen del encounter"),
+        config={"configurable": {"thread_id": "copilot:encounter:12:doctor:7"}},
+    )
+
+    assert next_state["final_response"] == "Resumen listo del encounter demo."
+    assert [call["tool_name"] for call in next_state["tool_calls"]] == [
+        "list_open_documents",
+        "build_context_view",
+        "read_document_summary",
+        "read_document_span",
+        "search_documents",
+        "search_documents",
+    ]
+    assert next_state["document_summaries"]["99"]["document_id"] == "99"
+    assert any(document["document_id"] == "55" for document in next_state["read_documents"])
+    assert [result["query"] for result in next_state["search_results"]] == [
+        "abdomen",
+        "egreso",
+    ]
+    assert next_state["search_query"] is None
+    assert next_state["last_tool_error"] is None
+
+
+def test_parallel_batch_preserves_error_when_one_tool_fails():
+    planner = ScriptedPlanner(
+        responses=[
+            AIMessage(
+                content="Haré dos lecturas y una puede fallar.",
+                tool_calls=[
+                    {
+                        "name": "read_document_summary",
+                        "args": {"document_id": "404"},
+                        "id": "call-1",
+                        "type": "tool_call",
+                    },
+                    {
+                        "name": "search_documents",
+                        "args": {"query": "abdomen", "max_results": 1},
+                        "id": "call-2",
+                        "type": "tool_call",
+                    },
+                ],
+            ),
+            make_ai_response("Intento completado."),
+        ],
+    )
+    graph = build_clinical_copilot_graph(
+        tools_client=FakeToolsClient(),
+        planner=planner,
+    )
+
+    next_state = graph.invoke(
+        build_state("Busca abdomen y trata de leer un resumen"),
+        config={"configurable": {"thread_id": "copilot:encounter:12:doctor:7"}},
+    )
+
+    assert next_state["final_response"] == "Intento completado."
+    assert "No pude leer el resumen del documento 404" in str(next_state["last_tool_error"])
+    assert [result["query"] for result in next_state["search_results"]] == ["abdomen"]
+
+
 def test_toolruntime_tools_bind_and_execute_inside_graph():
     tools = build_graph_tools(
         tools_client=FakeToolsClient(),
@@ -610,9 +849,19 @@ def test_toolruntime_tools_bind_and_execute_inside_graph():
         for tool in tools
     }
     assert all("runtime" not in schema.get("properties", {}) for schema in tool_schemas.values())
+    assert "document_id" in tool_schemas["read_document"].get("properties", {})
+    assert "mode" in tool_schemas["read_document"].get("properties", {})
     assert "document_id" in tool_schemas["read_document_summary"].get("properties", {})
     assert "document_id" in tool_schemas["read_document_span"].get("properties", {})
     assert "target_document_id" in tool_schemas["propose_replace_span"].get(
+        "properties",
+        {},
+    )
+    assert "target_document_id" in tool_schemas["propose_insert_before"].get(
+        "properties",
+        {},
+    )
+    assert "target_document_id" in tool_schemas["propose_delete_span"].get(
         "properties",
         {},
     )
@@ -621,10 +870,14 @@ def test_toolruntime_tools_bind_and_execute_inside_graph():
     propose_insert_tool = next(
         tool for tool in tools if tool.name == "propose_insert_after_span"
     )
+    propose_insert_before_tool = next(
+        tool for tool in tools if tool.name == "propose_insert_before"
+    )
     assert "Sequential precondition" in (propose_replace_tool.description or "")
     assert "Never call this in the same turn as read tools" in (
         propose_insert_tool.description or ""
     )
+    assert "read_document(mode=\"full\")" in (propose_insert_before_tool.description or "")
 
     planner = ScriptedPlanner(
         responses=[
@@ -655,6 +908,72 @@ def test_toolruntime_tools_bind_and_execute_inside_graph():
     assert next_state["final_response"] == "Listo."
     assert next_state["available_documents"]
     assert next_state["document_summaries"]["99"]["document_id"] == "99"
+
+
+def test_read_document_full_populates_read_documents_state():
+    planner = ScriptedPlanner(
+        responses=[
+            make_ai_tool_call(
+                tool_name="read_document",
+                args={"document_id": "99", "mode": "full"},
+                tool_call_id="call-1",
+                content="Necesito leer el documento completo.",
+            ),
+            make_ai_response("Listo."),
+        ],
+    )
+    graph = build_clinical_copilot_graph(
+        tools_client=FakeToolsClient(),
+        planner=planner,
+    )
+
+    next_state = graph.invoke(
+        build_state("lee la nota completa"),
+        config={"configurable": {"thread_id": "copilot:encounter:12:doctor:7"}},
+    )
+
+    assert next_state["final_response"] == "Listo."
+    assert any(
+        document["document_id"] == "99" and document["mode"] == "full"
+        for document in next_state["read_documents"]
+    )
+
+
+def test_full_document_read_can_unlock_insert_after_proposal():
+    planner = ScriptedPlanner(
+        responses=[
+            make_ai_tool_call(
+                tool_name="list_open_documents",
+                tool_call_id="call-1",
+                content="Primero necesito ubicar el documento objetivo.",
+            ),
+            make_ai_tool_call(
+                tool_name="read_document",
+                args={"document_id": "99", "mode": "full"},
+                tool_call_id="call-2",
+                content="Leeré el documento completo porque el cambio va al final.",
+            ),
+            make_ai_tool_call(
+                tool_name="propose_insert_after_span",
+                args={"target_document_id": "99"},
+                tool_call_id="call-3",
+                content="Con la lectura completa ya puedo proponer el insert al final.",
+            ),
+        ],
+    )
+    graph = build_clinical_copilot_graph(
+        tools_client=FakeToolsClient(),
+        planner=planner,
+    )
+
+    next_state = graph.invoke(
+        build_state("agrega mi nombre al final de la nota"),
+        config={"configurable": {"thread_id": "copilot:encounter:12:doctor:7"}},
+    )
+
+    assert next_state["requires_human_review"] is True
+    assert next_state["patch_set_preview"]["target_document_id"] == "99"
+    assert next_state["patch_set_preview"]["base_hash"] == "hash-demo"
 
 
 def test_edit_request_proposes_patch_after_tool_loop():
@@ -742,7 +1061,7 @@ def test_tool_error_allows_self_correction_on_next_planner_turn():
 
     assert next_state["requires_human_review"] is True
     assert any(
-        "Antes de proponer un patch debes leer el resumen del documento target"
+        "Antes de proponer un patch debes leer el documento target con "
         in result["summary"]
         for result in next_state["tool_results"]
     )

@@ -5,7 +5,7 @@ import uuid
 from contextlib import contextmanager
 from typing import Any, Iterator
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.postgres import PostgresSaver
 from psycopg import Connection
 from psycopg.rows import dict_row
@@ -68,12 +68,14 @@ class CopilotRuntime:
             "available_documents": [],
             "context_view": None,
             "document_summaries": {},
+            "document_reads": [],
             "read_spans": [],
             "retrieved_context": [],
             "read_documents": [],
             "encounter_context": None,
             "search_matches": [],
             "search_query": None,
+            "search_results": [],
             "patch_history": {},
             "tool_calls": [],
             "tool_results": [],
@@ -299,7 +301,62 @@ class CopilotRuntime:
                 ],
             )
 
+        self._append_review_resolution_to_thread(
+            thread_id=updated_run.thread_id,
+            encounter_id=updated_run.encounter_id,
+            user_id=updated_run.user_id,
+            run_id=updated_run.run_id,
+            final_response=final_response,
+        )
+
         return updated_run, [self._event_to_schema(event) for event in stored_events]
+
+    def _append_review_resolution_to_thread(
+        self,
+        *,
+        thread_id: str,
+        encounter_id: str,
+        user_id: str,
+        run_id: str,
+        final_response: str,
+    ) -> None:
+        # Review outcomes are persisted as run metadata/events, but future planner
+        # turns reason over the thread checkpoint. Mirror the resolution back into
+        # the conversation so the next user request does not keep treating the
+        # previous edit flow as unresolved.
+        try:
+            tools_client = CopilotBackendToolsClient(
+                settings=self._settings,
+                run_id=run_id,
+                thread_id=thread_id,
+                encounter_id=encounter_id,
+                user_id=user_id,
+            )
+            with PostgresSaver.from_conn_string(self._settings.database_url) as checkpointer:
+                graph = build_clinical_copilot_graph(
+                    tools_client=tools_client,
+                    planner=self._planner,
+                    checkpointer=checkpointer,
+                )
+                graph.update_state(
+                    {"configurable": {"thread_id": thread_id}},
+                    {
+                        "messages": [
+                            AIMessage(
+                                content=(
+                                    f"{final_response} "
+                                    "Este flujo anterior ya quedo resuelto."
+                                )
+                            )
+                        ]
+                    },
+                    as_node="finalize_response",
+                )
+        except Exception:
+            logger.warning(
+                "No pude reflejar la resolucion del review dentro del thread checkpoint",
+                exc_info=True,
+            )
 
     def get_run(self, run_id: str) -> StoredRun:
         with self._connection() as conn:
@@ -500,7 +557,8 @@ class CopilotRuntime:
 
         encounter_context = state.get("encounter_context") or {}
         context_view = state.get("context_view") or {}
-        if state.get("retrieved_context") or encounter_context or context_view:
+        search_results = state.get("search_results") or []
+        if state.get("retrieved_context") or encounter_context or context_view or search_results:
             events.append(
                 {
                     "event": "retrieval_progress",
@@ -524,6 +582,12 @@ class CopilotRuntime:
                             for span in state.get("read_spans", [])
                         ],
                         "search_query": state.get("search_query"),
+                        "search_queries": [
+                            result.get("query")
+                            for result in search_results
+                            if result.get("query")
+                        ],
+                        "search_results": search_results,
                         "context_view": context_view,
                         "encounter_context": {
                             "encounter_id": encounter_context.get("encounter_id"),

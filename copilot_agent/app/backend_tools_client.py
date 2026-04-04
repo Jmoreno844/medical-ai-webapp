@@ -56,6 +56,24 @@ class CopilotBackendToolsClient:
             },
         )
 
+    def read_document(self, document_id: str, *, mode: str = "excerpt") -> dict[str, Any]:
+        if mode == "summary":
+            summary_payload = self.read_document_summary(document_id)
+            return {
+                **summary_payload,
+                "mode": "summary",
+                "content": None,
+            }
+
+        return self._request(
+            "/api/internal/copilot/tools/read-document",
+            {
+                **self._base_payload(),
+                "document_id": int(document_id),
+                "mode": mode,
+            },
+        )
+
     def read_document_span(
         self,
         document_id: str,
