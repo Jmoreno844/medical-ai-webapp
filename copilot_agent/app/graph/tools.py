@@ -193,7 +193,7 @@ def _build_retrieved_context(
             "document_id": document["document_id"],
             "title": document.get("title"),
             "excerpt": _shorten_text(
-                document.get("content"),
+                document.get("content") or document.get("excerpt"),
                 max_length=12000,
             ),
             "read_mode": document.get("mode"),
@@ -300,7 +300,7 @@ def _tool_observation_content(
         if tool_name == "read_document_summary":
             lines.append(f"  {_xml_line('excerpt', payload.get('excerpt') or payload.get('content'))}")
         else:
-            lines.append(f"  {_xml_line('excerpt', payload.get('excerpt') or payload.get('content'), max_length=12000)}")
+            lines.append(f"  {_xml_line('excerpt', payload.get('content') or payload.get('excerpt'), max_length=12000)}")
     elif tool_name in {"list_open_documents", "list_encounter_documents"}:
         for document in (payload.get("documents") or [])[:6]:
             lines.append("  <document>")
