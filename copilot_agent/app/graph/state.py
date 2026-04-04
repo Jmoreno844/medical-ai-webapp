@@ -77,7 +77,7 @@ def _document_score(document: dict[str, Any]) -> tuple[int, ...]:
         1 if document.get("pinned_for_agent") else 0,
         1 if document.get("is_open") else 0,
         1 if document.get("ai_writable") else 0,
-        _truthy_score(document.get("excerpt")),
+        _truthy_score(document.get("short_summary")),
         _truthy_score(document.get("updated_at")),
         _truthy_score(document.get("title")),
         _truthy_score(document.get("type")),
@@ -106,7 +106,7 @@ def _merge_document_pair(
     merged["ai_writable"] = bool(existing.get("ai_writable")) or bool(incoming.get("ai_writable"))
     merged["version"] = max(int(existing.get("version") or 0), int(incoming.get("version") or 0)) or None
 
-    for field_name in ("title", "type", "status", "source", "updated_at", "excerpt"):
+    for field_name in ("title", "type", "status", "source", "updated_at", "short_summary"):
         merged[field_name] = preferred.get(field_name) or fallback.get(field_name)
 
     return merged
@@ -148,7 +148,6 @@ def merge_available_documents(
 def _summary_score(summary: dict[str, Any]) -> tuple[int, ...]:
     return (
         _truthy_score(summary.get("short_summary")),
-        _truthy_score(summary.get("excerpt")),
         _truthy_score(summary.get("content_hash")),
         int(summary.get("version") or 0),
     )
@@ -236,7 +235,6 @@ def _document_read_score(document: dict[str, Any]) -> tuple[int, ...]:
     return (
         _truthy_score(document.get("content")),
         len(str(document.get("content") or "")),
-        _truthy_score(document.get("excerpt")),
         _truthy_score(document.get("short_summary")),
         _truthy_score(document.get("content_hash")),
         int(document.get("version") or 0),

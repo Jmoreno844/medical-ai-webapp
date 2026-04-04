@@ -246,8 +246,7 @@ def _derive_read_documents(state: CopilotState) -> list[dict[str, Any]]:
             "title": document.get("title"),
             "type": document.get("type"),
             "mode": key[1],
-            "short_summary": document.get("short_summary"),
-            "excerpt": document.get("excerpt")
+            "short_summary": document.get("short_summary")
             or " ".join(str(document.get("content") or "").split())[:480],
             "content": document.get("content"),
             "content_hash": document.get("content_hash"),
@@ -263,7 +262,6 @@ def _derive_read_documents(state: CopilotState) -> list[dict[str, Any]]:
                 "type": summary.get("type"),
                 "mode": "summary",
                 "short_summary": summary.get("short_summary"),
-                "excerpt": summary.get("excerpt"),
                 "content": None,
                 "content_hash": summary.get("content_hash"),
             },
@@ -277,7 +275,7 @@ def _derive_read_documents(state: CopilotState) -> list[dict[str, Any]]:
             "type": span.get("type"),
             "mode": "span",
             "content": span.get("content"),
-            "excerpt": " ".join(str(span.get("content") or "").split())[:480],
+            "short_summary": " ".join(str(span.get("content") or "").split())[:480],
             "content_hash": span.get("content_hash"),
         }
         existing = by_key.get(key)

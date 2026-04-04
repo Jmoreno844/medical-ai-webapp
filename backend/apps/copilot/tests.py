@@ -995,14 +995,14 @@ class CopilotInternalToolsTests(SimpleTestCase):
             [document.document_id for document in response["documents"]], ["99"]
         )
 
-    def test_read_document_tool_returns_excerpt_for_owned_document(self):
+    def test_read_document_tool_returns_content_for_full_mode(self):
         payload = SimpleNamespace(
             run_id="run-123",
             thread_id=self.thread_id,
             encounter_id=12,
             user_id=7,
             document_id=99,
-            mode="excerpt",
+            mode="full",
         )
         document = SimpleNamespace(
             id=99,
@@ -1020,9 +1020,9 @@ class CopilotInternalToolsTests(SimpleTestCase):
             response = read_document_tool(self.request, payload)
 
         self.assertEqual(response["document_id"], "99")
-        self.assertEqual(response["mode"], "excerpt")
-        self.assertIsNone(response["content"])
-        self.assertIn("dolor abdominal", response["excerpt"])
+        self.assertEqual(response["mode"], "full")
+        self.assertIn("dolor abdominal", response["content"])
+        self.assertNotIn("excerpt", response)
 
     def test_list_encounter_documents_marks_only_transcriptions_read_only(self):
         payload = SimpleNamespace(

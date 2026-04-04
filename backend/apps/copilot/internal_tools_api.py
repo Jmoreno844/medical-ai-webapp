@@ -236,7 +236,7 @@ def _serialize_workspace_documents(
                 is_active=document.get("is_active", False),
                 is_open=document.get("is_open", False),
                 pinned_for_agent=document.get("pinned_for_agent", False),
-                excerpt=document.get("excerpt"),
+                short_summary=document.get("short_summary") or document.get("excerpt"),
             )
         )
     return serialized_documents
@@ -326,7 +326,6 @@ def list_encounter_documents_tool(request, payload: CopilotListEncounterDocument
                 ai_writable=_document_ai_writable(document.kind),
                 version=_document_version(document),
                 updated_at=document.created_on.isoformat(),
-                excerpt=_build_excerpt(document.content),
             )
             for document in documents
         ]
@@ -351,7 +350,6 @@ def read_document_tool(request, payload: CopilotReadDocumentIn):
         encounter_id=payload.encounter_id,
         user_id=payload.user_id,
     )
-    excerpt = _build_excerpt(document.content)
 
     return {
         "document_id": str(document.id),
@@ -363,7 +361,6 @@ def read_document_tool(request, payload: CopilotReadDocumentIn):
         "updated_at": document.created_on.isoformat(),
         "mode": payload.mode,
         "content": document.content if payload.mode == "full" else None,
-        "excerpt": excerpt,
     }
 
 
@@ -385,7 +382,7 @@ def read_document_summary_tool(request, payload: CopilotReadDocumentSummaryIn):
         encounter_id=payload.encounter_id,
         user_id=payload.user_id,
     )
-    excerpt = _build_excerpt(document.content)
+    short_summary = _build_excerpt(document.content, max_length=160)
     return {
         "document_id": str(document.id),
         "encounter_id": str(document.encounter_id),
@@ -394,8 +391,7 @@ def read_document_summary_tool(request, payload: CopilotReadDocumentSummaryIn):
         "version": _document_version(document),
         "content_hash": _content_hash(document.content),
         "updated_at": document.created_on.isoformat(),
-        "short_summary": excerpt[:160],
-        "excerpt": excerpt,
+        "short_summary": short_summary,
     }
 
 

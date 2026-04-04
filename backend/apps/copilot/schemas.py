@@ -192,7 +192,7 @@ class CopilotToolDocumentOut(Schema):
     is_active: bool = False
     is_open: bool = False
     pinned_for_agent: bool = False
-    excerpt: Optional[str] = None
+    short_summary: Optional[str] = None
 
 
 class CopilotListOpenDocumentsOut(Schema):
@@ -214,7 +214,6 @@ class CopilotReadDocumentOut(Schema):
     updated_at: str
     mode: Literal["full", "excerpt"]
     content: Optional[str] = None
-    excerpt: Optional[str] = None
 
 
 class CopilotSearchDocumentsIn(CopilotInternalToolRequest):
@@ -259,7 +258,6 @@ class CopilotReadDocumentSummaryOut(Schema):
     content_hash: str
     updated_at: str
     short_summary: Optional[str] = None
-    excerpt: Optional[str] = None
 
 
 class CopilotReadDocumentSpanIn(CopilotInternalToolRequest):
