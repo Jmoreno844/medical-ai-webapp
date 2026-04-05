@@ -1,15 +1,17 @@
+import { createChildLogger } from "@/lib/logger";
 import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
 import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
 import { useDocumentSnapshotStore } from "@/workspace/stores/documentSnapshotStore";
 import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
 import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
 
+const log = createChildLogger("applyCopilotPatch");
+
 type ApplyCopilotPatchToWorkspaceParams = {
   documentId: string;
   content: string;
   baseVersion: number;
   appliedVersion?: number | null;
-  appliedPatchId?: string | null;
 };
 
 export function applyCopilotPatchToWorkspace({
@@ -17,7 +19,6 @@ export function applyCopilotPatchToWorkspace({
   content,
   baseVersion,
   appliedVersion,
-  appliedPatchId,
 }: ApplyCopilotPatchToWorkspaceParams) {
   const workspaceState = useWorkspaceStore.getState();
   const snapshotStore = useDocumentSnapshotStore.getState();
@@ -32,8 +33,17 @@ export function applyCopilotPatchToWorkspace({
   const existingDraft = draftStore.getDraft(documentId);
   const existingDerivedState = derivedStore.getDerivedState(documentId);
   const nextVersion =
-    appliedVersion ??
-    Math.max(existingSnapshot?.version ?? 1, baseVersion) + 1;
+    appliedVersion ?? Math.max(existingSnapshot?.version ?? 1, baseVersion) + 1;
+
+  log.debug("applying patch to workspace", {
+    documentId,
+    nextVersion,
+    activeDocumentId,
+    isDirty: existingDraft?.isDirty,
+    editorMode: existingDerivedState?.editorMode,
+    hasSnapshot: !!existingSnapshot,
+    contentLength: content.length,
+  });
 
   snapshotStore.setSnapshot(documentId, content, nextVersion);
 
@@ -44,16 +54,22 @@ export function applyCopilotPatchToWorkspace({
   ) {
     draftStore.resetDraftFromSnapshot(documentId);
     draftStore.markDraftClean(documentId);
+    log.debug("draft reset from new snapshot", { documentId });
+  } else {
+    // Draft has unsaved local edits on a background document.
+    // Snapshot is updated but the draft is kept to avoid discarding the doctor's work.
+    // The editor will show the new content on next focus/reload.
+    log.warn("patch applied to snapshot but draft is dirty — draft NOT reset", {
+      documentId,
+      activeDocumentId,
+    });
   }
 
   derivedStore.clearPatchPreview(documentId);
 
-  if (appliedPatchId && patchSetStore.selectedPatchId === appliedPatchId) {
-    if (patchSetStore.activePatchSetId) {
-       patchSetStore.updatePatchStatus(patchSetStore.activePatchSetId, appliedPatchId, "applied");
-    }
-    patchSetStore.setSelectedPatch(null);
-  }
+  // Clear the entire patch set store so PatchInlineDiffView unmounts and the
+  // Lexical editor re-renders with the new (markdown-parsed) content.
+  patchSetStore.clearAll();
 
   window.triggerEditorRefresh?.();
 }

@@ -41,6 +41,32 @@ def content_hash(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
+_ANCHOR_WINDOW_MULTIPLIER = 3
+
+
+def _normalize_ws(text: str) -> str:
+    """Collapse all whitespace runs into a single space and strip edges."""
+    return " ".join(text.split())
+
+
+def _prefix_matches(content: str, index: int, prefix_text: str) -> bool:
+    """Check if *prefix_text* plausibly ends the text just before *index*.
+
+    The LLM may drop leading bullet markers, newlines, or extra spaces, so we
+    take a wider window and compare after whitespace normalisation.
+    """
+    window_size = max(len(prefix_text) * _ANCHOR_WINDOW_MULTIPLIER, 30)
+    window = content[max(0, index - window_size) : index]
+    return _normalize_ws(window).endswith(_normalize_ws(prefix_text))
+
+
+def _suffix_matches(content: str, after_index: int, suffix_text: str) -> bool:
+    """Check if *suffix_text* plausibly starts the text right after the match."""
+    window_size = max(len(suffix_text) * _ANCHOR_WINDOW_MULTIPLIER, 30)
+    window = content[after_index : after_index + window_size]
+    return _normalize_ws(window).startswith(_normalize_ws(suffix_text))
+
+
 def resolve_anchor_span(content: str, anchor: dict[str, Any]) -> tuple[int, int]:
     exact_text = str(anchor.get("exactText") or "")
     prefix_text = anchor.get("prefixText")
@@ -81,18 +107,13 @@ def resolve_anchor_span(content: str, anchor: dict[str, Any]) -> tuple[int, int]
 
     narrowed: list[int] = []
     for index in occurrences:
-        prefix_match = True
-        suffix_match = True
+        p_ok = True
+        s_ok = True
         if isinstance(prefix_text, str):
-            prefix_match = (
-                content[max(0, index - len(prefix_text)) : index] == prefix_text
-            )
+            p_ok = _prefix_matches(content, index, prefix_text)
         if isinstance(suffix_text, str):
-            suffix_start = index + len(exact_text)
-            suffix_match = (
-                content[suffix_start : suffix_start + len(suffix_text)] == suffix_text
-            )
-        if prefix_match and suffix_match:
+            s_ok = _suffix_matches(content, index + len(exact_text), suffix_text)
+        if p_ok and s_ok:
             narrowed.append(index)
 
     if len(narrowed) != 1:

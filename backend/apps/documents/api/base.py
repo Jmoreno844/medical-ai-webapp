@@ -63,6 +63,7 @@ def create_document(request, payload: DocumentCreateIn):
             "encounter_id": doc.encounter_id,
             "kind": doc.kind,
             "doctor_template_id": doc.doctor_template_id,
+            "doctor_template_name": None,
             "content": doc.content,
             "doctor_id": doctor.id,
             "created_on": doc.created_on,
@@ -84,7 +85,7 @@ def get_documents_by_encounter(request, encounter_id: int):
         if enc.doctor.id != doctor.id:
             raise HttpError(403, "No tienes permiso para acceder a este encuentro")
 
-        docs = Document.objects.filter(encounter=enc)
+        docs = Document.objects.filter(encounter=enc).select_related("doctor_template")
 
         result = []
         for doc in docs:
@@ -94,6 +95,7 @@ def get_documents_by_encounter(request, encounter_id: int):
                     "encounter_id": doc.encounter_id,
                     "kind": doc.kind,
                     "doctor_template_id": doc.doctor_template_id,
+                    "doctor_template_name": doc.doctor_template.name if doc.doctor_template else None,
                     "content": doc.content,
                     "doctor_id": doc.doctor_id,
                     "created_on": doc.created_on,

@@ -161,6 +161,15 @@ class CopilotBackendToolsClient:
             )
             response.raise_for_status()
         except httpx.HTTPError as error:
+            # Include the response body for HTTP status errors so that Django's
+            # rejection reason (e.g. "El anchor es ambiguo") reaches the LLM and
+            # allows it to self-correct (e.g. by adding prefix_text/suffix_text).
+            if isinstance(error, httpx.HTTPStatusError):
+                try:
+                    body = error.response.text
+                except Exception:
+                    body = ""
+                raise CopilotBackendToolsError(f"{error}: {body}") from error
             raise CopilotBackendToolsError(str(error)) from error
 
         return response.json()

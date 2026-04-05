@@ -93,7 +93,7 @@ def _get_owned_encounter(*, encounter_id: int, user_id: int) -> Encounter:
 def _get_encounter_documents(*, encounter_id: int, user_id: int) -> QuerySet[Document]:
     return Document.objects.filter(
         encounter_id=encounter_id, doctor_id=user_id
-    ).order_by(
+    ).select_related("doctor_template").order_by(
         "created_on",
         "id",
     )
@@ -102,13 +102,17 @@ def _get_encounter_documents(*, encounter_id: int, user_id: int) -> QuerySet[Doc
 def _get_owned_document(
     *, document_id: int, encounter_id: int, user_id: int
 ) -> Document:
-    document = get_object_or_404(Document, id=document_id)
+    document = get_object_or_404(
+        Document.objects.select_related("doctor_template"), id=document_id
+    )
     if document.encounter_id != encounter_id or document.doctor_id != user_id:
         raise HttpError(403, "No tienes permiso para acceder a este documento")
     return document
 
 
-def _document_title(kind: str, document_id: int) -> str:
+def _document_title(kind: str, document_id: int, *, template_name: str | None = None) -> str:
+    if template_name and kind in ("note", "template"):
+        return template_name
     return DOCUMENT_TITLES.get(kind, f"Documento {document_id}")
 
 
@@ -236,7 +240,7 @@ def _serialize_workspace_documents(
                 is_active=document.get("is_active", False),
                 is_open=document.get("is_open", False),
                 pinned_for_agent=document.get("pinned_for_agent", False),
-                short_summary=document.get("short_summary") or document.get("excerpt"),
+                short_summary=document.get("short_summary"),
             )
         )
     return serialized_documents
@@ -319,7 +323,7 @@ def list_encounter_documents_tool(request, payload: CopilotListEncounterDocument
         "documents": [
             CopilotToolDocumentOut(
                 document_id=str(document.id),
-                title=_document_title(document.kind, document.id),
+                title=_document_title(document.kind, document.id, template_name=document.doctor_template.name if document.doctor_template else None),
                 type=document.kind,
                 status="final" if document.kind == "transcription" else "draft",
                 source="transcription" if document.kind == "transcription" else "user",
@@ -354,7 +358,7 @@ def read_document_tool(request, payload: CopilotReadDocumentIn):
     return {
         "document_id": str(document.id),
         "encounter_id": str(document.encounter_id),
-        "title": _document_title(document.kind, document.id),
+        "title": _document_title(document.kind, document.id, template_name=document.doctor_template.name if document.doctor_template else None),
         "type": document.kind,
         "version": _document_version(document),
         "content_hash": _content_hash(document.content),
@@ -386,7 +390,7 @@ def read_document_summary_tool(request, payload: CopilotReadDocumentSummaryIn):
     return {
         "document_id": str(document.id),
         "encounter_id": str(document.encounter_id),
-        "title": _document_title(document.kind, document.id),
+        "title": _document_title(document.kind, document.id, template_name=document.doctor_template.name if document.doctor_template else None),
         "type": document.kind,
         "version": _document_version(document),
         "content_hash": _content_hash(document.content),
@@ -426,7 +430,7 @@ def read_document_span_tool(request, payload: CopilotReadDocumentSpanIn):
 
     return {
         "document_id": str(document.id),
-        "title": _document_title(document.kind, document.id),
+        "title": _document_title(document.kind, document.id, template_name=document.doctor_template.name if document.doctor_template else None),
         "type": document.kind,
         "version": _document_version(document),
         "content_hash": _content_hash(document.content),
@@ -474,7 +478,7 @@ def search_documents_tool(request, payload: CopilotSearchDocumentsIn):
         matches.append(
             CopilotSearchDocumentMatchOut(
                 document_id=str(document.id),
-                title=_document_title(document.kind, document.id),
+                title=_document_title(document.kind, document.id, template_name=document.doctor_template.name if document.doctor_template else None),
                 type=document.kind,
                 updated_at=document.created_on.isoformat(),
                 snippet=_build_excerpt(document.content, query=query),

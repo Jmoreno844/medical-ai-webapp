@@ -267,7 +267,7 @@ class CopilotReadDocumentSpanIn(CopilotInternalToolRequest):
     suffix_text: Optional[str] = None
     start_offset: Optional[int] = None
     end_offset: Optional[int] = None
-    max_chars: int = Field(default=600, ge=50, le=20000)
+    max_chars: int = Field(default=600, ge=1, le=20000)
 
 
 class CopilotReadDocumentSpanOut(Schema):

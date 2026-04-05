@@ -1,5 +1,8 @@
 import { create } from "zustand";
-import { CopilotPatchSetResponse, CopilotPatchStatus } from "../../features/copilotDebug/types";
+import {
+  CopilotPatchSetResponse,
+  CopilotPatchStatus,
+} from "../../features/copilotChat/types";
 
 interface PatchSetState {
   activePatchSetId: string | null;
@@ -11,7 +14,11 @@ interface PatchSetState {
   removePatchSet: (id: string) => void;
   setActivePatchSet: (id: string | null) => void;
   setSelectedPatch: (id: string | null) => void;
-  updatePatchStatus: (patchSetId: string, patchId: string, status: CopilotPatchStatus) => void;
+  updatePatchStatus: (
+    patchSetId: string,
+    patchId: string,
+    status: CopilotPatchStatus,
+  ) => void;
   clearAll: () => void;
 }
 
@@ -34,8 +41,15 @@ export const usePatchSetStore = create<PatchSetState>((set) => ({
       delete newPatchSets[id];
       return {
         patchSets: newPatchSets,
-        activePatchSetId: state.activePatchSetId === id ? null : state.activePatchSetId,
-        selectedPatchId: state.selectedPatchId && state.patchSets[id]?.patches.some(p => p.id === state.selectedPatchId) ? null : state.selectedPatchId,
+        activePatchSetId:
+          state.activePatchSetId === id ? null : state.activePatchSetId,
+        selectedPatchId:
+          state.selectedPatchId &&
+          state.patchSets[id]?.patches.some(
+            (p) => p.id === state.selectedPatchId,
+          )
+            ? null
+            : state.selectedPatchId,
       };
     }),
 
@@ -49,7 +63,7 @@ export const usePatchSetStore = create<PatchSetState>((set) => ({
       if (!patchSet) return state;
 
       const updatedPatches = patchSet.patches.map((p) =>
-        p.id === patchId ? { ...p, status } : p
+        p.id === patchId ? { ...p, status } : p,
       );
 
       return {

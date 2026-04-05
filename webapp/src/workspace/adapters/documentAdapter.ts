@@ -1,7 +1,4 @@
-import {
-  DOCUMENT_TYPE_LABELS_LONG,
-  DocumentoOut,
-} from "@/types/documento";
+import { DOCUMENT_TYPE_LABELS_LONG, DocumentoOut } from "@/types/documento";
 import {
   WorkspaceDocument,
   WorkspaceDocumentSource,
@@ -50,11 +47,14 @@ function getWorkspaceSource(kind: string): WorkspaceDocumentSource {
 
 export function adaptDocumentoToWorkspaceDocument(
   doc: DocumentoOut,
-  encounterId?: number | string
+  encounterId?: number | string,
 ): WorkspaceDocument {
   const resolvedEncounterId = String(encounterId ?? doc.encounter_id);
   const type = mapKindToWorkspaceType(doc.kind);
-  const title = DOCUMENT_TYPE_LABELS_LONG[doc.kind.toLowerCase()] || doc.kind;
+  const title =
+    doc.doctor_template_name ||
+    DOCUMENT_TYPE_LABELS_LONG[doc.kind.toLowerCase()] ||
+    doc.kind;
   const isReadOnly = doc.kind === "transcription";
   const isAiWritable = doc.kind !== "transcription";
 
@@ -83,7 +83,7 @@ export function adaptDocumentoToWorkspaceDocument(
 }
 
 export function adaptWorkspaceDocumentToDocumentoOut(
-  doc: WorkspaceDocument
+  doc: WorkspaceDocument,
 ): DocumentoOut {
   return {
     id: Number(doc.id),

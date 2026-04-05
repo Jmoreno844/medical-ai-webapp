@@ -46,7 +46,7 @@ def encuentro(db, medico, paciente):
 class TestEncuentroAPI:
     def test_list_encuentros(self, client, medico, encuentro):
         # Create an encounter for another doctor to ensure it's not returned
-        otro_encuentro = Encuentro.objects.create(
+        Encuentro.objects.create(
             id_medico=otro_medico,
             id_paciente=paciente,
             nombre_encuentro="Other Encuentro",

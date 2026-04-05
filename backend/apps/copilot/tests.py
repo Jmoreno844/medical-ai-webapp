@@ -1009,6 +1009,7 @@ class CopilotInternalToolsTests(SimpleTestCase):
             encounter_id=12,
             doctor_id=7,
             kind="note",
+            doctor_template=None,
             content="Paciente con dolor abdominal de varios dias y mejoria parcial.",
             created_on=SimpleNamespace(isoformat=lambda: "2026-04-02T10:00:00Z"),
         )
@@ -1035,18 +1036,21 @@ class CopilotInternalToolsTests(SimpleTestCase):
             SimpleNamespace(
                 id=10,
                 kind="note",
+                doctor_template=None,
                 content="Nota editable.",
                 created_on=SimpleNamespace(isoformat=lambda: "2026-04-02T10:00:00Z"),
             ),
             SimpleNamespace(
                 id=11,
                 kind="context",
+                doctor_template=None,
                 content="Contexto editable.",
                 created_on=SimpleNamespace(isoformat=lambda: "2026-04-02T11:00:00Z"),
             ),
             SimpleNamespace(
                 id=12,
                 kind="transcription",
+                doctor_template=None,
                 content="Transcripcion solo lectura.",
                 created_on=SimpleNamespace(isoformat=lambda: "2026-04-02T12:00:00Z"),
             ),
@@ -1084,6 +1088,7 @@ class CopilotInternalToolsTests(SimpleTestCase):
                 SimpleNamespace(
                     id=10,
                     kind="note",
+                    doctor_template=None,
                     content="Dolor lumbar con irradiacion leve.",
                     created_on=SimpleNamespace(
                         isoformat=lambda: "2026-04-02T10:00:00Z"
@@ -1092,6 +1097,7 @@ class CopilotInternalToolsTests(SimpleTestCase):
                 SimpleNamespace(
                     id=11,
                     kind="context",
+                    doctor_template=None,
                     content="Dolor abdominal posterior a comida.",
                     created_on=SimpleNamespace(
                         isoformat=lambda: "2026-04-02T11:00:00Z"
@@ -1100,6 +1106,7 @@ class CopilotInternalToolsTests(SimpleTestCase):
                 SimpleNamespace(
                     id=12,
                     kind="note",
+                    doctor_template=None,
                     content="Sin coincidencias relevantes.",
                     created_on=SimpleNamespace(
                         isoformat=lambda: "2026-04-02T12:00:00Z"

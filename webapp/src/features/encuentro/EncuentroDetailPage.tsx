@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import EncuentroHeader from "../encuentroHeader/EncuentroHeader";
 import DocumentArea from "../encuentroTextArea/DocumentArea";
 import { AppProviders } from "@/contexts/AppProviders";
-import CopilotSidePanel from "@/features/copilotDebug/CopilotSidePanel";
+import CopilotPanel from "@/features/copilotChat/CopilotPanel";
 
 export default function EncuentroDetailPage() {
   // Get the encounter ID from URL params
@@ -40,7 +40,7 @@ export default function EncuentroDetailPage() {
             </div>
             {showCopilotDebugPanel && (
               <aside className="min-h-0 w-full shrink-0 overflow-y-auto lg:w-[380px] xl:w-[420px]">
-                <CopilotSidePanel encounterId={encounterId} />
+                <CopilotPanel encounterId={encounterId} />
               </aside>
             )}
           </div>

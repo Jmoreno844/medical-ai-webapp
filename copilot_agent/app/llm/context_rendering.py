@@ -32,7 +32,7 @@ def _render_documents(documents: Sequence[Mapping[str, Any]]) -> str:
                 f"    {xml_line('is_active', document.get('is_active'))}",
                 f"    {xml_line('is_open', document.get('is_open'))}",
                 f"    {xml_line('ai_writable', document.get('ai_writable'))}",
-                f"    {xml_line('short_summary', document.get('short_summary'))}",
+                f"    {xml_line('short_summary', document.get('short_summary') or '(no summary)')}",
                 "  </document>",
             ]
         )
@@ -80,7 +80,7 @@ def _render_workspace_documents(
                 f"    {xml_line('is_active', document.get('is_active'))}",
                 f"    {xml_line('is_open', document.get('is_open'))}",
                 f"    {xml_line('ai_writable', document.get('ai_writable'))}",
-                f"    {xml_line('short_summary', document.get('short_summary'))}",
+                f"    {xml_line('short_summary', document.get('short_summary') or '(no summary)')}",
                 "  </workspace_document>",
             ]
         )
@@ -101,7 +101,7 @@ def _render_document_summaries(document_summaries: Mapping[str, Mapping[str, Any
                 f"    {xml_line('title', summary.get('title'))}",
                 f"    {xml_line('type', summary.get('type'))}",
                 f"    {xml_line('version', summary.get('version'))}",
-                f"    {xml_line('short_summary', summary.get('short_summary'))}",
+                f"    {xml_line('short_summary', summary.get('short_summary') or '(no summary)')}",
                 "  </document_summary>",
             ]
         )

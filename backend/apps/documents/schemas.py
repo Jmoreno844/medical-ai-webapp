@@ -16,6 +16,7 @@ class DocumentOut(Schema):
     encounter_id: int
     kind: str
     doctor_template_id: Optional[int]
+    doctor_template_name: Optional[str] = None
     content: str
     created_on: date
     doctor_id: int

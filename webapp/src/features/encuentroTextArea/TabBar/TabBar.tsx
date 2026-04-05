@@ -120,7 +120,7 @@ const TabBar: React.FC = () => {
               aria-label={`Seleccionar ${getTabLabel(doc)}`}
               data-document-type={doc.type}
             >
-              {DOCUMENT_TYPE_LABELS[doc.type.toLowerCase()] || doc.type}
+              {doc.title || DOCUMENT_TYPE_LABELS[doc.type.toLowerCase()] || doc.type}
             </button>
           ))}
 
@@ -229,7 +229,7 @@ const TabBar: React.FC = () => {
 function getDocumentTitle(doc: WorkspaceDocument | null) {
   if (!doc) return "";
 
-  const docType = DOCUMENT_TYPE_LABELS_LONG[doc.type.toLowerCase()] || doc.type;
+  const docType = doc.title || DOCUMENT_TYPE_LABELS_LONG[doc.type.toLowerCase()] || doc.type;
   const date = new Date(doc.createdAt).toLocaleDateString("es-ES", {
     day: "numeric",
     month: "long",
@@ -240,7 +240,7 @@ function getDocumentTitle(doc: WorkspaceDocument | null) {
 }
 
 function getTabLabel(doc: WorkspaceDocument) {
-  return DOCUMENT_TYPE_LABELS[doc.type.toLowerCase()] || doc.type;
+  return doc.title || DOCUMENT_TYPE_LABELS[doc.type.toLowerCase()] || doc.type;
 }
 
 export default TabBar;

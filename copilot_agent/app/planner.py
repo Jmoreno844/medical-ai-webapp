@@ -408,7 +408,7 @@ class LangChainCopilotPlanner:
                     messages,
                     **self._provider_runtime_kwargs(),
                 ),
-                attempts=1,
+                attempts=2,
             )
         except Exception as error:  # pragma: no cover - provider edge
             raise RuntimeError(

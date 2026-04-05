@@ -4,6 +4,7 @@ export interface DocumentoOut {
   encounter_id: number;
   kind: string;
   doctor_template_id?: number | null;
+  doctor_template_name?: string | null;
   content: string;
   created_on: string;
   doctor_id: number;

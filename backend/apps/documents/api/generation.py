@@ -87,6 +87,10 @@ def generate_document_workflow(request, data: DocumentGenerationWorkflowRequest)
         except DoctorTemplate.DoesNotExist:
             raise HttpError(404, "Plantilla de doctor no encontrada")
 
+        # Link the template to the note so its name can be used as the document title.
+        doc_new.doctor_template = doctor_template
+        doc_new.save(update_fields=["doctor_template"])
+
         process_id = get_processing_id(doc_new.id)
 
         sse_token = encode_service_jwt(

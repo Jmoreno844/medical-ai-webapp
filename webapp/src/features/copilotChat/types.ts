@@ -2,6 +2,25 @@ import { WorkspaceIndex } from "@/workspace/types";
 
 export type CopilotCapability = "read_only";
 
+/** Maps backend section slugs to human-readable Spanish labels */
+export const SECTION_DISPLAY_NAMES: Record<string, string> = {
+  datos_basicos: "Datos básicos",
+  motivo_consulta: "Motivo de consulta",
+  enfermedad_actual: "Enfermedad actual",
+  revision_sistemas: "Revisión por sistemas",
+  antecedentes: "Antecedentes",
+  signos_vitales: "Signos vitales",
+  examen_fisico: "Examen físico",
+  impresion_diagnostica: "Impresión diagnóstica",
+  analisis_clinico: "Análisis clínico",
+  plan_manejo: "Plan de manejo",
+  cierre: "Cierre",
+  // Generic fallback keys the agent may use
+  general: "General",
+  tratamiento: "Tratamiento",
+  diagnostico: "Diagnóstico",
+};
+
 export type CopilotSessionResponse = {
   thread_id: string;
   capability: CopilotCapability;
@@ -54,6 +73,8 @@ export type CopilotPatchResponse = {
   status: CopilotPatchStatus;
   rationale?: string | null;
   confidence?: number | null;
+  /** Semantic section key (e.g. 'datos_basicos') from the clinical plan */
+  section?: string | null;
 };
 
 export type CopilotPatchSetResponse = {
@@ -70,6 +91,12 @@ export type CopilotPatchSetResponse = {
   review_comment?: string | null;
   created_at: string;
   updated_at: string;
+  /** Scope of the edit: 'local' | 'propagation' | 'full_rewrite' */
+  edit_scope?: string | null;
+  /** Clinical impact level: 'low' | 'medium' | 'high' | 'critical' */
+  clinical_impact_level?: string | null;
+  /** Section slugs that this patch set affects */
+  affected_sections?: string[];
 };
 
 export type CopilotStreamEventName =

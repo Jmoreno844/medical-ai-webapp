@@ -6,7 +6,7 @@ import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
 import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import { TRANSFORMERS } from "@lexical/markdown";
-import { PatchSetEditorView } from "./PatchSetEditorView";
+import { PatchInlineDiffView } from "./PatchInlineDiffView";
 
 // Import custom plugins
 import {
@@ -24,6 +24,7 @@ import { useTranscriptionContext } from "../../../contexts/TranscriptionContext"
 import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
 import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
 import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
+import { usePatchDecision } from "@/workspace/hooks/usePatchDecision";
 
 // Import utilities
 import { createEditorConfig } from "./utils/editorConfig";
@@ -54,7 +55,7 @@ const TextArea: React.FC = () => {
   // useSyncExternalStore/Zustand when the editor is already rerendering often.
   const activePatchSetId = usePatchSetStore((state) => state.activePatchSetId);
   const patchSets = usePatchSetStore((state) => state.patchSets);
-  const selectedPatchId = usePatchSetStore((state) => state.selectedPatchId);
+  const { submitDecision: submitPatchDecisionFn } = usePatchDecision();
 
   // Local state & refs
   const [showGenerationSuccess, setShowGenerationSuccess] = useState(false);
@@ -182,36 +183,37 @@ const TextArea: React.FC = () => {
   const activeDerivedState = derivedByDocumentId[String(activeDocument.id)] ?? null;
 
   const activePatchSet = activePatchSetId ? patchSets[activePatchSetId] : null;
-  const hasPatchReviewForDocument = 
-    selectedPatchId &&
-    activePatchSet &&
-    activePatchSet.patches.some(
-      (p) => p.id === selectedPatchId && p.documentId === String(activeDocument.id)
-    );
-
-  const patchPreviewContent = hasPatchReviewForDocument
-    ? activeDerivedState?.patchPreviewContent
-    : null;
+  const patchesForDocument = activePatchSet
+    ? activePatchSet.patches.filter(
+        (p) => p.documentId === String(activeDocument.id),
+      )
+    : [];
 
   const editorMode =
-    patchPreviewContent !== null && patchPreviewContent !== undefined
+    patchesForDocument.length > 0
       ? "patch_review"
       : activeDerivedState?.editorMode === "streaming_preview" &&
-        activeDerivedState.inProgress
-      ? "streaming_preview"
-      : activeDocument.kind === "transcription"
-      ? "read_only"
-      : "edit";
+          activeDerivedState.inProgress
+        ? "streaming_preview"
+        : activeDocument.kind === "transcription"
+          ? "read_only"
+          : "edit";
 
   const derivedContent =
-    editorMode === "patch_review"
-      ? patchPreviewContent ?? undefined
-      : editorMode === "streaming_preview"
+    editorMode === "streaming_preview"
       ? activeDerivedState?.streamingContent
       : undefined;
 
   const isStreamingActiveDocument = editorMode === "streaming_preview";
   const isPatchPreviewMode = editorMode === "patch_review";
+
+  const handlePatchDecision = useCallback(
+    (patchId: string, decision: "approve" | "reject") => {
+      if (!activePatchSet) return;
+      submitPatchDecisionFn(activePatchSet.id, patchId, decision);
+    },
+    [activePatchSet, submitPatchDecisionFn],
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -264,8 +266,8 @@ const TextArea: React.FC = () => {
       )}
 
       {isPatchPreviewMode && (
-        <div className="bg-amber-100 p-2 border-b border-amber-200 text-amber-900 text-sm text-center font-medium">
-          Vista previa de patch en modo solo lectura
+        <div className="bg-amber-50 p-2 border-b border-amber-200 text-amber-800 text-sm text-center">
+          Revisión de cambios — aprueba o rechaza cada modificación directamente en el documento
         </div>
       )}
 
@@ -299,9 +301,11 @@ const TextArea: React.FC = () => {
       {/* Editor */}
       <div className="border rounded-md flex-1 bg-white overflow-hidden">
         {isPatchPreviewMode ? (
-          <PatchSetEditorView 
-            content={documentContent} 
-            patches={activePatchSet?.patches.filter(p => p.documentId === String(activeDocument.id)) ?? []} 
+          <PatchInlineDiffView
+            content={documentContent}
+            patches={patchesForDocument}
+            patchSetId={activePatchSet!.id}
+            onDecision={handlePatchDecision}
           />
         ) : (
           <LexicalComposer

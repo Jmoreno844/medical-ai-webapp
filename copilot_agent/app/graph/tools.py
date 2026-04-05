@@ -1074,6 +1074,28 @@ def build_graph_tools(
                 requested_tool_name=tool_name,
             )
         except Exception as error:
+            error_str = str(error)
+            is_resource_exhausted = (
+                "RESOURCE_EXHAUSTED" in error_str or "429" in error_str
+            )
+            if is_resource_exhausted:
+                return _error_command(
+                    state=state,
+                    tool_name=tool_name,
+                    tool_call_id=tool_call_id,
+                    error_message=(
+                        "RECURSO DE IA AGOTADO (429). "
+                        "No reintentes este patch en este run."
+                    ),
+                    updates={
+                        "run_error": "Recurso de IA agotado (429)",
+                        "final_response": (
+                            "En este momento hay una demanda muy alta en el servicio de IA "
+                            "y no pude completar la edición. "
+                            "Por favor, inténtalo de nuevo en unos minutos."
+                        ),
+                    },
+                )
             return _error_command(
                 state=state,
                 tool_name=tool_name,

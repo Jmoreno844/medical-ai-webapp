@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { useCopilotDebug } from "@/features/copilotDebug/useCopilotDebug";
+import { createChildLogger } from "@/lib/logger";
+import { useCopilotDebug } from "@/features/copilotChat/useCopilotDebug";
 import {
   CopilotChatMessage,
   CopilotMessageRequest,
   CopilotPatchResponse,
   CopilotPatchSetResponse,
-} from "@/features/copilotDebug/types";
+} from "@/features/copilotChat/types";
 import { buildWorkspaceIndex } from "@/workspace/builders/workspaceIndex";
 import { applyCopilotPatchToWorkspace } from "@/workspace/adapters/applyCopilotPatchToWorkspace";
 import { useAiSessionStore } from "@/workspace/stores/aiSessionStore";
@@ -31,8 +32,10 @@ type UseCopilotPanelControllerResult = {
   pendingPatchCount: number;
   acceptedPatchCount: number;
   rejectedPatchCount: number;
+  conflictedPatchCount: number;
   canFinalizeAccepted: boolean;
   canFinalizeRejected: boolean;
+  canFinalizeConflicted: boolean;
   patchFlowError: string | null;
   readMode: ReturnType<typeof useAiSessionStore.getState>["readMode"];
   ensureSession: () => Promise<unknown>;
@@ -42,11 +45,16 @@ type UseCopilotPanelControllerResult = {
   selectReviewPatch: (patchId: string | null) => void;
   submitPatchDecision: (
     decision: "approve" | "reject",
-    comment?: string
+    comment?: string,
+  ) => Promise<unknown>;
+  submitPatchDecisionById: (
+    patchId: string,
+    decision: "approve" | "reject",
+    comment?: string,
   ) => Promise<unknown>;
   submitPatchSetDecision: (
     decision: "approve" | "reject",
-    comment?: string
+    comment?: string,
   ) => Promise<unknown>;
   finalizeReview: (comment?: string) => Promise<unknown>;
 };
@@ -54,7 +62,7 @@ type UseCopilotPanelControllerResult = {
 function buildChatMessage(
   role: CopilotChatMessage["role"],
   content: string,
-  runId?: string | null
+  runId?: string | null,
 ): CopilotChatMessage {
   return {
     id: `${role}-${runId ?? "local"}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -66,16 +74,17 @@ function buildChatMessage(
 }
 
 export function useCopilotPanelController(
-  encounterId: number
+  encounterId: number,
 ): UseCopilotPanelControllerResult {
+  const log = createChildLogger("CopilotController");
   const syncWorkingSetFromWorkspace = useAiSessionStore(
-    (state) => state.syncWorkingSetFromWorkspace
+    (state) => state.syncWorkingSetFromWorkspace,
   );
   const workingSetDocumentIds = useAiSessionStore(
-    (state) => state.workingSetDocumentIds
+    (state) => state.workingSetDocumentIds,
   );
   const selectedDocumentIds = useAiSessionStore(
-    (state) => state.selectedDocumentIds
+    (state) => state.selectedDocumentIds,
   );
   const readMode = useAiSessionStore((state) => state.readMode);
   useWorkspaceStore();
@@ -89,10 +98,11 @@ export function useCopilotPanelController(
     submitPatchSetDecision: submitPatchSetDecisionRequest,
     finalizePatchSetReview,
     reset,
-  } =
-    useCopilotDebug(encounterId);
+  } = useCopilotDebug(encounterId);
   const [chatMessages, setChatMessages] = useState<CopilotChatMessage[]>([]);
-  const [selectedReviewPatchId, setSelectedReviewPatchId] = useState<string | null>(null);
+  const [selectedReviewPatchId, setSelectedReviewPatchId] = useState<
+    string | null
+  >(null);
   const lastAssistantResponseRef = useRef<string | null>(null);
   const lastReviewPatchSetIdRef = useRef<string | null>(null);
   const didAutoRefreshWaitingReviewRef = useRef<string | null>(null);
@@ -123,12 +133,12 @@ export function useCopilotPanelController(
     .map((event) => event.payload);
 
   const selectedDocumentIdsFromRun = Array.isArray(
-    latestDocumentsSelectedEvent?.payload.selected_document_ids
+    latestDocumentsSelectedEvent?.payload.selected_document_ids,
   )
     ? latestDocumentsSelectedEvent.payload.selected_document_ids.map(String)
     : [];
   const readDocumentsFromRun = Array.isArray(
-    latestRetrievalEvent?.payload.read_documents
+    latestRetrievalEvent?.payload.read_documents,
   )
     ? latestRetrievalEvent.payload.read_documents
     : [];
@@ -137,7 +147,7 @@ export function useCopilotPanelController(
       ? latestRetrievalEvent.payload.search_query
       : null;
   const searchQueriesFromRun = Array.isArray(
-    latestRetrievalEvent?.payload.search_queries
+    latestRetrievalEvent?.payload.search_queries,
   )
     ? latestRetrievalEvent.payload.search_queries
         .map((value) => String(value))
@@ -165,15 +175,19 @@ export function useCopilotPanelController(
     }
 
     const payload = latestPatchProposedEvent.payload;
-    const patchId = typeof payload.patch_id === "string" ? payload.patch_id : null;
+    const patchId =
+      typeof payload.patch_id === "string" ? payload.patch_id : null;
     const targetDocumentId =
-      typeof payload.target_document_id === "string" ? payload.target_document_id : null;
+      typeof payload.target_document_id === "string"
+        ? payload.target_document_id
+        : null;
     if (!patchId || !targetDocumentId) {
       return null;
     }
 
     const resolvedRangePayload =
-      typeof payload.resolved_range === "object" && payload.resolved_range !== null
+      typeof payload.resolved_range === "object" &&
+      payload.resolved_range !== null
         ? (payload.resolved_range as { start?: unknown; end?: unknown })
         : null;
 
@@ -195,7 +209,9 @@ export function useCopilotPanelController(
     return {
       id: patchId,
       patchSetId:
-        typeof payload.patch_set_id === "string" ? payload.patch_set_id : "event-derived",
+        typeof payload.patch_set_id === "string"
+          ? payload.patch_set_id
+          : "event-derived",
       documentId: targetDocumentId,
       type:
         typeof payload.patch_type === "string"
@@ -222,30 +238,44 @@ export function useCopilotPanelController(
               ? payload.content_preview
               : "",
       resolvedRange,
-      orderIndex: typeof payload.order_index === "number" ? payload.order_index : 0,
+      orderIndex:
+        typeof payload.order_index === "number" ? payload.order_index : 0,
       status: "pending",
-      rationale: typeof payload.rationale === "string" ? payload.rationale : null,
-      confidence: typeof payload.confidence === "number" ? payload.confidence : null,
+      rationale:
+        typeof payload.rationale === "string" ? payload.rationale : null,
+      confidence:
+        typeof payload.confidence === "number" ? payload.confidence : null,
     } satisfies CopilotPatchResponse;
   }, [latestPatchProposedEvent, state.status]);
 
+  // Read patch state from the Zustand store so that decisions made from the inline
+  // editor (usePatchDecision) are immediately reflected in the chat panel.
+  // The store is populated both by the controller's sync effect (from state.patchSets)
+  // and by usePatchDecision when the doctor acts from the document editor.
+  const storeActivePatchSetId = usePatchSetStore((s) => s.activePatchSetId);
+  const storePatchSets = usePatchSetStore((s) => s.patchSets);
+
+  // Only expose a reviewPatchSet while the run is actively waiting for human review.
+  // When usePatchDecision.clearAll() fires after auto-finalize, storeActivePatchSetId
+  // becomes null and the card disappears immediately — no need to wait for a stream event.
   const reviewPatchSet = useMemo(() => {
-    if (!Array.isArray(state.patchSets) || state.patchSets.length === 0) {
-      return null;
-    }
-    return state.patchSets[0] ?? null;
-  }, [state.patchSets]);
+    if (state.status !== "waiting_review") return null;
+    if (!storeActivePatchSetId) return null;
+    return storePatchSets[storeActivePatchSetId] ?? null;
+  }, [state.status, storeActivePatchSetId, storePatchSets]);
 
   const reviewPatches = useMemo(
     () => reviewPatchSet?.patches ?? [],
-    [reviewPatchSet]
+    [reviewPatchSet],
   );
   const selectedReviewPatch = useMemo(() => {
     if (reviewPatches.length === 0) {
       return eventDerivedPendingPatch;
     }
     if (selectedReviewPatchId) {
-      const selectedPatch = reviewPatches.find((patch) => patch.id === selectedReviewPatchId);
+      const selectedPatch = reviewPatches.find(
+        (patch) => patch.id === selectedReviewPatchId,
+      );
       if (selectedPatch) {
         return selectedPatch;
       }
@@ -257,22 +287,44 @@ export function useCopilotPanelController(
     );
   }, [eventDerivedPendingPatch, reviewPatches, selectedReviewPatchId]);
 
+  // "pending" = still needs a doctor decision.
+  // "conflicted" = two patches overlap in the same document region; the backend
+  //   marks them automatically and skips them in accept-all / reject-all calls.
+  //   They do NOT block finalization (backend only checks for status="pending").
+  //   Keep them separate so the UI can explain the situation instead of looping.
   const pendingPatchCount = useMemo(
     () => reviewPatches.filter((patch) => patch.status === "pending").length,
-    [reviewPatches]
+    [reviewPatches],
   );
   const acceptedPatchCount = useMemo(
     () => reviewPatches.filter((patch) => patch.status === "accepted").length,
-    [reviewPatches]
+    [reviewPatches],
   );
   const rejectedPatchCount = useMemo(
     () => reviewPatches.filter((patch) => patch.status === "rejected").length,
-    [reviewPatches]
+    [reviewPatches],
   );
+  const conflictedPatchCount = useMemo(
+    () => reviewPatches.filter((patch) => patch.status === "conflicted").length,
+    [reviewPatches],
+  );
+  // canFinalizeAccepted: all decisions made, at least one accepted → apply button.
   const canFinalizeAccepted =
     !!reviewPatchSet && pendingPatchCount === 0 && acceptedPatchCount > 0;
+  // canFinalizeRejected: all decisions made, all rejected → close without applying.
   const canFinalizeRejected =
-    !!reviewPatchSet && pendingPatchCount === 0 && acceptedPatchCount === 0 && rejectedPatchCount > 0;
+    !!reviewPatchSet &&
+    pendingPatchCount === 0 &&
+    acceptedPatchCount === 0 &&
+    rejectedPatchCount > 0;
+  // canFinalizeConflicted: no pending patches remain but all are conflicted (none accepted/rejected).
+  // Finalization is still valid; the backend will close the review without applying any changes.
+  const canFinalizeConflicted =
+    !!reviewPatchSet &&
+    pendingPatchCount === 0 &&
+    acceptedPatchCount === 0 &&
+    rejectedPatchCount === 0 &&
+    conflictedPatchCount > 0;
 
   const patchSetSyncSignature = useMemo(
     () =>
@@ -284,7 +336,7 @@ export function useCopilotPanelController(
           return `${patchSet.id}:${patchSet.status}:${patchSet.updated_at}:${patchSignature}`;
         })
         .join("|") || "empty",
-    [state.patchSets]
+    [state.patchSets],
   );
 
   const patchFlowError = useMemo(() => {
@@ -356,20 +408,27 @@ export function useCopilotPanelController(
 
     const activePatchSet = state.patchSets[0];
     const patchIds = new Set(activePatchSet.patches.map((patch) => patch.id));
-    const pendingInActiveSet = activePatchSet.patches.find((patch) => patch.status === "pending");
+    const pendingInActiveSet = activePatchSet.patches.find(
+      (patch) => patch.status === "pending",
+    );
     const nextSelectedPatchId =
       selectedReviewPatchId && patchIds.has(selectedReviewPatchId)
         ? selectedReviewPatchId
-        : pendingInActiveSet?.id ?? activePatchSet.patches[0]?.id ?? null;
+        : (pendingInActiveSet?.id ?? activePatchSet.patches[0]?.id ?? null);
 
     usePatchSetStore.setState((storeState) => {
       const existingPatchSet = storeState.patchSets[activePatchSet.id];
       const existingPatchCount = existingPatchSet?.patches.length ?? -1;
-      const shouldUpsertPatchSet =
+      // "Newer wins": don't overwrite fresher data that usePatchDecision already wrote.
+      const isNewer =
         !existingPatchSet ||
-        existingPatchCount !== activePatchSet.patches.length ||
-        existingPatchSet.updated_at !== activePatchSet.updated_at ||
-        existingPatchSet.status !== activePatchSet.status;
+        activePatchSet.updated_at >= existingPatchSet.updated_at;
+      const shouldUpsertPatchSet =
+        isNewer &&
+        (!existingPatchSet ||
+          existingPatchCount !== activePatchSet.patches.length ||
+          existingPatchSet.updated_at !== activePatchSet.updated_at ||
+          existingPatchSet.status !== activePatchSet.status);
 
       const nextPatchSets = shouldUpsertPatchSet
         ? {
@@ -411,13 +470,16 @@ export function useCopilotPanelController(
   }, [state.finalResponse, state.runId]);
 
   useEffect(() => {
-    if (reviewPatchSet && reviewPatchSet.id !== lastReviewPatchSetIdRef.current) {
+    if (
+      reviewPatchSet &&
+      reviewPatchSet.id !== lastReviewPatchSetIdRef.current
+    ) {
       setChatMessages((current) => [
         ...current,
         buildChatMessage(
           "system",
           `Patch set pendiente para documento ${reviewPatchSet.target_document_id}. Requiere review humana.`,
-          state.runId
+          state.runId,
         ),
       ]);
       lastReviewPatchSetIdRef.current = reviewPatchSet.id;
@@ -465,7 +527,13 @@ export function useCopilotPanelController(
       };
       return runMessage(payload);
     },
-    [encounterId, ensureSession, runMessage, state.runId, syncWorkingSetFromWorkspace]
+    [
+      encounterId,
+      ensureSession,
+      runMessage,
+      state.runId,
+      syncWorkingSetFromWorkspace,
+    ],
   );
 
   const submitPatchDecision = useCallback(
@@ -478,7 +546,7 @@ export function useCopilotPanelController(
         reviewPatchSet.id,
         selectedReviewPatch.id,
         decision,
-        comment?.trim() || undefined
+        comment?.trim() || undefined,
       );
 
       setChatMessages((current) => [
@@ -488,13 +556,58 @@ export function useCopilotPanelController(
           decision === "approve"
             ? `Patch ${selectedReviewPatch.orderIndex + 1} aprobado.`
             : `Patch ${selectedReviewPatch.orderIndex + 1} rechazado.`,
-          state.runId
+          state.runId,
         ),
       ]);
 
       return patchSet;
     },
-    [reviewPatchSet, selectedReviewPatch, state.runId, submitPatchDecisionRequest]
+    [
+      reviewPatchSet,
+      selectedReviewPatch,
+      state.runId,
+      submitPatchDecisionRequest,
+    ],
+  );
+
+  /** Approve or reject a specific patch by ID, without requiring it to be
+   *  currently selected. Used by PatchReviewCard per-patch buttons. */
+  const submitPatchDecisionById = useCallback(
+    async (
+      patchId: string,
+      decision: "approve" | "reject",
+      comment?: string,
+    ) => {
+      if (!reviewPatchSet) {
+        return null;
+      }
+
+      const patch = reviewPatches.find((p) => p.id === patchId);
+      if (!patch) {
+        return null;
+      }
+
+      const patchSet = await submitPatchDecisionRequest(
+        reviewPatchSet.id,
+        patchId,
+        decision,
+        comment?.trim() || undefined,
+      );
+
+      setChatMessages((current) => [
+        ...current,
+        buildChatMessage(
+          "system",
+          decision === "approve"
+            ? `Patch ${patch.orderIndex + 1} aprobado.`
+            : `Patch ${patch.orderIndex + 1} rechazado.`,
+          state.runId,
+        ),
+      ]);
+
+      return patchSet;
+    },
+    [reviewPatchSet, reviewPatches, state.runId, submitPatchDecisionRequest],
   );
 
   const submitPatchSetDecision = useCallback(
@@ -506,19 +619,21 @@ export function useCopilotPanelController(
       const patchSet = await submitPatchSetDecisionRequest(
         reviewPatchSet.id,
         decision,
-        comment?.trim() || undefined
+        comment?.trim() || undefined,
       );
       setChatMessages((current) => [
         ...current,
         buildChatMessage(
           "system",
-          decision === "approve" ? "Todos los patches fueron aprobados." : "Todos los patches fueron rechazados.",
-          state.runId
+          decision === "approve"
+            ? "Todos los patches fueron aprobados."
+            : "Todos los patches fueron rechazados.",
+          state.runId,
         ),
       ]);
       return patchSet;
     },
-    [reviewPatchSet, state.runId, submitPatchSetDecisionRequest]
+    [reviewPatchSet, state.runId, submitPatchSetDecisionRequest],
   );
 
   const finalizeReview = useCallback(
@@ -529,22 +644,38 @@ export function useCopilotPanelController(
 
       const currentWorkspaceIndex = buildWorkspaceIndex();
       const currentDocument = currentWorkspaceIndex.documents.find(
-        (document) => document.documentId === reviewPatchSet.target_document_id
+        (document) => document.documentId === reviewPatchSet.target_document_id,
       );
+
+      log.debug("[finalizeReview] calling finalizePatchSetReview", {
+        patchSetId: reviewPatchSet.id,
+        targetDocumentId: reviewPatchSet.target_document_id,
+        documentVersion: currentDocument?.version,
+      });
+
       const run = await finalizePatchSetReview(
         reviewPatchSet.id,
         comment?.trim() || undefined,
-        currentDocument?.version
+        currentDocument?.version,
       );
 
-      if (
-        run?.applied_document_id &&
-        typeof run.applied_content === "string"
-      ) {
+      log.debug("[finalizeReview] response from backend", {
+        runStatus: run?.status,
+        appliedDocumentId: run?.applied_document_id,
+        appliedVersion: run?.applied_version,
+        hasAppliedContent: typeof run?.applied_content === "string",
+        appliedContentLength: run?.applied_content?.length ?? 0,
+      });
+
+      if (run?.applied_document_id && typeof run.applied_content === "string") {
+        log.debug("[finalizeReview] applying patch to workspace", {
+          documentId: run.applied_document_id,
+        });
         applyCopilotPatchToWorkspace({
           documentId: run.applied_document_id,
           content: run.applied_content,
-          baseVersion: reviewPatchSet.base_version ?? currentDocument?.version ?? 1,
+          baseVersion:
+            reviewPatchSet.base_version ?? currentDocument?.version ?? 1,
           appliedVersion: run.applied_version,
         });
       }
@@ -553,14 +684,16 @@ export function useCopilotPanelController(
         ...current,
         buildChatMessage(
           "system",
-          acceptedPatchCount > 0 ? "Cambios aplicados al documento." : "Revision cerrada sin aplicar cambios.",
-          run?.run_id ?? state.runId
+          acceptedPatchCount > 0
+            ? "Cambios aplicados al documento."
+            : "Revision cerrada sin aplicar cambios.",
+          run?.run_id ?? state.runId,
         ),
       ]);
 
       return run;
     },
-    [acceptedPatchCount, finalizePatchSetReview, reviewPatchSet, state.runId]
+    [acceptedPatchCount, finalizePatchSetReview, reviewPatchSet, state.runId],
   );
 
   const wrappedReset = useCallback(() => {
@@ -576,6 +709,25 @@ export function useCopilotPanelController(
     });
     reset();
   }, [reset]);
+
+  // Auto-finalize when all patches are decided (e.g. after accept-all / reject-all
+  // from the chat card).  The inline-editor path handles auto-finalize in usePatchDecision.
+  const autoFinalizeTriggeredRef = useRef<string | null>(null);
+  useEffect(() => {
+    const shouldFinalize =
+      canFinalizeAccepted || canFinalizeRejected || canFinalizeConflicted;
+    if (!shouldFinalize || !reviewPatchSet) return;
+    // Prevent re-trigger for the same patch set.
+    if (autoFinalizeTriggeredRef.current === reviewPatchSet.id) return;
+    autoFinalizeTriggeredRef.current = reviewPatchSet.id;
+    void finalizeReview();
+  }, [
+    canFinalizeAccepted,
+    canFinalizeRejected,
+    canFinalizeConflicted,
+    reviewPatchSet,
+    finalizeReview,
+  ]);
 
   return {
     state,
@@ -595,8 +747,10 @@ export function useCopilotPanelController(
     pendingPatchCount,
     acceptedPatchCount,
     rejectedPatchCount,
+    conflictedPatchCount,
     canFinalizeAccepted,
     canFinalizeRejected,
+    canFinalizeConflicted,
     patchFlowError,
     readMode,
     ensureSession,
@@ -605,6 +759,7 @@ export function useCopilotPanelController(
     sendMessage,
     selectReviewPatch: setSelectedReviewPatchId,
     submitPatchDecision,
+    submitPatchDecisionById,
     submitPatchSetDecision,
     finalizeReview,
   };
