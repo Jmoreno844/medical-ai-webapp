@@ -187,6 +187,7 @@ class CopilotPlanner(Protocol):
         supporting_context: list[dict[str, Any]],
         span_payload: Mapping[str, Any] | None = None,
         requested_tool_name: str | None = None,
+        requested_tool_instruction: str | None = None,
     ) -> DraftedPatchPlan: ...
 
 
@@ -212,6 +213,12 @@ def _filter_parallel_tool_calls(message: AIMessage) -> AIMessage:
     # with no ordering guarantee. We keep only the first proposal; the doctor can
     # request subsequent edits in the next turn.
     # Read-only calls (list_*, read_*) are safe to parallelize and are not filtered.
+    #
+    # NOTE: this filter was also the root cause of a secondary bug where the planner
+    # tried to call propose_replace_span 5 times (one per inline replacement) and
+    # 4 were silently dropped. The fix is ProposePatchInput.instruction: the planner
+    # now encodes ALL intended replacements for a document in a single call, and the
+    # drafter materializes them as multiple patches[]. See tools.py ProposePatchInput.
     tool_calls = list(message.tool_calls or [])
     if len(tool_calls) <= 1:
         return message
@@ -343,6 +350,7 @@ class LangChainCopilotPlanner:
         supporting_context: list[dict[str, Any]],
         span_payload: Mapping[str, Any] | None = None,
         requested_tool_name: str | None = None,
+        requested_tool_instruction: str | None = None,
     ) -> DraftedPatchPlan:
         messages = [
             SystemMessage(
@@ -358,6 +366,7 @@ class LangChainCopilotPlanner:
                     supporting_context=supporting_context,
                     span_payload=span_payload,
                     requested_tool_name=requested_tool_name,
+                    requested_tool_instruction=requested_tool_instruction,
                 )
             ),
         ]

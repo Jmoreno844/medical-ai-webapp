@@ -166,14 +166,21 @@ Todas las tools de propose siguen el mismo patrón:
 3. Construyen y validan el `patch_set_preview`.
 4. Setean `requires_human_review=True` → el grafo pausará en `interrupt_for_review`.
 
-| Tool                                            | Operación del drafter                            |
-| ----------------------------------------------- | ------------------------------------------------ |
-| `propose_replace_span(target_document_id)`      | Reemplaza un span existente por contenido nuevo. |
-| `propose_insert_after_span(target_document_id)` | Inserta contenido nuevo después de un span.      |
-| `propose_insert_before(target_document_id)`     | Inserta contenido nuevo antes de un anchor.      |
-| `propose_delete_span(target_document_id)`       | Borra un span del documento.                     |
+Todas aceptan un parámetro opcional `instruction: str | None`. El planner debe usarlo para
+describir exactamente qué texto cambiar y cómo. Si el planner tiene múltiples reemplazos
+para un mismo documento, **debe consolidarlos todos en una sola llamada** usando `instruction`
+en lugar de llamar la tool varias veces (el filtro `_filter_parallel_tool_calls` descargaría
+las llamadas adicionales silenciosamente). El drafter lee `instruction` como `<requested_instruction>`
+en su contexto XML y la prioriza sobre la inferencia desde el mensaje original del médico.
 
-La tool llama al drafter con `requested_tool_name` como pista. El drafter puede emitir múltiples patches en una sola llamada (`patches: list[DraftedPatch]`).
+| Tool                                                        | Operación del drafter                            |
+| ----------------------------------------------------------- | ------------------------------------------------ |
+| `propose_replace_span(target_document_id, instruction?)`    | Reemplaza un span existente por contenido nuevo. |
+| `propose_insert_after_span(target_document_id, instruction?)` | Inserta contenido nuevo después de un span.    |
+| `propose_insert_before(target_document_id, instruction?)`   | Inserta contenido nuevo antes de un anchor.      |
+| `propose_delete_span(target_document_id, instruction?)`     | Borra un span del documento.                     |
+
+La tool llama al drafter con `requested_tool_name` y `requested_tool_instruction` como pistas. El drafter puede emitir múltiples patches en una sola llamada (`patches: list[DraftedPatch]`).
 
 > `propose_create_document()` existe en el código pero siempre retorna error. No está habilitada.
 

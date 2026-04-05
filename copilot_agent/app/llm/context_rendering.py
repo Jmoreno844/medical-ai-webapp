@@ -283,11 +283,13 @@ def render_patch_input(
     supporting_context: list[dict[str, Any]],
     span_payload: Mapping[str, Any] | None,
     requested_tool_name: str | None,
+    requested_tool_instruction: str | None = None,
 ) -> str:
     lines = [
         "<patch_drafting_input>",
         f"  {xml_line('user_query', state.get('user_message'), max_length=1400)}",
         f"  {xml_line('requested_tool_name', requested_tool_name)}",
+        f"  {xml_line('requested_instruction', requested_tool_instruction)}",
         "  <target_document>",
         f"    {xml_line('document_id', target_document.get('document_id'))}",
         f"    {xml_line('title', target_document.get('title'))}",

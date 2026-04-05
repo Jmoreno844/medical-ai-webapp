@@ -122,7 +122,23 @@ class ReadPatchHistoryInput(BaseModel):
 
 class ProposePatchInput(BaseModel):
     target_document_id: str = Field(..., min_length=1)
-
+    # `instruction` fue agregado para resolver un bug donde el planner LLM intentaba
+    # llamar propose_replace_span 5 veces en paralelo (una por cada reemplazo puntual),
+    # y el filtro _filter_parallel_tool_calls descartaba 4 de ellas silenciosamente.
+    # La raíz del problema: el planner no tenia forma de expresar QUE cambiar, solo
+    # podía indicar EN QUE documento cambiar. Sin ese campo, el LLM alucinaba params
+    # inexistentes (exact_text, new_text, current_text) para compensar.
+    # Solución: un solo campo libre donde el planner consolida TODOS sus reemplazos
+    # para ese documento, que el drafter LLM luego materializa en patches individuales.
+    instruction: str | None = Field(
+        default=None,
+        description=(
+            "Opcional pero muy recomendado. Describe EXACTAMENTE el texto que quieres buscar "
+            "y como lo quieres reemplazar o estructurar. Si tienes varios cambios para este "
+            "mismo documento target, consolidalos TODOS en un solo llamado a esta tool explicando "
+            "cada cambio en esta instruction."
+        )
+    )
 
 class ProposeCreateDocumentInput(BaseModel):
     pass
@@ -970,6 +986,11 @@ def build_graph_tools(
         tool_call_id: str,
         tool_name: str,
         target_document_id: str,
+        instruction: str | None = None,
+        # `instruction` se pasa directamente al drafter via draft_patch_preview.
+        # El drafter lo recibe como <requested_instruction> en su contexto XML
+        # y lo prioriza sobre la inferencia desde el user_query.
+        # Si es None, el drafter infiere los cambios desde el mensaje original del médico.
     ) -> Command:
         if int(state.get("patch_operations_count") or 0) >= int(
             state.get("max_patch_operations") or 1
@@ -1072,6 +1093,7 @@ def build_graph_tools(
                 ),
                 span_payload=span_payload,
                 requested_tool_name=tool_name,
+                requested_tool_instruction=instruction,
             )
         except Exception as error:
             error_str = str(error)
@@ -1231,6 +1253,7 @@ def build_graph_tools(
     def propose_replace_span(
         target_document_id: str,
         runtime: ToolRuntime,
+        instruction: str | None = None,
     ) -> Command:
         """Draft a reviewable patch set centered on span replacement.
 
@@ -1238,23 +1261,32 @@ def build_graph_tools(
         `read_document` para este documento target, y ademas `read_document_span` o
         `read_document(mode="full")` en PREVIOUS TURNS. Si intentas llamarla antes, fallara.
         Never call this in the same turn as read tools.
+        
+        Optional 'instruction': Describe exactamente QUE texto quieres localizar y por QUE 
+        nuevo texto reemplazarlo. Si tienes multiples reemplazos para este documento localizados,
+        juntalos todos en UNA sola llamada a esta tool, detallandolos en instruction.
         """
         state, tool_call_id = _runtime_parts(
             runtime,
             tool_name="propose_replace_span",
         )
-        validated = ProposePatchInput(target_document_id=target_document_id)
+        validated = ProposePatchInput(
+            target_document_id=target_document_id,
+            instruction=instruction,
+        )
         return _propose_patch(
             state=state,
             tool_call_id=tool_call_id,
             tool_name="propose_replace_span",
             target_document_id=validated.target_document_id,
+            instruction=validated.instruction,
         )
 
     @tool
     def propose_insert_after_span(
         target_document_id: str,
         runtime: ToolRuntime,
+        instruction: str | None = None,
     ) -> Command:
         """Draft a reviewable patch set centered on anchored insertion.
 
@@ -1262,23 +1294,32 @@ def build_graph_tools(
         `read_document` para este documento target, y ademas `read_document_span` o
         `read_document(mode="full")` en PREVIOUS TURNS. Si intentas llamarla antes, fallara.
         Never call this in the same turn as read tools.
+        
+        Optional 'instruction': Describe exactly WHAT text to insert and WHERE (after which span).
+        If you have multiple insertions for this document, consolidate them into ONE tool call
+        and detail all of them in instruction.
         """
         state, tool_call_id = _runtime_parts(
             runtime,
             tool_name="propose_insert_after_span",
         )
-        validated = ProposePatchInput(target_document_id=target_document_id)
+        validated = ProposePatchInput(
+            target_document_id=target_document_id,
+            instruction=instruction,
+        )
         return _propose_patch(
             state=state,
             tool_call_id=tool_call_id,
             tool_name="propose_insert_after_span",
             target_document_id=validated.target_document_id,
+            instruction=validated.instruction,
         )
 
     @tool
     def propose_insert_before(
         target_document_id: str,
         runtime: ToolRuntime,
+        instruction: str | None = None,
     ) -> Command:
         """Draft a reviewable patch set centered on anchored insertion before a span.
 
@@ -1286,23 +1327,32 @@ def build_graph_tools(
         `read_document` para este documento target, y ademas `read_document_span` o
         `read_document(mode="full")` en PREVIOUS TURNS. Si intentas llamarla antes, fallara.
         Never call this in the same turn as read tools.
+        
+        Optional 'instruction': Describe exactly WHAT text to insert and WHERE (before which span).
+        If you have multiple insertions for this document, consolidate them into ONE tool call
+        and detail all of them in instruction.
         """
         state, tool_call_id = _runtime_parts(
             runtime,
             tool_name="propose_insert_before",
         )
-        validated = ProposePatchInput(target_document_id=target_document_id)
+        validated = ProposePatchInput(
+            target_document_id=target_document_id,
+            instruction=instruction,
+        )
         return _propose_patch(
             state=state,
             tool_call_id=tool_call_id,
             tool_name="propose_insert_before",
             target_document_id=validated.target_document_id,
+            instruction=validated.instruction,
         )
 
     @tool
     def propose_delete_span(
         target_document_id: str,
         runtime: ToolRuntime,
+        instruction: str | None = None,
     ) -> Command:
         """Draft a reviewable patch set centered on deleting an anchored span.
 
@@ -1310,17 +1360,25 @@ def build_graph_tools(
         `read_document` para este documento target, y ademas `read_document_span` o
         `read_document(mode="full")` en PREVIOUS TURNS. Si intentas llamarla antes, fallara.
         Never call this in the same turn as read tools.
+        
+        Optional 'instruction': Describe exactly WHICH text to delete.
+        If you have multiple deletions for this document, consolidate them into ONE tool call
+        and detail all of them in instruction.
         """
         state, tool_call_id = _runtime_parts(
             runtime,
             tool_name="propose_delete_span",
         )
-        validated = ProposePatchInput(target_document_id=target_document_id)
+        validated = ProposePatchInput(
+            target_document_id=target_document_id,
+            instruction=instruction,
+        )
         return _propose_patch(
             state=state,
             tool_call_id=tool_call_id,
             tool_name="propose_delete_span",
             target_document_id=validated.target_document_id,
+            instruction=validated.instruction,
         )
 
     @tool
