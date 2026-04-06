@@ -5,9 +5,11 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from app.graph.tools import build_graph_tools
 from app.graph.tools import _is_valid_patch_preview as tool_patch_preview_is_valid
+from app.graph.tools import _validate_drafted_plan_against_clinical_plan
 from app.graph.workflow import build_clinical_copilot_graph
 from app.graph.state import materialize_state_snapshot, reset_dict_state, reset_list_state
 from app.llm.instructions import DOCUMENTS_ARE_DATA_RULE
+from app.llm.providers import LlmProviderSpec
 from app.planner import (
     DraftedPatch,
     DraftedPatchPlan,
@@ -126,7 +128,12 @@ class _FakeStructuredRunnable:
     def __init__(self, *, result=None, error: Exception | None = None):
         self._result = result
         self._error = error
+        self.configs: list[dict] = []
         self.invocation_kwargs: list[dict] = []
+
+    def with_config(self, config=None, **kwargs):
+        self.configs.append({**(config or {}), **kwargs})
+        return self
 
     def invoke(self, _messages, **kwargs):
         self.invocation_kwargs.append(kwargs)
@@ -154,8 +161,8 @@ class _FakePatchModel:
         self._result = result
         self.runnables: list[_FakeStructuredRunnable] = []
 
-    def with_structured_output(self, _schema, *, method: str):
-        self.methods.append(method)
+    def with_structured_output(self, _schema, *, method: str | None = None):
+        self.methods.append(method or "default")
         runnable = _FakeStructuredRunnable(result=self._result)
         self.runnables.append(runnable)
         return runnable
@@ -167,11 +174,20 @@ class _FakeInvalidPatchModel:
         self._error = error
         self.runnables: list[_FakeStructuredRunnable] = []
 
-    def with_structured_output(self, _schema, *, method: str):
-        self.methods.append(method)
+    def with_structured_output(self, _schema, *, method: str | None = None):
+        self.methods.append(method or "default")
         runnable = _FakeStructuredRunnable(error=self._error)
         self.runnables.append(runnable)
         return runnable
+
+
+ChatGoogleGenerativeAIFake = type("ChatGoogleGenerativeAI", (), {})
+ChatGoogleGenerativeAIPatchFake = type(
+    "ChatGoogleGenerativeAI", (_FakePatchModel,), {}
+)
+ChatGoogleGenerativeAIInvalidPatchFake = type(
+    "ChatGoogleGenerativeAI", (_FakeInvalidPatchModel,), {}
+)
 
 
 class _RecordingPlanner:
@@ -238,9 +254,62 @@ def test_provider_runtime_kwargs_disable_google_afc():
         ),
     )
 
-    kwargs = planner._provider_runtime_kwargs()
+    kwargs = planner._provider_runtime_kwargs_for_model(
+        ChatGoogleGenerativeAIFake()
+    )
 
     assert kwargs["automatic_function_calling"].disable is True
+
+
+def test_langsmith_trace_config_uses_role_friendly_names():
+    planner_config = LangChainCopilotPlanner._langsmith_trace_config(
+        role="planner",
+        operation="tool_calling",
+        provider_spec=LlmProviderSpec(
+            provider_family="openai",
+            model_name="gpt-5.4-mini",
+        ),
+    )
+    drafter_config = LangChainCopilotPlanner._langsmith_trace_config(
+        role="drafter",
+        operation="structured_output",
+        provider_spec=LlmProviderSpec(
+            provider_family="google",
+            model_name="gemini-2.5-flash",
+            google_location="us-east1",
+        ),
+    )
+
+    # Without iteration/tool_names the planner label stays minimal.
+    assert planner_config["run_name"] == "Planner"
+    assert planner_config["metadata"]["llm_role"] == "planner"
+    assert planner_config["metadata"]["model_name"] == "gpt-5.4-mini"
+    assert "tool_calling" in planner_config["tags"]
+    # Drafter always appends → structured_output even without iteration.
+    assert drafter_config["run_name"] == "Drafter → structured_output"
+    assert drafter_config["metadata"]["llm_role"] == "drafter"
+    assert drafter_config["metadata"]["google_location"] == "us-east1"
+
+
+def test_langsmith_trace_config_includes_iteration_and_tool_names():
+    cfg = LangChainCopilotPlanner._langsmith_trace_config(
+        role="planner",
+        operation="tool_calling",
+        provider_spec=LlmProviderSpec(provider_family="anthropic", model_name="claude-haiku-4-5"),
+        iteration=3,
+        tool_names=["read_document", "set_edit_plan"],
+    )
+    assert cfg["run_name"] == "Planner [i=3] → read_document, set_edit_plan"
+    assert cfg["metadata"]["iteration"] == 3
+
+    drafter_cfg = LangChainCopilotPlanner._langsmith_trace_config(
+        role="drafter",
+        operation="structured_output",
+        provider_spec=LlmProviderSpec(provider_family="anthropic", model_name="claude-haiku-4-5"),
+        iteration=3,
+    )
+    assert drafter_cfg["run_name"] == "Drafter [i=3] → structured_output"
+    assert drafter_cfg["metadata"]["iteration"] == 3
 
 
 def test_planner_system_instruction_enforces_sequential_tool_dependencies():
@@ -408,7 +477,7 @@ def test_patch_drafting_uses_only_json_schema():
             vertex_model="gemini-2.5-flash",
         ),
     )
-    planner._patch_model = _FakePatchModel(
+    planner._patch_model = ChatGoogleGenerativeAIPatchFake(
         DraftedPatchPlan(
             rationale="Agregar fecha clinica.",
             document_preview_after="Fecha: 2 abril 2026\n\nPaciente estable y con mejoria.",
@@ -425,7 +494,6 @@ def test_patch_drafting_uses_only_json_schema():
                     expected_hash="hash-demo",
                     before_preview="Paciente estable y con mejoria.",
                     after_preview="Fecha: 2 abril 2026\n\n",
-                    document_preview_after="Fecha: 2 abril 2026\n\nPaciente estable y con mejoria.",
                     content_preview="Fecha: 2 abril 2026\n\nPaciente estable y con mejoria.",
                     rationale="Agregar fecha al inicio.",
                 )
@@ -449,11 +517,49 @@ def test_patch_drafting_uses_only_json_schema():
 
     assert result.patches
     assert planner._patch_model.methods == ["json_schema"]
+    # run_name now includes iteration (i=1 when state has no iteration_count) and role suffix.
+    assert planner._patch_model.runnables[0].configs[0]["run_name"] == "Drafter [i=1] → structured_output"
     assert all(
-        runnable.invocation_kwargs[0]["automatic_function_calling"].disable is True
+        runnable.invocation_kwargs == [{}]
         for runnable in planner._patch_model.runnables
         if runnable.invocation_kwargs
     )
+
+
+def test_planner_tool_calling_trace_is_named_planner():
+    planner = LangChainCopilotPlanner(
+        settings=SimpleNamespace(
+            gcp_project_id="demo",
+            gcp_region="us-central1",
+            vertex_model="gemini-2.5-flash",
+        ),
+    )
+    planner._planner_model = _FakePlannerModel(
+        AIMessage(
+            content="",
+            tool_calls=[
+                {
+                    "name": "read_document",
+                    "args": {"document_id": "99", "mode": "full"},
+                    "id": "call-1",
+                    "type": "tool_call",
+                }
+            ],
+        )
+    )
+
+    response = planner.invoke_model(
+        state=build_state("lee la nota"),
+        messages=[HumanMessage(content="lee la nota")],
+        tools=build_graph_tools(
+            tools_client=FakeToolsClient(),
+            planner=ScriptedPlanner(responses=[]),
+        ),
+    )
+
+    assert response.tool_calls
+    # run_name now includes iteration (i=1 when state has no prior iteration_count).
+    assert planner._planner_model.runnables[0].configs[0]["run_name"] == "Planner [i=1]"
 
 
 def test_planner_binds_sanitized_tool_specs_without_runtime_field():
@@ -495,7 +601,9 @@ def test_patch_drafting_fails_closed_without_function_calling_fallback():
             vertex_model="gemini-2.5-flash",
         ),
     )
-    planner._patch_model = _FakeInvalidPatchModel(RuntimeError("Invalid json output"))
+    planner._patch_model = ChatGoogleGenerativeAIInvalidPatchFake(
+        RuntimeError("Invalid json output")
+    )
 
     try:
         planner.draft_patch_preview(
@@ -522,11 +630,157 @@ def test_patch_drafting_fails_closed_without_function_calling_fallback():
         raise AssertionError("Expected patch drafting to fail closed without fallback")
 
     assert planner._patch_model.methods == ["json_schema"]
-    assert all(
-        runnable.invocation_kwargs[0]["automatic_function_calling"].disable is True
-        for runnable in planner._patch_model.runnables
-        if runnable.invocation_kwargs
+
+
+def test_planner_empty_response_after_full_read_falls_back_to_single_proposal_tool_call():
+    planner = LangChainCopilotPlanner(
+        settings=SimpleNamespace(
+            gcp_project_id="demo",
+            gcp_region="us-central1",
+            vertex_model="gemini-2.5-flash",
+        ),
     )
+    planner._planner_model = _FakePlannerModel(AIMessage(content=""))
+
+    state = build_state("agrega fiebre y dolor lumbar a la historia clinica")
+    state["read_documents"] = [
+        {
+            "document_id": "99",
+            "title": "Nota clinica",
+            "type": "note",
+            "read_mode": "full",
+        }
+    ]
+
+    response = planner.invoke_model(
+        state=state,
+        messages=[HumanMessage(content=state["user_message"])],
+        tools=build_graph_tools(
+            tools_client=FakeToolsClient(),
+            planner=ScriptedPlanner(responses=[]),
+        ),
+    )
+
+    assert response.tool_calls
+    assert response.tool_calls[0]["name"] == "propose_replace_span"
+    assert response.tool_calls[0]["args"]["target_document_id"] == "99"
+    assert (
+        response.tool_calls[0]["args"]["instruction"]
+        == "agrega fiebre y dolor lumbar a la historia clinica"
+    )
+
+
+def test_planner_empty_response_after_non_edit_read_returns_text_instead_of_failing():
+    planner = LangChainCopilotPlanner(
+        settings=SimpleNamespace(
+            gcp_project_id="demo",
+            gcp_region="us-central1",
+            vertex_model="gemini-2.5-flash",
+        ),
+    )
+    planner._planner_model = _FakePlannerModel(AIMessage(content=""))
+
+    state = build_state("resume la historia clinica")
+    state["read_documents"] = [
+        {
+            "document_id": "99",
+            "title": "Nota clinica",
+            "type": "note",
+            "read_mode": "full",
+        }
+    ]
+
+    response = planner.invoke_model(
+        state=state,
+        messages=[HumanMessage(content=state["user_message"])],
+        tools=build_graph_tools(
+            tools_client=FakeToolsClient(),
+            planner=ScriptedPlanner(responses=[]),
+        ),
+    )
+
+    assert response.tool_calls == []
+    assert "Lei el documento disponible" in str(response.content)
+
+
+def test_planner_empty_after_drafter_failure_returns_text_not_propose():
+    """When the drafter just failed (last_tool_error indicates json_schema/patch failure),
+    the fallback must NOT re-propose propose_* — that would loop into another drafter
+    failure. Instead it should return user-facing text."""
+    planner = LangChainCopilotPlanner(
+        settings=SimpleNamespace(
+            gcp_project_id="demo",
+            gcp_region="us-central1",
+            vertex_model="gemini-2.5-flash",
+        ),
+    )
+    planner._planner_model = _FakePlannerModel(AIMessage(content=""))
+
+    state = build_state("agrega fiebre a la nota")
+    state["read_documents"] = [
+        {
+            "document_id": "99",
+            "title": "Nota clinica",
+            "type": "note",
+            "read_mode": "full",
+        }
+    ]
+    # Simulate that the drafter just failed on the previous tool call
+    state["last_tool_error"] = (
+        "No pude redactar un patch clinico seguro: patch drafting failed "
+        "with json_schema structured output: Invalid json output"
+    )
+
+    response = planner.invoke_model(
+        state=state,
+        messages=[HumanMessage(content=state["user_message"])],
+        tools=build_graph_tools(
+            tools_client=FakeToolsClient(),
+            planner=ScriptedPlanner(responses=[]),
+        ),
+    )
+
+    # Must NOT propose again — that would loop into the same drafter failure
+    assert response.tool_calls == []
+    assert "No pude materializar" in str(response.content)
+
+
+def test_planner_empty_recovery_prompt_after_drafter_failure_avoids_propose():
+    """The recovery prompt should tell the planner to NOT call propose_* when
+    the last tool error was a drafter failure."""
+    state = build_state("agrega fiebre al diagnostico")
+    state["read_documents"] = [
+        {
+            "document_id": "42",
+            "title": "Nota clinica",
+            "type": "note",
+            "read_mode": "full",
+        }
+    ]
+    state["last_tool_error"] = "No pude redactar un patch clinico seguro: boom"
+
+    prompt = LangChainCopilotPlanner._empty_response_recovery_prompt(state)
+    assert "NO vuelvas a llamar propose" in prompt
+    assert "propose_replace_span" not in prompt
+
+
+def test_last_error_is_drafter_failure_detects_known_markers():
+    assert LangChainCopilotPlanner._last_error_is_drafter_failure(
+        {"last_tool_error": "No pude redactar un patch clinico seguro: json_schema error"}
+    )
+    assert LangChainCopilotPlanner._last_error_is_drafter_failure(
+        {"last_tool_error": "patch drafting failed with json_schema: truncated"}
+    )
+    assert LangChainCopilotPlanner._last_error_is_drafter_failure(
+        {"last_tool_error": "RECURSO DE IA AGOTADO (429)"}
+    )
+    assert not LangChainCopilotPlanner._last_error_is_drafter_failure(
+        {"last_tool_error": "Document not found for id 99"}
+    )
+    assert not LangChainCopilotPlanner._last_error_is_drafter_failure(
+        {"last_tool_error": None}
+    )
+    assert not LangChainCopilotPlanner._last_error_is_drafter_failure({})
 
 
 def test_drafted_patch_schema_rejects_tool_names_and_defaults_rationale():
@@ -1140,7 +1394,6 @@ def test_regression_edit_note_request_stays_in_waiting_review_path():
                     expected_hash="note-hash",
                     before_preview="**HISTORIA CLINICA**\n\nMotivo de consulta: Dolor de estomago.",
                     after_preview="Fecha: 2 abril 2026\n\n",
-                    document_preview_after="Fecha: 2 abril 2026\n\n**HISTORIA CLINICA**\n\nMotivo de consulta: Dolor de estomago.",
                     content_preview="Fecha: 2 abril 2026\n\n**HISTORIA CLINICA**\n\nMotivo de consulta: Dolor de estomago.",
                     rationale="Agregar fecha al inicio.",
                 )
@@ -1276,7 +1529,6 @@ def test_multi_patch_plan_is_preserved_in_patch_set_preview():
                     expected_hash="hash-demo",
                     before_preview="Paciente estable y con mejoria.",
                     after_preview="Fecha: 2 abril 2026\n\n",
-                    document_preview_after="Fecha: 2 abril 2026\n\nPaciente estable y con mejoria.",
                     content_preview="Fecha: 2 abril 2026\n\nPaciente estable y con mejoria.",
                     rationale="Agregar fecha al inicio.",
                 ),
@@ -1292,7 +1544,6 @@ def test_multi_patch_plan_is_preserved_in_patch_set_preview():
                     expected_hash="hash-demo",
                     before_preview="Paciente estable y con mejoria.",
                     after_preview="\n\nFirma:\nJuan Moreno",
-                    document_preview_after="Fecha: 2 abril 2026\n\nPaciente estable y con mejoria.\n\nFirma:\nJuan Moreno",
                     content_preview="Fecha: 2 abril 2026\n\nPaciente estable y con mejoria.\n\nFirma:\nJuan Moreno",
                     rationale="Agregar firma al final.",
                 ),
@@ -1317,6 +1568,121 @@ def test_multi_patch_plan_is_preserved_in_patch_set_preview():
         == "insert_after_span"
     )
     assert next_state["patch_preview"]["patch_id"] == next_state["patch_set_preview"]["patches"][0]["patch_id"]
+
+
+def test_validate_drafted_plan_rejects_partial_propagation_plan():
+    validation_error = _validate_drafted_plan_against_clinical_plan(
+        drafted_plan=DraftedPatchPlan(
+            rationale="Solo materialicé el primer cambio.",
+            patches=[
+                DraftedPatch(
+                    operation_type="replace_span",
+                    anchor={
+                        "exactText": "Paciente estable y con mejoria.",
+                    },
+                    content_preview="Paciente con fiebre y con mejoria.",
+                    rationale="Actualizar enfermedad actual.",
+                    section=None,
+                )
+            ],
+        ),
+        clinical_plan={
+            "edit_scope": "propagation",
+            "affected_sections": [
+                "enfermedad_actual",
+                "analisis",
+                "plan",
+            ],
+        },
+    )
+
+    assert validation_error is not None
+    assert "patches sin section" in validation_error
+    assert "faltan secciones obligatorias: enfermedad_actual, analisis, plan." in validation_error
+
+
+def test_partial_propagation_plan_fails_closed_before_review():
+    planner = ScriptedPlanner(
+        responses=[
+            make_ai_tool_call(
+                tool_name="set_edit_plan",
+                args={
+                    "edit_scope": "propagation",
+                    "clinical_impact_level": "clinical",
+                    "affected_sections": [
+                        "enfermedad_actual",
+                        "analisis",
+                        "plan",
+                    ],
+                    "needs_full_note": True,
+                    "needs_external_knowledge": False,
+                },
+                tool_call_id="call-1",
+            ),
+            make_ai_tool_call(
+                tool_name="read_document",
+                args={"document_id": "99", "mode": "full"},
+                tool_call_id="call-2",
+            ),
+            make_ai_tool_call(
+                tool_name="propose_replace_span",
+                args={
+                    "target_document_id": "99",
+                    "instruction": (
+                        "Actualizar enfermedad actual y propagar el nuevo dato a análisis y plan."
+                    ),
+                },
+                tool_call_id="call-3",
+            ),
+            make_ai_response(
+                "Necesito rehacer el patch set completo por secciones antes de enviarlo a revisión."
+            ),
+        ],
+        drafted_patch=DraftedPatchPlan(
+            rationale="Solo pude materializar el primer cambio.",
+            document_preview_after="Paciente con fiebre y con mejoria.",
+            patches=[
+                DraftedPatch(
+                    operation_type="replace_span",
+                    anchor={
+                        "exactText": "Paciente estable y con mejoria.",
+                        "prefixText": "",
+                        "suffixText": "",
+                        "startOffset": 0,
+                        "endOffset": 29,
+                    },
+                    expected_hash="hash-demo",
+                    before_preview="Paciente estable y con mejoria.",
+                    after_preview="Paciente con fiebre y con mejoria.",
+                    content_preview="Paciente con fiebre y con mejoria.",
+                    rationale="Actualizar solo enfermedad actual.",
+                    section=None,
+                )
+            ],
+        ),
+    )
+    graph = build_clinical_copilot_graph(
+        tools_client=FakeToolsClient(),
+        planner=planner,
+    )
+
+    next_state = graph.invoke(
+        build_state("agrega fiebre y propagalo a analisis y plan"),
+        config={"configurable": {"thread_id": "copilot:encounter:12:doctor:7"}},
+    )
+
+    assert next_state["requires_human_review"] is False
+    assert next_state.get("patch_set_preview") is None
+    assert next_state.get("patch_preview") is None
+    assert next_state.get("run_error") is None
+    assert (
+        next_state["final_response"]
+        == "Necesito rehacer el patch set completo por secciones antes de enviarlo a revisión."
+    )
+    assert any(
+        "patch set incompleto para el plan clínico actual" in result["summary"]
+        for result in next_state["tool_results"]
+    )
 
 
 def test_provider_failure_marks_run_as_failed():

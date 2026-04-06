@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Literal, Protocol, Sequence
+from typing import Any, Literal, Mapping, Protocol, Sequence
 from xml.sax.saxutils import escape
 
 from langchain_core.messages import ToolMessage
@@ -351,6 +351,8 @@ def _tool_observation_content(
             f"  {_xml_line('needs_external_knowledge', payload.get('needs_external_knowledge'))}"
         )
         lines.append(f"  {_xml_line('max_patch_operations', payload.get('max_patch_operations'))}")
+        if payload.get("reasoning"):
+            lines.append(f"  {_xml_line('reasoning', payload.get('reasoning'))}")
     elif tool_name.startswith("propose_"):
         lines.append(f"  {_xml_line('patch_set_id', payload.get('patch_set_id'))}")
         lines.append(f"  {_xml_line('target_document_id', payload.get('target_document_id'))}")
@@ -578,6 +580,82 @@ def _is_valid_patch_set_preview(patch_set_preview: dict[str, Any] | None) -> boo
     )
 
 
+def _normalize_section_name(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def _validate_drafted_plan_against_clinical_plan(
+    *,
+    drafted_plan: DraftedPatchPlan,
+    clinical_plan: Mapping[str, Any],
+) -> str | None:
+    edit_scope = _normalize_section_name(clinical_plan.get("edit_scope"))
+    if edit_scope not in {"propagation", "reinterpretation"}:
+        return None
+
+    expected_sections: list[str] = []
+    seen_expected: set[str] = set()
+    for section in clinical_plan.get("affected_sections") or []:
+        normalized = _normalize_section_name(section)
+        if not normalized or normalized in seen_expected:
+            continue
+        seen_expected.add(normalized)
+        expected_sections.append(normalized)
+
+    if not expected_sections:
+        return None
+
+    # Fail closed for multi-section clinical edits. Without this guard Gemini may
+    # accept a long consolidated instruction, emit only the first obvious patch,
+    # and still open human review with the rest of the requested propagation silently
+    # missing. That is worse than an explicit tool error because it looks successful.
+    patch_sections: set[str] = set()
+    patches_without_section: list[int] = []
+    invalid_sections: set[str] = set()
+    for index, patch in enumerate(drafted_plan.patches, start=1):
+        normalized_section = _normalize_section_name(patch.section)
+        if not normalized_section:
+            patches_without_section.append(index)
+            continue
+        if normalized_section not in seen_expected:
+            invalid_sections.add(normalized_section)
+            continue
+        patch_sections.add(normalized_section)
+
+    missing_sections = [
+        section for section in expected_sections if section not in patch_sections
+    ]
+    if not patches_without_section and not invalid_sections and not missing_sections:
+        return None
+
+    issues: list[str] = []
+    if patches_without_section:
+        issues.append(
+            "patches sin section en posiciones: "
+            + ", ".join(str(index) for index in patches_without_section)
+            + "."
+        )
+    if invalid_sections:
+        issues.append(
+            "sections fuera del plan clínico: "
+            + ", ".join(sorted(invalid_sections))
+            + "."
+        )
+    if missing_sections:
+        issues.append(
+            "faltan secciones obligatorias: "
+            + ", ".join(missing_sections)
+            + "."
+        )
+
+    return (
+        "El drafter devolvió un patch set incompleto para el plan clínico actual. "
+        f"Scope={edit_scope}. Se esperaban patches para: {', '.join(expected_sections)}. "
+        + " ".join(issues)
+        + " Regenera el patch set completo y asigna section a cada patch antes de abrir review."
+    )
+
+
 def _build_patch_set_preview_payload(
     *,
     state: CopilotState,
@@ -611,8 +689,7 @@ def _build_patch_set_preview_payload(
     patches: list[dict[str, Any]] = []
     for index, patch in enumerate(drafted_plan.patches):
         document_preview_after = (
-            patch.document_preview_after
-            or drafted_plan.document_preview_after
+            drafted_plan.document_preview_after
             or patch.content_preview
         )
         patches.append(
@@ -630,7 +707,6 @@ def _build_patch_set_preview_payload(
                 "document_preview_after": document_preview_after,
                 "content_preview": patch.content_preview,
                 "rationale": patch.rationale,
-                "confidence": patch.confidence,
                 # Sección semántica indicada por el drafter, derivada del clinical_plan.
                 # Permite al frontend agrupar patches por sección y al auditor clínico
                 # validar que el cambio quedó registrado en el lugar correcto.
@@ -832,7 +908,31 @@ def build_graph_tools(
         end_offset: int | None = None,
         max_chars: int = 4000,
     ) -> Command:
-        """Read a focused span from one document."""
+        """Lee un fragmento focalizado de un documento.
+
+        Usa este tool cuando ya sabes QUÉ sección necesitas leer pero no su contenido exacto.
+        No lo uses como sustituto de read_document(mode='full') para ediciones multi-sección.
+
+        Hay dos formas de anclar el span:
+
+        1. `exact_text` (recomendado para spans puntuales): proporciona una frase CORTA Y ÚNICA
+           (3-8 palabras) de una sola línea del documento. El backend la busca como substring
+           exacto. No incluyas saltos de línea (\\n) ni párrafos largos.
+           Opcionalmente añade `prefix_text` / `suffix_text` para desambiguar si el texto
+           aparece más de una vez. Devuelve exactamente ese fragmento + max_chars alrededor.
+
+        2. `prefix_text` SOLO, SIN exact_text (para leer una sección entera por su encabezado):
+           proporciona el encabezado EXACTO de la sección como aparece en el documento,
+           por ejemplo `"## 10. Plan de manejo"`.
+           El backend lo localiza y devuelve desde ahí hasta el siguiente encabezado (#/##)
+           o hasta max_chars, lo que ocurra primero.
+           Úsalo cuando sabes el título de la sección pero no su contenido.
+           NO funciona si el encabezado aparece más de una vez en el documento.
+
+        NUNCA uses este tool para leer una sección si ya tienes el documento completo en
+        contexto (de un read_document previo en modo full). En ese caso el contenido ya está
+        disponible y una segunda lectura parcial no aporta nada al drafter.
+        """
         state, tool_call_id = _runtime_parts(
             runtime,
             tool_name="read_document_span",
@@ -1136,6 +1236,18 @@ def build_graph_tools(
                 ),
             )
 
+        drafted_plan_validation_error = _validate_drafted_plan_against_clinical_plan(
+            drafted_plan=drafted_plan,
+            clinical_plan=clinical_plan,
+        )
+        if drafted_plan_validation_error:
+            return _error_command(
+                state=state,
+                tool_name=tool_name,
+                tool_call_id=tool_call_id,
+                error_message=drafted_plan_validation_error,
+            )
+
         payload = _build_patch_set_preview_payload(
             state=state,
             drafted_plan=drafted_plan,
@@ -1183,8 +1295,8 @@ def build_graph_tools(
         affected_sections: list[str],
         needs_full_note: bool,
         needs_external_knowledge: bool,
-        should_propagate_to_analysis_and_plan: bool,
         runtime: ToolRuntime,
+        reasoning: str | None = None,
     ) -> Command:
         """Registra el plan de edición clínica ANTES de proponer patches.
 
@@ -1209,7 +1321,14 @@ def build_graph_tools(
 
         Valores válidos para edit_scope: 'local', 'propagation', 'reinterpretation'.
         Valores válidos para clinical_impact_level: 'cosmetic', 'factual', 'clinical'.
+        OJO: 'cosmetic' describe impacto semántico, no tamaño del cambio. Un reformateo
+        amplio puede requerir propagation si toca varias secciones aunque no cambie datos.
         affected_sections: lista snake_case, ej ['enfermedad_actual', 'plan'].
+        reasoning: razonamiento clínico breve que explica POR QUÉ ese scope y esas secciones.
+          Ejemplo: 'El paciente no tiene diabetes — debo borrarla de antecedentes, quitar el
+          control glucémico del plan y corregir el análisis que la mencionaba como activa.'
+          El drafter usa este campo para entender el hilo clínico sin releer la conversación.
+          También se muestra al médico en el chat mientras espera los patches.
         """
         state, tool_call_id = _runtime_parts(runtime, tool_name="set_edit_plan")
 
@@ -1229,7 +1348,10 @@ def build_graph_tools(
             "affected_sections": list(affected_sections or []),
             "needs_full_note": bool(needs_full_note),
             "needs_external_knowledge": bool(needs_external_knowledge),
-            "should_propagate_to_analysis_and_plan": bool(should_propagate_to_analysis_and_plan),
+            # reasoning es opcional: algunos modelos (GPT mini) no lo emiten siempre.
+            # Se almacena en clinical_plan para que render_patch_input lo inyecte
+            # en el contexto del drafter y para que el frontend lo muestre al doctor.
+            "reasoning": (reasoning or "").strip() or None,
         }
         payload = {**plan, "max_patch_operations": max_ops}
 

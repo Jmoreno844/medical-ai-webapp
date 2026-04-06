@@ -296,7 +296,7 @@ def render_patch_input(
         f"    {xml_line('type', target_document.get('type'))}",
         f"    {xml_line('version', target_document.get('version'))}",
         "  </target_document>",
-        f"  {xml_line('target_document_content', target_document_content, max_length=4000)}",
+        f"  {xml_line('target_document_content', target_document_content, max_length=12000)}",
     ]
     if span_payload:
         lines.extend(
@@ -335,9 +335,12 @@ def render_patch_input(
                 f"    {xml_line('clinical_impact_level', clinical_plan.get('clinical_impact_level'))}",
                 f"    {xml_line('affected_sections', sections_str)}",
                 f"    {xml_line('needs_full_note', clinical_plan.get('needs_full_note'))}",
-                f"    {xml_line('should_propagate_to_analysis_and_plan', clinical_plan.get('should_propagate_to_analysis_and_plan'))}",
-                "  </edit_plan>",
             ]
         )
+        if clinical_plan.get("reasoning"):
+            # El planner escribió su razonamiento clínico aquí. El drafter debe usarlo
+            # para entender el hilo causal del cambio sin releer la conversación.
+            lines.append(f"    {xml_line('reasoning', clinical_plan.get('reasoning'), max_length=800)}")
+        lines.append("  </edit_plan>")
     lines.append("</patch_drafting_input>")
     return "\n".join(lines)
