@@ -27,6 +27,11 @@ type WorkspaceStoreState = {
   clearEncounterWorkspace: () => void;
   setWorkspaceLoading: (loading: boolean) => void;
   setWorkspaceError: (error: string | null) => void;
+  // True while the copilot agent is actively streaming a run.
+  // Used by the editor to show a light lock overlay so the doctor
+  // knows AI is working and edits may be overwritten.
+  isCopilotRunning: boolean;
+  setCopilotRunning: (running: boolean) => void;
 };
 
 function sortDocuments(docs: DocumentoOut[]): DocumentoOut[] {
@@ -229,4 +234,6 @@ export const useWorkspaceStore = create<WorkspaceStoreState>((set) => ({
 
   setWorkspaceLoading: (loading) => set({ loading }),
   setWorkspaceError: (error) => set({ error }),
+  isCopilotRunning: false,
+  setCopilotRunning: (running) => set({ isCopilotRunning: running }),
 }));

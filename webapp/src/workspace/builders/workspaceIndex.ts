@@ -61,15 +61,17 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
         hasPendingPatches: patches.length > 0,
         // Pre-load full content for open, writable documents so the agent can
         // propose patches on turn 1 without a read_document round-trip.
-        // Read-only, hidden, or streaming docs are excluded to keep payload size
-        // predictable. The agent treats this as a mode="full" pre-seeded read.
+        // Read-only, hidden, streaming, or dirty-drafted docs are excluded:
+        // - dirty docs have an unsaved draft whose version is ahead of the
+        //   last snapshot, so base_version in any patch would be wrong.
+        //   The agent receives a warning notice instead and can ask the
+        //   doctor to save before editing.
         contentMarkdown:
           document.aiWritable &&
+          !draft?.isDirty &&
           !workspaceState.hiddenFromAgentDocumentIds.includes(document.id) &&
           !(derived?.inProgress && derived?.streamingContent)
-            ? (draft?.localUnsavedContent ??
-                snapshot?.contentMarkdown ??
-                document.contentMarkdown) ||
+            ? (snapshot?.contentMarkdown ?? document.contentMarkdown) ||
               undefined
             : undefined,
       };

@@ -24,6 +24,7 @@ import { useTranscriptionContext } from "../../../contexts/TranscriptionContext"
 import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
 import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
 import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
+import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
 import { usePatchDecision } from "@/workspace/hooks/usePatchDecision";
 
 // Import utilities
@@ -57,6 +58,7 @@ const TextArea: React.FC = () => {
   // useSyncExternalStore/Zustand when the editor is already rerendering often.
   const activePatchSetId = usePatchSetStore((state) => state.activePatchSetId);
   const patchSets = usePatchSetStore((state) => state.patchSets);
+  const isCopilotRunning = useWorkspaceStore((state) => state.isCopilotRunning);
   const { submitDecision: submitPatchDecisionFn } = usePatchDecision();
 
   // Local state & refs
@@ -308,7 +310,18 @@ const TextArea: React.FC = () => {
       )}
 
       {/* Editor */}
-      <div className="border rounded-md flex-1 bg-white overflow-hidden">
+      <div className="border rounded-md flex-1 bg-white overflow-hidden relative">
+        {/* AI-running lock overlay — shown when the copilot agent is streaming.
+            pointer-events-none: doctor can still scroll and read, just not type.
+            Only shown in edit mode; patch_review and streaming_preview have
+            their own visual states that already imply the doc is busy. */}
+        {isCopilotRunning && editorMode === "edit" && (
+          <div className="absolute inset-0 bg-black/5 pointer-events-none z-10 flex items-start justify-end">
+            <span className="m-2 px-2 py-0.5 bg-white/80 text-xs text-gray-500 rounded shadow-sm select-none">
+              IA trabajando…
+            </span>
+          </div>
+        )}
         {isPatchPreviewMode ? (
           <PatchInlineDiffView
             content={documentContent}

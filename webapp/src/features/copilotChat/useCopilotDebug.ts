@@ -19,6 +19,7 @@ import {
   CopilotRunResponse,
   CopilotStreamEvent,
 } from "@/features/copilotChat/types";
+import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
 
 const INITIAL_STATE: CopilotDebugState = {
   threadId: null,
@@ -43,6 +44,19 @@ export function useCopilotDebug(encounterId: number) {
       closeStreamRef.current?.();
     };
   }, []);
+
+  // Keep the workspace store in sync so the editor can show a lock overlay
+  // while the agent is running. setCopilotRunning is stable (Zustand action)
+  // so this effect only re-runs when isStreaming actually changes.
+  const setCopilotRunning = useWorkspaceStore((s) => s.setCopilotRunning);
+  useEffect(() => {
+    setCopilotRunning(state.isStreaming);
+    return () => {
+      // On unmount clear the flag so the editor doesn't stay locked
+      // if the copilot panel is closed mid-run.
+      setCopilotRunning(false);
+    };
+  }, [state.isStreaming, setCopilotRunning]);
 
   const appendEvent = useCallback((event: CopilotStreamEvent) => {
     if (event.event !== "response_chunk") {

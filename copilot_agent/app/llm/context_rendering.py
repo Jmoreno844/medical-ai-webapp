@@ -224,6 +224,38 @@ def _render_search_results(
     return "\n".join(lines)
 
 
+def _render_user_edit_notices(workspace_index: Mapping[str, Any]) -> str:
+    # Emitted when the doctor has unsaved edits in a writable document.
+    # The agent must not attempt to patch these documents because:
+    # - their content_markdown was not pre-seeded (version mismatch risk)
+    # - the draft content is ahead of the last saved version Django knows about
+    # The notice tells the agent to inform the doctor to save first.
+    dirty_docs = [
+        doc
+        for doc in (workspace_index.get("documents") or [])
+        if doc.get("ai_writable") and doc.get("has_dirty_draft")
+    ]
+    if not dirty_docs:
+        return ""
+
+    lines = ["<user_edit_notices>"]
+    for doc in dirty_docs[:4]:
+        lines.extend(
+            [
+                "  <notice>",
+                f"    {xml_line('document_id', doc.get('document_id'))}",
+                f"    {xml_line('title', doc.get('title'))}",
+                "    <message>Este documento tiene cambios sin guardar del medico. "
+                "NO intentes editarlo. Si el medico quiere que lo modifiques, "
+                "pidele que guarde primero (o espera a que el autosave termine).</message>",
+                "  </notice>",
+            ]
+        )
+    lines.append("</user_edit_notices>")
+    return "\n".join(lines)
+
+
+
 # Context is rendered as XML rather than JSON for two reasons:
 # 1. Clinical text contains colons, braces, and quotes that require escaping in JSON,
 #    which increases token count and parser ambiguity.
@@ -241,16 +273,19 @@ def render_turn_context(state: Mapping[str, Any]) -> str:
             }
         ]
     return "\n".join(
-        [
-            "<copilot_turn_context>",
-            f"  {xml_line('user_query', state.get('user_message'), max_length=1200)}",
-            "  <workspace_index>",
-            f"    {xml_line('encounter_id', workspace_index.get('encounter_id'))}",
-            f"    {xml_line('workspace_version', workspace_index.get('workspace_version'))}",
-            f"    {xml_line('active_document_id', state.get('active_document_id'))}",
-            f"    {xml_line('selected_document_ids', ', '.join(selected_document_ids))}",
-            "  </workspace_index>",
-            _render_workspace_documents(
+        filter(
+            None,
+            [
+                "<copilot_turn_context>",
+                f"  {xml_line('user_query', state.get('user_message'), max_length=1200)}",
+                "  <workspace_index>",
+                f"    {xml_line('encounter_id', workspace_index.get('encounter_id'))}",
+                f"    {xml_line('workspace_version', workspace_index.get('workspace_version'))}",
+                f"    {xml_line('active_document_id', state.get('active_document_id'))}",
+                f"    {xml_line('selected_document_ids', ', '.join(selected_document_ids))}",
+                "  </workspace_index>",
+                _render_user_edit_notices(workspace_index) or None,
+                _render_workspace_documents(
                 workspace_index,
                 active_document_id=state.get("active_document_id"),
                 selected_document_ids=selected_document_ids,
@@ -271,7 +306,8 @@ def render_turn_context(state: Mapping[str, Any]) -> str:
             f"  {xml_line('last_tool_error', state.get('last_tool_error'))}",
             f"  {xml_line('last_planner_error', state.get('last_planner_error'))}",
             "</copilot_turn_context>",
-        ]
+            ]
+        )
     )
 
 
