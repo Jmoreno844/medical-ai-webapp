@@ -338,9 +338,16 @@ def render_patch_input(
             ]
         )
         if clinical_plan.get("reasoning"):
-            # El planner escribió su razonamiento clínico aquí. El drafter debe usarlo
-            # para entender el hilo causal del cambio sin releer la conversación.
+            # Razonamiento clínico interno del planner: explica el hilo causal del cambio.
             lines.append(f"    {xml_line('reasoning', clinical_plan.get('reasoning'), max_length=800)}")
+        section_instructions = clinical_plan.get("section_instructions") or {}
+        if section_instructions:
+            # Instrucciones quirúrgicas por sección: el drafter las prioriza sobre
+            # inferir el cambio desde reasoning o user_query.
+            lines.append("    <section_instructions>")
+            for section_name, instruction in section_instructions.items():
+                lines.append(f"      <instruction section=\"{section_name}\">{instruction}</instruction>")
+            lines.append("    </section_instructions>")
         lines.append("  </edit_plan>")
     lines.append("</patch_drafting_input>")
     return "\n".join(lines)

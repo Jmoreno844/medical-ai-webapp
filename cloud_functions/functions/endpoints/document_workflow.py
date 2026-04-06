@@ -2,13 +2,45 @@
 Cloud Function endpoint for complete document generation workflow.
 """
 
-import logging
 import json
+import logging
+
+from langsmith_tracing import trace_operation
+
 from services.document_generation.generator import generate_document_from_components
 from services.django_api import send_generation_chunk
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _langsmith_request_inputs(request) -> dict:
+    request_json = request.get_json(silent=True) or {}
+    context_document = request_json.get("context_document", {}) or {}
+    transcription_document = request_json.get("transcription_document", {}) or {}
+    template = request_json.get("template", {}) or {}
+    return {
+        "method": request.method,
+        "new_document_id": request_json.get("new_document_id"),
+        "process_id": request_json.get("process_id"),
+        "validate_only": bool(request_json.get("validate_only", False)),
+        "context_length": len(context_document.get("content") or ""),
+        "transcription_length": len(transcription_document.get("content") or ""),
+        "template_length": len(template.get("content") or ""),
+        "has_auth_token": bool(request_json.get("auth_token")),
+    }
+
+
+def _langsmith_request_outputs(response: tuple) -> dict:
+    body, status_code, _headers = response
+    payload = json.loads(body)
+    return {
+        "status_code": status_code,
+        "success": bool(payload.get("success")),
+        "document_id": payload.get("document_id"),
+        "process_id": payload.get("process_id"),
+        "validate_only": bool(payload.get("validate_only", False)),
+    }
 
 
 def generate_document_workflow(request) -> tuple:
@@ -34,6 +66,13 @@ def generate_document_workflow(request) -> tuple:
     )
 
 
+@trace_operation(
+    name="cloud_functions.document_generation_request",
+    run_type="chain",
+    process_inputs=_langsmith_request_inputs,
+    process_outputs=_langsmith_request_outputs,
+    tags=["document_generation", "http"],
+)
 def _generate_document_workflow_impl(request) -> tuple:
     logger.info(f"Received document generation workflow request: {request.method}")
 

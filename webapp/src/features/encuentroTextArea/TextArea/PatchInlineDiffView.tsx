@@ -29,7 +29,10 @@ type Chunk = TextChunk | PatchChunk;
 // Chunk builder
 // ---------------------------------------------------------------------------
 
-function buildChunks(content: string, patches: CopilotPatchResponse[]): Chunk[] {
+function buildChunks(
+  content: string,
+  patches: CopilotPatchResponse[],
+): Chunk[] {
   const resolved = [...patches]
     .filter((p) => p.resolvedRange != null)
     .sort((a, b) => a.resolvedRange!.start - b.resolvedRange!.start);
@@ -114,7 +117,10 @@ function InlinePatchChunk({ patch, onDecision }: InlinePatchChunkProps) {
   // ---- rejected ------------------------------------------------------------
   if (patch.status === "rejected") {
     return (
-      <span ref={chunkRef} className="text-gray-400 line-through decoration-gray-300">
+      <span
+        ref={chunkRef}
+        className="text-gray-400 line-through decoration-gray-300"
+      >
         {patch.oldText}
       </span>
     );
@@ -122,12 +128,30 @@ function InlinePatchChunk({ patch, onDecision }: InlinePatchChunkProps) {
 
   // ---- applied / stale — show as plain text --------------------------------
   if (patch.status === "applied" || patch.status === "stale") {
-    return (
-      <span ref={chunkRef}>{patch.newText ?? patch.oldText}</span>
-    );
+    return <span ref={chunkRef}>{patch.newText ?? patch.oldText}</span>;
   }
 
   // ---- pending: full inline diff with approve/reject buttons ---------------
+
+  // For insert operations the anchor text is preserved exactly — nothing is
+  // removed. Showing oldText in red would falsely imply the anchor is deleted.
+  // Instead show the anchor as neutral context and only the inserted content
+  // in green. We derive the inserted-only content from newText by stripping
+  // the repeated anchor (insert_after: newText = oldText + inserted;
+  //                         insert_before: newText = inserted + oldText).
+  const isInsertAfter =
+    patch.type === "insert_after" || patch.type === "insert_after_span";
+  const isInsertBefore = patch.type === "insert_before";
+  const isInsert = isInsertAfter || isInsertBefore;
+
+  const insertedOnly: string | null = isInsert
+    ? isInsertAfter && patch.newText.startsWith(patch.oldText)
+      ? patch.newText.slice(patch.oldText.length)
+      : isInsertBefore && patch.newText.endsWith(patch.oldText)
+        ? patch.newText.slice(0, patch.newText.length - patch.oldText.length)
+        : patch.newText // fallback: show full newText in green
+    : null;
+
   return (
     <span
       ref={chunkRef}
@@ -139,15 +163,32 @@ function InlinePatchChunk({ patch, onDecision }: InlinePatchChunkProps) {
       onClick={handleSelect}
       title={patch.rationale ?? undefined}
     >
-      {/* Old text — red + strikethrough */}
-      {patch.oldText && (
-        <span className="bg-red-100 text-red-800 line-through decoration-red-400">
-          {patch.oldText}
-        </span>
-      )}
-      {/* New text — green */}
-      {patch.newText && (
-        <span className="bg-green-100 text-green-900">{patch.newText}</span>
+      {isInsert ? (
+        // Insert: anchor is context (no colour), only new content is green.
+        isInsertBefore ? (
+          <>
+            <span className="bg-green-100 text-green-900">{insertedOnly}</span>
+            <span>{patch.oldText}</span>
+          </>
+        ) : (
+          <>
+            <span>{patch.oldText}</span>
+            <span className="bg-green-100 text-green-900">{insertedOnly}</span>
+          </>
+        )
+      ) : (
+        <>
+          {/* Old text — red + strikethrough */}
+          {patch.oldText && (
+            <span className="bg-red-100 text-red-800 line-through decoration-red-400">
+              {patch.oldText}
+            </span>
+          )}
+          {/* New text — green */}
+          {patch.newText && (
+            <span className="bg-green-100 text-green-900">{patch.newText}</span>
+          )}
+        </>
       )}
       {/* Inline approve / reject buttons */}
       <span className="inline-flex items-center gap-0.5 ml-1 align-middle">

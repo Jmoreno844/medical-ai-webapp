@@ -6,16 +6,70 @@ import logging
 import time
 from typing import Dict, Any, Optional, Callable
 
+from config import DOCUMENT_GENERATION_PROMPT
+from langsmith_tracing import trace_operation
 from models.gemini_client import (
     generate_content,
     generate_content_streaming as gemini_generate_content_streaming,
 )
 from services.django_api import send_generation_chunk
 from services.document_generation.formatter import get_prompt_for_type
-from config import DOCUMENT_GENERATION_PROMPT
 
 # Initialize logger
 logger = logging.getLogger(__name__)
+
+
+def _langsmith_streaming_inputs(
+    content: str,
+    generation_type: str = "summarize",
+    custom_prompt: Optional[str] = None,
+    document_id: Optional[int] = None,
+    process_id: Optional[str] = None,
+    token_auth: Optional[str] = None,
+    model_name: Optional[str] = None,
+    chunk_size: int = 50,
+    max_delay: float = 1.0,
+) -> dict[str, Any]:
+    return {
+        "generation_type": generation_type,
+        "content_length": len(content or ""),
+        "custom_prompt_length": len(custom_prompt or ""),
+        "document_id": document_id,
+        "process_id": process_id,
+        "has_auth_token": bool(token_auth),
+        "model": model_name,
+        "chunk_size": chunk_size,
+        "max_delay": max_delay,
+    }
+
+
+def _langsmith_generation_outputs(result: Dict[str, Any]) -> dict[str, Any]:
+    return {
+        "success": bool(result.get("success")),
+        "model": result.get("model"),
+        "text_length": len(result.get("text") or result.get("summary") or ""),
+        "error_present": bool(result.get("error")),
+    }
+
+
+def _langsmith_document_inputs(
+    template_content: str,
+    context_content: str,
+    transcription_content: str,
+    new_document_id: int,
+    process_id: str,
+    auth_token: str,
+    model_name: str = None,
+) -> dict[str, Any]:
+    return {
+        "new_document_id": new_document_id,
+        "process_id": process_id,
+        "template_length": len(template_content or ""),
+        "context_length": len(context_content or ""),
+        "transcription_length": len(transcription_content or ""),
+        "has_auth_token": bool(auth_token),
+        "model": model_name,
+    }
 
 
 def summarize_text(text: str, model_name: Optional[str] = None) -> Dict[str, Any]:
@@ -61,6 +115,13 @@ def summarize_text(text: str, model_name: Optional[str] = None) -> Dict[str, Any
         return {"success": False, "error": f"Summarization error: {str(e)}"}
 
 
+@trace_operation(
+    name="cloud_functions.generate_content_streaming",
+    run_type="chain",
+    process_inputs=_langsmith_streaming_inputs,
+    process_outputs=_langsmith_generation_outputs,
+    tags=["document_generation", "streaming"],
+)
 def generate_content_streaming(
     content: str,
     generation_type: str = "summarize",
@@ -225,6 +286,13 @@ def generate_content_streaming(
         return {"success": False, "error": error_msg}
 
 
+@trace_operation(
+    name="cloud_functions.generate_document_from_components",
+    run_type="chain",
+    process_inputs=_langsmith_document_inputs,
+    process_outputs=_langsmith_generation_outputs,
+    tags=["document_generation"],
+)
 def generate_document_from_components(
     template_content: str,
     context_content: str,

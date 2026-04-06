@@ -94,7 +94,6 @@ Extender la salida estructurada del planner existente con campos como:
 - `affected_sections`: lista de regiones que el planner identifica como afectadas
 - `needs_full_note`: bool
 - `needs_external_knowledge`: bool
-- `should_propagate_to_analysis_and_plan`: bool
 
 `affected_sections` funciona como un **change map**: el planner le dice al drafter exactamente que regiones tocar, y el drafter no deberia salirse de ese scope.
 Esto es mas seguro que dejar al drafter decidir que secciones tocar por su cuenta.

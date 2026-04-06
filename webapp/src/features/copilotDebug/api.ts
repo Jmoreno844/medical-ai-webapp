@@ -56,7 +56,10 @@ type CopilotPatchSetApi = {
   updated_at?: string;
 };
 
-function normalizePatch(apiPatch: CopilotPatchApi, parentPatchSetId: string): CopilotPatchResponse {
+function normalizePatch(
+  apiPatch: CopilotPatchApi,
+  parentPatchSetId: string,
+): CopilotPatchResponse {
   const resolvedRange =
     apiPatch.resolvedRange ??
     apiPatch.resolved_range ??
@@ -72,12 +75,25 @@ function normalizePatch(apiPatch: CopilotPatchApi, parentPatchSetId: string): Co
 
   return {
     id: String(apiPatch.id ?? apiPatch.patch_id ?? ""),
-    patchSetId: String(apiPatch.patchSetId ?? apiPatch.patch_set_id ?? parentPatchSetId),
-    documentId: String(apiPatch.documentId ?? apiPatch.target_document_id ?? ""),
-    type: String(apiPatch.type ?? apiPatch.patch_type ?? apiPatch.operation_type ?? "replace_span"),
+    patchSetId: String(
+      apiPatch.patchSetId ?? apiPatch.patch_set_id ?? parentPatchSetId,
+    ),
+    documentId: String(
+      apiPatch.documentId ?? apiPatch.target_document_id ?? "",
+    ),
+    type: String(
+      apiPatch.type ??
+        apiPatch.patch_type ??
+        apiPatch.operation_type ??
+        "replace_span",
+    ),
     anchor: apiPatch.anchor ?? {},
-    oldText: String(apiPatch.oldText ?? apiPatch.old_text ?? apiPatch.before_preview ?? ""),
-    newText: String(apiPatch.newText ?? apiPatch.new_text ?? apiPatch.after_preview ?? ""),
+    oldText: String(
+      apiPatch.oldText ?? apiPatch.old_text ?? apiPatch.before_preview ?? "",
+    ),
+    newText: String(
+      apiPatch.newText ?? apiPatch.new_text ?? apiPatch.after_preview ?? "",
+    ),
     resolvedRange,
     orderIndex: Number(apiPatch.orderIndex ?? apiPatch.order_index ?? 0),
     status: apiPatch.status ?? "pending",
@@ -92,7 +108,12 @@ function normalizePatchSets(response: unknown): CopilotPatchSetResponse[] {
   }
 
   // New backend contract: list of patch sets.
-  if (response.length === 0 || (typeof response[0] === "object" && response[0] !== null && "patches" in response[0])) {
+  if (
+    response.length === 0 ||
+    (typeof response[0] === "object" &&
+      response[0] !== null &&
+      "patches" in response[0])
+  ) {
     return (response as CopilotPatchSetApi[]).map((patchSet) => {
       const patchSetId = String(patchSet.id ?? patchSet.patch_set_id ?? "");
       return {
@@ -119,30 +140,41 @@ function normalizePatchSets(response: unknown): CopilotPatchSetResponse[] {
   const patches = response as CopilotPatchApi[];
   const groupedByPatchSet = new Map<string, CopilotPatchApi[]>();
   for (const patch of patches) {
-    const patchSetId = String(patch.patchSetId ?? patch.patch_set_id ?? `legacy-${patch.id ?? patch.patch_id ?? "unknown"}`);
+    const patchSetId = String(
+      patch.patchSetId ??
+        patch.patch_set_id ??
+        `legacy-${patch.id ?? patch.patch_id ?? "unknown"}`,
+    );
     const existing = groupedByPatchSet.get(patchSetId) ?? [];
     existing.push(patch);
     groupedByPatchSet.set(patchSetId, existing);
   }
 
-  return Array.from(groupedByPatchSet.entries()).map(([patchSetId, groupedPatches]) => {
-    const firstPatch = groupedPatches[0];
-    return {
-      id: patchSetId,
-      run_id: String((firstPatch as { run_id?: unknown }).run_id ?? ""),
-      target_document_id: String(firstPatch.target_document_id ?? ""),
-      base_version: Number((firstPatch as { base_version?: unknown }).base_version ?? 1),
-      operation_type: String(firstPatch.operation_type ?? "replace_span"),
-      status: (firstPatch.status as CopilotPatchSetResponse["status"]) ?? "pending",
-      patches: groupedPatches.map((patch) => normalizePatch(patch, patchSetId)),
-      source_context_document_ids: [],
-      target_document_title: null,
-      target_selection_reason: null,
-      review_comment: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-  });
+  return Array.from(groupedByPatchSet.entries()).map(
+    ([patchSetId, groupedPatches]) => {
+      const firstPatch = groupedPatches[0];
+      return {
+        id: patchSetId,
+        run_id: String((firstPatch as { run_id?: unknown }).run_id ?? ""),
+        target_document_id: String(firstPatch.target_document_id ?? ""),
+        base_version: Number(
+          (firstPatch as { base_version?: unknown }).base_version ?? 1,
+        ),
+        operation_type: String(firstPatch.operation_type ?? "replace_span"),
+        status:
+          (firstPatch.status as CopilotPatchSetResponse["status"]) ?? "pending",
+        patches: groupedPatches.map((patch) =>
+          normalizePatch(patch, patchSetId),
+        ),
+        source_context_document_ids: [],
+        target_document_title: null,
+        target_selection_reason: null,
+        review_comment: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+    },
+  );
 }
 
 function serializeWorkspaceIndex(workspaceIndex: WorkspaceIndex) {
@@ -171,6 +203,7 @@ function serializeWorkspaceIndex(workspaceIndex: WorkspaceIndex) {
       short_summary: document.shortSummary,
       estimated_tokens: document.estimatedTokens,
       has_pending_patches: document.hasPendingPatches,
+      content_markdown: document.contentMarkdown,
     })),
   };
 }
@@ -180,7 +213,7 @@ export async function createCopilotSession(encounterId: number) {
     "/api/copilot/sessions",
     {
       encounter_id: encounterId,
-    }
+    },
   );
 
   return response.data;
@@ -196,7 +229,7 @@ export async function sendCopilotMessage(payload: CopilotMessageRequest) {
       workspace_index: serializeWorkspaceIndex(payload.workspace_index),
       active_document_id: payload.active_document_id,
       selected_document_ids: payload.selected_document_ids,
-    }
+    },
   );
 
   return response.data;
@@ -204,7 +237,7 @@ export async function sendCopilotMessage(payload: CopilotMessageRequest) {
 
 export async function getCopilotRun(runId: string) {
   const response = await axiosInstance.get<CopilotRunResponse>(
-    `/api/copilot/runs/${runId}`
+    `/api/copilot/runs/${runId}`,
   );
 
   return response.data;
@@ -212,7 +245,7 @@ export async function getCopilotRun(runId: string) {
 
 export async function listCopilotPatchSets(runId: string) {
   const response = await axiosInstance.get<unknown>(
-    `/api/copilot/runs/${runId}/patch-sets`
+    `/api/copilot/runs/${runId}/patch-sets`,
   );
 
   return normalizePatchSets(response.data);
@@ -225,11 +258,11 @@ export async function reviewCopilotPatch(
     decision: "approve" | "reject";
     comment?: string | null;
     document_version?: number;
-  }
+  },
 ) {
   const response = await axiosInstance.post<CopilotRunResponse>(
     `/api/copilot/runs/${runId}/review`,
-    payload
+    payload,
   );
 
   return response.data;
@@ -240,11 +273,11 @@ export async function acceptCopilotPatch(
   payload: {
     patch_id: string;
     comment?: string | null;
-  }
+  },
 ) {
   const response = await axiosInstance.post<CopilotPatchSetResponse>(
     `/api/copilot/patch-sets/${patchSetId}/accept-patch`,
-    payload
+    payload,
   );
 
   return normalizePatchSets([response.data])[0];
@@ -255,11 +288,11 @@ export async function rejectCopilotPatch(
   payload: {
     patch_id: string;
     comment?: string | null;
-  }
+  },
 ) {
   const response = await axiosInstance.post<CopilotPatchSetResponse>(
     `/api/copilot/patch-sets/${patchSetId}/reject-patch`,
-    payload
+    payload,
   );
 
   return normalizePatchSets([response.data])[0];
@@ -269,11 +302,11 @@ export async function acceptAllCopilotPatches(
   patchSetId: string,
   payload: {
     comment?: string | null;
-  }
+  },
 ) {
   const response = await axiosInstance.post<CopilotPatchSetResponse>(
     `/api/copilot/patch-sets/${patchSetId}/accept-all`,
-    payload
+    payload,
   );
 
   return normalizePatchSets([response.data])[0];
@@ -283,11 +316,11 @@ export async function rejectAllCopilotPatches(
   patchSetId: string,
   payload: {
     comment?: string | null;
-  }
+  },
 ) {
   const response = await axiosInstance.post<CopilotPatchSetResponse>(
     `/api/copilot/patch-sets/${patchSetId}/reject-all`,
-    payload
+    payload,
   );
 
   return normalizePatchSets([response.data])[0];
@@ -298,11 +331,11 @@ export async function applyAcceptedCopilotPatchSet(
   payload: {
     comment?: string | null;
     document_version?: number;
-  }
+  },
 ) {
   const response = await axiosInstance.post<CopilotRunResponse>(
     `/api/copilot/patch-sets/${patchSetId}/apply-accepted`,
-    payload
+    payload,
   );
 
   return response.data;
@@ -313,11 +346,11 @@ export async function finalizeCopilotPatchSetReview(
   payload: {
     comment?: string | null;
     document_version?: number;
-  }
+  },
 ) {
   const response = await axiosInstance.post<CopilotRunResponse>(
     `/api/copilot/patch-sets/${patchSetId}/finalize-review`,
-    payload
+    payload,
   );
 
   return response.data;
@@ -330,7 +363,7 @@ export function streamCopilotRun(
     onEvent: (event: CopilotStreamEvent) => void;
     onError: (message: string) => void;
     onOpen?: () => void;
-  }
+  },
 ) {
   const params = new URLSearchParams();
   if (afterSequence > 0) {
@@ -351,7 +384,9 @@ export function streamCopilotRun(
           run_id: String(parsed.run_id ?? runId),
           thread_id: String(parsed.thread_id ?? ""),
           created_at:
-            typeof parsed.created_at === "string" ? parsed.created_at : undefined,
+            typeof parsed.created_at === "string"
+              ? parsed.created_at
+              : undefined,
           sequence:
             typeof parsed.sequence === "number" ? parsed.sequence : undefined,
           payload: parsed,

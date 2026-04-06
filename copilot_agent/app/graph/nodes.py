@@ -17,6 +17,13 @@ from app.planner import CopilotPlanner
 
 logger = logging.getLogger(__name__)
 
+NODE_PLANNER_TURN = "planner_turn"
+NODE_EXECUTE_TOOLS = "execute_tools"
+NODE_RECONCILE_TOOL_STATE = "reconcile_tool_state"
+NODE_WAIT_FOR_HUMAN_REVIEW = "wait_for_human_review"
+NODE_APPLY_PATCH_REVIEW = "apply_patch_review"
+NODE_FINALIZE_RUN = "finalize_run"
+
 PATCH_REQUIRED_FIELDS = {
     "patch_id",
     "target_document_id",
@@ -46,20 +53,57 @@ def _append_state_items(
     return [*(current or []), *(updates or [])]
 
 
-def _reset_transient_run_state() -> dict[str, Any]:
+def _reset_transient_run_state(workspace_index: dict[str, Any] | None = None) -> dict[str, Any]:
     # LangGraph checkpoints are thread-scoped, so a new run on the same thread
     # inherits the full prior checkpoint (tool reads, proposals, counters).
     # This function clears all per-run transient state so each new HTTP request
     # starts clean without losing conversational history from the messages list.
     # Called only when iteration_count == 0 (first call_model invocation per run).
+
+    # Pre-seed writable documents from the workspace_index content sent by the
+    # frontend. Docs with ai_writable=True carry their full markdown so the agent
+    # can call propose_* on turn 1 without needing a read_document round-trip.
+    # The RESET_MARKER at position 0 tells merge_document_reads to discard the
+    # prior run's reads before inserting the newly seeded entries.
+    pre_reads: list[dict[str, Any]] = []
+    for doc in ((workspace_index or {}).get("documents") or []):
+        content = doc.get("content_markdown")
+        if doc.get("ai_writable") and content:
+            pre_reads.append({
+                "document_id": str(doc["document_id"]),
+                "title": doc.get("title"),
+                "type": doc.get("type"),
+                "version": doc.get("version"),
+                "mode": "full",
+                "content": content,
+                "content_hash": doc.get("content_hash"),
+            })
+
+    doc_reads_update: list[dict[str, Any]] = [{"__reset__": True}, *pre_reads]
+
+    # Derive the read_documents view up-front so the planner context already
+    # shows these documents as read on turn 1, before reconcile_tool_state runs.
+    pre_read_documents: list[dict[str, Any]] = [
+        {
+            "document_id": r["document_id"],
+            "title": r.get("title"),
+            "type": r.get("type"),
+            "mode": "full",
+            "short_summary": " ".join(str(r["content"]).split())[:480],
+            "content": r["content"],
+            "content_hash": r.get("content_hash"),
+        }
+        for r in pre_reads
+    ]
+
     return {
         "available_documents": reset_list_state(),
         "context_view": None,
         "document_summaries": reset_dict_state(),
-        "document_reads": reset_list_state(),
+        "document_reads": doc_reads_update,
         "read_spans": reset_list_state(),
         "retrieved_context": [],
-        "read_documents": [],
+        "read_documents": pre_read_documents,
         "encounter_context": None,
         "search_matches": [],
         "search_query": None,
@@ -301,7 +345,7 @@ def _derive_search_legacy_fields(state: CopilotState) -> tuple[str | None, list[
     return only_result.get("query"), list(only_result.get("matches") or [])
 
 
-def consolidate_tool_state(state: CopilotState) -> dict[str, Any]:
+def reconcile_tool_state(state: CopilotState) -> dict[str, Any]:
     # Dedicated reconciliation node between the tools node and call_model.
     # When the planner emits parallel tool calls each ToolNode write lands in state
     # independently. Without this node the next call_model turn would see a
@@ -326,40 +370,42 @@ def consolidate_tool_state(state: CopilotState) -> dict[str, Any]:
     }
 
 
-def _route_after_model(state: CopilotState) -> str:
+def route_after_planner_turn(state: CopilotState) -> str:
     if state.get("run_error"):
-        return "finalize_response"
+        return NODE_FINALIZE_RUN
     if state.get("requires_human_review") and _is_valid_patch_set_preview(
         state.get("patch_set_preview")
     ):
-        return "interrupt_for_review"
+        return NODE_WAIT_FOR_HUMAN_REVIEW
 
     messages = state.get("messages") or []
     last_message = messages[-1] if messages else None
     if isinstance(last_message, AIMessage) and (last_message.tool_calls or []):
-        return "tools"
-    return "finalize_response"
+        return NODE_EXECUTE_TOOLS
+    return NODE_FINALIZE_RUN
 
 
-def _route_after_tools(state: CopilotState) -> str:
+def route_after_tool_execution(state: CopilotState) -> str:
     if state.get("run_error"):
-        return "finalize_response"
+        return NODE_FINALIZE_RUN
     if state.get("requires_human_review") and _is_valid_patch_set_preview(
         state.get("patch_set_preview")
     ):
-        return "interrupt_for_review"
-    return "call_model"
+        return NODE_WAIT_FOR_HUMAN_REVIEW
+    return NODE_PLANNER_TURN
 
 
-def make_call_model_node(
+def make_planner_turn_node(
     planner: CopilotPlanner,
     tools: Sequence[BaseTool | Any],
 ):
-    def call_model(state: CopilotState) -> dict[str, Any]:
+    def planner_turn(state: CopilotState) -> dict[str, Any]:
         updates: dict[str, Any] = {}
 
         if int(state.get("iteration_count") or 0) == 0:
-            updates.update(_reset_transient_run_state())
+            updates.update(_reset_transient_run_state(
+                workspace_index=state.get("workspace_index"),
+            ))
 
         max_iterations = int(state.get("max_iterations") or 6)
         if int(state.get("iteration_count") or 0) >= max_iterations:
@@ -431,17 +477,17 @@ def make_call_model_node(
         # treated as a clean completed turn instead of a synthetic runtime failure.
         return updates
 
-    return call_model
+    return planner_turn
 
 
-def interrupt_for_review(state: CopilotState) -> dict[str, Any]:
+def wait_for_human_review(state: CopilotState) -> dict[str, Any]:
     # No-op node. LangGraph pauses graph execution here when review_result is None.
     # The run is stored as waiting_review; the frontend resumes it via /resume.
     del state
     return {}
 
 
-def apply_patch(state: CopilotState) -> dict[str, Any]:
+def apply_patch_review(state: CopilotState) -> dict[str, Any]:
     # Intentional stub. Django owns the actual clinical write and audit trail.
     # This node exists to keep the graph edge explicit and auditable in traces.
     # If the copilot ever gets direct write authority, this is the right place.
@@ -449,7 +495,7 @@ def apply_patch(state: CopilotState) -> dict[str, Any]:
     return {}
 
 
-def finalize_response(state: CopilotState) -> dict[str, Any]:
+def finalize_run(state: CopilotState) -> dict[str, Any]:
     if state.get("requires_human_review") and _is_valid_patch_set_preview(
         state.get("patch_set_preview")
     ):
@@ -469,12 +515,34 @@ def finalize_response(state: CopilotState) -> dict[str, Any]:
     }
 
 
+consolidate_tool_state = reconcile_tool_state
+_route_after_model = route_after_planner_turn
+_route_after_tools = route_after_tool_execution
+make_call_model_node = make_planner_turn_node
+interrupt_for_review = wait_for_human_review
+apply_patch = apply_patch_review
+finalize_response = finalize_run
+
+
 __all__ = [
+    "NODE_APPLY_PATCH_REVIEW",
+    "NODE_EXECUTE_TOOLS",
+    "NODE_FINALIZE_RUN",
+    "NODE_PLANNER_TURN",
+    "NODE_RECONCILE_TOOL_STATE",
+    "NODE_WAIT_FOR_HUMAN_REVIEW",
     "apply_patch",
+    "apply_patch_review",
     "consolidate_tool_state",
     "finalize_response",
+    "finalize_run",
     "interrupt_for_review",
     "make_call_model_node",
+    "make_planner_turn_node",
+    "reconcile_tool_state",
+    "route_after_planner_turn",
+    "route_after_tool_execution",
+    "wait_for_human_review",
     "_route_after_model",
     "_route_after_tools",
 ]

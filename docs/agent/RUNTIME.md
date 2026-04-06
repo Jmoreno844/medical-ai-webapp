@@ -14,12 +14,12 @@ Documento de referencia de implementación para quien trabaje sobre el runtime d
 El runtime usa dos LLMs separados por responsabilidad:
 
 ```
-Planner (temp=0.1, max=700 tokens)
+Planner (temp=0.1, max=1400 tokens)
   → Decide qué hacer: qué tool llamar, qué documento leer, o responder directo.
   → Razona sobre el mensaje del médico, el workspace y los resultados de tools previos.
   → No escribe patches.
 
-Drafter (temp=0.0, max=1600 tokens, json_schema structured output)
+Drafter (temp=0.0, max=3200 tokens, json_schema structured output)
   → Solo es invocado cuando el planner llama una propose_* tool.
   → Recibe la nota completa + contexto de soporte.
   → Emite un DraftedPatchPlan con todos los patches en una sola llamada.
@@ -28,6 +28,20 @@ Drafter (temp=0.0, max=1600 tokens, json_schema structured output)
 
 El planner y el drafter no se llaman en paralelo. El drafter es invocado dentro de la
 lógica de `propose_*` tools, que son ejecutadas por el ToolNode del grafo.
+
+## LangSmith local
+
+El runtime puede emitir traces a LangSmith solo cuando `COPILOT_AGENT_ENV=local` y existen `LANGSMITH_API_KEY` + `LANGSMITH_PROJECT`. El proyecto recomendado para este servicio es `copilot-agent-local`, separado del `cloud-functions-local` usado por las Cloud Functions.
+
+Estos traces del runtime registran metadata sanitizada del run (`run_id`, `thread_id`, estado, conteos, provider/model) y no incluyen texto clínico completo, documentos generados ni tokens. Dentro del árbol de LangSmith, los nodos LLM del runtime aparecen con nombres de rol (`Planner`, `Drafter`) en vez del nombre crudo del adapter (`ChatOpenAI`, `ChatGoogleGenerativeAI`, etc.), y además quedan etiquetados con `provider_family` para filtrar más rápido. Los nodos principales del grafo también usan nombres más semánticos (`planner_turn`, `execute_tools`, `reconcile_tool_state`, `wait_for_human_review`, `finalize_run`) para que la vista superior del trace deje más claro en qué etapa del agente estabas. Los live evals en `evals/langsmith/` siguen usando LangSmith para la matriz comparativa, pero comparten el proyecto local del servicio para mantener una sola vista del componente.
+
+El planner tiene además un fallback defensivo para respuestas vacías del provider. Si
+después de 3 reintentos sigue devolviendo un `AIMessage` sin texto ni tool calls, el
+runtime evita fallar el run de forma inconsistente: cuando ya existe una lectura `full`
+de un único documento y el mensaje del médico parece una edición, sintetiza una sola
+`propose_replace_span(target_document_id, instruction=user_query)` para reencaminar el
+flujo normal de patches. Si el pedido no parece de edición, responde con texto seguro
+en lugar de dejar el run en error duro.
 
 ---
 
@@ -80,7 +94,7 @@ call_model  interrupt_for_review  finalize_response
 
 ```python
 max_iterations: int = 6        # default en CopilotState
-max_patch_operations: int = 1  # default — a revisar para casos multipatch (ver P0 en writer-direction.md)
+max_patch_operations: int = 1  # base local; set_edit_plan lo eleva dinámicamente por scope clínico
 ```
 
 ---
@@ -172,13 +186,17 @@ para un mismo documento, **debe consolidarlos todos en una sola llamada** usando
 en lugar de llamar la tool varias veces (el filtro `_filter_parallel_tool_calls` descargaría
 las llamadas adicionales silenciosamente). El drafter lee `instruction` como `<requested_instruction>`
 en su contexto XML y la prioriza sobre la inferencia desde el mensaje original del médico.
+Para `edit_scope in {propagation, reinterpretation}`, el runtime valida además que el
+`DraftedPatchPlan` cubra todas las `affected_sections` del `edit_plan` y que cada patch
+declare `section`. Si el drafter devuelve un subconjunto parcial, la tool falla cerrada y
+no abre review humana con un patch set incompleto.
 
-| Tool                                                        | Operación del drafter                            |
-| ----------------------------------------------------------- | ------------------------------------------------ |
-| `propose_replace_span(target_document_id, instruction?)`    | Reemplaza un span existente por contenido nuevo. |
-| `propose_insert_after_span(target_document_id, instruction?)` | Inserta contenido nuevo después de un span.    |
-| `propose_insert_before(target_document_id, instruction?)`   | Inserta contenido nuevo antes de un anchor.      |
-| `propose_delete_span(target_document_id, instruction?)`     | Borra un span del documento.                     |
+| Tool                                                          | Operación del drafter                            |
+| ------------------------------------------------------------- | ------------------------------------------------ |
+| `propose_replace_span(target_document_id, instruction?)`      | Reemplaza un span existente por contenido nuevo. |
+| `propose_insert_after_span(target_document_id, instruction?)` | Inserta contenido nuevo después de un span.      |
+| `propose_insert_before(target_document_id, instruction?)`     | Inserta contenido nuevo antes de un anchor.      |
+| `propose_delete_span(target_document_id, instruction?)`       | Borra un span del documento.                     |
 
 La tool llama al drafter con `requested_tool_name` y `requested_tool_instruction` como pistas. El drafter puede emitir múltiples patches en una sola llamada (`patches: list[DraftedPatch]`).
 
@@ -245,6 +263,133 @@ Los patches no dependen de offsets exactos para ser aplicados porque los offsets
 El drafter debe usar `exactText` de 3-8 palabras, de una sola línea, único en el documento. No incluir `\n` en `exactText`.
 
 ---
+
+## Evals live del runtime
+
+La surface de evals live del agente busca comparar el comportamiento del workflow real,
+no solo el prompt aislado. Por eso los evals principales reutilizan:
+
+- el mismo `LangChainCopilotPlanner`
+- las mismas instrucciones del planner y del drafter
+- el mismo schema clínico (`ClinicalPlan`, `DraftedPatchPlan`)
+- la misma surface de propose tools y sus validaciones runtime
+
+### Matriz actual de providers
+
+- `gpt-5.4-mini`
+- `gpt-5.4-nano`
+- `gemini-2.5-flash`
+- `gemini-2.5-flash-lite`
+- `gemini-3-flash-preview`
+- `gemini-3.1-flash-lite-preview`
+- `claude-haiku-4-5`
+
+Los providers Gemini no comparten exactamente la misma región:
+
+- `gemini-2.5*` corre en `us-east1`
+- `gemini-3* preview` corre en `global`
+
+La región correcta viaja dentro de la propia matriz de providers para que un run mixto
+mantenga el endpoint correcto por modelo y no dependa de un único `GCP_REGION` global.
+
+### Provider del runtime productivo
+
+El runtime real ya no queda fijo a Gemini. Se configura por `.env` con:
+
+- `COPILOT_LLM_PROVIDER_FAMILY=openai|google|anthropic`
+- `COPILOT_PLANNER_MODEL`
+- `COPILOT_PATCH_MODEL`
+
+Overrides opcionales por componente:
+
+- `COPILOT_PLANNER_PROVIDER_FAMILY`
+- `COPILOT_PATCH_PROVIDER_FAMILY`
+- `COPILOT_PLANNER_GOOGLE_LOCATION`
+- `COPILOT_PATCH_GOOGLE_LOCATION`
+
+Reglas actuales:
+
+- si no se overridea nada, planner y drafter usan el mismo provider/modelo
+- el default del repo ahora es `openai + gpt-5.4-mini`
+- `VERTEX_MODEL` queda como fallback legacy cuando el provider efectivo es `google`
+- para OpenAI y Anthropic, las credenciales se leen desde `OPENAI_API_KEY` y `ANTHROPIC_API_KEY`
+
+### Comandos útiles
+
+Desde `copilot_agent/`:
+
+```bash
+make evals-e2e COUNT=5
+make evals-e2e EXACT=3
+make evals-e2e-gemini-2-5 COUNT=5
+make evals-e2e-gemini-preview COUNT=5
+make evals-e2e-openai COUNT=5
+make evals-e2e-anthropic COUNT=5
+make evals-e2e-model MODEL=google-gemini-3-flash-preview EXACT=3
+```
+
+`COUNT=5|10|15` recorta la matriz a los primeros N casos clínicos compartidos.
+`EXACT=3` corre solo el caso número 3 de la lista compartida y tiene prioridad sobre `COUNT`.
+Si además quieres exactamente un solo pytest case, combínalo con `MODEL=...`.
+
+### Qué mirar en LangSmith para comparar modelos
+
+Los evals e2e publican en `inputs` y `outputs` campos pensados para filtrar sin abrir cada trace:
+
+- `model_name`
+- `patch_model_name`
+- `provider`
+- `provider_family`
+- `provider_region`
+- `selected_document_ids`
+- `failure_stage`
+
+Además publican feedbacks comparables entre modelos:
+
+- `correct_first_tool`
+- `single_tool_call`
+- `edit_scope_exact_match`
+- `impact_level_exact_match`
+- `section_coverage`
+- `runtime_valid`
+- `patches_per_expected_section`
+- `planner_latency_s`
+- `drafter_latency_s`
+
+Para elegir “qué modelo es mejor para nuestros casos”, el mejor filtro inicial no es el texto libre del trace sino:
+
+1. `runtime_valid = 0`
+2. `failure_stage != ok`
+3. baja `section_coverage`
+4. latencia alta con `runtime_valid = 1`
+
+### Casos thread-like vs replay real
+
+El primer caso live ya es más parecido a un sidechat real porque incluye varios documentos
+seleccionados, un target note y contexto clínico de soporte que cambia análisis y plan.
+
+Eso sigue siendo un estado sintético controlado, no un replay literal de un `thread_id` real.
+
+Si se quiere probar el runtime completo “como ocurrió en producción”, la siguiente capa no es
+agregar más texto al caso actual sino crear `thread replay evals` con fixtures anonimizadas que
+incluyan:
+
+- `messages` previos del hilo
+- `workspace_index`
+- `selected_document_ids`
+- `read_documents`
+- `tool_results` previos
+- `planner_decisions` previos
+- `patch_history` si existía
+
+La idea es ejecutar el grafo compilado completo, no solo planner→drafter, para medir mejor:
+
+- vacíos del planner tras un `read_document(full)`
+- loops innecesarios de lectura
+- errores de mezcla `read_*` + `propose_*`
+- patch sets incompletos bajo contexto largo del thread
+
+Esa surface complementa a la matriz e2e actual; no la reemplaza.
 
 ## Flujos típicos
 
@@ -314,6 +459,18 @@ call_model
   → planner: llama build_context_view() o read_document(mode="summary")
 
 tools + consolidate
+
+---
+
+## Evaluaciones locales
+
+El runtime ahora tiene dos superficies de eval separadas del `pytest` determinista:
+
+- `copilot_agent/evals/langsmith/` contiene tests `pytest` marcados como `live_llm` y `langsmith`. Ejecutan el planner y el drafter reales contra Vertex con casos clínicos dummy/de-identified. Por defecto quedan fuera del `pytest` normal para evitar costo accidental.
+- `copilot_agent/evals/promptfoo/` contiene una suite de prompt regressions que reutiliza esos mismos casos mediante un provider Python local. La idea es validar contratos de salida y regresiones de prompt sin duplicar la lógica del runtime ni mantener un segundo stack de auth.
+- `copilot_agent/evals/shared/clinical_cases.py` es la única fuente de verdad para los casos clínicos dummy usados por ambas superficies.
+
+Los live evals deben seguir siendo local-first y nunca deben usar notas o transcripciones reales. Si cambias el contrato del planner/drafter, actualiza los casos compartidos, las aserciones de promptfoo y cualquier feedback/logging relevante de LangSmith en el mismo cambio.
   → contexto / summary leído
 
 call_model

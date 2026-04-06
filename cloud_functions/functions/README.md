@@ -23,3 +23,9 @@ Este directorio contiene la lógica serverless que habla con Gemini.
 ## Contrato crítico
 
 Si cambias un payload aquí, confirma el endpoint espejo en `backend/apps/documents/api/`.
+
+## Observabilidad local
+
+- OpenTelemetry sigue cubriendo spans HTTP y callbacks locales.
+- LangSmith ahora puede activarse solo en `ENVIRONMENT=local` con `LANGSMITH_API_KEY` + `LANGSMITH_PROJECT=cloud-functions-local`.
+- Los traces de LangSmith se limitan a metadata sanitizada: IDs, flags, tamaños y modelo. No envían transcripciones completas, documentos generados ni tokens.

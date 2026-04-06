@@ -24,6 +24,10 @@ class WorkspaceDocumentSummary(BaseModel):
     short_summary: str | None = None
     estimated_tokens: int | None = None
     has_pending_patches: bool = False
+    # Full markdown pre-loaded by the frontend for writable docs.
+    # Used in _build_initial_state to seed document_reads so the agent can
+    # propose patches without a read_document round-trip.
+    content_markdown: str | None = None
 
 
 class WorkspaceIndexPayload(BaseModel):

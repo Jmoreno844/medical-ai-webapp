@@ -64,6 +64,19 @@ En el sidechat actual, `thread_id` ya identifica una conversación real: Django 
 - **Owner:** `copilot_agent/` + `backend/apps/copilot/`.
 - **Trigger para pagarla:** cuando el costo de `mode="full"` en notas largas empiece a notarse o aparezcan suficientes casos de edición donde leer solo el final del documento sea claramente mejor.
 
+### 7. Streaming de eventos del agente al frontend aún pendiente
+
+- **Impacto:** el runtime ejecuta el grafo completo (`graph.invoke`) y solo cuando termina construye y persiste los eventos. El frontend recibe el `doctor_summary`, el `reasoning` y los patches todos juntos en el response HTTP de `create_run`. No hay visibilidad parcial mientras el planner razona o el drafter genera patches.
+- **Por qué se aceptó:** el transporte actual request/response es suficiente para validar el contrato planner→drafter→review. El `doctor_summary` provee UX útil (el frontend puede animarlo con typewriter al recibirlo) sin necesidad de streaming real.
+- **Qué requeriría la solución completa:**
+  - Cambiar `graph.invoke` a `graph.stream` en `runtime.py`.
+  - Abrir un canal SSE desde el copilot agent hacia Django broker (análogo al SSE de document generation pero brokered).
+  - Django reemitiría los eventos parciales al browser vía el SSE existente o uno nuevo.
+  - El frontend consumiría eventos `set_edit_plan` (con `doctor_summary`) y `tool_called` en tiempo real.
+- **Workaround actual:** el frontend puede hacer fake streaming (typewriter) del `doctor_summary` una vez que recibe la respuesta completa desde el evento `tool_result` donde `tool_name == "set_edit_plan"`.
+- **Owner:** `copilot_agent/app/runtime.py` + `backend/apps/copilot/` + `webapp/`.
+- **Trigger para pagarla:** cuando la latencia total del run (planner + drafter) llegue a 8-12 segundos con modelos más potentes o cuando se abra el copiloto fuera del debug panel a usuarios reales.
+
 ## Referencias
 
 - [`../architecture/ai-agent-workspace.md`](../architecture/ai-agent-workspace.md)

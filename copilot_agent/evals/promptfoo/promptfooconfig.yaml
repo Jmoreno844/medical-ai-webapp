@@ -1,0 +1,50 @@
+description: Copilot agent live prompt regressions
+prompts:
+  - id: copilot-agent-live
+    raw: "{{ user_message }}"
+providers:
+  - id: file://provider.py
+    label: openai-gpt-5.4-mini
+    config:
+      workers: 1
+      provider_id: openai-gpt-5.4-mini
+      provider_family: openai
+      planner_model: gpt-5.4-mini
+      patch_model: gpt-5.4-mini
+  - id: file://provider.py
+    label: openai-gpt-5.4-nano
+    config:
+      workers: 1
+      provider_id: openai-gpt-5.4-nano
+      provider_family: openai
+      planner_model: gpt-5.4-nano
+      patch_model: gpt-5.4-nano
+  - id: file://provider.py
+    label: google-gemini-2.5-flash
+    config:
+      workers: 1
+      provider_id: google-gemini-2.5-flash
+      provider_family: google
+      planner_model: gemini-2.5-flash
+      patch_model: gemini-2.5-flash
+  - id: file://provider.py
+    label: google-gemini-2.5-flash-lite
+    config:
+      workers: 1
+      provider_id: google-gemini-2.5-flash-lite
+      provider_family: google
+      planner_model: gemini-2.5-flash-lite
+      patch_model: gemini-2.5-flash-lite
+  - id: file://provider.py
+    label: anthropic-claude-haiku-4-5
+    config:
+      workers: 1
+      provider_id: anthropic-claude-haiku-4-5
+      provider_family: anthropic
+      planner_model: claude-haiku-4-5
+      patch_model: claude-haiku-4-5
+defaultTest:
+  options:
+    disableVarExpansion: true
+tests:
+  - file://generate_cases.py:create_tests

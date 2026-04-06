@@ -69,7 +69,9 @@ export function applyCopilotPatchToWorkspace({
 
   // Clear the entire patch set store so PatchInlineDiffView unmounts and the
   // Lexical editor re-renders with the new (markdown-parsed) content.
+  log.debug("clearing all patches from state store");
   patchSetStore.clearAll();
 
+  log.debug("triggering editor refresh");
   window.triggerEditorRefresh?.();
 }

@@ -56,7 +56,7 @@ class CopilotBackendToolsClient:
             },
         )
 
-    def read_document(self, document_id: str, *, mode: str = "excerpt") -> dict[str, Any]:
+    def read_document(self, document_id: str, *, mode: str = "full") -> dict[str, Any]:
         if mode == "summary":
             # Route summary mode through read_document_summary to avoid duplicating
             # the backend endpoint. The summary payload is a strict subset of the full

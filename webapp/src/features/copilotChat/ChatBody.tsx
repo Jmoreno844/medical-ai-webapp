@@ -6,6 +6,7 @@ import ChatMessageList from "@/features/copilotChat/components/ChatMessageList";
 import StatusIndicator from "@/features/copilotChat/components/StatusIndicator";
 import ChatInput from "@/features/copilotChat/components/ChatInput";
 import PatchReviewCard from "@/features/copilotChat/components/PatchReviewCard";
+import PatchGeneratingCard from "@/features/copilotChat/components/PatchGeneratingCard";
 
 type ChatBodyProps = {
   controller: CopilotPanelController;
@@ -19,12 +20,15 @@ export default function ChatBody({ controller }: ChatBodyProps) {
     state,
     chatMessages,
     reviewPatchSet,
+    resolvedPatchCard,
     reviewPatches,
     pendingPatchCount,
     acceptedPatchCount,
     rejectedPatchCount,
     conflictedPatchCount,
     patchFlowError,
+    isGeneratingPatch,
+    editPlanDoctorSummary,
     ensureSession,
     sendMessage,
     submitPatchDecisionById,
@@ -53,7 +57,32 @@ export default function ChatBody({ controller }: ChatBodyProps) {
 
         {state.isStreaming && <StatusIndicator />}
 
-        {/* Patch review card — grouped by section with per-patch approve/reject */}
+        {/* Generating card — shown while set_edit_plan has fired but review is not ready yet.
+             Hidden once the review was resolved (accepted/rejected) to prevent the card
+             from reappearing while state.status is still "waiting_review" during the
+             brief window between store clear and Django's final status response. */}
+        {isGeneratingPatch && !reviewPatchSet && !resolvedPatchCard && (
+          <PatchGeneratingCard doctorSummary={editPlanDoctorSummary} />
+        )}
+
+        {/* Resolved patch card — persists after review closes */}
+        {resolvedPatchCard && !reviewPatchSet && (
+          <PatchReviewCard
+            patchSet={resolvedPatchCard.patchSet}
+            patches={resolvedPatchCard.patchSet.patches}
+            pendingCount={0}
+            acceptedCount={resolvedPatchCard.patchSet.patches.length}
+            rejectedCount={0}
+            conflictedCount={0}
+            resolved={resolvedPatchCard.outcome}
+            onApproveAll={() => {}}
+            onRejectAll={() => {}}
+            onApprovePatch={() => {}}
+            onRejectPatch={() => {}}
+          />
+        )}
+
+        {/* Active patch review card */}
         {reviewPatchSet && (
           <PatchReviewCard
             patchSet={reviewPatchSet}

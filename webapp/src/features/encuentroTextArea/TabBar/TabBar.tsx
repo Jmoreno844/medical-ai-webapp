@@ -31,13 +31,15 @@ const TabBar: React.FC = () => {
   const documentOrder = useWorkspaceStore((state) => state.documentOrder);
   const documentsById = useWorkspaceStore((state) => state.documentsById);
   const activeDocumentId = useWorkspaceStore((state) => state.activeDocumentId);
-  const setActiveDocument = useWorkspaceStore((state) => state.setActiveDocument);
+  const setActiveDocument = useWorkspaceStore(
+    (state) => state.setActiveDocument,
+  );
   const documents = useMemo(
     () =>
       documentOrder
         .map((documentId) => documentsById[documentId])
         .filter(Boolean),
-    [documentOrder, documentsById]
+    [documentOrder, documentsById],
   );
   const { openGenerationModal } = useGenerationContext();
   const { hasBeenTranscribed } = useTranscriptionContext();
@@ -120,7 +122,9 @@ const TabBar: React.FC = () => {
               aria-label={`Seleccionar ${getTabLabel(doc)}`}
               data-document-type={doc.type}
             >
-              {doc.title || DOCUMENT_TYPE_LABELS[doc.type.toLowerCase()] || doc.type}
+              {doc.title ||
+                DOCUMENT_TYPE_LABELS[doc.type.toLowerCase()] ||
+                doc.type}
             </button>
           ))}
 
@@ -133,7 +137,11 @@ const TabBar: React.FC = () => {
                 ? "text-blue-600 hover:bg-blue-100"
                 : "text-gray-400 cursor-not-allowed"
             } rounded-full transition-colors self-center mx-2`}
-            title={hasBeenTranscribed ? "Generar documentación" : "Transcriba el audio primero para generar documentación"}
+            title={
+              hasBeenTranscribed
+                ? "Generar documentación"
+                : "Transcriba el audio primero para generar documentación"
+            }
             aria-label="Generar documentación"
           >
             <svg
@@ -229,7 +237,8 @@ const TabBar: React.FC = () => {
 function getDocumentTitle(doc: WorkspaceDocument | null) {
   if (!doc) return "";
 
-  const docType = doc.title || DOCUMENT_TYPE_LABELS_LONG[doc.type.toLowerCase()] || doc.type;
+  const docType =
+    doc.title || DOCUMENT_TYPE_LABELS_LONG[doc.type.toLowerCase()] || doc.type;
   const date = new Date(doc.createdAt).toLocaleDateString("es-ES", {
     day: "numeric",
     month: "long",

@@ -205,7 +205,7 @@ def _finalize_patch_set_review(
 ) -> dict[str, Any]:
     run = patch_set.run
     if run.status != "waiting_review":
-        raise HttpError(409, "El run no esta esperando revision humana")
+        return _serialize_run(run)
 
     if patch_set.patches.filter(status="pending").exists():
         raise HttpError(
@@ -258,6 +258,29 @@ def _finalize_patch_set_review(
     try:
         remote_run = client.resume_run(run.run_id, resume_payload)
     except CopilotServiceError as error:
+        # 409 means the agent already completed this run (race condition: the
+        # agent finished processing the review decision via SSE before our
+        # resume HTTP call landed).  apply_accepted_patch_set already persisted
+        # the content, so we can build a synthetic completed response and avoid
+        # surfacing a misleading 502 to the doctor.
+        if error.status_code == 409:
+            if accepted_exists:
+                synthetic_remote: dict[str, Any] = {
+                    "status": "completed",
+                    "requires_human_review": False,
+                    "final_response": None,
+                    "applied_document_id": str(apply_result.document_id),
+                    "applied_content": apply_result.content,
+                    "applied_version": apply_result.applied_version,
+                }
+            else:
+                synthetic_remote = {
+                    "status": "completed",
+                    "requires_human_review": False,
+                    "final_response": None,
+                }
+            run = _sync_run_from_remote(run, synthetic_remote)
+            return _serialize_run(run, synthetic_remote)
         raise HttpError(502, f"Copilot agent unavailable: {error}") from error
 
     run = _sync_run_from_remote(run, remote_run)
@@ -469,6 +492,17 @@ def get_copilot_run(request, run_id: str):
     _validate_remote_patch_set_preview(remote_run)
 
     run = _sync_run_from_remote(run, remote_run)
+    # With the async agent path the run was created with status="running" and no
+    # patch set.  When the background graph finishes and review_required arrives
+    # via SSE, the frontend calls syncRunStatus → getCopilotRun.  This is the
+    # first time Django sees the completed patch_set_preview, so we must persist
+    # it here so that the subsequent listCopilotPatchSets call finds it in Django DB.
+    _persist_patch_set_preview(
+        run=run,
+        remote_run=remote_run,
+        user_id=request.user.id,
+        encounter_id=run.encounter_id,
+    )
     return _serialize_run(run, remote_run)
 
 

@@ -5,11 +5,35 @@ Cloud Function endpoint for audio transcription.
 import logging
 import json
 
+from langsmith_tracing import trace_operation
 from services.transcription.audio_processor import transcribe_audio
 from services.django_api import update_document_content
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _langsmith_request_inputs(request) -> dict:
+    request_json = request.get_json(silent=True) or {}
+    audio_uri = str(request_json.get("audio_uri") or "")
+    audio_scheme = audio_uri.split(":", 1)[0] if audio_uri else None
+    return {
+        "method": request.method,
+        "document_id": request_json.get("document_id"),
+        "audio_scheme": audio_scheme,
+        "has_auth_token": bool(request_json.get("auth_token")),
+    }
+
+
+def _langsmith_request_outputs(response: tuple) -> dict:
+    body, status_code, _headers = response
+    payload = json.loads(body)
+    return {
+        "status_code": status_code,
+        "success": bool(payload.get("success")),
+        "document_id": payload.get("document_id"),
+        "error_code": payload.get("error_code"),
+    }
 
 
 def validate_document_id(document_id) -> tuple:
@@ -43,6 +67,13 @@ def transcription_endpoint(request) -> tuple:
     )
 
 
+@trace_operation(
+    name="cloud_functions.transcription_request",
+    run_type="chain",
+    process_inputs=_langsmith_request_inputs,
+    process_outputs=_langsmith_request_outputs,
+    tags=["transcription", "http"],
+)
 def _transcription_endpoint_impl(request) -> tuple:
     logger.info(f"Received transcription request: {request.method}")
 

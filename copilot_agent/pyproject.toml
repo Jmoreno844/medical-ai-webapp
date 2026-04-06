@@ -17,10 +17,13 @@ dependencies = [
   "pyjwt>=2.10.1,<3",
   "httpx>=0.28.0,<0.29",
   "langchain-google-genai>=4.2.1,<5",
+  "langchain-openai>=1.1.12,<2",
+  "langchain-anthropic>=1.4.0,<2",
 ]
 
 [dependency-groups]
 dev = [
+  "langsmith[pytest]>=0.7.24,<0.8",
   "pytest>=8.3.4,<9",
   "ruff>=0.9.6,<0.10",
 ]
@@ -38,3 +41,11 @@ only-include = ["pyproject.toml"]
 [tool.ruff]
 line-length = 88
 target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "evals/langsmith"]
+addopts = "-m 'not live_llm'"
+markers = [
+  "live_llm: calls the real Vertex/Gemini provider and is opt-in only",
+  "langsmith: enables LangSmith pytest wrapping and test-case logging",
+]

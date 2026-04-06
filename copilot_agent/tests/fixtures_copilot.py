@@ -234,7 +234,6 @@ def default_drafted_patch() -> DraftedPatch:
         expected_hash="hash-demo",
         before_preview="Paciente estable y con mejoria.",
         after_preview="\n\nFecha: 2 abril 2026",
-        document_preview_after="Paciente estable y con mejoria.\n\nFecha: 2 abril 2026",
         content_preview="Paciente estable y con mejoria.\n\nFecha: 2 abril 2026",
         rationale="Integrar fecha solicitada en la nota.",
     )
@@ -244,7 +243,7 @@ def default_drafted_patch_plan() -> DraftedPatchPlan:
     patch = default_drafted_patch()
     return DraftedPatchPlan(
         rationale=patch.rationale,
-        document_preview_after=patch.document_preview_after,
+        document_preview_after=patch.content_preview,
         patches=[patch],
     )
 

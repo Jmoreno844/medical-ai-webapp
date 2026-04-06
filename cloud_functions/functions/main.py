@@ -6,6 +6,7 @@ import warnings
 
 import functions_framework
 
+import langsmith_tracing
 import tracing
 from endpoints.transcription_endpoint import transcription_endpoint
 from endpoints.document_workflow import generate_document_workflow
@@ -19,6 +20,7 @@ warnings.filterwarnings(
 )
 
 tracing.configure_tracing()
+langsmith_tracing.configure_langsmith()
 #
 # Export the Cloud Functions
 transcription_endpoint = functions_framework.http(transcription_endpoint)

@@ -165,14 +165,16 @@ export type WorkspaceIndex = {
     shortSummary?: string;
     estimatedTokens?: number;
     hasPendingPatches?: boolean;
+    // Full markdown content for ai_writable docs — sent so the agent can propose
+    // patches without a separate read_document round-trip. Only present for docs
+    // the frontend decides to pre-load (open + ai_writable). Read-only or
+    // hidden docs never carry this field.
+    contentMarkdown?: string;
   }>;
 };
 
 export type ReadMode = "index" | "summary" | "sections" | "range" | "full";
 
-export type AiSessionReadMode =
-  | "active_only"
-  | "working_set"
-  | "all_readable";
+export type AiSessionReadMode = "active_only" | "working_set" | "all_readable";
 
 export type WorkspaceLegacyDocument = DocumentoOut;

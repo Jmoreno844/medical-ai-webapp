@@ -199,6 +199,15 @@ def _resolve_patch_against_document(
     new_text = patch.get("new_text")
     if patch_type == PATCH_TYPE_DELETE_SPAN:
         new_text = ""
+    elif patch_type in (PATCH_TYPE_INSERT_AFTER, PATCH_TYPE_INSERT_BEFORE):
+        # For insert operations _apply_patches_to_content already keeps the anchor
+        # span from the document in place (content[cursor:end] for insert_after,
+        # content[start:end] for insert_before). Therefore new_text must be ONLY
+        # the inserted content, not anchor + inserted_content.
+        # The drafter often sets new_text = anchor + inserted_content for preview
+        # purposes, which would duplicate the anchor. content_preview is explicitly
+        # just the inserted content, so always use it here.
+        new_text = patch["content_preview"]
     elif new_text is None:
         new_text = patch["content_preview"]
 

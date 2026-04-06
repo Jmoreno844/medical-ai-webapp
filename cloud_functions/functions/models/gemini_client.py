@@ -5,9 +5,12 @@ Client for Google's Gemini API using VertexAI
 import os
 import logging
 from typing import Dict, Any, Optional, Callable
+
 import vertexai
-from vertexai.generative_models import GenerativeModel
 from google.api_core.exceptions import GoogleAPIError
+from vertexai.generative_models import GenerativeModel
+
+from langsmith_tracing import trace_operation
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -19,6 +22,37 @@ DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash-001")
 
 # Initialization flag
 _is_initialized = False
+
+
+def _langsmith_generation_inputs(
+    prompt: str,
+    model_name: Optional[str] = None,
+) -> dict[str, Any]:
+    return {
+        "model": model_name or DEFAULT_MODEL,
+        "prompt_length": len(prompt or ""),
+    }
+
+
+def _langsmith_generation_outputs(result: Dict[str, Any]) -> dict[str, Any]:
+    return {
+        "success": bool(result.get("success")),
+        "model": result.get("model"),
+        "text_length": len(result.get("text") or ""),
+        "error_present": bool(result.get("error")),
+    }
+
+
+def _langsmith_streaming_inputs(
+    prompt: str,
+    model_name: Optional[str] = None,
+    chunk_handler: Optional[Callable[[str], bool]] = None,
+) -> dict[str, Any]:
+    return {
+        "model": model_name or DEFAULT_MODEL,
+        "prompt_length": len(prompt or ""),
+        "has_chunk_handler": chunk_handler is not None,
+    }
 
 
 def initialize_vertexai():
@@ -63,6 +97,13 @@ def get_gemini_model(model_name: Optional[str] = None) -> GenerativeModel:
     return GenerativeModel(model)
 
 
+@trace_operation(
+    name="cloud_functions.gemini_generate_content",
+    run_type="llm",
+    process_inputs=_langsmith_generation_inputs,
+    process_outputs=_langsmith_generation_outputs,
+    tags=["gemini", "content_generation"],
+)
 def generate_content(prompt: str, model_name: Optional[str] = None) -> Dict[str, Any]:
     """
     Generate content using Gemini model.
@@ -119,6 +160,13 @@ def generate_content(prompt: str, model_name: Optional[str] = None) -> Dict[str,
         }
 
 
+@trace_operation(
+    name="cloud_functions.gemini_generate_content_streaming",
+    run_type="llm",
+    process_inputs=_langsmith_streaming_inputs,
+    process_outputs=_langsmith_generation_outputs,
+    tags=["gemini", "streaming"],
+)
 def generate_content_streaming(
     prompt: str,
     model_name: Optional[str] = None,

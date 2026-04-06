@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from langchain_core.messages import AIMessage
 
+from app.graph.nodes import NODE_FINALIZE_RUN
 from app.repository import StoredRun, StoredRunEvent
 from app.runtime import CopilotRuntime
 from app.schemas import RunCreateRequest, RunResumeRequest, WorkspaceIndexPayload
@@ -129,7 +130,7 @@ def test_resume_run_completes_waiting_review_run(monkeypatch):
     assert fake_graph.updated["config"] == {
         "configurable": {"thread_id": "copilot:encounter:12:doctor:7:chat:test"}
     }
-    assert fake_graph.updated["as_node"] == "finalize_response"
+    assert fake_graph.updated["as_node"] == NODE_FINALIZE_RUN
     thread_messages = fake_graph.updated["values"]["messages"]
     assert len(thread_messages) == 1
     assert isinstance(thread_messages[0], AIMessage)

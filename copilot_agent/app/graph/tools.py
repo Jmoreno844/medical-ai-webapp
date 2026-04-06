@@ -96,7 +96,7 @@ class ReadDocumentSummaryInput(BaseModel):
 
 class ReadDocumentInput(BaseModel):
     document_id: str = Field(..., min_length=1)
-    mode: Literal["summary", "excerpt", "full"] = "excerpt"
+    mode: Literal["summary", "full"] = "full"
 
 
 class ReadDocumentSpanInput(BaseModel):
@@ -353,6 +353,8 @@ def _tool_observation_content(
         lines.append(f"  {_xml_line('max_patch_operations', payload.get('max_patch_operations'))}")
         if payload.get("reasoning"):
             lines.append(f"  {_xml_line('reasoning', payload.get('reasoning'))}")
+        if payload.get("doctor_summary"):
+            lines.append(f"  {_xml_line('doctor_summary', payload.get('doctor_summary'))}")
     elif tool_name.startswith("propose_"):
         lines.append(f"  {_xml_line('patch_set_id', payload.get('patch_set_id'))}")
         lines.append(f"  {_xml_line('target_document_id', payload.get('target_document_id'))}")
@@ -474,7 +476,7 @@ def _find_document(
     document_read = _current_document_read(
         state,
         document_id=document_id,
-        modes=("summary", "excerpt", "full"),
+        modes=("summary", "full"),
     )
     if document_read:
         return {
@@ -817,13 +819,13 @@ def build_graph_tools(
     def read_document(
         document_id: str,
         runtime: ToolRuntime,
-        mode: Literal["summary", "excerpt", "full"] = "excerpt",
+        mode: Literal["summary", "full"] = "full",
     ) -> Command:
         """
-        Lee un documento completo o una version resumida/excerpt segun la necesidad.
-        Usa `mode="summary"` para orientarte rapido, `mode="excerpt"` para una lectura
-        ligera y `mode="full"` cuando necesites verificar estructura global, insertar
-        al inicio/final o redactar cambios amplios sin depender de un span parcial.
+        Lee un documento completo o un resumen segun la necesidad.
+        Usa `mode="summary"` para orientarte rapido (solo metadatos + excerpt corto).
+        Usa `mode="full"` cuando necesites el texto completo para proponer patches,
+        verificar estructura global o insertar al inicio/final del documento.
         """
         state, tool_call_id = _runtime_parts(
             runtime,
@@ -1127,7 +1129,7 @@ def build_graph_tools(
         summary_payload = _current_summary(state, document_id=target_document_id) or _current_document_read(
             state,
             document_id=target_document_id,
-            modes=("summary", "excerpt", "full"),
+            modes=("summary", "full"),
         )
         if not summary_payload:
             return _error_command(
@@ -1136,7 +1138,7 @@ def build_graph_tools(
                 tool_call_id=tool_call_id,
                 error_message=(
                     "Antes de proponer un patch debes leer el documento target con "
-                    "read_document(mode='summary'|'excerpt'|'full')."
+                    "read_document(mode='summary'|'full')."
                 ),
             )
         span_payload = _current_span(state, document_id=target_document_id)
@@ -1297,6 +1299,8 @@ def build_graph_tools(
         needs_external_knowledge: bool,
         runtime: ToolRuntime,
         reasoning: str | None = None,
+        doctor_summary: str | None = None,
+        section_instructions: dict[str, str] | None = None,
     ) -> Command:
         """Registra el plan de edición clínica ANTES de proponer patches.
 
@@ -1324,11 +1328,22 @@ def build_graph_tools(
         OJO: 'cosmetic' describe impacto semántico, no tamaño del cambio. Un reformateo
         amplio puede requerir propagation si toca varias secciones aunque no cambie datos.
         affected_sections: lista snake_case, ej ['enfermedad_actual', 'plan'].
-        reasoning: razonamiento clínico breve que explica POR QUÉ ese scope y esas secciones.
-          Ejemplo: 'El paciente no tiene diabetes — debo borrarla de antecedentes, quitar el
-          control glucémico del plan y corregir el análisis que la mencionaba como activa.'
-          El drafter usa este campo para entender el hilo clínico sin releer la conversación.
-          También se muestra al médico en el chat mientras espera los patches.
+        reasoning: razonamiento clínico interno que explica POR QUÉ ese scope y esas secciones.
+          Llega al drafter para guiar la redacción. Para ediciones locales puede omitirse.
+        doctor_summary: mensaje en lenguaje natural dirigido al médico explicando qué se va
+          a cambiar y por qué. Se muestra en el chat mientras el drafter genera los patches.
+          Escríbelo en primera persona, breve y claro.
+          Ejemplo: 'Voy a corregir el diagnóstico de diabetes en antecedentes, plan y análisis
+          clínico, ya que fue descartado en la consulta de hoy.'
+        section_instructions: instrucciones quirúrgicas por sección para el drafter.
+          Claves = nombres de sección (snake_case), valores = qué cambiar exactamente.
+          Ejemplo: {{
+            'antecedentes_relevantes': 'Eliminar Diabetes mellitus tipo 2 de la lista de antecedentes',
+            'plan': 'Remover control glucémico y HbA1c del esquema terapéutico',
+            'analisis_clinico': 'Corregir el párrafo que trata la diabetes como condición activa'
+          }}
+          Proporciona section_instructions para propagation y reinterpretation siempre que
+          puedas. El drafter las prioriza sobre inferir el cambio desde reasoning o user_query.
         """
         state, tool_call_id = _runtime_parts(runtime, tool_name="set_edit_plan")
 
@@ -1342,16 +1357,29 @@ def build_graph_tools(
             else "factual"
         )
 
+        safe_section_instructions: dict[str, str] | None = None
+        if section_instructions and isinstance(section_instructions, dict):
+            # Solo conservar entradas cuya clave coincida con affected_sections para
+            # evitar que el planner inyecte instrucciones para secciones no declaradas.
+            allowed = set(affected_sections or [])
+            safe_section_instructions = {
+                k: str(v)
+                for k, v in section_instructions.items()
+                if isinstance(k, str) and isinstance(v, str) and (not allowed or k in allowed)
+            } or None
+
         plan = {
             "edit_scope": safe_scope,
             "clinical_impact_level": safe_impact,
             "affected_sections": list(affected_sections or []),
             "needs_full_note": bool(needs_full_note),
             "needs_external_knowledge": bool(needs_external_knowledge),
-            # reasoning es opcional: algunos modelos (GPT mini) no lo emiten siempre.
-            # Se almacena en clinical_plan para que render_patch_input lo inyecte
-            # en el contexto del drafter y para que el frontend lo muestre al doctor.
+            # reasoning: razonamiento interno para el drafter.
+            # doctor_summary: mensaje en lenguaje natural para el médico visible en el chat.
+            # section_instructions: instrucciones quirúrgicas por sección para el drafter.
             "reasoning": (reasoning or "").strip() or None,
+            "doctor_summary": (doctor_summary or "").strip() or None,
+            "section_instructions": safe_section_instructions,
         }
         payload = {**plan, "max_patch_operations": max_ops}
 

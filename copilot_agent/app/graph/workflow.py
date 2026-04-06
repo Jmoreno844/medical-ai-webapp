@@ -4,13 +4,19 @@ from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from app.graph.nodes import (
-    _route_after_model,
-    _route_after_tools,
-    apply_patch,
-    consolidate_tool_state,
-    finalize_response,
-    interrupt_for_review,
-    make_call_model_node,
+    NODE_APPLY_PATCH_REVIEW,
+    NODE_EXECUTE_TOOLS,
+    NODE_FINALIZE_RUN,
+    NODE_PLANNER_TURN,
+    NODE_RECONCILE_TOOL_STATE,
+    NODE_WAIT_FOR_HUMAN_REVIEW,
+    apply_patch_review,
+    finalize_run,
+    make_planner_turn_node,
+    reconcile_tool_state,
+    route_after_planner_turn,
+    route_after_tool_execution,
+    wait_for_human_review,
 )
 from app.graph.state import CopilotState
 from app.graph.tools import build_graph_tools
@@ -30,50 +36,50 @@ def build_clinical_copilot_graph(*, tools_client, planner, checkpointer=None):
         planner=planner,
     )
 
-    graph.add_node("call_model", make_call_model_node(planner, tools))
+    graph.add_node(NODE_PLANNER_TURN, make_planner_turn_node(planner, tools))
     graph.add_node(
-        "tools",
+        NODE_EXECUTE_TOOLS,
         ToolNode(
             tools,
             handle_tool_errors=_tool_error_message,
         ),
     )
-    graph.add_node("consolidate_tool_state", consolidate_tool_state)
-    graph.add_node("interrupt_for_review", interrupt_for_review)
-    graph.add_node("apply_patch", apply_patch)
-    graph.add_node("finalize_response", finalize_response)
+    graph.add_node(NODE_RECONCILE_TOOL_STATE, reconcile_tool_state)
+    graph.add_node(NODE_WAIT_FOR_HUMAN_REVIEW, wait_for_human_review)
+    graph.add_node(NODE_APPLY_PATCH_REVIEW, apply_patch_review)
+    graph.add_node(NODE_FINALIZE_RUN, finalize_run)
 
-    graph.set_entry_point("call_model")
+    graph.set_entry_point(NODE_PLANNER_TURN)
     graph.add_conditional_edges(
-        "call_model",
-        _route_after_model,
+        NODE_PLANNER_TURN,
+        route_after_planner_turn,
         {
-            "tools": "tools",
-            "interrupt_for_review": "interrupt_for_review",
-            "finalize_response": "finalize_response",
+            NODE_EXECUTE_TOOLS: NODE_EXECUTE_TOOLS,
+            NODE_WAIT_FOR_HUMAN_REVIEW: NODE_WAIT_FOR_HUMAN_REVIEW,
+            NODE_FINALIZE_RUN: NODE_FINALIZE_RUN,
         },
     )
-    graph.add_edge("tools", "consolidate_tool_state")
+    graph.add_edge(NODE_EXECUTE_TOOLS, NODE_RECONCILE_TOOL_STATE)
     graph.add_conditional_edges(
-        "consolidate_tool_state",
-        _route_after_tools,
+        NODE_RECONCILE_TOOL_STATE,
+        route_after_tool_execution,
         {
-            "call_model": "call_model",
-            "interrupt_for_review": "interrupt_for_review",
-            "finalize_response": "finalize_response",
+            NODE_PLANNER_TURN: NODE_PLANNER_TURN,
+            NODE_WAIT_FOR_HUMAN_REVIEW: NODE_WAIT_FOR_HUMAN_REVIEW,
+            NODE_FINALIZE_RUN: NODE_FINALIZE_RUN,
         },
     )
     graph.add_conditional_edges(
-        "interrupt_for_review",
-        lambda state: "apply_patch"
+        NODE_WAIT_FOR_HUMAN_REVIEW,
+        lambda state: NODE_APPLY_PATCH_REVIEW
         if state.get("review_result") == "approve"
-        else "finalize_response",
+        else NODE_FINALIZE_RUN,
         {
-            "apply_patch": "apply_patch",
-            "finalize_response": "finalize_response",
+            NODE_APPLY_PATCH_REVIEW: NODE_APPLY_PATCH_REVIEW,
+            NODE_FINALIZE_RUN: NODE_FINALIZE_RUN,
         },
     )
-    graph.add_edge("apply_patch", "finalize_response")
-    graph.add_edge("finalize_response", END)
+    graph.add_edge(NODE_APPLY_PATCH_REVIEW, NODE_FINALIZE_RUN)
+    graph.add_edge(NODE_FINALIZE_RUN, END)
 
     return graph.compile(checkpointer=checkpointer)

@@ -27,6 +27,9 @@ class WorkspaceDocumentSummaryIn(Schema):
     short_summary: Optional[str] = None
     estimated_tokens: Optional[int] = None
     has_pending_patches: bool = False
+    # Full markdown content for ai_writable docs pre-loaded by the frontend.
+    # Django passes this through to the agent verbatim; it never persists it.
+    content_markdown: Optional[str] = None
 
 
 class WorkspaceIndexIn(Schema):
@@ -201,7 +204,7 @@ class CopilotListOpenDocumentsOut(Schema):
 
 class CopilotReadDocumentIn(CopilotInternalToolRequest):
     document_id: int
-    mode: Literal["full", "excerpt"] = "excerpt"
+    mode: Literal["full"] = "full"
 
 
 class CopilotReadDocumentOut(Schema):
@@ -212,7 +215,7 @@ class CopilotReadDocumentOut(Schema):
     version: int
     content_hash: str
     updated_at: str
-    mode: Literal["full", "excerpt"]
+    mode: Literal["full"]
     content: Optional[str] = None
 
 

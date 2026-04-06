@@ -1265,5 +1265,59 @@ class CopilotPatchSetServiceTests(SimpleTestCase):
             "Motivo: dolor abdominal. Plan: hidratacion intensiva.",
         )
 
+    def test_insert_after_does_not_duplicate_anchor(self):
+        # The drafter sets new_text = anchor + inserted_content for diff-preview
+        # purposes. _resolve_patch_against_document must use content_preview
+        # (inserted-only text) so the apply step doesn't double the anchor.
+        resolved = _resolve_patch_against_document(
+            preview={
+                "patch_id": "patch-1",
+                "patch_type": "insert_after_span",
+                "operation_type": "insert_after_span",
+                "order_index": 0,
+                "anchor": {
+                    "exactText": "# TÍTULO",
+                    "suffixText": " ## Sección",
+                },
+                "new_text": "# TÍTULO\n6 de abril de 2026",
+                "content_preview": "\n6 de abril de 2026",
+                "after_preview": "# TÍTULO\n6 de abril de 2026",
+                "before_preview": "# TÍTULO",
+            },
+            document_content="# TÍTULO\n\n## Sección\nContenido.",
+        )
+        result = _apply_patches_to_content(
+            "# TÍTULO\n\n## Sección\nContenido.",
+            [resolved],
+        )
+        self.assertEqual(result, "# TÍTULO\n6 de abril de 2026\n\n## Sección\nContenido.")
+
+    def test_insert_before_does_not_duplicate_anchor(self):
+        # Same invariant for insert_before: new_text contains anchor + insert for
+        # preview purposes; only content_preview (the inserted text) should be used.
+        resolved = _resolve_patch_against_document(
+            preview={
+                "patch_id": "patch-2",
+                "patch_type": "insert_before",
+                "operation_type": "insert_before",
+                "order_index": 0,
+                "anchor": {
+                    "exactText": "# TÍTULO",
+                    "prefixText": "",
+                    "suffixText": " ## Sección",
+                },
+                "new_text": "Fecha: 06/04/2026\n# TÍTULO",
+                "content_preview": "Fecha: 06/04/2026\n",
+                "after_preview": "Fecha: 06/04/2026\n# TÍTULO",
+                "before_preview": "# TÍTULO",
+            },
+            document_content="# TÍTULO\n\n## Sección\nContenido.",
+        )
+        result = _apply_patches_to_content(
+            "# TÍTULO\n\n## Sección\nContenido.",
+            [resolved],
+        )
+        self.assertEqual(result, "Fecha: 06/04/2026\n# TÍTULO\n\n## Sección\nContenido.")
+
     def test_content_hash_is_stable_for_same_text(self):
         self.assertEqual(content_hash("abc"), content_hash("abc"))

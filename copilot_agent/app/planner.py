@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from dataclasses import dataclass
 from typing import Any, Callable, Literal, Mapping, Protocol, Sequence
 
@@ -9,12 +10,16 @@ from google.genai import types as genai_types
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.tools import BaseTool
 from langchain_core.utils.function_calling import convert_to_openai_tool
-from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import Settings
 from app.llm.context_rendering import render_patch_input, render_turn_context
 from app.llm.instructions import patch_system_instruction, planner_system_instruction
+from app.llm.providers import (
+    LlmProviderSpec,
+    build_langchain_chat_model,
+    resolve_runtime_provider_specs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +65,9 @@ class ClinicalPlan(BaseModel):
     )
     clinical_impact_level: Literal["cosmetic", "factual", "clinical"] = Field(
         description=(
-            "'cosmetic' = estilo, formato, traducción sin cambio de datos. "
+            "'cosmetic' = ajuste de estilo, formato o redaccion sin cambio de datos ni "
+            "significado clinico. El alcance del cambio lo decide edit_scope: un reformateo "
+            "amplio puede seguir siendo propagation aunque el impacto sea cosmetic. "
             "'factual' = agrega o corrige un dato documentado (EG edad gestacional). "
             "'clinical' = cambia diagnóstico, análisis, riesgo o plan de manejo."
         )
@@ -86,11 +93,6 @@ class ClinicalPlan(BaseModel):
         description=(
             "True si el cambio requiere conocimiento externo (guías clínicas, farmacología) "
             "que no está presente en la nota del encuentro. Señal para RAG futuro."
-        )
-    )
-    should_propagate_to_analysis_and_plan: bool = Field(
-        description=(
-            "True si el nuevo dato clínico debe reflejarse en análisis clínico y/o plan de manejo."
         )
     )
 
@@ -140,7 +142,6 @@ class DraftedPatch(BaseModel):
     expected_hash: str | None = None
     before_preview: str | None = None
     after_preview: str | None = None
-    document_preview_after: str | None = None
     content_preview: str
     rationale: str = Field(
         default="",
@@ -149,7 +150,6 @@ class DraftedPatch(BaseModel):
             "cannot provide a concise rationale safely."
         ),
     )
-    confidence: float | None = None
     # Sección semántica del documento a la que pertenece este patch.
     # Debe coincidir con uno de los valores en ClinicalPlan.affected_sections.
     # Permite al frontend y al auditor clínico entender qué parte de la nota se está tocando.
@@ -277,20 +277,118 @@ def _provider_tool_spec(tool: BaseTool | Callable[..., Any]) -> Any:
 class LangChainCopilotPlanner:
     settings: Settings
 
-    _planner_model: ChatGoogleGenerativeAI | None = None
-    _patch_model: ChatGoogleGenerativeAI | None = None
+    _planner_model: Any | None = None
+    _patch_model: Any | None = None
 
     @staticmethod
-    def _provider_runtime_kwargs() -> dict[str, Any]:
+    def _is_google_chat_model(model: Any) -> bool:
+        return model.__class__.__name__ == "ChatGoogleGenerativeAI"
+
+    @staticmethod
+    def _is_openai_chat_model(model: Any) -> bool:
+        return model.__class__.__name__ == "ChatOpenAI"
+
+    @classmethod
+    def _provider_runtime_kwargs_for_model(cls, model: Any) -> dict[str, Any]:
         # Google AFC (Automatic Function Calling) would re-enter its own tool loop
         # server-side, bypassing our LangGraph state machine. That means tool results
         # would never reach our state reducers, streaming events would be missing, and
         # our per-turn budgets (max_iterations, max_patch_operations) would not apply.
-        return {
-            "automatic_function_calling": genai_types.AutomaticFunctionCallingConfig(
-                disable=True
-            )
+        if cls._is_google_chat_model(model):
+            return {
+                "automatic_function_calling": genai_types.AutomaticFunctionCallingConfig(
+                    disable=True
+                )
+            }
+
+        # OpenAI enables parallel tool calls by default. The clinical planner relies on
+        # a single ordered tool decision per turn so evals stay comparable to the
+        # LangGraph runtime, where writes and reads are budgeted sequentially.
+        if cls._is_openai_chat_model(model):
+            return {"parallel_tool_calls": False}
+
+        return {}
+
+    @staticmethod
+    def _planner_provider_spec(settings: Settings) -> LlmProviderSpec:
+        planner_spec, _ = resolve_runtime_provider_specs(settings)
+        return planner_spec
+
+    @staticmethod
+    def _patch_provider_spec(settings: Settings) -> LlmProviderSpec:
+        _, patch_spec = resolve_runtime_provider_specs(settings)
+        return patch_spec
+
+    @staticmethod
+    def _langsmith_trace_config(
+        *,
+        role: Literal["planner", "drafter"],
+        operation: str,
+        provider_spec: LlmProviderSpec,
+        iteration: int | None = None,
+        tool_names: list[str] | None = None,
+    ) -> dict[str, Any]:
+        # Build a human-readable run_name so LangSmith traces show which component
+        # is running, at which iteration, and what tools it called. Instead of seeing
+        # six identical "Planner" spans, you see:
+        #   Planner [i=2] → read_document, set_edit_plan
+        #   Drafter [i=2] → structured_output
+        role_label = "Planner" if role == "planner" else "Drafter"
+        name_parts = [role_label]
+        if iteration is not None:
+            name_parts.append(f"[i={iteration}]")
+        if tool_names:
+            name_parts.append("→ " + ", ".join(tool_names))
+        elif role == "drafter":
+            name_parts.append("→ structured_output")
+        run_name = " ".join(name_parts)
+
+        metadata = {
+            "component": "copilot_agent",
+            "llm_role": role,
+            "llm_operation": operation,
+            "provider_family": provider_spec.provider_family,
+            "model_name": provider_spec.model_name,
         }
+        if iteration is not None:
+            metadata["iteration"] = iteration
+        if provider_spec.google_location:
+            metadata["google_location"] = provider_spec.google_location
+        return {
+            "run_name": run_name,
+            "tags": [
+                "copilot_agent",
+                "llm",
+                role,
+                operation,
+                provider_spec.provider_family,
+            ],
+            "metadata": metadata,
+        }
+
+    @classmethod
+    def _configure_runnable_for_trace(
+        cls,
+        runnable: Any,
+        *,
+        role: Literal["planner", "drafter"],
+        operation: str,
+        provider_spec: LlmProviderSpec,
+        iteration: int | None = None,
+        tool_names: list[str] | None = None,
+    ) -> Any:
+        with_config = getattr(runnable, "with_config", None)
+        if not callable(with_config):
+            return runnable
+        return with_config(
+            cls._langsmith_trace_config(
+                role=role,
+                operation=operation,
+                provider_spec=provider_spec,
+                iteration=iteration,
+                tool_names=tool_names,
+            )
+        )
 
     def invoke_model(
         self,
@@ -299,8 +397,30 @@ class LangChainCopilotPlanner:
         messages: Sequence[BaseMessage],
         tools: Sequence[BaseTool | Callable[..., Any]],
     ) -> AIMessage:
-        runnable = self._planner_model_instance().bind_tools(
+        planner_model = self._planner_model_instance()
+        planner_spec = self._planner_provider_spec(self.settings)
+        planner_runtime_kwargs = self._provider_runtime_kwargs_for_model(planner_model)
+        runnable = planner_model.bind_tools(
             [_provider_tool_spec(tool) for tool in tools]
+        )
+        # iteration_count in state reflects the count BEFORE this turn increments it,
+        # so the upcoming planner call is iteration+1.
+        current_iteration = int(state.get("iteration_count") or 0) + 1
+        # Derive the tool names the planner called in the PREVIOUS turn so the
+        # trace label reflects what action triggered this invocation (e.g. after
+        # read_document the next span shows "Planner [i=2] → set_edit_plan").
+        prev_tool_calls: list[str] = [
+            str(tc.get("tool_name") or tc.get("name") or "")
+            for tc in (state.get("tool_calls") or [])
+            if tc.get("tool_name") or tc.get("name")
+        ]
+        runnable = self._configure_runnable_for_trace(
+            runnable,
+            role="planner",
+            operation="tool_calling",
+            provider_spec=planner_spec,
+            iteration=current_iteration,
+            tool_names=prev_tool_calls or None,
         )
         
         current_messages = list(messages)
@@ -313,7 +433,7 @@ class LangChainCopilotPlanner:
                         HumanMessage(content=render_turn_context(state)),
                         *curr_msgs,
                     ],
-                    **self._provider_runtime_kwargs(),
+                    **planner_runtime_kwargs,
                 ),
             )
             if not isinstance(response, AIMessage):
@@ -326,20 +446,227 @@ class LangChainCopilotPlanner:
                 return _filter_parallel_tool_calls(response)
                 
             # Gemini occasionally returns an empty AIMessage (no text, no tool calls)
-            # on complex tool schemas, especially after a large tool result in context.
-            # Injecting an explicit error forces it to generate a non-empty turn.
+            # on complex tool schemas, especially after a large tool result in context
+            # (e.g. a full read_document payload adds ~1000 tokens to context).
+            # Do NOT append the empty AIMessage — an AIMessage with no content and no
+            # tool_calls is an invalid conversation turn and confuses the model on
+            # subsequent retries. Only inject a directive HumanMessage.
             logger.warning("El planner devolvio una respuesta vacia en el intento %d. Forzando reintento.", attempt)
-            current_messages.extend([
-                response,
-                HumanMessage(content=(
-                    "Tu ultima respuesta estuvo completamente vacia (sin texto ni tools). "
-                    "Esto es un ERROR. Por favor, usa una tool para continuar el flujo de edicion "
-                    "o responde con un mensaje de texto explicando por que te detuviste."
-                ))
-            ])
+            current_messages.append(
+                HumanMessage(content=self._empty_response_recovery_prompt(state))
+            )
             
         logger.error("El planner fallo 3 veces devolviendo respuestas vacias repetidamente.")
-        return _filter_parallel_tool_calls(response)
+        return self._empty_response_fallback_message(state)
+
+    @staticmethod
+    def _last_error_is_drafter_failure(state: Mapping[str, Any]) -> bool:
+        """Detect whether the last tool error was a drafter/patch invocation failure.
+
+        When the drafter fails (e.g. json_schema parsing, RESOURCE_EXHAUSTED),
+        re-proposing the same propose_* call will just loop into another drafter
+        failure.  The recovery prompt and fallback must NOT suggest propose_* again.
+        """
+        error = str(state.get("last_tool_error") or "").lower()
+        if not error:
+            return False
+        drafter_markers = (
+            "patch clinico",
+            "patch drafting",
+            "json_schema",
+            "draftedpatchplan",
+            "recurso de ia agotado",
+        )
+        return any(marker in error for marker in drafter_markers)
+
+    @staticmethod
+    def _empty_response_recovery_prompt(state: Mapping[str, Any]) -> str:
+        # Build a directive recovery message based on what the planner already has
+        # in state. A generic "you were empty, try again" often makes things worse
+        # because the model receives an empty AIMessage + a vague error and loops.
+        # A state-aware prompt points the model to its concrete next action.
+        #
+        # IMPORTANT: if the last tool error indicates a drafter failure, we must NOT
+        # suggest propose_* again — that would create an infinite loop where the
+        # drafter keeps failing and the planner keeps re-proposing.
+        read_docs = state.get("read_documents") or []
+        clinical_plan = state.get("clinical_plan") or {}
+        read_ids = [d.get("document_id") for d in read_docs if d.get("document_id")]
+
+        parts = [
+            "Tu respuesta anterior estuvo completamente vacia (sin texto ni tool calls). "
+            "No devuelvas una respuesta vacia. Debes continuar el flujo."
+        ]
+
+        fallback_target_document_id = LangChainCopilotPlanner._fallback_target_document_id(
+            state
+        )
+        user_query = str(state.get("user_message") or "").strip()
+        drafter_just_failed = LangChainCopilotPlanner._last_error_is_drafter_failure(state)
+
+        if drafter_just_failed:
+            # The drafter crashed (json parse, 429, etc.) — re-proposing will loop.
+            # Tell the planner to surface the failure as a user-facing text response
+            # instead of calling propose_* again.
+            parts.append(
+                "La tool propose_* acaba de fallar al redactar el patch clinico. "
+                "NO vuelvas a llamar propose_*. Responde con un mensaje de texto breve "
+                "explicando al medico que no pudiste materializar la edicion en este "
+                "momento y que puede intentar de nuevo."
+            )
+        elif fallback_target_document_id and (
+            clinical_plan.get("edit_scope")
+            or LangChainCopilotPlanner._looks_like_edit_request(user_query)
+        ):
+            # After a successful full read, the most common empty-response failure mode
+            # is that Gemini stalls deciding whether to propose or ask for clarification.
+            # Tell it explicitly to stop reading and open exactly one proposal tool call.
+            parts.append(
+                f"No vuelvas a leer. Ya tienes suficiente contexto del documento {fallback_target_document_id}. "
+                f"Tu siguiente paso obligatorio es llamar EXACTAMENTE una sola tool propose_* "
+                f"para ese documento. Si no estas seguro del tipo exacto, usa "
+                f"propose_replace_span(target_document_id='{fallback_target_document_id}', "
+                f"instruction='{user_query or 'materializa el cambio pedido usando el documento leido'}')."
+            )
+        elif clinical_plan.get("edit_scope") and read_ids:
+            # Planner has a plan and already read the document — next step is propose
+            parts.append(
+                f"Ya tienes un plan clinico (scope={clinical_plan['edit_scope']}) "
+                f"y leiste los documentos: {', '.join(read_ids)}. "
+                f"Tu siguiente paso obligatorio es llamar propose_replace_span("
+                f"target_document_id='{read_ids[-1]}', "
+                f"instruction='<describe aqui todos los cambios exactos a realizar>') "
+                f"consolidando todos los cambios en UNA sola llamada."
+            )
+        elif read_ids:
+            parts.append(
+                f"Ya leiste los documentos: {', '.join(read_ids)}. "
+                "Usa esa informacion para proponer cambios con propose_* "
+                "o responde al medico con texto explicando tu analisis."
+            )
+        else:
+            parts.append(
+                "Usa una tool para avanzar o responde con un mensaje de texto "
+                "explicando tu analisis o por que no puedes continuar."
+            )
+
+        return " ".join(parts)
+
+    @staticmethod
+    def _looks_like_edit_request(user_query: str) -> bool:
+        normalized = str(user_query or "").strip().lower()
+        if not normalized:
+            return False
+        edit_markers = (
+            "agrega",
+            "agrega",
+            "añade",
+            "anade",
+            "inserta",
+            "cambia",
+            "modifica",
+            "actualiza",
+            "corrige",
+            "reemplaza",
+            "elimina",
+            "borra",
+            "quita",
+            "reescribe",
+            "redacta",
+            "propaga",
+            "ajusta",
+            "completa",
+        )
+        return any(marker in normalized for marker in edit_markers)
+
+    @staticmethod
+    def _fallback_target_document_id(state: Mapping[str, Any]) -> str | None:
+        full_read_ids: list[str] = []
+        seen_full_read_ids: set[str] = set()
+        for document in state.get("read_documents") or []:
+            read_mode = str(document.get("read_mode") or document.get("mode") or "")
+            document_id = str(document.get("document_id") or "")
+            if read_mode != "full" or not document_id or document_id in seen_full_read_ids:
+                continue
+            seen_full_read_ids.add(document_id)
+            full_read_ids.append(document_id)
+
+        if len(full_read_ids) == 1:
+            return full_read_ids[0]
+
+        read_ids: list[str] = []
+        seen_read_ids: set[str] = set()
+        for document in state.get("read_documents") or []:
+            document_id = str(document.get("document_id") or "")
+            if not document_id or document_id in seen_read_ids:
+                continue
+            seen_read_ids.add(document_id)
+            read_ids.append(document_id)
+        if len(read_ids) == 1:
+            return read_ids[0]
+        return None
+
+    @staticmethod
+    def _empty_response_fallback_message(state: Mapping[str, Any]) -> AIMessage:
+        target_document_id = LangChainCopilotPlanner._fallback_target_document_id(state)
+        user_query = str(state.get("user_message") or "").strip()
+        clinical_plan = state.get("clinical_plan") or {}
+        drafter_just_failed = LangChainCopilotPlanner._last_error_is_drafter_failure(state)
+
+        # If the drafter just crashed (json parse error, 429, etc.), re-proposing
+        # will enter the exact same failure path and loop.  Surface a safe text
+        # response so the run finishes cleanly instead of cycling.
+        if drafter_just_failed:
+            logger.warning(
+                "Planner vacio 3 veces tras fallo del drafter; devolviendo error textual "
+                "en lugar de re-proponer para evitar loop."
+            )
+            return AIMessage(
+                content=(
+                    "No pude materializar la edicion solicitada porque el servicio de IA "
+                    "no logro generar un borrador valido. "
+                    "Por favor, intenta de nuevo o reformula la instruccion."
+                )
+            )
+
+        # Safety rationale: once the provider has returned an empty planner turn 3 times,
+        # hard-failing the run is worse than forcing a single propose_* call when we have
+        # one clearly-read target document and an edit-like user request. This fallback
+        # does NOT write canonically; it only opens the normal propose_* path, which still
+        # goes through patch drafting, validation, backend conflict checks and human review.
+        if target_document_id and (
+            clinical_plan.get("edit_scope")
+            or LangChainCopilotPlanner._looks_like_edit_request(user_query)
+        ):
+            logger.warning(
+                "Planner quedo vacio 3 veces; sintetizando propose_replace_span fallback para %s.",
+                target_document_id,
+            )
+            return AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "propose_replace_span",
+                        "args": {
+                            "target_document_id": target_document_id,
+                            "instruction": user_query
+                            or "Materializa el cambio pedido usando el documento leido.",
+                        },
+                        "id": f"empty-response-fallback-{uuid.uuid4()}",
+                        "type": "tool_call",
+                    }
+                ],
+            )
+
+        logger.warning(
+            "Planner quedo vacio 3 veces sin target de edicion claro; devolviendo respuesta textual segura."
+        )
+        return AIMessage(
+            content=(
+                "Lei el documento disponible, pero no pude decidir automaticamente el siguiente paso. "
+                "Indica el cambio exacto que deseas realizar o vuelve a intentarlo."
+            )
+        )
 
     def draft_patch_preview(
         self,
@@ -370,7 +697,7 @@ class LangChainCopilotPlanner:
                 )
             ),
         ]
-        result = self._invoke_patch_drafting(messages=messages)
+        result = self._invoke_patch_drafting(messages=messages, state=state)
         return self._normalize_patch_plan(self._validate_patch_plan_result(result))
 
     def _invoke_with_retry(
@@ -400,22 +727,38 @@ class LangChainCopilotPlanner:
         self,
         *,
         messages: Sequence[BaseMessage],
+        state: Mapping[str, Any] | None = None,
     ) -> Any:
         # json_schema forces the model to return a typed DraftedPatchPlan in one shot.
         # function_calling was tried and dropped: it caused Gemini to echo tool names
         # (propose_replace_span) as operation_type values instead of the patch enum
         # constants (replace_span), and re-introduced AFC-like multi-turn behavior
         # that bypassed our structured output contract.
-        structured = self._patch_model_instance().with_structured_output(
-            DraftedPatchPlan,
-            method="json_schema",
+        patch_model = self._patch_model_instance()
+        patch_spec = self._patch_provider_spec(self.settings)
+        structured = self._patch_structured_output_runnable(
+            patch_model,
+            provider_spec=patch_spec,
         )
+        # Pass iteration from state so the drafter span shows which planner
+        # iteration triggered the drafting call (e.g. "Drafter [i=3]").
+        drafter_iteration = int((state or {}).get("iteration_count") or 0) + 1
+        structured = self._configure_runnable_for_trace(
+            structured,
+            role="drafter",
+            operation="structured_output",
+            provider_spec=patch_spec,
+            iteration=drafter_iteration,
+        )
+        # Do NOT pass _provider_runtime_kwargs_for_model here: those kwargs
+        # (parallel_tool_calls for OpenAI, AFC disable for Gemini) only apply
+        # when tools are bound. Structured output via json_schema has no tools,
+        # and OpenAI rejects parallel_tool_calls without a tools list.
         try:
             return self._invoke_with_retry(
                 "patch drafting via json_schema",
                 lambda: structured.invoke(
                     messages,
-                    **self._provider_runtime_kwargs(),
                 ),
                 attempts=2,
             )
@@ -424,6 +767,19 @@ class LangChainCopilotPlanner:
                 "patch drafting failed with json_schema structured output: "
                 f"{error}"
             ) from error
+
+    def _patch_structured_output_runnable(
+        self,
+        model: Any,
+        *,
+        provider_spec: LlmProviderSpec,
+    ) -> Any:
+        # Gemini's native json_schema mode is the most reliable path for our writer
+        # flow. For other LangChain adapters we keep the same DraftedPatchPlan schema
+        # but let each provider choose its supported structured-output transport.
+        if provider_spec.provider_family == "google" or self._is_google_chat_model(model):
+            return model.with_structured_output(DraftedPatchPlan, method="json_schema")
+        return model.with_structured_output(DraftedPatchPlan)
 
     @staticmethod
     def _validate_patch_plan_result(result: Any) -> DraftedPatchPlan:
@@ -443,9 +799,12 @@ class LangChainCopilotPlanner:
                 f"{error}"
             ) from error
 
-    def _planner_model_instance(self) -> ChatGoogleGenerativeAI:
+    def _planner_model_instance(self) -> Any:
         if self._planner_model is None:
-            self._planner_model = self._build_chat_model(
+            planner_spec = self._planner_provider_spec(self.settings)
+            self._planner_model = build_langchain_chat_model(
+                settings=self.settings,
+                provider_spec=planner_spec,
                 temperature=0.1,
                 # 1400 tokens permiten al planner generar resúmenes clínicos completos
                 # cuando action_type='respond' (ej. resumir una nota de 11 secciones).
@@ -455,9 +814,12 @@ class LangChainCopilotPlanner:
             )
         return self._planner_model
 
-    def _patch_model_instance(self) -> ChatGoogleGenerativeAI:
+    def _patch_model_instance(self) -> Any:
         if self._patch_model is None:
-            self._patch_model = self._build_chat_model(
+            patch_spec = self._patch_provider_spec(self.settings)
+            self._patch_model = build_langchain_chat_model(
+                settings=self.settings,
+                provider_spec=patch_spec,
                 temperature=0.0,
                 # 3200 tokens para dar espacio al drafter cuando emite 5-8 patches en un solo
                 # structured-output call (propagation/reinterpretation). 1600 era suficiente
@@ -465,25 +827,6 @@ class LangChainCopilotPlanner:
                 max_tokens=3200,
             )
         return self._patch_model
-
-    def _build_chat_model(
-        self,
-        *,
-        temperature: float,
-        max_tokens: int,
-    ) -> ChatGoogleGenerativeAI:
-        # planner.py stays as a thin facade over app/llm/ so runtime behavior remains
-        # stable while prompt/render helpers become easier to reason about and test.
-        return ChatGoogleGenerativeAI(
-            model=self.settings.vertex_model,
-            vertexai=True,
-            project=self.settings.gcp_project_id,
-            location=self.settings.gcp_region,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            retries=0,
-            disable_streaming="tool_calling",
-        )
 
     @staticmethod
     def _planner_system_instruction() -> str:
@@ -497,24 +840,16 @@ class LangChainCopilotPlanner:
     def _normalize_patch_plan(result: DraftedPatchPlan) -> DraftedPatchPlan:
         patches: list[DraftedPatch] = []
         for patch in result.patches:
-            normalized_preview_after = (
-                patch.document_preview_after or patch.content_preview or None
-            )
             patches.append(
                 patch.model_copy(
                     update={
-                        "document_preview_after": normalized_preview_after,
-                        "content_preview": patch.content_preview
-                        or normalized_preview_after
-                        or "",
+                        "content_preview": patch.content_preview or "",
                     }
                 )
             )
         document_preview_after = result.document_preview_after
         if not document_preview_after and patches:
-            document_preview_after = (
-                patches[-1].document_preview_after or patches[-1].content_preview
-            )
+            document_preview_after = patches[-1].content_preview or None
         return DraftedPatchPlan(
             patches=patches,
             rationale=result.rationale,

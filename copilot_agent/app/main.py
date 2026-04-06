@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, status
 
 from app.auth import require_internal_bearer_token
 from app.config import get_settings
+from app.langsmith import configure_langsmith
 from app.logging_config import configure_logging
 from app.runtime import CopilotRuntime
 from app.schemas import RunCreateRequest, RunResumeRequest
 
 settings = get_settings()
 configure_logging(settings.log_level)
+configure_langsmith(settings)
 logger = logging.getLogger(__name__)
 runtime = CopilotRuntime(settings=settings)
 
@@ -36,16 +40,27 @@ def healthz() -> dict[str, str]:
 
 
 @app.post("/internal/copilot/runs")
-def create_run(
+async def create_run(
     request: RunCreateRequest,
+    background_tasks: BackgroundTasks,
     _token_payload: dict[str, object] = Depends(require_internal_bearer_token),
 ) -> dict[str, object]:
-    stored_run, events = runtime.create_run(request)
+    run_id = str(uuid.uuid4())
+    # Create the run record and emit run_started immediately so Django can return
+    # run_id to the browser within ~50 ms instead of blocking for 15-30 s.
+    # The graph runs as a BackgroundTask: uvicorn's event loop keeps the background
+    # coroutine alive until it completes even after the HTTP response is sent.
+    # Django's existing SSE polling (stream_copilot_run) delivers events to the
+    # browser as they land in DB — typically within 1 s of each graph step.
+    stored_run, events = await asyncio.to_thread(
+        runtime.bootstrap_run, request, run_id=run_id
+    )
+    background_tasks.add_task(runtime.run_graph_async, run_id=run_id, request=request)
     logger.info(
-        "Created copilot run",
+        "Bootstrapped copilot run (graph running in background)",
         extra={
-            "run_id": stored_run.run_id,
-            "thread_id": stored_run.thread_id,
+            "run_id": run_id,
+            "thread_id": request.thread_id,
             "trace_id": request.trace_metadata.get("trace_id"),
         },
     )

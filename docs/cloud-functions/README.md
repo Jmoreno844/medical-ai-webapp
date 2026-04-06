@@ -10,6 +10,7 @@ El directorio `cloud_functions/` contiene las funciones serverless que hacen el 
 - `functions/services/document_generation/` — prompt building, streaming y formateo.
 - `functions/services/django_api.py` — callbacks hacia Django (`PATCH` de contenido, chunks de generación, notify complete).
 - `functions/tracing.py` — OpenTelemetry (span por request + propagación en `requests` hacia Django). Variables: [`../backend/tracing.md`](../backend/tracing.md).
+- `functions/langsmith_tracing.py` — LangSmith local-first para request/model spans con metadata sanitizada.
 
 ## Modelo de despliegue en `stg`
 
@@ -27,8 +28,13 @@ El directorio `cloud_functions/` contiene las funciones serverless que hacen el 
 | `GCP_REGION`                     | Región de Vertex AI.                                                |
 | `GEMINI_MODEL`                   | Modelo de Gemini a usar.                                            |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Ruta **dentro del contenedor** al JSON de credenciales (ver abajo). |
+| `LANGSMITH_TRACING`              | Activa tracing local en LangSmith si también hay API key + project. |
+| `LANGSMITH_API_KEY`              | API key de LangSmith para el runtime local.                         |
+| `LANGSMITH_PROJECT`              | Proyecto LangSmith recomendado: `cloud-functions-local`.            |
 
 En local con Docker Compose, `GEMINI_MODEL` se toma de `functions/.env.local`. En despliegue por GitHub Actions, el workflow lee la variable `GEMINI_MODEL` desde el environment de GitHub `stg` si existe; si no, usa `gemini-3.1-flash-lite-preview`.
+
+El tracing a LangSmith en este servicio es solo para `ENVIRONMENT=local` y registra metadatos de request/modelo, no el texto completo de transcripciones, prompts ni documentos generados.
 
 ## Local con Docker: credenciales GCP (Vertex / Secret Manager / GCS)
 

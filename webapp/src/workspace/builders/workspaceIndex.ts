@@ -19,11 +19,14 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
       const draft = draftState.draftsByDocumentId[document.id];
       const derived = derivedState.derivedByDocumentId[document.id];
       const snapshot = snapshotState.snapshotsByDocumentId[document.id];
-      
-      const activePatchSet = patchSetState.activePatchSetId 
+
+      const activePatchSet = patchSetState.activePatchSetId
         ? patchSetState.patchSets[patchSetState.activePatchSetId]
         : null;
-      const patches = activePatchSet?.patches.filter(p => p.documentId === document.id && p.status === "pending") ?? [];
+      const patches =
+        activePatchSet?.patches.filter(
+          (p) => p.documentId === document.id && p.status === "pending",
+        ) ?? [];
       const contentForExcerpt =
         draft?.localUnsavedContent ??
         snapshot?.contentMarkdown ??
@@ -49,27 +52,39 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
         hasStreamingState:
           Boolean(derived?.inProgress) && Boolean(derived?.streamingContent),
         hiddenFromAgent: workspaceState.hiddenFromAgentDocumentIds.includes(
-          document.id
+          document.id,
         ),
         pinnedForAgent: workspaceState.pinnedDocumentIds.includes(document.id),
         excerpt: contentForExcerpt.trim().slice(0, 160) || undefined,
         shortSummary: document.summaryShort,
         estimatedTokens: document.estimatedTokens,
         hasPendingPatches: patches.length > 0,
+        // Pre-load full content for open, writable documents so the agent can
+        // propose patches on turn 1 without a read_document round-trip.
+        // Read-only, hidden, or streaming docs are excluded to keep payload size
+        // predictable. The agent treats this as a mode="full" pre-seeded read.
+        contentMarkdown:
+          document.aiWritable &&
+          !workspaceState.hiddenFromAgentDocumentIds.includes(document.id) &&
+          !(derived?.inProgress && derived?.streamingContent)
+            ? (draft?.localUnsavedContent ??
+                snapshot?.contentMarkdown ??
+                document.contentMarkdown) ||
+              undefined
+            : undefined,
       };
     });
 
   const workspaceVersion = documents
-    .map(
-      (document) =>
-        [
-          document.documentId,
-          document.version,
-          document.updatedAt,
-          document.hasDirtyDraft ? "dirty" : "clean",
-          document.hasStreamingState ? "streaming" : "stable",
-          document.hasPendingPatches ? "patch" : "no-patch",
-        ].join(":")
+    .map((document) =>
+      [
+        document.documentId,
+        document.version,
+        document.updatedAt,
+        document.hasDirtyDraft ? "dirty" : "clean",
+        document.hasStreamingState ? "streaming" : "stable",
+        document.hasPendingPatches ? "patch" : "no-patch",
+      ].join(":"),
     )
     .join("|");
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Wrench, ChevronDown, ChevronRight } from "lucide-react";
+import { Info, ChevronDown, ChevronRight } from "lucide-react";
 
 import { CopilotChatMessage } from "@/features/copilotChat/types";
 
@@ -11,6 +11,20 @@ type ChatBubbleProps = {
 
 function ToolBubble({ message }: ChatBubbleProps) {
   const [open, setOpen] = useState(false);
+  const isLikelyDebugPayload =
+    message.content.trim().startsWith("{") || message.content.length > 160;
+
+  if (!isLikelyDebugPayload) {
+    return (
+      <div className="mr-10">
+        <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+          <span className="leading-5">{message.content}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mr-10">
       <button
@@ -18,8 +32,8 @@ function ToolBubble({ message }: ChatBubbleProps) {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-500 transition-colors hover:bg-slate-200"
       >
-        <Wrench className="h-3 w-3 shrink-0" />
-        <span className="truncate">Tool call</span>
+        <Info className="h-3 w-3 shrink-0" />
+        <span className="truncate">Detalle técnico</span>
         {open ? (
           <ChevronDown className="h-3 w-3 shrink-0" />
         ) : (

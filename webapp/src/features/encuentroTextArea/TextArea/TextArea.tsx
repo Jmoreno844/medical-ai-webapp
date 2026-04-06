@@ -47,9 +47,11 @@ const TextArea: React.FC = () => {
 
   const { generationStatus } = useGenerationContext();
   const { transcriptionCompleteTimestamp } = useTranscriptionContext();
-  const setDraftContent = useDocumentDraftStore((state) => state.setDraftContent);
+  const setDraftContent = useDocumentDraftStore(
+    (state) => state.setDraftContent,
+  );
   const derivedByDocumentId = useDocumentDerivedStore(
-    (state) => state.derivedByDocumentId
+    (state) => state.derivedByDocumentId,
   );
   // Keep patch review subscriptions stable; object selectors here can loop with
   // useSyncExternalStore/Zustand when the editor is already rerendering often.
@@ -69,21 +71,21 @@ const TextArea: React.FC = () => {
       editorRefreshTrigger !== previousRefreshTriggerRef.current
     ) {
       logger.debug(
-        `[TEXT_AREA] Refresh trigger changed to ${editorRefreshTrigger} for document ${activeDocument.id}`
+        `[TEXT_AREA] Refresh trigger changed to ${editorRefreshTrigger} for document ${activeDocument.id}`,
       );
       previousRefreshTriggerRef.current = editorRefreshTrigger;
 
       // Check if the document is already in the cache
       if (documentContentCache.has(activeDocument.id)) {
         logger.debug(
-          `[TEXT_AREA] Document ${activeDocument.id} already in cache, skipping reloadContent`
+          `[TEXT_AREA] Document ${activeDocument.id} already in cache, skipping reloadContent`,
         );
         return; // Skip reloadContent if already cached
       }
 
       if (typeof reloadContent === "function") {
         logger.debug(
-          `[TEXT_AREA] Calling reloadContent for document ${activeDocument.id}`
+          `[TEXT_AREA] Calling reloadContent for document ${activeDocument.id}`,
         );
         const forceRefresh = false;
         reloadContent(forceRefresh);
@@ -105,8 +107,8 @@ const TextArea: React.FC = () => {
     ) {
       logger.debug(
         `[TEXT_AREA] Transcription completed at ${new Date(
-          transcriptionCompleteTimestamp
-        ).toISOString()}`
+          transcriptionCompleteTimestamp,
+        ).toISOString()}`,
       );
       // Force refresh for transcription updates since we need the latest content
       reloadContent(true);
@@ -119,21 +121,21 @@ const TextArea: React.FC = () => {
       // Prevent saving empty content for documents that previously had content
       if (contentLoadedSuccessfully && content.trim() === "") {
         logger.error(
-          "Prevented saving empty content for a document that previously had content"
+          "Prevented saving empty content for a document that previously had content",
         );
         return;
       }
 
       await saveContent(docId, content);
     },
-    [saveContent, contentLoadedSuccessfully]
+    [saveContent, contentLoadedSuccessfully],
   );
 
   const handleDraftChange = useCallback(
     (docId: number, content: string) => {
       setDraftContent(String(docId), content);
     },
-    [setDraftContent]
+    [setDraftContent],
   );
 
   // Track document changes
@@ -142,7 +144,7 @@ const TextArea: React.FC = () => {
 
     if (activeDocument.id !== previousDocIdRef.current) {
       logger.debug(
-        `[DOC_SWITCH] Changed from document ${previousDocIdRef.current} to ${activeDocument.id}`
+        `[DOC_SWITCH] Changed from document ${previousDocIdRef.current} to ${activeDocument.id}`,
       );
       previousDocIdRef.current = activeDocument.id;
     }
@@ -180,7 +182,8 @@ const TextArea: React.FC = () => {
   // Create editor configuration
   const initialConfig = createEditorConfig(onError);
 
-  const activeDerivedState = derivedByDocumentId[String(activeDocument.id)] ?? null;
+  const activeDerivedState =
+    derivedByDocumentId[String(activeDocument.id)] ?? null;
 
   const activePatchSet = activePatchSetId ? patchSets[activePatchSetId] : null;
   const patchesForDocument = activePatchSet
@@ -257,8 +260,11 @@ const TextArea: React.FC = () => {
             className="h-1 bg-purple-600 transition-all duration-300"
             style={{
               width: `${Math.min(
-                Math.max((((derivedContent ?? "").length || 0) / 500) * 100, 10),
-                95
+                Math.max(
+                  (((derivedContent ?? "").length || 0) / 500) * 100,
+                  10,
+                ),
+                95,
               )}%`,
             }}
           />
@@ -267,7 +273,8 @@ const TextArea: React.FC = () => {
 
       {isPatchPreviewMode && (
         <div className="bg-amber-50 p-2 border-b border-amber-200 text-amber-800 text-sm text-center">
-          Revisión de cambios — aprueba o rechaza cada modificación directamente en el documento
+          Revisión de cambios — aprueba o rechaza cada modificación directamente
+          en el documento
         </div>
       )}
 
@@ -286,7 +293,9 @@ const TextArea: React.FC = () => {
                 clipRule="evenodd"
               />
             </svg>
-            <span className="font-medium">Documento generado correctamente</span>
+            <span className="font-medium">
+              Documento generado correctamente
+            </span>
           </div>
         </div>
       )}
@@ -339,9 +348,7 @@ const TextArea: React.FC = () => {
                 derivedContent={derivedContent}
                 documentType={activeDocument.kind}
               />
-              <ReadOnlyPlugin
-                isReadOnly={editorMode !== "edit"}
-              />
+              <ReadOnlyPlugin isReadOnly={editorMode !== "edit"} />
 
               {/* Conditional plugins for edit mode */}
               {editorMode === "edit" && (

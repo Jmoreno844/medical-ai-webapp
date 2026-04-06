@@ -12,7 +12,15 @@ logger = logging.getLogger(__name__)
 
 
 class CopilotServiceError(Exception):
-    pass
+    """Raised when the copilot agent service returns an error or is unreachable.
+
+    ``status_code`` is set when the agent returned an HTTP error response (e.g.
+    409 Conflict).  It is None for network-level failures.
+    """
+
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class CopilotAgentClient:
@@ -70,6 +78,14 @@ class CopilotAgentClient:
                 timeout=self.timeout,
             )
             response.raise_for_status()
+        except requests.HTTPError as error:
+            status_code = (
+                error.response.status_code if error.response is not None else None
+            )
+            logger.error(
+                "Copilot agent HTTP error: %s (status=%s)", error, status_code
+            )
+            raise CopilotServiceError(str(error), status_code=status_code) from error
         except requests.RequestException as error:
             logger.error("Copilot agent request failed: %s", error)
             raise CopilotServiceError(str(error)) from error

@@ -9,8 +9,9 @@ from urllib.parse import urlparse
 
 from vertexai.generative_models import GenerationConfig, Part
 
-from models.gemini_client import initialize_vertexai, get_gemini_model
 from config import TRANSCRIPTION_PROMPT
+from langsmith_tracing import trace_operation
+from models.gemini_client import initialize_vertexai, get_gemini_model
 from services.transcription.extractor import extract_gs_uri
 
 # Initialize logger
@@ -52,6 +53,35 @@ def _normalize_transcript(raw_text: Optional[str]) -> Optional[str]:
     return transcript
 
 
+def _langsmith_transcribe_inputs(
+    audio_uri: str,
+    model_name: Optional[str] = None,
+) -> dict[str, Any]:
+    parsed = urlparse(str(audio_uri or ""))
+    _, extension = os.path.splitext(parsed.path.lower())
+    return {
+        "audio_scheme": parsed.scheme or None,
+        "audio_extension": extension or None,
+        "model": model_name or os.environ.get("GEMINI_MODEL", "gemini-2.0-flash"),
+    }
+
+
+def _langsmith_transcribe_outputs(result: Dict[str, Any]) -> dict[str, Any]:
+    return {
+        "success": bool(result.get("success")),
+        "model": result.get("model"),
+        "error_code": result.get("error_code"),
+        "transcript_length": len(result.get("transcript") or ""),
+    }
+
+
+@trace_operation(
+    name="cloud_functions.transcribe_audio",
+    run_type="tool",
+    process_inputs=_langsmith_transcribe_inputs,
+    process_outputs=_langsmith_transcribe_outputs,
+    tags=["transcription", "gemini"],
+)
 def transcribe_audio(
     audio_uri: str, model_name: Optional[str] = None
 ) -> Dict[str, Any]:

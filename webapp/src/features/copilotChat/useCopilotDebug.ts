@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { createChildLogger } from "@/lib/logger";
 import {
   acceptCopilotPatch,
   acceptAllCopilotPatches,
@@ -30,9 +31,10 @@ const INITIAL_STATE: CopilotDebugState = {
   patchSets: [],
 };
 
-const TERMINAL_STATUSES = new Set(["completed", "failed"]);
+const TERMINAL_STATUSES = new Set(["completed", "failed", "waiting_review"]);
 
 export function useCopilotDebug(encounterId: number) {
+  const log = createChildLogger("CopilotDebug");
   const [state, setState] = useState<CopilotDebugState>(INITIAL_STATE);
   const closeStreamRef = useRef<(() => void) | null>(null);
 
@@ -43,6 +45,13 @@ export function useCopilotDebug(encounterId: number) {
   }, []);
 
   const appendEvent = useCallback((event: CopilotStreamEvent) => {
+    if (event.event !== "response_chunk") {
+      log.debug("[stream:event]", {
+        event: event.event,
+        sequence: event.sequence,
+        runId: event.run_id,
+      });
+    }
     setState((current) => {
       const nextStatus =
         event.event === "run_completed"
@@ -51,12 +60,14 @@ export function useCopilotDebug(encounterId: number) {
             ? "failed"
             : event.event === "review_required"
               ? "waiting_review"
-          : current.status;
+              : current.status;
 
       const nextFinalResponse =
         event.event === "response_chunk" &&
         typeof event.payload.content === "string"
-          ? event.payload.content
+          ? event.payload.is_chunk
+            ? (current.finalResponse || "") + event.payload.content
+            : event.payload.content
           : current.finalResponse;
 
       return {
@@ -65,7 +76,8 @@ export function useCopilotDebug(encounterId: number) {
         finalResponse: nextFinalResponse,
         isStreaming: !TERMINAL_STATUSES.has(nextStatus),
         lastError:
-          event.event === "run_failed" && typeof event.payload.error === "string"
+          event.event === "run_failed" &&
+          typeof event.payload.error === "string"
             ? event.payload.error
             : current.lastError,
         events: [...current.events, event],
@@ -75,9 +87,11 @@ export function useCopilotDebug(encounterId: number) {
 
   const openStream = useCallback(
     (runId: string, afterSequence = 0) => {
+      log.debug("[stream:open]", { runId, afterSequence });
       closeStreamRef.current?.();
       closeStreamRef.current = streamCopilotRun(runId, afterSequence, {
         onOpen: () => {
+          log.debug("[stream:onOpen]", { runId, afterSequence });
           setState((current) => ({
             ...current,
             isStreaming: true,
@@ -88,6 +102,7 @@ export function useCopilotDebug(encounterId: number) {
           appendEvent(event);
         },
         onError: async (message) => {
+          log.warn("[stream:onError]", { runId, afterSequence, message });
           setState((current) => ({
             ...current,
             isStreaming: false,
@@ -112,7 +127,7 @@ export function useCopilotDebug(encounterId: number) {
         },
       });
     },
-    [appendEvent]
+    [appendEvent],
   );
 
   const ensureSession = useCallback(async () => {
@@ -134,14 +149,33 @@ export function useCopilotDebug(encounterId: number) {
 
   const runMessage = useCallback(
     async (payload: CopilotMessageRequest) => {
-      const run = await sendCopilotMessage(payload);
-      const patchSets =
-        run.requires_human_review ? await listCopilotPatchSets(run.run_id) : [];
+      // Show spinner immediately while the POST is in flight.
+      setState((current) => ({
+        ...current,
+        isStreaming: true,
+        lastError: null,
+      }));
+      let run;
+      try {
+        run = await sendCopilotMessage(payload);
+      } catch (error) {
+        setState((current) => ({
+          ...current,
+          isStreaming: false,
+          status: "failed",
+          lastError: String(error),
+        }));
+        throw error;
+      }
+      const patchSets = run.requires_human_review
+        ? await listCopilotPatchSets(run.run_id)
+        : [];
+      // Keep isStreaming true — openStream's onOpen will manage it from here.
       setState({
         threadId: run.thread_id,
         runId: run.run_id,
         status: run.status,
-        isStreaming: false,
+        isStreaming: true,
         lastError: null,
         finalResponse: run.final_response ?? null,
         events: [],
@@ -150,7 +184,7 @@ export function useCopilotDebug(encounterId: number) {
       openStream(run.run_id);
       return run;
     },
-    [openStream]
+    [openStream],
   );
 
   const syncRunStatus = useCallback(async () => {
@@ -175,7 +209,7 @@ export function useCopilotDebug(encounterId: number) {
       patchSetId: string,
       patchId: string,
       decision: "approve" | "reject",
-      comment?: string
+      comment?: string,
     ) => {
       if (!state.runId) {
         return null;
@@ -201,14 +235,14 @@ export function useCopilotDebug(encounterId: number) {
       }));
       return patchSet;
     },
-    [state.runId]
+    [state.runId],
   );
 
   const submitPatchSetDecision = useCallback(
     async (
       patchSetId: string,
       decision: "approve" | "reject",
-      comment?: string
+      comment?: string,
     ) => {
       if (!state.runId) {
         return null;
@@ -227,15 +261,11 @@ export function useCopilotDebug(encounterId: number) {
       }));
       return patchSet;
     },
-    [state.runId]
+    [state.runId],
   );
 
   const finalizePatchSetReview = useCallback(
-    async (
-      patchSetId: string,
-      comment?: string,
-      documentVersion?: number
-    ) => {
+    async (patchSetId: string, comment?: string, documentVersion?: number) => {
       if (!state.runId) {
         return null;
       }
@@ -244,15 +274,35 @@ export function useCopilotDebug(encounterId: number) {
         0,
         ...state.events
           .map((event) => event.sequence ?? 0)
-          .filter((sequence) => Number.isFinite(sequence))
+          .filter((sequence) => Number.isFinite(sequence)),
       );
+
+      log.debug("[finalizePatchSetReview:start]", {
+        runId: state.runId,
+        patchSetId,
+        afterSequence,
+        documentVersion,
+      });
 
       const run = await finalizeCopilotPatchSetReviewApi(patchSetId, {
         comment,
         document_version: documentVersion,
       });
 
+      log.debug("[finalizePatchSetReview:response]", {
+        runId: state.runId,
+        patchSetId,
+        status: run.status,
+        appliedPatchSetId: run.applied_patch_set_id,
+        appliedDocumentId: run.applied_document_id,
+      });
+
       const patchSets = await listCopilotPatchSets(state.runId);
+      log.debug("[finalizePatchSetReview:patchSets]", {
+        runId: state.runId,
+        patchSetId,
+        patchSetCount: patchSets.length,
+      });
       setState((current) => ({
         ...current,
         status: run.status,
@@ -263,7 +313,7 @@ export function useCopilotDebug(encounterId: number) {
       openStream(state.runId, afterSequence);
       return run;
     },
-    [openStream, state.events, state.runId]
+    [log, openStream, state.events, state.runId],
   );
 
   const reset = useCallback(() => {

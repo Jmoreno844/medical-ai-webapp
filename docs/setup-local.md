@@ -59,6 +59,9 @@ Variables clave:
 - `GCP_REGION`
 - `GEMINI_MODEL`
 - `DJANGO_API_BASE_URL=http://localhost:8000/`
+- `LANGSMITH_TRACING=true` si quieres tracing local en LangSmith
+- `LANGSMITH_API_KEY`
+- `LANGSMITH_PROJECT=cloud-functions-local`
 
 `cloud_functions/docker-compose.yml` ya monta ADC del host en `/app/adc.json`.
 
@@ -70,6 +73,13 @@ cp copilot_agent/.env.example copilot_agent/.env.local
 
 Variables clave:
 
+- `COPILOT_LLM_PROVIDER_FAMILY=openai`
+- `COPILOT_PLANNER_MODEL=gpt-5.4-mini`
+- `COPILOT_PATCH_MODEL=gpt-5.4-mini`
+- `OPENAI_API_KEY`
+- `LANGSMITH_TRACING=true` para tracing local del runtime
+- `LANGSMITH_API_KEY`
+- `LANGSMITH_PROJECT=copilot-agent-local`
 - `COPILOT_AGENT_DATABASE_URL`
 - `COPILOT_LONG_TERM_DATABASE_URL`
 - `BACKEND_INTERNAL_BASE_URL=http://localhost:8000`
@@ -77,10 +87,24 @@ Variables clave:
 - `COPILOT_SERVICE_SHARED_JWT`
 - `COPILOT_ALLOWED_AUDIENCE=app-api-service`
 - `COPILOT_BACKEND_AUDIENCE=medical-api`
+
+Si quieres usar Gemini en lugar de OpenAI, cambia `COPILOT_LLM_PROVIDER_FAMILY=google` y define también:
+
 - `GCP_PROJECT_ID`
 - `GCP_REGION`
+- `VERTEX_MODEL`
+
+Si quieres separar planner y drafter por proveedor/modelo, puedes usar overrides opcionales:
+
+- `COPILOT_PLANNER_PROVIDER_FAMILY`
+- `COPILOT_PATCH_PROVIDER_FAMILY`
+- `COPILOT_PLANNER_MODEL`
+- `COPILOT_PATCH_MODEL`
+- `COPILOT_GOOGLE_LOCATION` o los overrides `COPILOT_PLANNER_GOOGLE_LOCATION` / `COPILOT_PATCH_GOOGLE_LOCATION` para modelos Gemini preview.
 
 Para local, el valor recomendado es reutilizar la misma base `medical_web_app` que levanta `make -C backend db-up`. No necesitas crear una DB adicional solo para el agent runtime.
+
+La integración LangSmith del `copilot_agent` y de `cloud_functions` queda limitada a `local` y registra solo metadata sanitizada del request/run. No envía transcripciones completas, documentos generados ni tokens a LangSmith.
 
 ## 2. Base de datos
 
