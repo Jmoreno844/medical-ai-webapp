@@ -49,6 +49,7 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
         isActive: workspaceState.activeDocumentId === document.id,
         isOpen: workspaceState.openDocumentIds.includes(document.id),
         hasDirtyDraft: Boolean(draft?.isDirty),
+        hasUserEdits: Boolean(draft?.userEditedSinceLastCopilotTurn),
         hasStreamingState:
           Boolean(derived?.inProgress) && Boolean(derived?.streamingContent),
         hiddenFromAgent: workspaceState.hiddenFromAgentDocumentIds.includes(
@@ -61,19 +62,42 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
         hasPendingPatches: patches.length > 0,
         // Pre-load full content for open, writable documents so the agent can
         // propose patches on turn 1 without a read_document round-trip.
-        // Read-only, hidden, streaming, or dirty-drafted docs are excluded:
-        // - dirty docs have an unsaved draft whose version is ahead of the
-        //   last snapshot, so base_version in any patch would be wrong.
-        //   The agent receives a warning notice instead and can ask the
-        //   doctor to save before editing.
-        contentMarkdown:
-          document.aiWritable &&
-          !draft?.isDirty &&
-          !workspaceState.hiddenFromAgentDocumentIds.includes(document.id) &&
-          !(derived?.inProgress && derived?.streamingContent)
-            ? (snapshot?.contentMarkdown ?? document.contentMarkdown) ||
-              undefined
-            : undefined,
+        // Excluded when:
+        // - the draft has unsaved changes that differ from the snapshot
+        //   (base_version in any patch would be wrong), or
+        // - the document is hidden or currently streaming.
+        //
+        // Note: isDirty can be true even if the draft content equals the
+        // snapshot because Lexical fires onChange after DocumentContentPlugin
+        // applies refreshed content. We compare the actual content strings so
+        // that a transient isDirty=true after a patch apply does not
+        // incorrectly exclude the pre-seed.
+        contentMarkdown: (() => {
+          if (!document.aiWritable) return undefined;
+          if (workspaceState.hiddenFromAgentDocumentIds.includes(document.id))
+            return undefined;
+          if (derived?.inProgress && derived?.streamingContent) return undefined;
+          const canonical =
+            snapshot?.contentMarkdown ?? document.contentMarkdown ?? "";
+          if (draft?.isDirty && draft.localUnsavedContent != null) {
+            // Normalize with the same rules as saveContent in ContentContext so that
+            // Lexical re-fires (onChange after DocumentContentPlugin refresh) that
+            // produce slightly different whitespace do not incorrectly mark the
+            // content as "different" and exclude the pre-seed.
+            const normalize = (s: string) =>
+              s
+                .replace(/\r\n/g, "\n")
+                .replace(/\r/g, "\n")
+                .replace(/\n\n+/g, "\n\n")
+                .replace(/[ \t]+/g, " ")
+                .trim();
+            if (normalize(draft.localUnsavedContent ?? "") !== normalize(canonical)) {
+              // Real unsaved changes — exclude to avoid base_version mismatch.
+              return undefined;
+            }
+          }
+          return canonical || undefined;
+        })(),
       };
     });
 

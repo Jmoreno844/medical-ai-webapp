@@ -4,6 +4,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
 from app.graph.tools import build_graph_tools
+from app.graph.tools import draft_patch_set_from_state
 from app.graph.tools import _is_valid_patch_preview as tool_patch_preview_is_valid
 from app.graph.tools import _validate_drafted_plan_against_clinical_plan
 from app.graph.workflow import build_clinical_copilot_graph
@@ -16,7 +17,12 @@ from app.planner import (
     LangChainCopilotPlanner,
     _filter_parallel_tool_calls,
 )
-from app.graph.nodes import _is_valid_patch_preview as node_patch_preview_is_valid
+from app.graph.nodes import (
+    NODE_DRAFT_PATCH_FROM_PLAN,
+    _is_valid_patch_preview as node_patch_preview_is_valid,
+    make_draft_patch_from_plan_node,
+    route_after_tool_execution,
+)
 from tests.fixtures_copilot import (
     FakeToolsClient,
     ScriptedPlanner,
@@ -1599,6 +1605,236 @@ def test_validate_drafted_plan_rejects_partial_propagation_plan():
     assert validation_error is not None
     assert "patches sin section" in validation_error
     assert "faltan secciones obligatorias: enfermedad_actual, analisis, plan." in validation_error
+
+
+def test_direct_propose_with_affected_sections_passes_local_scope_guardrail():
+    planner = ScriptedPlanner(
+        drafted_patch=DraftedPatchPlan(
+            rationale="Quitar bullets solo en analisis clinico.",
+            document_preview_after="Paciente estable y con mejoria.",
+            patches=[
+                DraftedPatch(
+                    operation_type="delete_span",
+                    anchor={
+                        "exactText": "Paciente estable y con mejoria.",
+                        "prefixText": "",
+                        "suffixText": "",
+                        "startOffset": 0,
+                        "endOffset": 29,
+                    },
+                    expected_hash="hash-demo",
+                    before_preview="- Paciente estable y con mejoria.",
+                    after_preview="Paciente estable y con mejoria.",
+                    content_preview="Paciente estable y con mejoria.",
+                    rationale="Quitar solo el bullet point.",
+                    section="analisis_clinico",
+                )
+            ],
+        )
+    )
+    state = build_state("en analisis clinico, quitale los bullets")
+    state["available_documents"] = [
+        make_document(
+            "99",
+            title="Nota clinica",
+            document_type="note",
+            is_active=True,
+            version=3,
+        )
+    ]
+    state["document_summaries"] = {
+        "99": FakeToolsClient().read_document_summary("99"),
+    }
+    state["document_reads"] = [
+        FakeToolsClient().read_document("99", mode="full"),
+    ]
+    state["read_documents"] = [
+        {
+            **state["document_reads"][0],
+            "short_summary": "Paciente estable y con mejoria.",
+        }
+    ]
+
+    result = draft_patch_set_from_state(
+        planner=planner,
+        state=state,
+        tool_name="propose_delete_span",
+        target_document_id="99",
+        instruction=(
+            "En analisis_clinico, bloque presentes y ausentes, elimina solo los bullet "
+            "points y no toques otras secciones."
+        ),
+        affected_sections=["analisis_clinico"],
+    )
+
+    assert result["ok"] is True
+    assert result["payload"]["affected_sections"] == ["analisis_clinico"]
+    assert result["payload"]["patches"][0]["section"] == "analisis_clinico"
+
+
+def test_direct_propose_with_affected_sections_fails_closed_on_extra_section():
+    planner = ScriptedPlanner(
+        drafted_patch=DraftedPatchPlan(
+            rationale="El drafter se salio del scope.",
+            document_preview_after="Paciente estable y con mejoria.",
+            patches=[
+                DraftedPatch(
+                    operation_type="delete_span",
+                    anchor={"exactText": "Paciente estable y con mejoria."},
+                    expected_hash="hash-demo",
+                    before_preview="- Paciente estable y con mejoria.",
+                    after_preview="Paciente estable y con mejoria.",
+                    content_preview="Paciente estable y con mejoria.",
+                    rationale="Cambio correcto en analisis clinico.",
+                    section="analisis_clinico",
+                ),
+                DraftedPatch(
+                    operation_type="replace_span",
+                    anchor={"exactText": "Paciente estable y con mejoria."},
+                    expected_hash="hash-demo",
+                    before_preview="Paciente estable y con mejoria.",
+                    after_preview="Paciente egresa estable.",
+                    content_preview="Paciente egresa estable.",
+                    rationale="Cambio extra fuera de scope.",
+                    section="plan",
+                ),
+            ],
+        )
+    )
+    state = build_state("en analisis clinico, quitale los bullets")
+    state["available_documents"] = [
+        make_document(
+            "99",
+            title="Nota clinica",
+            document_type="note",
+            is_active=True,
+            version=3,
+        )
+    ]
+    state["document_summaries"] = {
+        "99": FakeToolsClient().read_document_summary("99"),
+    }
+    state["document_reads"] = [
+        FakeToolsClient().read_document("99", mode="full"),
+    ]
+    state["read_documents"] = [
+        {
+            **state["document_reads"][0],
+            "short_summary": "Paciente estable y con mejoria.",
+        }
+    ]
+
+    result = draft_patch_set_from_state(
+        planner=planner,
+        state=state,
+        tool_name="propose_delete_span",
+        target_document_id="99",
+        instruction="Quita los bullets solo en analisis_clinico.",
+        affected_sections=["analisis_clinico"],
+    )
+
+    assert result["ok"] is False
+    assert "sections fuera del plan clínico: plan." in result["error_message"]
+
+
+def test_set_edit_plan_auto_drafts_without_second_planner_turn_when_full_note_is_ready():
+    planner = ScriptedPlanner(
+        drafted_patch=DraftedPatchPlan(
+            rationale="Propagar cambio a analisis clinico y plan.",
+            document_preview_after="Paciente estable y con mejoria.\n\nPlan actualizado.",
+            patches=[
+                DraftedPatch(
+                    operation_type="replace_span",
+                    anchor={"exactText": "Paciente estable y con mejoria."},
+                    expected_hash="preseed-hash",
+                    before_preview="Paciente estable y con mejoria.",
+                    after_preview="Paciente estable, sin bullets duplicados.",
+                    content_preview="Paciente estable, sin bullets duplicados.",
+                    rationale="Ajuste en analisis clinico.",
+                    section="analisis_clinico",
+                ),
+                DraftedPatch(
+                    operation_type="insert_after_span",
+                    anchor={"exactText": "Paciente estable y con mejoria."},
+                    expected_hash="preseed-hash",
+                    before_preview="Paciente estable y con mejoria.",
+                    after_preview="\n\nPlan actualizado.",
+                    content_preview="Paciente estable y con mejoria.\n\nPlan actualizado.",
+                    rationale="Ajuste en plan.",
+                    section="plan",
+                ),
+            ],
+        )
+    )
+    state = build_state("propaga este cambio a analisis clinico y plan")
+    workspace_document = {
+        "document_id": "99",
+        "title": "Nota clinica",
+        "type": "note",
+        "is_active": True,
+        "is_open": True,
+        "ai_writable": True,
+        "pinned_for_agent": False,
+        "version": 3,
+        "content_markdown": "Paciente estable y con mejoria.",
+        "content_hash": "preseed-hash",
+    }
+    state["workspace_index"]["documents"] = [
+        workspace_document
+    ]
+    state["available_documents"] = [
+        {
+            "document_id": "99",
+            "title": "Nota clinica",
+            "type": "note",
+            "is_active": True,
+            "is_open": True,
+            "ai_writable": True,
+            "pinned_for_agent": False,
+            "version": 3,
+        }
+    ]
+    state["document_summaries"] = {
+        "99": FakeToolsClient().read_document_summary("99"),
+    }
+    state["document_reads"] = [
+        {
+            **FakeToolsClient().read_document("99", mode="full"),
+            "content_hash": "preseed-hash",
+        }
+    ]
+    state["read_documents"] = [
+        {
+            **state["document_reads"][0],
+            "short_summary": "Paciente estable y con mejoria.",
+        }
+    ]
+    state["clinical_plan"] = {
+        "edit_scope": "propagation",
+        "clinical_impact_level": "factual",
+        "affected_sections": ["analisis_clinico", "plan"],
+        "needs_full_note": True,
+        "needs_external_knowledge": False,
+        "reasoning": (
+            "El cambio debe propagarse a analisis clinico y plan para dejar "
+            "la nota coherente."
+        ),
+    }
+    state["next_required_action"] = "draft_patch_set"
+    state["planned_target_document_id"] = "99"
+
+    assert route_after_tool_execution(state) == NODE_DRAFT_PATCH_FROM_PLAN
+
+    draft_node = make_draft_patch_from_plan_node(planner)
+    updates = draft_node(state)
+
+    assert updates["requires_human_review"] is True
+    assert updates["patch_set_preview"]["affected_sections"] == [
+        "analisis_clinico",
+        "plan",
+    ]
+    assert updates["next_required_action"] is None
+    assert updates["patch_set_preview"]["patches"][0]["section"] == "analisis_clinico"
 
 
 def test_partial_propagation_plan_fails_closed_before_review():

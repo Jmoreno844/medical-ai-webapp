@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import hashlib
 import uuid
 from typing import Any, Literal, Mapping, Protocol, Sequence
 from xml.sax.saxutils import escape
 
 from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
-from langgraph.prebuilt import ToolRuntime
 from langgraph.types import Command
 from pydantic import BaseModel, Field
+
+try:  # pragma: no cover - import compatibility shim
+    from langgraph.prebuilt import ToolRuntime
+except ImportError:  # pragma: no cover - older langgraph in local test env
+    ToolRuntime = Any
 
 from app.graph.state import CopilotState
 from app.planner import CopilotPlanner, DraftedPatchPlan
@@ -139,9 +144,22 @@ class ProposePatchInput(BaseModel):
             "cada cambio en esta instruction."
         )
     )
+    affected_sections: list[str] | None = Field(
+        default=None,
+        description=(
+            "Scope semantico opcional para edits locales directos a propose_*. "
+            "Usa nombres de seccion snake_case cuando ya sabes exactamente donde debe aplicar "
+            "el cambio (ej. ['analisis_clinico']). Activa el guardrail de scope aunque no "
+            "hayas llamado set_edit_plan."
+        ),
+    )
 
 class ProposeCreateDocumentInput(BaseModel):
     pass
+
+
+def _content_hash(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 def _shorten_text(value: Any, *, max_length: int = 320) -> str:
@@ -557,6 +575,132 @@ def _selection_reason(state: CopilotState, *, target_document_id: str) -> str:
     return "llm_target_document_id"
 
 
+def _fallback_target_document_id_from_state(state: CopilotState) -> str | None:
+    explicit_target = str(state.get("target_document_id") or "").strip()
+    if explicit_target:
+        return explicit_target
+
+    full_read_ids: list[str] = []
+    seen_full_read_ids: set[str] = set()
+    for document in state.get("read_documents") or []:
+        read_mode = str(document.get("read_mode") or document.get("mode") or "")
+        document_id = str(document.get("document_id") or "").strip()
+        if read_mode != "full" or not document_id or document_id in seen_full_read_ids:
+            continue
+        seen_full_read_ids.add(document_id)
+        full_read_ids.append(document_id)
+    if len(full_read_ids) == 1:
+        return full_read_ids[0]
+
+    read_ids: list[str] = []
+    seen_read_ids: set[str] = set()
+    for document in state.get("read_documents") or []:
+        document_id = str(document.get("document_id") or "").strip()
+        if not document_id or document_id in seen_read_ids:
+            continue
+        seen_read_ids.add(document_id)
+        read_ids.append(document_id)
+    if len(read_ids) == 1:
+        return read_ids[0]
+
+    selected_ids = _default_selected_document_ids(state)
+    if len(selected_ids) == 1:
+        return selected_ids[0]
+    return None
+
+
+def _has_full_read_for_document(state: CopilotState, *, document_id: str) -> bool:
+    return _current_document_read(
+        state,
+        document_id=document_id,
+        modes=("full",),
+    ) is not None
+
+
+def _normalize_affected_sections(affected_sections: Sequence[str] | None) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for section in affected_sections or []:
+        value = str(section or "").strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        normalized.append(value)
+    return normalized
+
+
+def _build_runtime_instruction(
+    *,
+    state: Mapping[str, Any],
+    affected_sections: Sequence[str] | None = None,
+) -> str:
+    user_query = str(state.get("user_message") or "").strip()
+    clinical_plan = state.get("clinical_plan") or {}
+    sections = _normalize_affected_sections(
+        affected_sections if affected_sections is not None else clinical_plan.get("affected_sections")
+    )
+    reasoning = str(clinical_plan.get("reasoning") or "").strip()
+    section_instructions = clinical_plan.get("section_instructions") or {}
+
+    parts: list[str] = []
+    if user_query:
+        parts.append(f"Pedido actual del medico: {user_query}.")
+    if sections:
+        parts.append(
+            "Aplica el cambio solo dentro de estas secciones: "
+            + ", ".join(sections)
+            + "."
+        )
+    if reasoning:
+        parts.append(f"Contexto clinico heredado: {reasoning}.")
+    if section_instructions:
+        scoped_instructions: list[str] = []
+        for section_name, section_instruction in section_instructions.items():
+            if sections and str(section_name) not in sections:
+                continue
+            scoped_instructions.append(
+                f"{section_name}: {str(section_instruction).strip()}"
+            )
+        if scoped_instructions:
+            parts.append(
+                "Instrucciones quirurgicas por seccion: "
+                + " | ".join(scoped_instructions)
+                + "."
+            )
+    if sections:
+        parts.append("No toques otras secciones del documento aunque contengan texto parecido.")
+    return " ".join(part for part in parts if part).strip() or (
+        user_query or "Materializa el cambio pedido usando el documento leido."
+    )
+
+
+def _effective_scope_plan(
+    *,
+    state: CopilotState,
+    affected_sections: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    clinical_plan = dict(state.get("clinical_plan") or {})
+    if clinical_plan:
+        if affected_sections:
+            clinical_plan["affected_sections"] = _normalize_affected_sections(affected_sections)
+        return clinical_plan
+
+    normalized_sections = _normalize_affected_sections(affected_sections)
+    if not normalized_sections:
+        return {}
+
+    return {
+        "edit_scope": "local",
+        "clinical_impact_level": "factual",
+        "affected_sections": normalized_sections,
+        "needs_full_note": False,
+        "needs_external_knowledge": False,
+        "reasoning": None,
+        "doctor_summary": None,
+        "section_instructions": None,
+    }
+
+
 def _is_valid_patch_preview(patch_preview: dict[str, Any] | None) -> bool:
     if not isinstance(patch_preview, dict):
         return False
@@ -592,8 +736,6 @@ def _validate_drafted_plan_against_clinical_plan(
     clinical_plan: Mapping[str, Any],
 ) -> str | None:
     edit_scope = _normalize_section_name(clinical_plan.get("edit_scope"))
-    if edit_scope not in {"propagation", "reinterpretation"}:
-        return None
 
     expected_sections: list[str] = []
     seen_expected: set[str] = set()
@@ -607,10 +749,11 @@ def _validate_drafted_plan_against_clinical_plan(
     if not expected_sections:
         return None
 
-    # Fail closed for multi-section clinical edits. Without this guard Gemini may
-    # accept a long consolidated instruction, emit only the first obvious patch,
-    # and still open human review with the rest of the requested propagation silently
-    # missing. That is worse than an explicit tool error because it looks successful.
+    # Fail closed whenever the planner declared explicit semantic scope via
+    # affected_sections, even for edit_scope='local'. Without this guard the
+    # drafter may silently spill into adjacent sections or return only a partial
+    # subset of the intended scoped edit while still opening review as if it
+    # matched planner intent.
     patch_sections: set[str] = set()
     patches_without_section: list[int] = []
     invalid_sections: set[str] = set()
@@ -651,8 +794,8 @@ def _validate_drafted_plan_against_clinical_plan(
         )
 
     return (
-        "El drafter devolvió un patch set incompleto para el plan clínico actual. "
-        f"Scope={edit_scope}. Se esperaban patches para: {', '.join(expected_sections)}. "
+        "El drafter devolvió un patch set fuera del scope declarado por el planner. "
+        f"Scope={edit_scope or 'local'}. Se esperaban patches para: {', '.join(expected_sections)}. "
         + " ".join(issues)
         + " Regenera el patch set completo y asigna section a cada patch antes de abrir review."
     )
@@ -665,6 +808,7 @@ def _build_patch_set_preview_payload(
     target_document: dict[str, Any],
     summary_payload: dict[str, Any],
     span_payload: dict[str, Any] | None,
+    scope_plan: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     target_document_id = str(target_document["document_id"])
     target_document_title = str(
@@ -724,15 +868,23 @@ def _build_patch_set_preview_payload(
     # Adjuntar los campos del clinical_plan al patch_set_preview para que el backend
     # Django los persista en CopilotPatchSet y el frontend los pueda mostrar en la
     # tarjeta de revisión (ej. badge de alcance clínico).
-    clinical_plan = state.get("clinical_plan") or {}
+    clinical_plan = dict(scope_plan or {})
+    base_hash = (
+        summary_payload.get("content_hash")
+        or (span_payload or {}).get("content_hash")
+    )
+    if not base_hash and str(summary_payload.get("mode") or "") == "full":
+        full_content = summary_payload.get("content")
+        if isinstance(full_content, str) and full_content:
+            base_hash = _content_hash(full_content)
+
     return {
         "patch_set_id": str(uuid.uuid4()),
         "target_document_id": target_document_id,
         "target_document_title": target_document_title,
         "target_selection_reason": selection_reason,
         "base_version": base_version,
-        "base_hash": summary_payload.get("content_hash")
-        or (span_payload or {}).get("content_hash"),
+        "base_hash": base_hash,
         "rationale": drafted_plan.rationale,
         "document_preview_after": drafted_plan.document_preview_after,
         "source_context_document_ids": source_context_document_ids,
@@ -740,6 +892,247 @@ def _build_patch_set_preview_payload(
         "clinical_impact_level": clinical_plan.get("clinical_impact_level"),
         "affected_sections": list(clinical_plan.get("affected_sections") or []),
         "patches": patches,
+    }
+
+
+def draft_patch_set_from_state(
+    *,
+    planner: CopilotPlanner,
+    state: CopilotState,
+    tool_name: str,
+    target_document_id: str,
+    instruction: str | None = None,
+    affected_sections: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    effective_scope_plan = _effective_scope_plan(
+        state=state,
+        affected_sections=affected_sections,
+    )
+    requested_instruction = (instruction or "").strip() or _build_runtime_instruction(
+        state=state,
+        affected_sections=effective_scope_plan.get("affected_sections"),
+    )
+
+    if int(state.get("patch_operations_count") or 0) >= int(
+        state.get("max_patch_operations") or 1
+    ):
+        return {
+            "ok": False,
+            "error_message": "El run ya consumio el presupuesto maximo de operaciones de patch.",
+            "updates": {
+                "next_required_action": None,
+                "planned_target_document_id": None,
+                "last_tool_error": "El run ya consumio el presupuesto maximo de operaciones de patch.",
+            },
+        }
+
+    target_document = _find_document(state, document_id=target_document_id)
+    if not target_document:
+        error_message = (
+            f"El documento target {target_document_id} no existe en el workspace actual."
+        )
+        return {
+            "ok": False,
+            "error_message": error_message,
+            "updates": {
+                "next_required_action": None,
+                "planned_target_document_id": None,
+                "last_tool_error": error_message,
+            },
+        }
+    if target_document.get("ai_writable") is False:
+        error_message = (
+            f"El documento target {target_document_id} no es editable por el copiloto."
+        )
+        return {
+            "ok": False,
+            "error_message": error_message,
+            "updates": {
+                "next_required_action": None,
+                "planned_target_document_id": None,
+                "last_tool_error": error_message,
+            },
+        }
+
+    summary_payload = _current_summary(state, document_id=target_document_id) or _current_document_read(
+        state,
+        document_id=target_document_id,
+        modes=("summary", "full"),
+    )
+    if not summary_payload:
+        error_message = (
+            "Antes de proponer un patch debes leer el documento target con "
+            "read_document(mode='summary'|'full')."
+        )
+        return {
+            "ok": False,
+            "error_message": error_message,
+            "updates": {
+                "next_required_action": None,
+                "planned_target_document_id": None,
+                "last_tool_error": error_message,
+            },
+        }
+
+    span_payload = _current_span(state, document_id=target_document_id)
+    full_document_payload = _current_document_read(
+        state,
+        document_id=target_document_id,
+        modes=("full",),
+    )
+    if not span_payload and not full_document_payload:
+        error_message = (
+            "Antes de proponer un patch debes leer un span focalizado con "
+            "read_document_span o el documento completo con read_document(mode='full')."
+        )
+        return {
+            "ok": False,
+            "error_message": error_message,
+            "updates": {
+                "next_required_action": None,
+                "planned_target_document_id": None,
+                "last_tool_error": error_message,
+            },
+        }
+
+    if effective_scope_plan.get("needs_full_note") and not full_document_payload:
+        affected = ", ".join(effective_scope_plan.get("affected_sections") or []) or "varias"
+        error_message = (
+            f"El plan clínico (edit_scope='{effective_scope_plan.get('edit_scope')}') "
+            f"requiere leer la nota completa antes de proponer patches en: {affected}. "
+            f"Usa read_document(document_id='{target_document_id}', mode='full') primero."
+        )
+        return {
+            "ok": False,
+            "error_message": error_message,
+            "updates": {
+                "last_tool_error": error_message,
+            },
+        }
+
+    target_document_content = str(
+        (full_document_payload or {}).get("content")
+        or (span_payload or {}).get("content")
+        or (summary_payload or {}).get("excerpt")
+        or ""
+    )
+
+    try:
+        drafted_plan = planner.draft_patch_preview(
+            state={**state, "clinical_plan": effective_scope_plan or state.get("clinical_plan")},
+            target_document=target_document,
+            target_document_content=target_document_content,
+            supporting_context=_build_retrieved_context(
+                context_view=state.get("context_view"),
+                read_documents=state.get("read_documents") or [],
+                read_spans=state.get("read_spans") or [],
+            ),
+            span_payload=span_payload,
+            requested_tool_name=tool_name,
+            requested_tool_instruction=requested_instruction,
+            requested_affected_sections=list(effective_scope_plan.get("affected_sections") or []),
+        )
+    except Exception as error:
+        error_str = str(error)
+        is_resource_exhausted = "RESOURCE_EXHAUSTED" in error_str or "429" in error_str
+        if is_resource_exhausted:
+            return {
+                "ok": False,
+                "error_message": "RECURSO DE IA AGOTADO (429). No reintentes este patch en este run.",
+                "updates": {
+                    "run_error": "Recurso de IA agotado (429)",
+                    "final_response": (
+                        "En este momento hay una demanda muy alta en el servicio de IA "
+                        "y no pude completar la edición. "
+                        "Por favor, inténtalo de nuevo en unos minutos."
+                    ),
+                    "last_tool_error": "Recurso de IA agotado (429)",
+                    "next_required_action": None,
+                    "planned_target_document_id": None,
+                },
+            }
+        error_message = f"No pude redactar un patch clinico seguro: {error}"
+        return {
+            "ok": False,
+            "error_message": error_message,
+            "updates": {
+                "last_tool_error": error_message,
+                "next_required_action": None,
+                "planned_target_document_id": None,
+            },
+        }
+
+    if not drafted_plan.patches:
+        error_message = (
+            "No se pudo redactar un patch clinico revisable para esta solicitud. "
+            "El LLM no devolvio cambios materializados."
+        )
+        return {
+            "ok": False,
+            "error_message": error_message,
+            "updates": {
+                "last_tool_error": error_message,
+                "next_required_action": None,
+                "planned_target_document_id": None,
+            },
+        }
+
+    drafted_plan_validation_error = _validate_drafted_plan_against_clinical_plan(
+        drafted_plan=drafted_plan,
+        clinical_plan=effective_scope_plan,
+    )
+    if drafted_plan_validation_error:
+        return {
+            "ok": False,
+            "error_message": drafted_plan_validation_error,
+            "updates": {
+                "last_tool_error": drafted_plan_validation_error,
+                "next_required_action": None,
+                "planned_target_document_id": None,
+            },
+        }
+
+    payload = _build_patch_set_preview_payload(
+        state=state,
+        drafted_plan=drafted_plan,
+        target_document=target_document,
+        summary_payload=summary_payload,
+        span_payload=span_payload,
+        scope_plan=effective_scope_plan,
+    )
+    if not _is_valid_patch_set_preview(payload):
+        error_message = (
+            "El runtime no pudo construir un patch set revisable con metadata completa."
+        )
+        return {
+            "ok": False,
+            "error_message": error_message,
+            "updates": {
+                "last_tool_error": error_message,
+                "next_required_action": None,
+                "planned_target_document_id": None,
+            },
+        }
+
+    first_patch = payload["patches"][0]
+    return {
+        "ok": True,
+        "payload": payload,
+        "updates": {
+            "target_document_id": payload["target_document_id"],
+            "target_document_title": payload["target_document_title"],
+            "target_selection_reason": payload["target_selection_reason"],
+            "base_version": payload["base_version"],
+            "patch_set_preview": payload,
+            "patch_preview": first_patch,
+            "patch_id": first_patch["patch_id"],
+            "requires_human_review": True,
+            "final_response": None,
+            "last_tool_error": None,
+            "next_required_action": None,
+            "planned_target_document_id": None,
+            "patch_operations_count": int(state.get("patch_operations_count") or 0) + 1,
+        },
     }
 
 
@@ -1082,214 +1475,6 @@ def build_graph_tools(
             },
         )
 
-    def _propose_patch(
-        *,
-        state: CopilotState,
-        tool_call_id: str,
-        tool_name: str,
-        target_document_id: str,
-        instruction: str | None = None,
-        # `instruction` se pasa directamente al drafter via draft_patch_preview.
-        # El drafter lo recibe como <requested_instruction> en su contexto XML
-        # y lo prioriza sobre la inferencia desde el user_query.
-        # Si es None, el drafter infiere los cambios desde el mensaje original del médico.
-    ) -> Command:
-        if int(state.get("patch_operations_count") or 0) >= int(
-            state.get("max_patch_operations") or 1
-        ):
-            return _error_command(
-                state=state,
-                tool_name=tool_name,
-                tool_call_id=tool_call_id,
-                error_message=(
-                    "El run ya consumio el presupuesto maximo de operaciones de patch."
-                ),
-            )
-
-        target_document = _find_document(state, document_id=target_document_id)
-        if not target_document:
-            return _error_command(
-                state=state,
-                tool_name=tool_name,
-                tool_call_id=tool_call_id,
-                error_message=(
-                    f"El documento target {target_document_id} no existe en el workspace actual."
-                ),
-            )
-        if target_document.get("ai_writable") is False:
-            return _error_command(
-                state=state,
-                tool_name=tool_name,
-                tool_call_id=tool_call_id,
-                error_message=(
-                    f"El documento target {target_document_id} no es editable por el copiloto."
-                ),
-            )
-
-        summary_payload = _current_summary(state, document_id=target_document_id) or _current_document_read(
-            state,
-            document_id=target_document_id,
-            modes=("summary", "full"),
-        )
-        if not summary_payload:
-            return _error_command(
-                state=state,
-                tool_name=tool_name,
-                tool_call_id=tool_call_id,
-                error_message=(
-                    "Antes de proponer un patch debes leer el documento target con "
-                    "read_document(mode='summary'|'full')."
-                ),
-            )
-        span_payload = _current_span(state, document_id=target_document_id)
-        full_document_payload = _current_document_read(
-            state,
-            document_id=target_document_id,
-            modes=("full",),
-        )
-        if not span_payload and not full_document_payload:
-            return _error_command(
-                state=state,
-                tool_name=tool_name,
-                tool_call_id=tool_call_id,
-                error_message=(
-                    "Antes de proponer un patch debes leer un span focalizado con "
-                    "read_document_span o el documento completo con read_document(mode='full')."
-                ),
-            )
-
-        # Si el plan clínico requiere lectura completa (propagation/reinterpretation) y el planner
-        # no la ejecutó, rechazar el propose para forzar la lectura completa primero.
-        # Esto garantiza que el drafter tenga visibilidad de todas las secciones antes de
-        # emitir patches multi-sección coherentes.
-        clinical_plan = state.get("clinical_plan") or {}
-        if clinical_plan.get("needs_full_note") and not full_document_payload:
-            affected = ", ".join(clinical_plan.get("affected_sections") or []) or "varias"
-            return _error_command(
-                state=state,
-                tool_name=tool_name,
-                tool_call_id=tool_call_id,
-                error_message=(
-                    f"El plan clínico (edit_scope='{clinical_plan.get('edit_scope')}') "
-                    f"requiere leer la nota completa antes de proponer patches en: {affected}. "
-                    f"Usa read_document(document_id='{target_document_id}', mode='full') primero."
-                ),
-            )
-
-        target_document_content = str(
-            (full_document_payload or {}).get("content")
-            or (span_payload or {}).get("content")
-            or (summary_payload or {}).get("excerpt")
-            or ""
-        )
-
-        try:
-            drafted_plan = planner.draft_patch_preview(
-                state=state,
-                target_document=target_document,
-                target_document_content=target_document_content,
-                supporting_context=_build_retrieved_context(
-                    context_view=state.get("context_view"),
-                    read_documents=state.get("read_documents") or [],
-                    read_spans=state.get("read_spans") or [],
-                ),
-                span_payload=span_payload,
-                requested_tool_name=tool_name,
-                requested_tool_instruction=instruction,
-            )
-        except Exception as error:
-            error_str = str(error)
-            is_resource_exhausted = (
-                "RESOURCE_EXHAUSTED" in error_str or "429" in error_str
-            )
-            if is_resource_exhausted:
-                return _error_command(
-                    state=state,
-                    tool_name=tool_name,
-                    tool_call_id=tool_call_id,
-                    error_message=(
-                        "RECURSO DE IA AGOTADO (429). "
-                        "No reintentes este patch en este run."
-                    ),
-                    updates={
-                        "run_error": "Recurso de IA agotado (429)",
-                        "final_response": (
-                            "En este momento hay una demanda muy alta en el servicio de IA "
-                            "y no pude completar la edición. "
-                            "Por favor, inténtalo de nuevo en unos minutos."
-                        ),
-                    },
-                )
-            return _error_command(
-                state=state,
-                tool_name=tool_name,
-                tool_call_id=tool_call_id,
-                error_message=f"No pude redactar un patch clinico seguro: {error}",
-            )
-
-        if not drafted_plan.patches:
-            return _error_command(
-                state=state,
-                tool_name=tool_name,
-                tool_call_id=tool_call_id,
-                error_message=(
-                    "No se pudo redactar un patch clinico revisable para esta solicitud. "
-                    "El LLM no devolvio cambios materializados."
-                ),
-            )
-
-        drafted_plan_validation_error = _validate_drafted_plan_against_clinical_plan(
-            drafted_plan=drafted_plan,
-            clinical_plan=clinical_plan,
-        )
-        if drafted_plan_validation_error:
-            return _error_command(
-                state=state,
-                tool_name=tool_name,
-                tool_call_id=tool_call_id,
-                error_message=drafted_plan_validation_error,
-            )
-
-        payload = _build_patch_set_preview_payload(
-            state=state,
-            drafted_plan=drafted_plan,
-            target_document=target_document,
-            summary_payload=summary_payload,
-            span_payload=span_payload,
-        )
-        if not _is_valid_patch_set_preview(payload):
-            return _error_command(
-                state=state,
-                tool_name=tool_name,
-                tool_call_id=tool_call_id,
-                error_message=(
-                    "El runtime no pudo construir un patch set revisable con metadata completa."
-                ),
-            )
-
-        first_patch = payload["patches"][0]
-        return _success_command(
-            state=state,
-            tool_name=tool_name,
-            tool_call_id=tool_call_id,
-            payload=payload,
-            updates={
-                "target_document_id": payload["target_document_id"],
-                "target_document_title": payload["target_document_title"],
-                "target_selection_reason": payload["target_selection_reason"],
-                "base_version": payload["base_version"],
-                "patch_set_preview": payload,
-                # Keep the first patch mirrored for the legacy frontend review card
-                # until the full PatchSet UI becomes the only review surface.
-                "patch_preview": first_patch,
-                "patch_id": first_patch["patch_id"],
-                "requires_human_review": True,
-                "final_response": None,
-                "patch_operations_count": int(state.get("patch_operations_count") or 0)
-                + 1,
-            },
-        )
-
     @tool
     def set_edit_plan(
         edit_scope: str,
@@ -1302,7 +1487,7 @@ def build_graph_tools(
         doctor_summary: str | None = None,
         section_instructions: dict[str, str] | None = None,
     ) -> Command:
-        """Registra el plan de edición clínica ANTES de proponer patches.
+        """Registra el plan de edición clínica y transfiere el run al drafting runtime.
 
         Llama esta tool cuando el pedido del médico implica un cambio de propagación clínica
         (nuevo dato que debe reflejarse en varias secciones) o reinterpretación clínica
@@ -1311,8 +1496,9 @@ def build_graph_tools(
         NO es necesario para ediciones simples (typos, inserciones cortas, borrados puntuales).
         Para esos casos ve directamente a propose_*.
 
-        Esta tool NO hace ninguna llamada externa. Solo escribe el plan al estado del runtime
-        y eleva `max_patch_operations` según `edit_scope`:
+        Esta tool NO redacta patches por sí sola. Solo escribe el plan al estado del runtime,
+        fija el siguiente paso requerido (`draft_patch_set`) y eleva `max_patch_operations`
+        según `edit_scope`:
           - local          → max 1 patch
           - propagation    → max 5 patches
           - reinterpretation → max 8 patches
@@ -1383,19 +1569,20 @@ def build_graph_tools(
         }
         payload = {**plan, "max_patch_operations": max_ops}
 
+        planned_target_document_id = _fallback_target_document_id_from_state(state)
+
         return _success_command(
             state=state,
             tool_name="set_edit_plan",
             tool_call_id=tool_call_id,
             payload=payload,
             updates={
-                # Escribir el plan al state para que render_patch_input lo inyecte
-                # en el contexto del drafter en el siguiente turno de proposición.
+                # Escribir el plan al state para que el runtime pueda saltar
+                # directamente a drafting sin otra decisión abierta del planner.
                 "clinical_plan": plan,
-                # Levantar dinámicamente el presupuesto de patches según el alcance clínico.
-                # Esto permite al drafter emitir un patch set coherente multi-sección en
-                # una sola llamada LLM, en lugar de forzar múltiples turnos de propose_*.
                 "max_patch_operations": max_ops,
+                "next_required_action": "draft_patch_set",
+                "planned_target_document_id": planned_target_document_id,
             },
         )
 
@@ -1404,17 +1591,22 @@ def build_graph_tools(
         target_document_id: str,
         runtime: ToolRuntime,
         instruction: str | None = None,
+        affected_sections: list[str] | None = None,
     ) -> Command:
         """Draft a reviewable patch set centered on span replacement.
 
-        Sequential precondition: You MUST NOT call this tool unless you have ALREADY called
-        `read_document` para este documento target, y ademas `read_document_span` o
-        `read_document(mode="full")` en PREVIOUS TURNS. Si intentas llamarla antes, fallara.
-        Never call this in the same turn as read tools.
+        Sequential precondition: el documento target debe aparecer en `<read_documents>` del
+        contexto con mode='full'. Esto se cumple automaticamente si el documento es editable
+        (ai_writable=true) porque se pre-carga al inicio de cada run — en ese caso NO necesitas
+        llamar read_document antes de propose_*. Solo llama read_document si el documento NO
+        aparece aun en <read_documents> con mode='full'. Nunca combinas read tools y propose_*
+        en el mismo turno.
         
         Optional 'instruction': Describe exactamente QUE texto quieres localizar y por QUE 
         nuevo texto reemplazarlo. Si tienes multiples reemplazos para este documento localizados,
         juntalos todos en UNA sola llamada a esta tool, detallandolos en instruction.
+        Optional 'affected_sections': usa una o mas secciones snake_case cuando el scope local
+        ya es conocido y quieres activar el guardrail semantico sin pasar por set_edit_plan.
         """
         state, tool_call_id = _runtime_parts(
             runtime,
@@ -1423,13 +1615,30 @@ def build_graph_tools(
         validated = ProposePatchInput(
             target_document_id=target_document_id,
             instruction=instruction,
+            affected_sections=affected_sections,
         )
-        return _propose_patch(
+        result = draft_patch_set_from_state(
+            planner=planner,
             state=state,
-            tool_call_id=tool_call_id,
             tool_name="propose_replace_span",
             target_document_id=validated.target_document_id,
             instruction=validated.instruction,
+            affected_sections=validated.affected_sections,
+        )
+        if not result["ok"]:
+            return _error_command(
+                state=state,
+                tool_name="propose_replace_span",
+                tool_call_id=tool_call_id,
+                error_message=result["error_message"],
+                updates=result.get("updates"),
+            )
+        return _success_command(
+            state=state,
+            tool_name="propose_replace_span",
+            tool_call_id=tool_call_id,
+            payload=result["payload"],
+            updates=result["updates"],
         )
 
     @tool
@@ -1437,17 +1646,22 @@ def build_graph_tools(
         target_document_id: str,
         runtime: ToolRuntime,
         instruction: str | None = None,
+        affected_sections: list[str] | None = None,
     ) -> Command:
         """Draft a reviewable patch set centered on anchored insertion.
 
-        Sequential precondition: You MUST NOT call this tool unless you have ALREADY called
-        `read_document` para este documento target, y ademas `read_document_span` o
-        `read_document(mode="full")` en PREVIOUS TURNS. Si intentas llamarla antes, fallara.
-        Never call this in the same turn as read tools.
+        Sequential precondition: el documento target debe aparecer en `<read_documents>` del
+        contexto con mode='full'. Esto se cumple automaticamente si el documento es editable
+        (ai_writable=true) porque se pre-carga al inicio de cada run — en ese caso NO necesitas
+        llamar read_document antes de propose_*. Solo llama read_document si el documento NO
+        aparece aun en <read_documents> con mode='full'. Nunca combinas read tools y propose_*
+        en el mismo turno.
         
         Optional 'instruction': Describe exactly WHAT text to insert and WHERE (after which span).
         If you have multiple insertions for this document, consolidate them into ONE tool call
         and detail all of them in instruction.
+        Optional 'affected_sections': usa una o mas secciones snake_case cuando el scope local
+        ya es conocido y quieres activar el guardrail semantico sin pasar por set_edit_plan.
         """
         state, tool_call_id = _runtime_parts(
             runtime,
@@ -1456,13 +1670,30 @@ def build_graph_tools(
         validated = ProposePatchInput(
             target_document_id=target_document_id,
             instruction=instruction,
+            affected_sections=affected_sections,
         )
-        return _propose_patch(
+        result = draft_patch_set_from_state(
+            planner=planner,
             state=state,
-            tool_call_id=tool_call_id,
             tool_name="propose_insert_after_span",
             target_document_id=validated.target_document_id,
             instruction=validated.instruction,
+            affected_sections=validated.affected_sections,
+        )
+        if not result["ok"]:
+            return _error_command(
+                state=state,
+                tool_name="propose_insert_after_span",
+                tool_call_id=tool_call_id,
+                error_message=result["error_message"],
+                updates=result.get("updates"),
+            )
+        return _success_command(
+            state=state,
+            tool_name="propose_insert_after_span",
+            tool_call_id=tool_call_id,
+            payload=result["payload"],
+            updates=result["updates"],
         )
 
     @tool
@@ -1470,17 +1701,22 @@ def build_graph_tools(
         target_document_id: str,
         runtime: ToolRuntime,
         instruction: str | None = None,
+        affected_sections: list[str] | None = None,
     ) -> Command:
         """Draft a reviewable patch set centered on anchored insertion before a span.
 
-        Sequential precondition: You MUST NOT call this tool unless you have ALREADY called
-        `read_document` para este documento target, y ademas `read_document_span` o
-        `read_document(mode="full")` en PREVIOUS TURNS. Si intentas llamarla antes, fallara.
-        Never call this in the same turn as read tools.
+        Sequential precondition: el documento target debe aparecer en `<read_documents>` del
+        contexto con mode='full'. Esto se cumple automaticamente si el documento es editable
+        (ai_writable=true) porque se pre-carga al inicio de cada run — en ese caso NO necesitas
+        llamar read_document antes de propose_*. Solo llama read_document si el documento NO
+        aparece aun en <read_documents> con mode='full'. Nunca combinas read tools y propose_*
+        en el mismo turno.
         
         Optional 'instruction': Describe exactly WHAT text to insert and WHERE (before which span).
         If you have multiple insertions for this document, consolidate them into ONE tool call
         and detail all of them in instruction.
+        Optional 'affected_sections': usa una o mas secciones snake_case cuando el scope local
+        ya es conocido y quieres activar el guardrail semantico sin pasar por set_edit_plan.
         """
         state, tool_call_id = _runtime_parts(
             runtime,
@@ -1489,13 +1725,30 @@ def build_graph_tools(
         validated = ProposePatchInput(
             target_document_id=target_document_id,
             instruction=instruction,
+            affected_sections=affected_sections,
         )
-        return _propose_patch(
+        result = draft_patch_set_from_state(
+            planner=planner,
             state=state,
-            tool_call_id=tool_call_id,
             tool_name="propose_insert_before",
             target_document_id=validated.target_document_id,
             instruction=validated.instruction,
+            affected_sections=validated.affected_sections,
+        )
+        if not result["ok"]:
+            return _error_command(
+                state=state,
+                tool_name="propose_insert_before",
+                tool_call_id=tool_call_id,
+                error_message=result["error_message"],
+                updates=result.get("updates"),
+            )
+        return _success_command(
+            state=state,
+            tool_name="propose_insert_before",
+            tool_call_id=tool_call_id,
+            payload=result["payload"],
+            updates=result["updates"],
         )
 
     @tool
@@ -1503,17 +1756,22 @@ def build_graph_tools(
         target_document_id: str,
         runtime: ToolRuntime,
         instruction: str | None = None,
+        affected_sections: list[str] | None = None,
     ) -> Command:
         """Draft a reviewable patch set centered on deleting an anchored span.
 
-        Sequential precondition: You MUST NOT call this tool unless you have ALREADY called
-        `read_document` para este documento target, y ademas `read_document_span` o
-        `read_document(mode="full")` en PREVIOUS TURNS. Si intentas llamarla antes, fallara.
-        Never call this in the same turn as read tools.
+        Sequential precondition: el documento target debe aparecer en `<read_documents>` del
+        contexto con mode='full'. Esto se cumple automaticamente si el documento es editable
+        (ai_writable=true) porque se pre-carga al inicio de cada run — en ese caso NO necesitas
+        llamar read_document antes de propose_*. Solo llama read_document si el documento NO
+        aparece aun en <read_documents> con mode='full'. Nunca combinas read tools y propose_*
+        en el mismo turno.
         
         Optional 'instruction': Describe exactly WHICH text to delete.
         If you have multiple deletions for this document, consolidate them into ONE tool call
         and detail all of them in instruction.
+        Optional 'affected_sections': usa una o mas secciones snake_case cuando el scope local
+        ya es conocido y quieres activar el guardrail semantico sin pasar por set_edit_plan.
         """
         state, tool_call_id = _runtime_parts(
             runtime,
@@ -1522,13 +1780,30 @@ def build_graph_tools(
         validated = ProposePatchInput(
             target_document_id=target_document_id,
             instruction=instruction,
+            affected_sections=affected_sections,
         )
-        return _propose_patch(
+        result = draft_patch_set_from_state(
+            planner=planner,
             state=state,
-            tool_call_id=tool_call_id,
             tool_name="propose_delete_span",
             target_document_id=validated.target_document_id,
             instruction=validated.instruction,
+            affected_sections=validated.affected_sections,
+        )
+        if not result["ok"]:
+            return _error_command(
+                state=state,
+                tool_name="propose_delete_span",
+                tool_call_id=tool_call_id,
+                error_message=result["error_message"],
+                updates=result.get("updates"),
+            )
+        return _success_command(
+            state=state,
+            tool_name="propose_delete_span",
+            tool_call_id=tool_call_id,
+            payload=result["payload"],
+            updates=result["updates"],
         )
 
     @tool

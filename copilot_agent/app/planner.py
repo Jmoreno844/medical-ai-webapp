@@ -480,6 +480,33 @@ class LangChainCopilotPlanner:
         return any(marker in error for marker in drafter_markers)
 
     @staticmethod
+    def _build_scoped_instruction(state: Mapping[str, Any]) -> str:
+        user_query = str(state.get("user_message") or "").strip()
+        clinical_plan = state.get("clinical_plan") or {}
+        affected_sections = [
+            str(section).strip()
+            for section in (clinical_plan.get("affected_sections") or [])
+            if str(section).strip()
+        ]
+        reasoning = str(clinical_plan.get("reasoning") or "").strip()
+
+        if not affected_sections:
+            return user_query or "Materializa el cambio pedido usando el documento leido."
+
+        sections_label = ", ".join(affected_sections)
+        parts = [
+            f"Aplica el cambio solo dentro de estas secciones: {sections_label}.",
+        ]
+        if user_query:
+            parts.append(f"Pedido actual del medico: {user_query}.")
+        if reasoning:
+            parts.append(f"Contexto clinico relevante heredado del planner: {reasoning}.")
+        parts.append(
+            "No toques otras secciones del documento aunque contengan texto parecido."
+        )
+        return " ".join(parts)
+
+    @staticmethod
     def _empty_response_recovery_prompt(state: Mapping[str, Any]) -> str:
         # Build a directive recovery message based on what the planner already has
         # in state. A generic "you were empty, try again" often makes things worse
@@ -491,6 +518,7 @@ class LangChainCopilotPlanner:
         # drafter keeps failing and the planner keeps re-proposing.
         read_docs = state.get("read_documents") or []
         clinical_plan = state.get("clinical_plan") or {}
+        next_required_action = str(state.get("next_required_action") or "").strip()
         read_ids = [d.get("document_id") for d in read_docs if d.get("document_id")]
 
         parts = [
@@ -502,6 +530,7 @@ class LangChainCopilotPlanner:
             state
         )
         user_query = str(state.get("user_message") or "").strip()
+        scoped_instruction = LangChainCopilotPlanner._build_scoped_instruction(state)
         drafter_just_failed = LangChainCopilotPlanner._last_error_is_drafter_failure(state)
 
         if drafter_just_failed:
@@ -526,7 +555,7 @@ class LangChainCopilotPlanner:
                 f"Tu siguiente paso obligatorio es llamar EXACTAMENTE una sola tool propose_* "
                 f"para ese documento. Si no estas seguro del tipo exacto, usa "
                 f"propose_replace_span(target_document_id='{fallback_target_document_id}', "
-                f"instruction='{user_query or 'materializa el cambio pedido usando el documento leido'}')."
+                f"instruction='{scoped_instruction}')."
             )
         elif clinical_plan.get("edit_scope") and read_ids:
             # Planner has a plan and already read the document — next step is propose
@@ -535,8 +564,15 @@ class LangChainCopilotPlanner:
                 f"y leiste los documentos: {', '.join(read_ids)}. "
                 f"Tu siguiente paso obligatorio es llamar propose_replace_span("
                 f"target_document_id='{read_ids[-1]}', "
-                f"instruction='<describe aqui todos los cambios exactos a realizar>') "
+                f"instruction='{scoped_instruction}') "
                 f"consolidando todos los cambios en UNA sola llamada."
+            )
+        elif next_required_action == "draft_patch_set":
+            parts.append(
+                "Ya existe un edit_plan pendiente en el runtime. "
+                "No vuelvas a clasificar el scope. "
+                "Si falta la nota completa, tu siguiente paso es leerla con read_document(mode='full'). "
+                "Si la nota completa ya esta disponible, tu siguiente paso es proponer patches."
             )
         elif read_ids:
             parts.append(
@@ -609,9 +645,10 @@ class LangChainCopilotPlanner:
     @staticmethod
     def _empty_response_fallback_message(state: Mapping[str, Any]) -> AIMessage:
         target_document_id = LangChainCopilotPlanner._fallback_target_document_id(state)
-        user_query = str(state.get("user_message") or "").strip()
         clinical_plan = state.get("clinical_plan") or {}
+        scoped_instruction = LangChainCopilotPlanner._build_scoped_instruction(state)
         drafter_just_failed = LangChainCopilotPlanner._last_error_is_drafter_failure(state)
+        scoped_sections = list(clinical_plan.get("affected_sections") or [])
 
         # If the drafter just crashed (json parse error, 429, etc.), re-proposing
         # will enter the exact same failure path and loop.  Surface a safe text
@@ -649,8 +686,8 @@ class LangChainCopilotPlanner:
                         "name": "propose_replace_span",
                         "args": {
                             "target_document_id": target_document_id,
-                            "instruction": user_query
-                            or "Materializa el cambio pedido usando el documento leido.",
+                            "instruction": scoped_instruction,
+                            "affected_sections": scoped_sections or None,
                         },
                         "id": f"empty-response-fallback-{uuid.uuid4()}",
                         "type": "tool_call",
@@ -678,6 +715,7 @@ class LangChainCopilotPlanner:
         span_payload: Mapping[str, Any] | None = None,
         requested_tool_name: str | None = None,
         requested_tool_instruction: str | None = None,
+        requested_affected_sections: Sequence[str] | None = None,
     ) -> DraftedPatchPlan:
         messages = [
             SystemMessage(
@@ -694,6 +732,7 @@ class LangChainCopilotPlanner:
                     span_payload=span_payload,
                     requested_tool_name=requested_tool_name,
                     requested_tool_instruction=requested_tool_instruction,
+                    requested_affected_sections=requested_affected_sections,
                 )
             ),
         ]

@@ -34,6 +34,7 @@ export default function CopilotSideChatPanel({
     submitPatchSetDecision,
     finalizeReview,
   } = controller;
+  const showReviewCard = !!reviewPatchSet && pendingPatchCount > 0;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -107,7 +108,7 @@ export default function CopilotSideChatPanel({
               </div>
             )}
 
-            {reviewPatchSet && (
+            {showReviewCard && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 space-y-3">
                 <div>
                   <div className="text-[11px] font-medium uppercase tracking-wide text-amber-700">

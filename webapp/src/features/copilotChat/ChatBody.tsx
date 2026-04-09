@@ -34,6 +34,7 @@ export default function ChatBody({ controller }: ChatBodyProps) {
     submitPatchDecisionById,
     submitPatchSetDecision,
   } = controller;
+  const showReviewCard = !!reviewPatchSet && pendingPatchCount > 0;
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -65,25 +66,8 @@ export default function ChatBody({ controller }: ChatBodyProps) {
           <PatchGeneratingCard doctorSummary={editPlanDoctorSummary} />
         )}
 
-        {/* Resolved patch card — persists after review closes */}
-        {resolvedPatchCard && !reviewPatchSet && (
-          <PatchReviewCard
-            patchSet={resolvedPatchCard.patchSet}
-            patches={resolvedPatchCard.patchSet.patches}
-            pendingCount={0}
-            acceptedCount={resolvedPatchCard.patchSet.patches.length}
-            rejectedCount={0}
-            conflictedCount={0}
-            resolved={resolvedPatchCard.outcome}
-            onApproveAll={() => {}}
-            onRejectAll={() => {}}
-            onApprovePatch={() => {}}
-            onRejectPatch={() => {}}
-          />
-        )}
-
         {/* Active patch review card */}
-        {reviewPatchSet && (
+        {showReviewCard && (
           <PatchReviewCard
             patchSet={reviewPatchSet}
             patches={reviewPatches}

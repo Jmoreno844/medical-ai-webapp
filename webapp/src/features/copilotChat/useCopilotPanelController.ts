@@ -13,6 +13,8 @@ import { applyCopilotPatchToWorkspace } from "@/workspace/adapters/applyCopilotP
 import { useAiSessionStore } from "@/workspace/stores/aiSessionStore";
 import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
 import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
+import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
+import { flushDirtyDrafts } from "@/workspace/forceSaveRegistry";
 
 const COPILOT_PATCH_REVIEW_FINALIZED_EVENT = "copilot:patch-review-finalized";
 
@@ -85,6 +87,15 @@ function buildChatMessage(
   };
 }
 
+function isAdministrativePatchReviewFinalResponse(content: string): boolean {
+  return (
+    content ===
+      "El patch set del copiloto fue aprobado y aplicado al documento canonico." ||
+    content ===
+      "El patch set del copiloto fue rechazado. No se aplicaron cambios al documento canonico."
+  );
+}
+
 export function useCopilotPanelController(
   encounterId: number,
 ): UseCopilotPanelControllerResult {
@@ -121,6 +132,8 @@ export function useCopilotPanelController(
   const lastPatchSetSyncSignatureRef = useRef<string>("");
   const lastAgentIntentMsgRunIdRef = useRef<string | null>(null);
   const lastPatchUiSignatureRef = useRef<string>("");
+  // Tracks patchSet IDs already pushed to chatMessages to avoid duplicate history cards.
+  const resolvedPatchCardsInChatRef = useRef<Set<string>>(new Set());
   const [resolvedPatchCard, setResolvedPatchCard] = useState<{
     patchSet: CopilotPatchSetResponse;
     outcome: "applied" | "rejected";
@@ -368,13 +381,28 @@ export function useCopilotPanelController(
   const storePatchSets = usePatchSetStore((s) => s.patchSets);
 
   // Only expose a reviewPatchSet while the run is actively waiting for human review.
-  // When usePatchDecision.clearAll() fires after auto-finalize, storeActivePatchSetId
-  // becomes null and the card disappears immediately — no need to wait for a stream event.
+  // Once the review is finalizing or already resolved, suppress the active card
+  // immediately so we do not fall back to stale state.patchSets data and render a
+  // phantom "Aceptar / Rechazar" card at the bottom of the chat.
   const reviewPatchSet = useMemo(() => {
     if (state.status !== "waiting_review") return null;
-    if (!storeActivePatchSetId) return null;
-    return storePatchSets[storeActivePatchSetId] ?? null;
-  }, [state.status, storeActivePatchSetId, storePatchSets]);
+    if (isFinalizingReview || resolvedPatchCard) return null;
+    if (storeActivePatchSetId) {
+      return storePatchSets[storeActivePatchSetId] ?? null;
+    }
+    const localPatchSets = Object.values(storePatchSets);
+    if (localPatchSets.length > 0) {
+      return localPatchSets[0] ?? null;
+    }
+    return state.patchSets[0] ?? null;
+  }, [
+    isFinalizingReview,
+    resolvedPatchCard,
+    state.patchSets,
+    state.status,
+    storeActivePatchSetId,
+    storePatchSets,
+  ]);
 
   const reviewPatches = useMemo(
     () => reviewPatchSet?.patches ?? [],
@@ -546,12 +574,16 @@ export function useCopilotPanelController(
       didAutoRefreshWaitingReviewRef.current !== state.runId
     ) {
       didAutoRefreshWaitingReviewRef.current = state.runId;
+      log.debug("[waiting-review:auto-refresh]", {
+        runId: state.runId,
+        reason: "waiting_review-without-patchsets",
+      });
       void syncRunStatus();
     }
     if (state.status !== "waiting_review") {
       didAutoRefreshWaitingReviewRef.current = null;
     }
-  }, [state.patchSets.length, state.runId, state.status, syncRunStatus]);
+  }, [log, state.patchSets.length, state.runId, state.status, syncRunStatus]);
 
   useEffect(() => {
     if (lastPatchSetSyncSignatureRef.current === patchSetSyncSignature) {
@@ -642,12 +674,20 @@ export function useCopilotPanelController(
       state.finalResponse &&
       state.finalResponse !== lastAssistantResponseRef.current
     ) {
+      const shouldSuppressAdministrativeFinalResponse =
+        !!resolvedPatchCard &&
+        isAdministrativePatchReviewFinalResponse(state.finalResponse);
+      if (shouldSuppressAdministrativeFinalResponse) {
+        lastAssistantResponseRef.current = state.finalResponse;
+        return;
+      }
       setChatMessages((current) => {
         const lastMessage =
           current.length > 0 ? current[current.length - 1] : null;
         if (
           lastMessage?.role === "assistant" &&
-          lastMessage?.runId === state.runId
+          lastMessage?.runId === state.runId &&
+          !lastMessage?.patchCard
         ) {
           // Update the content of the existing streamed message
           const withoutLast = current.slice(0, current.length - 1);
@@ -664,7 +704,7 @@ export function useCopilotPanelController(
       });
       lastAssistantResponseRef.current = state.finalResponse;
     }
-  }, [state.finalResponse, state.runId]);
+  }, [resolvedPatchCard, state.finalResponse, state.runId]);
 
   // Track when a review_resolved event arrives so we can show the resolved card.
   useEffect(() => {
@@ -684,17 +724,31 @@ export function useCopilotPanelController(
       null;
     if (!resolvedData) return;
     const decision = latestReviewResolvedEvent.payload.decision;
-    setResolvedPatchCard({
+    const resolvedCardData = {
       patchSet: resolvedData,
-      outcome: decision === "approve" ? "applied" : "rejected",
-    });
+      outcome: (decision === "approve" ? "applied" : "rejected") as
+        | "applied"
+        | "rejected",
+    };
+    setResolvedPatchCard(resolvedCardData);
+    if (!resolvedPatchCardsInChatRef.current.has(resolvedPatchSetId)) {
+      resolvedPatchCardsInChatRef.current.add(resolvedPatchSetId);
+      setChatMessages((current) => [
+        ...current,
+        {
+          ...buildChatMessage("assistant", "", state.runId),
+          patchCard: resolvedCardData,
+        },
+      ]);
+    }
   }, [latestReviewResolvedEvent]);
 
   useEffect(() => {
     const handlePatchedReviewFinalized = (event: Event) => {
       const customEvent = event as CustomEvent<{
         patchSet?: CopilotPatchSetResponse;
-        outcome?: "applied" | "rejected";
+        outcome?: "applied" | "rejected" | "conflict";
+        conflictType?: "concurrent_edit" | "bad_anchor" | null;
         patchSetId?: string;
       }>;
       const patchSet = customEvent.detail?.patchSet;
@@ -705,9 +759,39 @@ export function useCopilotPanelController(
       log.debug("[patch-review-finalized:event] received bridge event", {
         patchSetId: customEvent.detail?.patchSetId,
         outcome,
+        conflictType: customEvent.detail?.conflictType,
       });
       lastResolvedPatchSetIdRef.current = patchSet.id;
-      setResolvedPatchCard({ patchSet, outcome });
+      if (outcome === "conflict") {
+        const conflictType = customEvent.detail?.conflictType;
+        const conflictMessage =
+          conflictType === "concurrent_edit"
+            ? "No pude aplicar los cambios porque el documento fue editado mientras el agente trabajaba. Vuelve a intentarlo."
+            : conflictType === "bad_anchor"
+              ? "No pude aplicar los cambios porque el texto exacto que el agente quería modificar no se encontró. Intenta de nuevo con una instrucción más específica."
+              : "No pude aplicar los cambios. Intenta de nuevo.";
+        setChatMessages((current) => [
+          ...current,
+          buildChatMessage("assistant", conflictMessage, state.runId),
+        ]);
+        setIsFinalizingReview(false);
+        return;
+      }
+      const resolvedCard = {
+        patchSet,
+        outcome: outcome as "applied" | "rejected",
+      };
+      setResolvedPatchCard(resolvedCard);
+      if (!resolvedPatchCardsInChatRef.current.has(patchSet.id)) {
+        resolvedPatchCardsInChatRef.current.add(patchSet.id);
+        setChatMessages((current) => [
+          ...current,
+          {
+            ...buildChatMessage("assistant", "", state.runId),
+            patchCard: resolvedCard,
+          },
+        ]);
+      }
       setIsFinalizingReview(false);
     };
 
@@ -721,7 +805,7 @@ export function useCopilotPanelController(
         handlePatchedReviewFinalized as EventListener,
       );
     };
-  }, [log]);
+  }, [log, state.runId]);
 
   const sendMessage = useCallback(
     async (message: string) => {
@@ -732,8 +816,54 @@ export function useCopilotPanelController(
 
       const session = await ensureSession();
 
+      // Force-save any dirty editor drafts before building the workspace index.
+      // This guarantees the DB reflects exactly what the doctor sees right now,
+      // so the agent's pre-seeded content_markdown and any base_hash used by
+      // the patcher matches the canonical document version in Django.
+      const draftState = useDocumentDraftStore.getState();
+      const dirtyDocIds = Object.entries(draftState.draftsByDocumentId)
+        .filter(([, draft]) => draft?.isDirty)
+        .map(([id]) => id);
+      log.debug("[sendMessage] dirty docs before flush", { dirtyDocIds });
+      if (dirtyDocIds.length > 0) {
+        await flushDirtyDrafts(dirtyDocIds);
+        // Log post-flush state to detect docs that still have isDirty=true
+        // because their editor was not mounted (no registered saveFn).
+        const postFlushDraft = useDocumentDraftStore.getState();
+        const stillDirty = Object.entries(postFlushDraft.draftsByDocumentId)
+          .filter(([id, draft]) => draft?.isDirty && dirtyDocIds.includes(id))
+          .map(([id]) => id);
+        if (stillDirty.length > 0) {
+          log.warn(
+            "[sendMessage] docs still dirty after flush — editor not mounted or re-dirtified by Lexical onChange; workspaceIndex will use content-equality check to decide pre-seed",
+            { stillDirty },
+          );
+        } else {
+          log.debug("[sendMessage] all dirty docs flushed successfully");
+        }
+      }
+
+      // Capture which document IDs the doctor recently edited (before clearing
+      // the flag). This is the set that will emit <user_edit_notices> to the agent.
+      const recentlyEditedDocIds = Object.entries(draftState.draftsByDocumentId)
+        .filter(([, draft]) => draft?.userEditedSinceLastCopilotTurn)
+        .map(([id]) => id);
+
       syncWorkingSetFromWorkspace();
       const currentWorkspaceIndex = buildWorkspaceIndex();
+      log.debug(
+        "[sendMessage] workspace index pre-seed summary",
+        currentWorkspaceIndex.documents.map((d) => ({
+          id: d.documentId,
+          title: d.title,
+          aiWritable: d.aiWritable,
+          hasDirtyDraft: d.hasDirtyDraft,
+          hasContent: Boolean(d.contentMarkdown),
+          contentLen: d.contentMarkdown?.length ?? 0,
+          // If aiWritable but no content, pre-seed is excluded — agent must read_document.
+          preSeedExcluded: d.aiWritable && !d.contentMarkdown,
+        })),
+      );
       const aiSessionState = useAiSessionStore.getState();
       const currentSelectedDocumentIds =
         aiSessionState.selectedDocumentIds.length > 0
@@ -749,7 +879,9 @@ export function useCopilotPanelController(
         buildChatMessage("user", trimmed, state.runId),
       ]);
 
-      lastAssistantResponseRef.current = null;
+      // Clear the resolved card so isGeneratingPatch works correctly for the
+      // new run. The permanent record is already in chatMessages as a patchCard.
+      setResolvedPatchCard(null);
 
       const payload: CopilotMessageRequest = {
         encounter_id: encounterId,
@@ -759,7 +891,15 @@ export function useCopilotPanelController(
         active_document_id: currentWorkspaceIndex.activeDocumentId,
         selected_document_ids: currentSelectedDocumentIds,
       };
-      return runMessage(payload);
+      const result = runMessage(payload);
+      // Reset the "doctor edited since last turn" flags now that the agent
+      // has been given the up-to-date context.
+      if (recentlyEditedDocIds.length > 0) {
+        useDocumentDraftStore
+          .getState()
+          .markCopilotTurnConsumed(recentlyEditedDocIds);
+      }
+      return result;
     },
     [
       encounterId,
@@ -844,17 +984,19 @@ export function useCopilotPanelController(
         return null;
       }
 
+      const authoritativePatchSet = serverReviewPatchSet ?? reviewPatchSet;
       const resolvedOutcome: "applied" | "rejected" =
-        acceptedPatchCount > 0 ? "applied" : "rejected";
+        serverAcceptedPatchCount > 0 ? "applied" : "rejected";
 
       const currentWorkspaceIndex = buildWorkspaceIndex();
       const currentDocument = currentWorkspaceIndex.documents.find(
-        (document) => document.documentId === reviewPatchSet.target_document_id,
+        (document) =>
+          document.documentId === authoritativePatchSet.target_document_id,
       );
 
       log.debug("[finalizeReview] calling finalizePatchSetReview", {
-        patchSetId: reviewPatchSet.id,
-        targetDocumentId: reviewPatchSet.target_document_id,
+        patchSetId: authoritativePatchSet.id,
+        targetDocumentId: authoritativePatchSet.target_document_id,
         documentVersion: currentDocument?.version,
         resolvedOutcome,
       });
@@ -864,7 +1006,7 @@ export function useCopilotPanelController(
       try {
         try {
           run = await finalizePatchSetReview(
-            reviewPatchSet.id,
+            authoritativePatchSet.id,
             comment?.trim() || undefined,
             currentDocument?.version,
           );
@@ -899,13 +1041,24 @@ export function useCopilotPanelController(
 
         // Don't depend exclusively on a later review_resolved SSE event to hide the
         // generating card. The finalize call already tells us the review finished.
-        lastResolvedPatchSetIdRef.current = reviewPatchSet.id;
-        setResolvedPatchCard({
-          patchSet: reviewPatchSet,
+        lastResolvedPatchSetIdRef.current = authoritativePatchSet.id;
+        const resolvedCard = {
+          patchSet: authoritativePatchSet,
           outcome: resolvedOutcome,
-        });
+        };
+        setResolvedPatchCard(resolvedCard);
+        if (!resolvedPatchCardsInChatRef.current.has(authoritativePatchSet.id)) {
+          resolvedPatchCardsInChatRef.current.add(authoritativePatchSet.id);
+          setChatMessages((current) => [
+            ...current,
+            {
+              ...buildChatMessage("assistant", "", state.runId),
+              patchCard: resolvedCard,
+            },
+          ]);
+        }
         log.debug("[finalizeReview] resolved patch card set optimistically", {
-          patchSetId: reviewPatchSet.id,
+          patchSetId: authoritativePatchSet.id,
           outcome: resolvedOutcome,
         });
 
@@ -920,7 +1073,7 @@ export function useCopilotPanelController(
             documentId: run.applied_document_id,
             content: run.applied_content,
             baseVersion:
-              reviewPatchSet.base_version ?? currentDocument?.version ?? 1,
+              authoritativePatchSet.base_version ?? currentDocument?.version ?? 1,
             appliedVersion: run.applied_version,
           });
         }
@@ -934,10 +1087,11 @@ export function useCopilotPanelController(
       }
     },
     [
-      acceptedPatchCount,
       finalizePatchSetReview,
       log,
       reviewPatchSet,
+      serverAcceptedPatchCount,
+      serverReviewPatchSet,
       state.runId,
     ],
   );
@@ -948,6 +1102,7 @@ export function useCopilotPanelController(
     lastResolvedPatchSetIdRef.current = null;
     lastPatchSetSyncSignatureRef.current = "";
     lastPatchUiSignatureRef.current = "";
+    resolvedPatchCardsInChatRef.current = new Set();
     setSelectedReviewPatchId(null);
     setIsFinalizingReview(false);
     setResolvedPatchCard(null);

@@ -5,7 +5,7 @@ import { $convertToMarkdownString, TRANSFORMERS } from "@lexical/markdown";
 import { logger } from "@/lib/logger";
 interface AutoSavePluginProps {
   documentId: number;
-  onSave: (docId: number, content: string) => Promise<void>;
+  onSave: (docId: number, content: string) => Promise<boolean | void>;
   onDraftChange?: (docId: number, content: string) => void;
   registerSaveFunction?: (saveFunc: (force?: boolean) => Promise<void>) => void;
   hasInitialContent?: boolean;
@@ -18,7 +18,7 @@ export function AutoSavePlugin({
   onDraftChange,
   registerSaveFunction,
   hasInitialContent = false,
-  saveInterval = 2000,
+  saveInterval = 1000,
 }: AutoSavePluginProps) {
   const [editor] = useLexicalComposerContext();
   const [, setIsSaving] = useState(false);
@@ -102,8 +102,18 @@ export function AutoSavePlugin({
     return () => {
       removeUpdateListener();
       if (timer) clearTimeout(timer);
+      if (getDocumentContent().trim() !== lastSavedContentRef.current.trim()) {
+        void handleSave(true);
+      }
     };
-  }, [documentId, editor, getDocumentContent, handleSave, onDraftChange, saveInterval]);
+  }, [
+    documentId,
+    editor,
+    getDocumentContent,
+    handleSave,
+    onDraftChange,
+    saveInterval,
+  ]);
 
   return null;
 }

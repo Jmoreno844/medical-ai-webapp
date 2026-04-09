@@ -20,14 +20,16 @@ Planner (temp=0.1, max=1400 tokens)
   → No escribe patches.
 
 Drafter (temp=0.0, max=3200 tokens, json_schema structured output)
-  → Solo es invocado cuando el planner llama una propose_* tool.
+  → Es invocado cuando el planner llama una propose_* tool o cuando el runtime
+    entra en auto-drafting después de set_edit_plan.
   → Recibe la nota completa + contexto de soporte.
   → Emite un DraftedPatchPlan con todos los patches en una sola llamada.
   → No toma decisiones de routing ni de qué documento tocar.
 ```
 
-El planner y el drafter no se llaman en paralelo. El drafter es invocado dentro de la
-lógica de `propose_*` tools, que son ejecutadas por el ToolNode del grafo.
+El planner y el drafter no se llaman en paralelo. El drafter se invoca dentro de la
+lógica de `propose_*` o desde una transición runtime inmediatamente posterior a
+`set_edit_plan`, sin abrir una segunda decisión libre del planner.
 
 ## LangSmith local
 
@@ -59,9 +61,9 @@ en lugar de dejar el run en error duro.
               ▼
     consolidate_tool_state
               │
-     ┌────────┼─────────────────────┐
-     ▼        ▼                     ▼
-call_model  interrupt_for_review  finalize_response
+     ┌────────┼───────────────┬───────────────┐
+     ▼        ▼               ▼               ▼
+call_model draft_patch_from_plan interrupt_for_review finalize_response
 ```
 
 ### Nodos
@@ -71,6 +73,7 @@ call_model  interrupt_for_review  finalize_response
 | `call_model`             | Invoca al planner. Si hay tool_calls → tools. Si hay patch_set_preview válido + requires_human_review → interrupt. Si no → finalize. |
 | `tools`                  | Executa las tools del batch actual (ToolNode). Errores se devuelven como ToolMessage al planner para que corrija.                    |
 | `consolidate_tool_state` | Deriva `read_documents`, `retrieved_context`, `selected_document_ids` del batch de resultados. Entonces re-routea.                   |
+| `draft_patch_from_plan`  | Si `set_edit_plan` ya dejó `next_required_action='draft_patch_set'` y las precondiciones están listas, invoca al drafter directamente. |
 | `interrupt_for_review`   | Pausa el grafo. Espera `review_result` externo (`approve` / `reject`). LangGraph interrupt.                                          |
 | `apply_patch`            | Placeholder — el apply real ocurre en Django, no aquí.                                                                               |
 | `finalize_response`      | Construye el `final_response` del run.                                                                                               |
@@ -88,6 +91,7 @@ call_model  interrupt_for_review  finalize_response
 - `iteration_count >= max_iterations` → `"finalize_response"`
 - `patch_set_preview` válido + `requires_human_review=True` → `"interrupt_for_review"`
 - `run_error` presente → `"finalize_response"`
+- `next_required_action='draft_patch_set'` + target/full note listos → `"draft_patch_from_plan"`
 - otherwise → `"call_model"`
 
 ### Límites de iteración
@@ -107,7 +111,7 @@ El estado completo es `CopilotState` en `app/graph/state.py`. Los campos relevan
 
 | Campo                 | Tipo                 | Descripción                                                                                                         |
 | --------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `workspace_index`     | `dict`               | Vista ligera del workspace: documento activo, abiertos, writable, versiones. Entra desde Django en el primer turno. |
+| `workspace_index`     | `dict`               | Vista ligera del workspace: documento activo, abiertos, writable, versiones y opcionalmente `content_markdown` pre-seedeado por el frontend. Entra desde Django en el primer turno. |
 | `available_documents` | `list[dict]`         | Documentos disponibles en el workspace. Se va enriqueciendo con lecturas. Merge inteligente por `document_id`.      |
 | `document_summaries`  | `dict[doc_id, dict]` | Summaries de documentos leídos. Merge por doc_id, score por completitud.                                            |
 
@@ -131,6 +135,8 @@ El estado completo es `CopilotState` en `app/graph/state.py`. Los campos relevan
 | `current_plan_step`      | `str`         | Última acción del planner (`"start"`, `"call_tool"`, `"respond"`).                 |
 | `run_error`              | `str \| None` | Si hay error irrecuperable, se setea aquí y el run termina en `finalize_response`. |
 | `last_tool_error`        | `str \| None` | Error del último batch de tools. Se pasa al planner para que corrija.              |
+| `next_required_action`   | `str \| None` | Señal runtime. Hoy usa `draft_patch_set` para continuar automáticamente tras `set_edit_plan`. |
+| `planned_target_document_id` | `str \| None` | Documento target congelado por `set_edit_plan` cuando el runtime lo puede inferir con seguridad. |
 
 ### Artefactos del patch set
 
@@ -153,6 +159,19 @@ El estado completo es `CopilotState` en `app/graph/state.py`. Los campos relevan
 ### Reset entre runs
 
 Cuando Django inicia un nuevo run en el mismo thread (misma conversación), `_reset_transient_run_state()` limpia todos los artefactos del run anterior (reads, spans, patches, errores) pero conserva `messages` y la historia del hilo LangGraph. Esto evita que un patch propuesto en turno anterior contamine el siguiente turno.
+
+### Pre-seed desde frontend (`workspace_index.documents[].content_markdown`)
+
+Si el frontend envía `content_markdown` para un documento `ai_writable`, `_reset_transient_run_state()` lo convierte en una lectura `mode="full"` antes del primer turno del planner.
+
+Eso permite que el planner llame `propose_*` en el turno 1 sin `read_document(...)`, pero trae dos invariantes importantes:
+
+1. el contenido debe representar el estado canónico que el médico ve realmente
+2. la lectura pre-seedeada necesita `content_hash` para que el patch set tenga `base_hash`
+
+El runtime ya no depende de que el frontend mande ese hash. Si falta en `workspace_index`, el agente calcula `sha256(content_markdown)` al pre-seedear la lectura full. Esto mantiene consistente el contrato con Django, que valida conflictos de apply usando `base_hash`.
+
+En otras palabras: el pre-seed del frontend reemplaza la lectura remota, pero no puede omitir la metadata que vuelve aplicable el patch set.
 
 ---
 
@@ -180,23 +199,41 @@ Todas las tools de propose siguen el mismo patrón:
 3. Construyen y validan el `patch_set_preview`.
 4. Setean `requires_human_review=True` → el grafo pausará en `interrupt_for_review`.
 
+Cuando la lectura previa proviene del pre-seed de `workspace_index` en vez de `read_document`, el builder del patch set puede derivar `base_hash` de dos maneras:
+
+- usar `summary_payload.content_hash` / `span_payload.content_hash` si ya existen
+- fallback: si el `summary_payload` es en realidad una lectura `mode="full"` con `content`, calcular `sha256(content)` localmente
+
+Ese fallback evita que una `propose_*` tool termine como `tool_result` exitoso pero sin `patch_set_preview` válido solo porque el frontend evitó el round-trip de lectura.
+
 Todas aceptan un parámetro opcional `instruction: str | None`. El planner debe usarlo para
 describir exactamente qué texto cambiar y cómo. Si el planner tiene múltiples reemplazos
 para un mismo documento, **debe consolidarlos todos en una sola llamada** usando `instruction`
 en lugar de llamar la tool varias veces (el filtro `_filter_parallel_tool_calls` descargaría
 las llamadas adicionales silenciosamente). El drafter lee `instruction` como `<requested_instruction>`
 en su contexto XML y la prioriza sobre la inferencia desde el mensaje original del médico.
-Para `edit_scope in {propagation, reinterpretation}`, el runtime valida además que el
+Las propose tools también aceptan `affected_sections: list[str] | None` para cambios locales
+directos donde el planner ya conoce la sección destino pero no quiere pasar por `set_edit_plan`.
+Cuando llegan esas secciones, el runtime construye un scope mínimo local y activa el mismo
+guardrail semántico del drafter.
+Para `edit_scope in {propagation, reinterpretation}` o para cualquier `propose_*` con
+`affected_sections`, el runtime valida además que el
 `DraftedPatchPlan` cubra todas las `affected_sections` del `edit_plan` y que cada patch
 declare `section`. Si el drafter devuelve un subconjunto parcial, la tool falla cerrada y
 no abre review humana con un patch set incompleto.
 
+Ese guardrail también aplica cuando el planner fija `affected_sections` en un
+`edit_scope="local"` para follow-ups ambiguos resueltos por contexto conversacional
+previo. Si el scope declarado contiene una sola sección y el drafter devuelve patches
+para secciones extra, el runtime falla cerrado y obliga a regenerar el patch set dentro
+del scope correcto.
+
 | Tool                                                          | Operación del drafter                            |
 | ------------------------------------------------------------- | ------------------------------------------------ |
-| `propose_replace_span(target_document_id, instruction?)`      | Reemplaza un span existente por contenido nuevo. |
-| `propose_insert_after_span(target_document_id, instruction?)` | Inserta contenido nuevo después de un span.      |
-| `propose_insert_before(target_document_id, instruction?)`     | Inserta contenido nuevo antes de un anchor.      |
-| `propose_delete_span(target_document_id, instruction?)`       | Borra un span del documento.                     |
+| `propose_replace_span(target_document_id, instruction?, affected_sections?)`      | Reemplaza un span existente por contenido nuevo. |
+| `propose_insert_after_span(target_document_id, instruction?, affected_sections?)` | Inserta contenido nuevo después de un span.      |
+| `propose_insert_before(target_document_id, instruction?, affected_sections?)`     | Inserta contenido nuevo antes de un anchor.      |
+| `propose_delete_span(target_document_id, instruction?, affected_sections?)`       | Borra un span del documento.                     |
 
 La tool llama al drafter con `requested_tool_name` y `requested_tool_instruction` como pistas. El drafter puede emitir múltiples patches en una sola llamada (`patches: list[DraftedPatch]`).
 
@@ -244,6 +281,17 @@ El `patch_set_preview` que se emite al finalizar una propose tool:
   ]
 }
 ```
+
+### Requisito de `base_hash`
+
+`base_hash` no es opcional en la práctica del runtime actual. Si falta, el patch set no se considera válido y el run puede terminar en `completed` sin `patch_proposed` ni `review_required`, aunque sí exista un `tool_result` de `propose_*`.
+
+Eso suele significar una de estas dos cosas:
+
+- no había ninguna lectura válida (`summary` / `full` / `span`) del documento target
+- había lectura pre-seedeada full, pero sin `content_hash` y sin fallback de contenido
+
+Los cambios recientes del runtime cubren explícitamente el segundo caso.
 
 Django recibe este payload, resuelve los anchors a offsets reales en el documento canónico, persiste un `CopilotPatchSet` + `CopilotPatch` por cada entrada en `patches`, y marca los patches como `pending` o `conflicted` según el resultado de la resolución.
 

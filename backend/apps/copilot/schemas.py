@@ -20,6 +20,7 @@ class WorkspaceDocumentSummaryIn(Schema):
     is_active: bool
     is_open: bool
     has_dirty_draft: bool
+    has_user_edits: bool = False
     has_streaming_state: bool
     hidden_from_agent: bool = False
     pinned_for_agent: bool = False

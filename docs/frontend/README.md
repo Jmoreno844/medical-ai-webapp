@@ -5,6 +5,7 @@ El `webapp/` es la SPA usada por el médico. Se encarga de autenticación en nav
 ## Qué leer aquí
 
 - [`system-map.md`](system-map.md) — mapa rápido de rutas, contextos, features y cliente API.
+- [`system-map.md`](system-map.md) — también documenta la semántica vigente de `snapshot`, `draft`, `isDirty`, autosave y el pre-seed del `WorkspaceIndex` hacia el copiloto.
 - [`logging.md`](logging.md) — uso de `src/lib/logger.ts`, comportamiento por entorno y reglas de no loguear datos sensibles.
 - Trazas locales: `src/tracing.ts` (OTLP vía `VITE_OTEL_EXPORTER_OTLP_TRACES_URL`, proxy en `vite.config.ts`); producción: ver [`../backend/tracing.md`](../backend/tracing.md).
 

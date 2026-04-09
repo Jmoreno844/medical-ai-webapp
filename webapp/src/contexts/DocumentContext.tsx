@@ -17,6 +17,7 @@ import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
 import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
 import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
 import { useAiSessionStore } from "@/workspace/stores/aiSessionStore";
+import { sanitizeDocumentContentForSave } from "@/workspace/utils/documentSave";
 
 // Define the context type
 type DocumentContextType = {
@@ -208,21 +209,7 @@ export function DocumentProvider({
           `[DOC_SAVE] Document ${docId}: Saving content (${content.length} chars)`
         );
 
-        let finalContent = content;
-
-        if (finalContent.includes("<") && finalContent.includes(">")) {
-          try {
-            const tempDiv = document.createElement("div");
-            tempDiv.innerHTML = content;
-            finalContent = tempDiv.textContent || "";
-            logger.debug(`[DOC_SAVE] Document ${docId}: Stripped HTML tags`);
-          } catch {
-            finalContent = content.replace(/<[^>]*>/g, "");
-            logger.debug(
-              `[DOC_SAVE] Document ${docId}: Stripped HTML tags (regex fallback)`
-            );
-          }
-        }
+        const finalContent = sanitizeDocumentContentForSave(content);
 
         logger.debug(
           `[DOC_SAVE] Document ${docId}: Final content length: ${finalContent.length} chars`

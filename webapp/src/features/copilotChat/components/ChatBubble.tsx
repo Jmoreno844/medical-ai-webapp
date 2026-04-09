@@ -1,13 +1,62 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Info, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Info,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 
 import { CopilotChatMessage } from "@/features/copilotChat/types";
 
 type ChatBubbleProps = {
   message: CopilotChatMessage;
 };
+
+function ResolvedPatchCardBubble({ message }: ChatBubbleProps) {
+  const { patchCard } = message;
+  if (!patchCard) return null;
+  const { patchSet, outcome } = patchCard;
+  const acceptedCount = patchSet.patches.filter(
+    (patch) => patch.status === "accepted" || patch.status === "applied",
+  ).length;
+  const rejectedCount = patchSet.patches.filter(
+    (patch) => patch.status === "rejected",
+  ).length;
+  const docTitle =
+    patchSet.target_document_title ||
+    `Documento ${patchSet.target_document_id}`;
+  const isApplied = outcome === "applied";
+  const count = isApplied
+    ? Math.max(acceptedCount, 1)
+    : Math.max(rejectedCount, 1);
+
+  return (
+    <div className="mr-2">
+      <div
+        className={[
+          "flex items-center gap-2 rounded-lg border px-3 py-2 text-xs",
+          isApplied
+            ? "border-green-200 bg-green-50 text-green-700"
+            : "border-slate-200 bg-slate-50 text-slate-500",
+        ].join(" ")}
+      >
+        {isApplied ? (
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-500" />
+        ) : (
+          <XCircle className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        )}
+        <span>
+          {isApplied
+            ? `${count} cambio${count !== 1 ? "s" : ""} aplicado${count !== 1 ? "s" : ""} en ${docTitle}`
+            : `${count} cambio${count !== 1 ? "s" : ""} rechazado${count !== 1 ? "s" : ""} en ${docTitle}`}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 function ToolBubble({ message }: ChatBubbleProps) {
   const [open, setOpen] = useState(false);
@@ -50,6 +99,10 @@ function ToolBubble({ message }: ChatBubbleProps) {
 }
 
 export default function ChatBubble({ message }: ChatBubbleProps) {
+  if (message.patchCard) {
+    return <ResolvedPatchCardBubble message={message} />;
+  }
+
   if (message.role === "system") {
     return <ToolBubble message={message} />;
   }

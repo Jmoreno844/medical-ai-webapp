@@ -7,6 +7,12 @@ import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
 import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
 import { TRANSFORMERS } from "@lexical/markdown";
 import { PatchInlineDiffView } from "./PatchInlineDiffView";
+import {
+  flushAllDirtyDrafts,
+  flushDirtyDrafts,
+  flushDirtyDraftsWithKeepalive,
+  registerForceSave,
+} from "@/workspace/forceSaveRegistry";
 
 // Import custom plugins
 import {
@@ -119,16 +125,16 @@ const TextArea: React.FC = () => {
 
   // Custom save wrapper
   const handleSave = useCallback(
-    async (docId: number, content: string) => {
+    async (docId: number, content: string): Promise<boolean> => {
       // Prevent saving empty content for documents that previously had content
       if (contentLoadedSuccessfully && content.trim() === "") {
         logger.error(
           "Prevented saving empty content for a document that previously had content",
         );
-        return;
+        return false;
       }
 
-      await saveContent(docId, content);
+      return await saveContent(docId, content);
     },
     [saveContent, contentLoadedSuccessfully],
   );
@@ -152,6 +158,40 @@ const TextArea: React.FC = () => {
     }
   }, [activeDocument]);
 
+  const flushMountedDirtyDrafts = useCallback(async () => {
+    await flushAllDirtyDrafts();
+  }, []);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        void flushMountedDirtyDrafts();
+        flushDirtyDraftsWithKeepalive();
+      }
+    };
+
+    const handlePageHide = () => {
+      void flushMountedDirtyDrafts();
+      flushDirtyDraftsWithKeepalive();
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [flushMountedDirtyDrafts]);
+
+  useEffect(() => {
+    return () => {
+      if (activeDocumentId) {
+        void flushDirtyDrafts([String(activeDocumentId)]);
+      }
+    };
+  }, [activeDocumentId]);
+
   // Show generation success indicator
   useEffect(() => {
     if (
@@ -167,15 +207,6 @@ const TextArea: React.FC = () => {
     }
   }, [generationStatus, activeDocument]);
 
-  // Early return if no document
-  if (!activeDocument) {
-    return (
-      <div className="flex items-center justify-center h-full text-gray-600 text-xl font-medium">
-        Seleccione un documento
-      </div>
-    );
-  }
-
   // Error handler for Lexical
   function onError(error: Error) {
     logger.error("Lexical Editor error:", error);
@@ -184,15 +215,34 @@ const TextArea: React.FC = () => {
   // Create editor configuration
   const initialConfig = createEditorConfig(onError);
 
-  const activeDerivedState =
-    derivedByDocumentId[String(activeDocument.id)] ?? null;
+  const activeDerivedState = activeDocument
+    ? (derivedByDocumentId[String(activeDocument.id)] ?? null)
+    : null;
 
   const activePatchSet = activePatchSetId ? patchSets[activePatchSetId] : null;
-  const patchesForDocument = activePatchSet
-    ? activePatchSet.patches.filter(
-        (p) => p.documentId === String(activeDocument.id),
-      )
-    : [];
+  const patchesForDocument =
+    activePatchSet && activeDocument
+      ? activePatchSet.patches.filter(
+          (p) => p.documentId === String(activeDocument.id),
+        )
+      : [];
+
+  const handlePatchDecision = useCallback(
+    (patchId: string, decision: "approve" | "reject") => {
+      if (!activePatchSet) return;
+      submitPatchDecisionFn(activePatchSet.id, patchId, decision);
+    },
+    [activePatchSet, submitPatchDecisionFn],
+  );
+
+  // Early return if no document
+  if (!activeDocument) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-600 text-xl font-medium">
+        Seleccione un documento
+      </div>
+    );
+  }
 
   const editorMode =
     patchesForDocument.length > 0
@@ -211,14 +261,6 @@ const TextArea: React.FC = () => {
 
   const isStreamingActiveDocument = editorMode === "streaming_preview";
   const isPatchPreviewMode = editorMode === "patch_review";
-
-  const handlePatchDecision = useCallback(
-    (patchId: string, decision: "approve" | "reject") => {
-      if (!activePatchSet) return;
-      submitPatchDecisionFn(activePatchSet.id, patchId, decision);
-    },
-    [activePatchSet, submitPatchDecisionFn],
-  );
 
   return (
     <div className="flex flex-col h-full">
@@ -311,13 +353,14 @@ const TextArea: React.FC = () => {
 
       {/* Editor */}
       <div className="border rounded-md flex-1 bg-white overflow-hidden relative">
-        {/* AI-running lock overlay — shown when the copilot agent is streaming.
-            pointer-events-none: doctor can still scroll and read, just not type.
-            Only shown in edit mode; patch_review and streaming_preview have
-            their own visual states that already imply the doc is busy. */}
+        {/* Non-blocking AI indicator — shown when the agent is streaming.
+            pointer-events-none keeps it visual-only; the doctor can keep typing.
+            If a patch conflict occurs we handle it in the review layer rather than
+            locking the editor here. */}
         {isCopilotRunning && editorMode === "edit" && (
-          <div className="absolute inset-0 bg-black/5 pointer-events-none z-10 flex items-start justify-end">
-            <span className="m-2 px-2 py-0.5 bg-white/80 text-xs text-gray-500 rounded shadow-sm select-none">
+          <div className="absolute top-0 right-0 pointer-events-none z-10">
+            <span className="m-2 px-2 py-0.5 bg-white/80 text-xs text-gray-400 rounded shadow-sm select-none flex items-center gap-1">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />
               IA trabajando…
             </span>
           </div>
@@ -374,6 +417,9 @@ const TextArea: React.FC = () => {
                     onDraftChange={handleDraftChange}
                     documentId={activeDocument.id}
                     hasInitialContent={contentLoadedSuccessfully}
+                    registerSaveFunction={(fn) =>
+                      registerForceSave(String(activeDocument.id), fn)
+                    }
                   />
                 </>
               )}

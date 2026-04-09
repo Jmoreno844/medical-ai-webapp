@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import Any, Sequence
 
@@ -12,14 +13,25 @@ from app.graph.state import (
     reset_dict_state,
     reset_list_state,
 )
-from app.graph.tools import _build_retrieved_context, _default_selected_document_ids
+from app.graph.tools import (
+    _build_retrieved_context,
+    _default_selected_document_ids,
+    _fallback_target_document_id_from_state,
+    _has_full_read_for_document,
+    draft_patch_set_from_state,
+)
 from app.planner import CopilotPlanner
 
 logger = logging.getLogger(__name__)
 
+
+def _content_hash(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
 NODE_PLANNER_TURN = "planner_turn"
 NODE_EXECUTE_TOOLS = "execute_tools"
 NODE_RECONCILE_TOOL_STATE = "reconcile_tool_state"
+NODE_DRAFT_PATCH_FROM_PLAN = "draft_patch_from_plan"
 NODE_WAIT_FOR_HUMAN_REVIEW = "wait_for_human_review"
 NODE_APPLY_PATCH_REVIEW = "apply_patch_review"
 NODE_FINALIZE_RUN = "finalize_run"
@@ -69,6 +81,7 @@ def _reset_transient_run_state(workspace_index: dict[str, Any] | None = None) ->
     for doc in ((workspace_index or {}).get("documents") or []):
         content = doc.get("content_markdown")
         if doc.get("ai_writable") and content:
+            content_hash = doc.get("content_hash") or _content_hash(str(content))
             pre_reads.append({
                 "document_id": str(doc["document_id"]),
                 "title": doc.get("title"),
@@ -76,7 +89,7 @@ def _reset_transient_run_state(workspace_index: dict[str, Any] | None = None) ->
                 "version": doc.get("version"),
                 "mode": "full",
                 "content": content,
-                "content_hash": doc.get("content_hash"),
+                "content_hash": content_hash,
             })
 
     doc_reads_update: list[dict[str, Any]] = [{"__reset__": True}, *pre_reads]
@@ -133,6 +146,8 @@ def _reset_transient_run_state(workspace_index: dict[str, Any] | None = None) ->
         # clinical_plan se resetea con cada run para que un plan de propagación
         # no contamine el siguiente turno del planner.
         "clinical_plan": None,
+        "next_required_action": None,
+        "planned_target_document_id": None,
     }
 
 
@@ -392,7 +407,58 @@ def route_after_tool_execution(state: CopilotState) -> str:
         state.get("patch_set_preview")
     ):
         return NODE_WAIT_FOR_HUMAN_REVIEW
+    if state.get("next_required_action") == "draft_patch_set":
+        target_document_id = str(
+            state.get("planned_target_document_id")
+            or _fallback_target_document_id_from_state(state)
+            or ""
+        ).strip()
+        clinical_plan = state.get("clinical_plan") or {}
+        if (
+            target_document_id
+            and (
+                not clinical_plan.get("needs_full_note")
+                or _has_full_read_for_document(state, document_id=target_document_id)
+            )
+        ):
+            return NODE_DRAFT_PATCH_FROM_PLAN
     return NODE_PLANNER_TURN
+
+
+def make_draft_patch_from_plan_node(
+    planner: CopilotPlanner,
+):
+    def draft_patch_from_plan(state: CopilotState) -> dict[str, Any]:
+        target_document_id = str(
+            state.get("planned_target_document_id")
+            or _fallback_target_document_id_from_state(state)
+            or ""
+        ).strip()
+        if not target_document_id:
+            return {
+                "last_tool_error": (
+                    "Existe un edit_plan pendiente pero el runtime no pudo resolver "
+                    "el documento target para redactar los patches."
+                ),
+                "next_required_action": None,
+                "planned_target_document_id": None,
+            }
+
+        result = draft_patch_set_from_state(
+            planner=planner,
+            state=state,
+            tool_name="propose_replace_span",
+            target_document_id=target_document_id,
+        )
+        if result["ok"]:
+            return result["updates"]
+        return result.get("updates") or {
+            "last_tool_error": result["error_message"],
+            "next_required_action": None,
+            "planned_target_document_id": None,
+        }
+
+    return draft_patch_from_plan
 
 
 def make_planner_turn_node(
@@ -526,6 +592,7 @@ finalize_response = finalize_run
 
 __all__ = [
     "NODE_APPLY_PATCH_REVIEW",
+    "NODE_DRAFT_PATCH_FROM_PLAN",
     "NODE_EXECUTE_TOOLS",
     "NODE_FINALIZE_RUN",
     "NODE_PLANNER_TURN",
@@ -537,6 +604,7 @@ __all__ = [
     "finalize_response",
     "finalize_run",
     "interrupt_for_review",
+    "make_draft_patch_from_plan_node",
     "make_call_model_node",
     "make_planner_turn_node",
     "reconcile_tool_state",

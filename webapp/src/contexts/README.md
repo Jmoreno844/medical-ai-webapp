@@ -37,7 +37,7 @@ Ese orden importa porque los providers se consumen entre sí.
 - `DocumentSnapshotStore`
   - contenido canónico conocido por documento y versión frontend
 - `DocumentDraftStore`
-  - draft local editable, `isDirty` y `lastEditedAt`
+  - draft local editable, `isDirty`, `lastEditedAt` y `userEditedSinceLastCopilotTurn`
 - `DocumentDerivedStore`
   - streaming, modo del editor y estado transitorio de generación/transcripción
 - `PatchStore`
@@ -63,6 +63,55 @@ Ese orden importa porque los providers se consumen entre sí.
   debe reconstruirse ad hoc en componentes de UI.
 - el primer consumidor frontend del broker debe ser un panel/debug client que
   valide payload y stream antes de introducir el chat final.
+
+## Semántica operativa de snapshot / draft
+
+### Snapshot
+
+- vive en `DocumentSnapshotStore`
+- representa el último contenido canónico conocido por el frontend
+- se actualiza al leer un documento, al guardar exitosamente, y al aplicar un patch del copiloto
+- `savedAt` es local al frontend; sirve para orden y trazabilidad visual, no como contrato de persistencia clínica
+
+### Draft
+
+- vive en `DocumentDraftStore`
+- `setDraftContent(...)` siempre marca `isDirty=true`
+- `markDraftClean(...)` solo baja el flag; no reemplaza el contenido
+- `resetDraftFromSnapshot(...)` vuelve a copiar el snapshot en el draft y deja `isDirty=false`
+- el draft también se persiste localmente en navegador para sobrevivir refresh/cierre inesperado
+- `userEditedSinceLastCopilotTurn` sobrevive al autosave y se limpia solo con `markCopilotTurnConsumed(...)` después de enviar contexto al copiloto
+
+### Regla importante sobre `isDirty`
+
+`isDirty` sigue usándose, pero ya no debe interpretarse como “el draft definitivamente difiere del snapshot”. En la práctica significa “hubo actividad local reciente del editor”.
+
+Lexical puede volver a disparar `onChange` al refrescar contenido desde snapshot y re-marcar el draft como dirty aunque el markdown sea el mismo. Por eso los caminos sensibles al copiloto deben comparar contenido normalizado, no basarse solo en el booleano.
+
+### Save path del editor
+
+1. `AutoSavePlugin` serializa Lexical a markdown.
+2. `onDraftChange` actualiza el draft store.
+3. el draft local se persiste en navegador con debounce corto (~400 ms).
+4. `AutoSavePlugin` dispara autosave backend con debounce corto (~1 s).
+5. `saveContent(...)` compara contra snapshot con normalización de whitespace.
+6. Si el contenido es igual, evita el save HTTP y solo limpia el draft.
+7. Si el contenido cambió, persiste, actualiza snapshot y limpia el draft.
+
+### Flush de salida / navegación
+
+- el editor intenta `flushDirtyDrafts(...)` al cambiar de documento, al ocultarse la pestaña (`visibilitychange`) y en `pagehide`
+- en salida también dispara un `fetch(..., { keepalive: true })` best-effort hacia el mismo write path del editor, pero solo si el draft local sigue siendo distinto del snapshot
+- ese flush solo aplica a editores montados; si no existe editor montado, el draft local persistido sigue siendo la red de seguridad
+- no existe todavía un write path especial vía `sendBeacon`; el primer mecanismo de protección sigue siendo `draft local persistido + save HTTP normal`
+
+### Force-save antes del copiloto
+
+`useCopilotPanelController.sendMessage()` llama `flushDirtyDrafts(...)` antes de construir `WorkspaceIndex`.
+
+- solo los editores montados participan porque el registro vive en `forceSaveRegistry.ts`
+- si un editor no está montado, el documento puede seguir dirty y salir sin `contentMarkdown` en el payload al agente
+- `buildWorkspaceIndex()` compensa parte de esto comparando `draft` vs `snapshot` para no excluir falsos dirty causados por re-render del editor
 
 ## Restricciones importantes
 

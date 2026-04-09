@@ -10,6 +10,10 @@ import { useDocumentContext } from "./DocumentContext";
 import { logger } from "@/lib/logger";
 import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
 import { useDocumentSnapshotStore } from "@/workspace/stores/documentSnapshotStore";
+import {
+  hasMeaningfulDocumentChange,
+  normalizeDocumentContent,
+} from "@/workspace/utils/documentSave";
 
 type ContentContextType = {
   documentContent: string;
@@ -22,7 +26,7 @@ type ContentContextType = {
 
   fetchDocumentContent: (
     docId: number,
-    forceRefresh?: boolean
+    forceRefresh?: boolean,
   ) => Promise<string | null>;
   reloadContent: (forceRefresh?: boolean) => Promise<void>;
   triggerEditorRefresh: () => void;
@@ -42,28 +46,32 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
   const [editorRefreshTrigger, setEditorRefreshTrigger] = useState<number>(0);
 
   const snapshotsByDocumentId = useDocumentSnapshotStore(
-    (state) => state.snapshotsByDocumentId
+    (state) => state.snapshotsByDocumentId,
   );
   const isLoadingByDocumentId = useDocumentSnapshotStore(
-    (state) => state.isLoadingByDocumentId
+    (state) => state.isLoadingByDocumentId,
   );
   const fetchErrorByDocumentId = useDocumentSnapshotStore(
-    (state) => state.fetchErrorByDocumentId
+    (state) => state.fetchErrorByDocumentId,
   );
   const loadedDocumentIds = useDocumentSnapshotStore(
-    (state) => state.loadedDocumentIds
+    (state) => state.loadedDocumentIds,
   );
   const getSnapshot = useDocumentSnapshotStore((state) => state.getSnapshot);
   const setSnapshot = useDocumentSnapshotStore((state) => state.setSnapshot);
-  const fetchSnapshot = useDocumentSnapshotStore((state) => state.fetchSnapshot);
+  const fetchSnapshot = useDocumentSnapshotStore(
+    (state) => state.fetchSnapshot,
+  );
 
   const draftsByDocumentId = useDocumentDraftStore(
-    (state) => state.draftsByDocumentId
+    (state) => state.draftsByDocumentId,
   );
   const getDraft = useDocumentDraftStore((state) => state.getDraft);
-  const setDraftContent = useDocumentDraftStore((state) => state.setDraftContent);
+  const setDraftContent = useDocumentDraftStore(
+    (state) => state.setDraftContent,
+  );
   const resetDraftFromSnapshot = useDocumentDraftStore(
-    (state) => state.resetDraftFromSnapshot
+    (state) => state.resetDraftFromSnapshot,
   );
   const markDraftClean = useDocumentDraftStore((state) => state.markDraftClean);
 
@@ -73,14 +81,17 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
 
   const activeDocumentKey = activeDocumentId ? String(activeDocumentId) : null;
   const activeDraft = activeDocumentKey ? getDraft(activeDocumentKey) : null;
-  const activeSnapshot = activeDocumentKey ? getSnapshot(activeDocumentKey) : null;
+  const activeSnapshot = activeDocumentKey
+    ? getSnapshot(activeDocumentKey)
+    : null;
 
-  const documentContent = activeDraft?.localUnsavedContent ?? activeSnapshot?.contentMarkdown ?? "";
+  const documentContent =
+    activeDraft?.localUnsavedContent ?? activeSnapshot?.contentMarkdown ?? "";
   const isLoadingContent = activeDocumentKey
     ? Boolean(isLoadingByDocumentId[activeDocumentKey])
     : false;
   const fetchError = activeDocumentKey
-    ? fetchErrorByDocumentId[activeDocumentKey] ?? null
+    ? (fetchErrorByDocumentId[activeDocumentKey] ?? null)
     : null;
   const contentLoadedSuccessfully = activeDocumentKey
     ? loadedDocumentIds.includes(activeDocumentKey) ||
@@ -98,7 +109,10 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
     });
 
     Object.entries(draftsByDocumentId).forEach(([documentId, draft]) => {
-      if (draft?.localUnsavedContent !== null && draft?.localUnsavedContent !== undefined) {
+      if (
+        draft?.localUnsavedContent !== null &&
+        draft?.localUnsavedContent !== undefined
+      ) {
         cache.set(Number(documentId), draft.localUnsavedContent);
       }
     });
@@ -123,7 +137,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
       const existingDraft = getDraft(documentKey);
 
       logger.debug(
-        `[DOC_FETCH] Request for document ${docId}, forceRefresh: ${forceRefresh}`
+        `[DOC_FETCH] Request for document ${docId}, forceRefresh: ${forceRefresh}`,
       );
 
       if (cachedSnapshot && !forceRefresh) {
@@ -139,26 +153,34 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
         return null;
       }
 
+      if (
+        existingDraft &&
+        !hasMeaningfulDocumentChange(
+          snapshot.contentMarkdown,
+          existingDraft.localUnsavedContent ?? "",
+        )
+      ) {
+        resetDraftFromSnapshot(documentKey);
+        markDraftClean(documentKey);
+      }
+
       if (!existingDraft || !existingDraft.isDirty) {
         resetDraftFromSnapshot(documentKey);
       }
 
       return snapshot.contentMarkdown;
     },
-    [fetchSnapshot, getDraft, getSnapshot, resetDraftFromSnapshot]
+    [
+      fetchSnapshot,
+      getDraft,
+      getSnapshot,
+      markDraftClean,
+      resetDraftFromSnapshot,
+    ],
   );
 
   const saveContent = useCallback(
     async (docId: number, content: string): Promise<boolean> => {
-      const normalizeBreaks = (text: string): string => {
-        return text
-          .replace(/\r\n/g, "\n")
-          .replace(/\r/g, "\n")
-          .replace(/\n\n+/g, "\n\n") // Collapse multiple newlines to max two
-          .replace(/[ \t]+/g, " ") // Collapse multiple spaces
-          .trim();
-      };
-
       try {
         const documentKey = String(docId);
         const snapshot = getSnapshot(documentKey);
@@ -166,15 +188,21 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
 
         if (
           cachedContent &&
-          normalizeBreaks(cachedContent) === normalizeBreaks(content)
+          normalizeDocumentContent(cachedContent) ===
+            normalizeDocumentContent(content)
         ) {
+          logger.debug(
+            `[saveContent] doc ${docId} content matches snapshot \u2014 skipping HTTP save, marking clean`,
+          );
           setDraftContent(documentKey, content);
           resetDraftFromSnapshot(documentKey);
           markDraftClean(documentKey);
           return true;
         }
 
-        setDraftContent(documentKey, content);
+        logger.debug(
+          `[saveContent] doc ${docId} has changes \u2014 saving to server`,
+        );
         const success = await saveDocument(docId, content);
 
         if (success) {
@@ -196,25 +224,28 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
       saveDocument,
       setDraftContent,
       setSnapshot,
-    ]
+    ],
   );
 
   const reloadContent = useCallback(
     async (forceRefresh: boolean = false): Promise<void> => {
       if (activeDocumentId) {
         logger.debug(
-          `[RELOAD_CONTENT] Document ${activeDocumentId}, forceRefresh: ${forceRefresh}`
+          `[RELOAD_CONTENT] Document ${activeDocumentId}, forceRefresh: ${forceRefresh}`,
         );
         const documentKey = String(activeDocumentId);
         const existingDraft = getDraft(documentKey);
-        const content = await fetchDocumentContent(activeDocumentId, forceRefresh);
+        const content = await fetchDocumentContent(
+          activeDocumentId,
+          forceRefresh,
+        );
 
         if (content !== null && (!existingDraft || !existingDraft.isDirty)) {
           resetDraftFromSnapshot(documentKey);
         }
       }
     },
-    [activeDocumentId, fetchDocumentContent, getDraft, resetDraftFromSnapshot]
+    [activeDocumentId, fetchDocumentContent, getDraft, resetDraftFromSnapshot],
   );
 
   useEffect(() => {
@@ -225,7 +256,9 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     return () => {
-      logger.debug(`[CACHE_CLEAR 🧹] ContentContext unmounting, clearing cache`);
+      logger.debug(
+        `[CACHE_CLEAR 🧹] ContentContext unmounting, clearing cache`,
+      );
     };
   }, []);
 
@@ -241,7 +274,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
         resetDraftFromSnapshot(documentKey);
       }
     },
-    [getDraft, getSnapshot, resetDraftFromSnapshot, setSnapshot]
+    [getDraft, getSnapshot, resetDraftFromSnapshot, setSnapshot],
   );
 
   const value: ContentContextType = {
@@ -251,7 +284,9 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
     contentLoadedSuccessfully,
     documentContentCache,
     editorRefreshTrigger,
-    loadedDocumentIds: loadedDocumentIds.map((documentId) => Number(documentId)),
+    loadedDocumentIds: loadedDocumentIds.map((documentId) =>
+      Number(documentId),
+    ),
     fetchDocumentContent,
     reloadContent,
     triggerEditorRefresh,

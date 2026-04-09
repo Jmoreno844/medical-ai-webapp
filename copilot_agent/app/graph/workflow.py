@@ -5,6 +5,7 @@ from langgraph.prebuilt import ToolNode
 
 from app.graph.nodes import (
     NODE_APPLY_PATCH_REVIEW,
+    NODE_DRAFT_PATCH_FROM_PLAN,
     NODE_EXECUTE_TOOLS,
     NODE_FINALIZE_RUN,
     NODE_PLANNER_TURN,
@@ -12,6 +13,7 @@ from app.graph.nodes import (
     NODE_WAIT_FOR_HUMAN_REVIEW,
     apply_patch_review,
     finalize_run,
+    make_draft_patch_from_plan_node,
     make_planner_turn_node,
     reconcile_tool_state,
     route_after_planner_turn,
@@ -37,6 +39,7 @@ def build_clinical_copilot_graph(*, tools_client, planner, checkpointer=None):
     )
 
     graph.add_node(NODE_PLANNER_TURN, make_planner_turn_node(planner, tools))
+    graph.add_node(NODE_DRAFT_PATCH_FROM_PLAN, make_draft_patch_from_plan_node(planner))
     graph.add_node(
         NODE_EXECUTE_TOOLS,
         ToolNode(
@@ -64,6 +67,17 @@ def build_clinical_copilot_graph(*, tools_client, planner, checkpointer=None):
         NODE_RECONCILE_TOOL_STATE,
         route_after_tool_execution,
         {
+            NODE_DRAFT_PATCH_FROM_PLAN: NODE_DRAFT_PATCH_FROM_PLAN,
+            NODE_PLANNER_TURN: NODE_PLANNER_TURN,
+            NODE_WAIT_FOR_HUMAN_REVIEW: NODE_WAIT_FOR_HUMAN_REVIEW,
+            NODE_FINALIZE_RUN: NODE_FINALIZE_RUN,
+        },
+    )
+    graph.add_conditional_edges(
+        NODE_DRAFT_PATCH_FROM_PLAN,
+        route_after_tool_execution,
+        {
+            NODE_DRAFT_PATCH_FROM_PLAN: NODE_DRAFT_PATCH_FROM_PLAN,
             NODE_PLANNER_TURN: NODE_PLANNER_TURN,
             NODE_WAIT_FOR_HUMAN_REVIEW: NODE_WAIT_FOR_HUMAN_REVIEW,
             NODE_FINALIZE_RUN: NODE_FINALIZE_RUN,

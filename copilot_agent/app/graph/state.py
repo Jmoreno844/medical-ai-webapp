@@ -349,3 +349,9 @@ class CopilotState(TypedDict):
     # None cuando el planner hace una edición local simple sin llamar set_edit_plan.
     # El drafter lo consume para saber qué secciones tocar y a qué nivel de impacto.
     clinical_plan: NotRequired[dict[str, Any] | None]
+    # Señal estructurada del runtime para continuar automáticamente con drafting
+    # después de set_edit_plan cuando ya están satisfechas las precondiciones.
+    next_required_action: NotRequired[str | None]
+    # Documento target congelado por set_edit_plan cuando el runtime puede inferirlo
+    # con seguridad. Evita una segunda "decisión libre" del planner antes de draft.
+    planned_target_document_id: NotRequired[str | None]

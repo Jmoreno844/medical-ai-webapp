@@ -204,6 +204,7 @@ function serializeWorkspaceIndex(workspaceIndex: WorkspaceIndex) {
       is_active: document.isActive,
       is_open: document.isOpen,
       has_dirty_draft: document.hasDirtyDraft,
+      has_user_edits: document.hasUserEdits,
       has_streaming_state: document.hasStreamingState,
       hidden_from_agent: document.hiddenFromAgent,
       pinned_for_agent: document.pinnedForAgent,

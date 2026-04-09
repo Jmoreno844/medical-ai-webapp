@@ -90,6 +90,10 @@ export type DocumentDraftState = {
   localSections?: DocumentSection[];
   isDirty: boolean;
   lastEditedAt?: string;
+  // True when the doctor typed in this document since the last copilot turn.
+  // Survives autosave (which clears isDirty) and is reset only after a
+  // successful copilot submission. Used to emit <user_edit_notices> to the agent.
+  userEditedSinceLastCopilotTurn?: boolean;
 };
 
 export type DocumentDerivedState = {
@@ -158,6 +162,9 @@ export type WorkspaceIndex = {
     isActive: boolean;
     isOpen: boolean;
     hasDirtyDraft: boolean;
+    // True when the doctor typed in this document since the last copilot turn,
+    // even if autosave already flushed isDirty to false.
+    hasUserEdits: boolean;
     hasStreamingState: boolean;
     hiddenFromAgent: boolean;
     pinnedForAgent: boolean;

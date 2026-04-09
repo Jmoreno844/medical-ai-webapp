@@ -16,7 +16,7 @@ type WorkspaceStoreState = {
   loadedEncounterId: string | null;
   bootstrapEncounterDocuments: (
     encounterId: number | string,
-    docs: DocumentoOut[]
+    docs: DocumentoOut[],
   ) => void;
   setActiveDocument: (documentId: string | null) => void;
   addDocument: (doc: DocumentoOut, encounterId: number | string) => void;
@@ -49,7 +49,7 @@ function sortDocuments(docs: DocumentoOut[]): DocumentoOut[] {
 
 function buildWorkspaceMap(
   docs: DocumentoOut[],
-  encounterId: number | string
+  encounterId: number | string,
 ): Record<string, WorkspaceDocument> {
   return sortDocuments(docs).reduce<Record<string, WorkspaceDocument>>(
     (acc, doc) => {
@@ -57,7 +57,7 @@ function buildWorkspaceMap(
       acc[workspaceDoc.id] = workspaceDoc;
       return acc;
     },
-    {}
+    {},
   );
 }
 
@@ -82,11 +82,13 @@ export const useWorkspaceStore = create<WorkspaceStoreState>((set) => ({
 
     set((state) => {
       const previousActiveId =
-        state.loadedEncounterId === encounterKey ? state.activeDocumentId : null;
+        state.loadedEncounterId === encounterKey
+          ? state.activeDocumentId
+          : null;
       const nextActiveId =
         previousActiveId && orderedIds.includes(previousActiveId)
           ? previousActiveId
-          : orderedIds[0] ?? null;
+          : (orderedIds[0] ?? null);
 
       return {
         documentsById: buildWorkspaceMap(docs, encounterId),
@@ -107,7 +109,7 @@ export const useWorkspaceStore = create<WorkspaceStoreState>((set) => ({
       if (!(documentId in state.documentsById)) {
         logger.warn(
           "[WORKSPACE] Tried to activate unknown document %s",
-          documentId
+          documentId,
         );
         return state;
       }
@@ -136,7 +138,7 @@ export const useWorkspaceStore = create<WorkspaceStoreState>((set) => ({
           content: item.contentMarkdown,
           created_on: String(item.metadata.created_on ?? item.createdAt),
           doctor_id: Number(item.metadata.doctor_id ?? 0),
-        }))
+        })),
       );
 
       return {
@@ -194,7 +196,7 @@ export const useWorkspaceStore = create<WorkspaceStoreState>((set) => ({
           content: item.contentMarkdown,
           created_on: String(item.metadata.created_on ?? item.createdAt),
           doctor_id: Number(item.metadata.doctor_id ?? 0),
-        }))
+        })),
       );
 
       return {

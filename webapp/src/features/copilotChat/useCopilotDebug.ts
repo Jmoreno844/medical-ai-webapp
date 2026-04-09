@@ -33,11 +33,14 @@ const INITIAL_STATE: CopilotDebugState = {
 };
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "waiting_review"]);
+const PATCH_SET_HYDRATION_RETRY_MS = 250;
+const PATCH_SET_HYDRATION_MAX_ATTEMPTS = 5;
 
 export function useCopilotDebug(encounterId: number) {
   const log = createChildLogger("CopilotDebug");
   const [state, setState] = useState<CopilotDebugState>(INITIAL_STATE);
   const closeStreamRef = useRef<(() => void) | null>(null);
+  const patchSetHydrationRunRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -99,6 +102,65 @@ export function useCopilotDebug(encounterId: number) {
     });
   }, []);
 
+  const hydratePatchSets = useCallback(
+    async (runId: string, reason: string) => {
+      patchSetHydrationRunRef.current = runId;
+
+      for (
+        let attempt = 1;
+        attempt <= PATCH_SET_HYDRATION_MAX_ATTEMPTS;
+        attempt += 1
+      ) {
+        if (patchSetHydrationRunRef.current !== runId) {
+          return;
+        }
+
+        try {
+          const patchSets = await listCopilotPatchSets(runId);
+          log.debug("[patch-set-hydration]", {
+            runId,
+            reason,
+            attempt,
+            patchSetCount: patchSets.length,
+          });
+
+          if (patchSets.length > 0) {
+            setState((current) => {
+              if (current.runId !== runId) {
+                return current;
+              }
+
+              return {
+                ...current,
+                patchSets,
+                status:
+                  current.status === "completed"
+                    ? "waiting_review"
+                    : current.status,
+                lastError: null,
+              };
+            });
+            return;
+          }
+        } catch (error) {
+          log.warn("[patch-set-hydration:error]", {
+            runId,
+            reason,
+            attempt,
+            message: String(error),
+          });
+        }
+
+        if (attempt < PATCH_SET_HYDRATION_MAX_ATTEMPTS) {
+          await new Promise<void>((resolve) => {
+            window.setTimeout(resolve, PATCH_SET_HYDRATION_RETRY_MS);
+          });
+        }
+      }
+    },
+    [log],
+  );
+
   const openStream = useCallback(
     (runId: string, afterSequence = 0) => {
       log.debug("[stream:open]", { runId, afterSequence });
@@ -114,6 +176,12 @@ export function useCopilotDebug(encounterId: number) {
         },
         onEvent: (event) => {
           appendEvent(event);
+          if (
+            event.event === "patch_proposed" ||
+            event.event === "review_required"
+          ) {
+            void hydratePatchSets(event.run_id, event.event);
+          }
         },
         onError: async (message) => {
           log.warn("[stream:onError]", { runId, afterSequence, message });
@@ -141,7 +209,7 @@ export function useCopilotDebug(encounterId: number) {
         },
       });
     },
-    [appendEvent],
+    [appendEvent, hydratePatchSets],
   );
 
   const ensureSession = useCallback(async () => {
@@ -195,10 +263,13 @@ export function useCopilotDebug(encounterId: number) {
         events: [],
         patchSets,
       });
+      if (run.requires_human_review && patchSets.length === 0) {
+        void hydratePatchSets(run.run_id, "runMessage");
+      }
       openStream(run.run_id);
       return run;
     },
-    [openStream],
+    [hydratePatchSets, openStream],
   );
 
   const syncRunStatus = useCallback(async () => {
@@ -333,6 +404,7 @@ export function useCopilotDebug(encounterId: number) {
   const reset = useCallback(() => {
     closeStreamRef.current?.();
     closeStreamRef.current = null;
+    patchSetHydrationRunRef.current = null;
     setState(INITIAL_STATE);
   }, []);
 

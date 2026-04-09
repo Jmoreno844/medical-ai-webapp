@@ -225,29 +225,32 @@ def _render_search_results(
 
 
 def _render_user_edit_notices(workspace_index: Mapping[str, Any]) -> str:
-    # Emitted when the doctor has unsaved edits in a writable document.
-    # The agent must not attempt to patch these documents because:
-    # - their content_markdown was not pre-seeded (version mismatch risk)
-    # - the draft content is ahead of the last saved version Django knows about
-    # The notice tells the agent to inform the doctor to save first.
-    dirty_docs = [
+    # Emitted when the doctor typed in a document since the last copilot turn.
+    # By the time the agent sees this, the chat submission path has already
+    # force-saved the drafts, so the latest content is in the DB. The notice
+    # is purely informational: if the user's instruction works on one of these
+    # documents, the planner should call read_document to get the fresh text
+    # rather than relying on any previous in-context snapshot.
+    noticed_docs = [
         doc
         for doc in (workspace_index.get("documents") or [])
-        if doc.get("ai_writable") and doc.get("has_dirty_draft")
+        if doc.get("ai_writable") and doc.get("has_user_edits")
     ]
-    if not dirty_docs:
+    if not noticed_docs:
         return ""
 
     lines = ["<user_edit_notices>"]
-    for doc in dirty_docs[:4]:
+    for doc in noticed_docs[:4]:
         lines.extend(
             [
                 "  <notice>",
                 f"    {xml_line('document_id', doc.get('document_id'))}",
                 f"    {xml_line('title', doc.get('title'))}",
-                "    <message>Este documento tiene cambios sin guardar del medico. "
-                "NO intentes editarlo. Si el medico quiere que lo modifiques, "
-                "pidele que guarde primero (o espera a que el autosave termine).</message>",
+                "    <message>El medico edito este documento manualmente en este turno. "
+                "La version mas reciente esta guardada. Si la instruccion del medico "
+                "requiere trabajar sobre este documento (p. ej. 'traduce lo que escribi', "
+                "'propaga este nuevo diagnostico'), debes leerlo primero con "
+                "read_document para obtener el texto mas reciente.</message>",
                 "  </notice>",
             ]
         )
@@ -297,6 +300,10 @@ def render_turn_context(state: Mapping[str, Any]) -> str:
             _render_context_view(state.get("context_view")),
             _render_search_results(search_results),
             _render_patch_history(state.get("patch_history") or {}),
+            "  <planning_state>",
+            f"    {xml_line('next_required_action', state.get('next_required_action'))}",
+            f"    {xml_line('planned_target_document_id', state.get('planned_target_document_id'))}",
+            "  </planning_state>",
             "  <budgets>",
             f"    {xml_line('iteration_count', state.get('iteration_count'))}",
             f"    {xml_line('max_iterations', state.get('max_iterations'))}",
@@ -320,6 +327,7 @@ def render_patch_input(
     span_payload: Mapping[str, Any] | None,
     requested_tool_name: str | None,
     requested_tool_instruction: str | None = None,
+    requested_affected_sections: Sequence[str] | None = None,
 ) -> str:
     lines = [
         "<patch_drafting_input>",
@@ -362,6 +370,13 @@ def render_patch_input(
     # El drafter usa <edit_plan> para saber exactamente qué secciones tocar y a qué nivel
     # de impacto clínico, sin necesidad de reinterpretar el historial de la conversación.
     clinical_plan = dict(state.get("clinical_plan") or {})
+    if not clinical_plan and requested_affected_sections:
+        clinical_plan = {
+            "edit_scope": "local",
+            "clinical_impact_level": "factual",
+            "affected_sections": list(requested_affected_sections),
+            "needs_full_note": False,
+        }
     if clinical_plan:
         sections_str = ", ".join(clinical_plan.get("affected_sections") or [])
         lines.extend(
@@ -373,6 +388,10 @@ def render_patch_input(
                 f"    {xml_line('needs_full_note', clinical_plan.get('needs_full_note'))}",
             ]
         )
+        if requested_affected_sections:
+            lines.append(
+                f"    {xml_line('requested_affected_sections', ', '.join(requested_affected_sections))}"
+            )
         if clinical_plan.get("reasoning"):
             # Razonamiento clínico interno del planner: explica el hilo causal del cambio.
             lines.append(f"    {xml_line('reasoning', clinical_plan.get('reasoning'), max_length=800)}")

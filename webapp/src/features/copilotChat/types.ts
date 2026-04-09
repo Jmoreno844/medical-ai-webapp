@@ -141,6 +141,11 @@ export type CopilotChatMessage = {
   content: string;
   createdAt: string;
   runId?: string | null;
+  /** When set, this message renders as a compact resolved patch card instead of text. */
+  patchCard?: {
+    patchSet: CopilotPatchSetResponse;
+    outcome: "applied" | "rejected";
+  } | null;
 };
 
 export type CopilotSidePanelTab = "copilot" | "debug";
