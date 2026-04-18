@@ -38,7 +38,7 @@ def get_api_base_url():
     """Get the Django API base URL from environment variables."""
     api_base_url = os.environ.get("DJANGO_API_BASE_URL")
     if not api_base_url:
-        default_url = "http://localhost:8000/api"
+        default_url = "http://localhost:8001/api"
         logger.warning(f"DJANGO_API_BASE_URL not set, using default: {default_url}")
         return default_url
 

@@ -111,7 +111,7 @@ El estado completo es `CopilotState` en `app/graph/state.py`. Los campos relevan
 
 | Campo                 | Tipo                 | Descripción                                                                                                         |
 | --------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `workspace_index`     | `dict`               | Vista ligera del workspace: documento activo, abiertos, writable, versiones y opcionalmente `content_markdown` pre-seedeado por el frontend. Entra desde Django en el primer turno. |
+| `workspace_index`     | `dict`               | Vista ligera del workspace: documento activo, abiertos, writable, versiones y opcionalmente `content_markdown` pre-seedeado por el frontend. Puede incluir `content_json`, pero hoy el runtime lo ignora deliberadamente y sigue operando sobre markdown. Entra desde Django en el primer turno. |
 | `available_documents` | `list[dict]`         | Documentos disponibles en el workspace. Se va enriqueciendo con lecturas. Merge inteligente por `document_id`.      |
 | `document_summaries`  | `dict[doc_id, dict]` | Summaries de documentos leídos. Merge por doc_id, score por completitud.                                            |
 
@@ -163,6 +163,16 @@ Cuando Django inicia un nuevo run en el mismo thread (misma conversación), `_re
 ### Pre-seed desde frontend (`workspace_index.documents[].content_markdown`)
 
 Si el frontend envía `content_markdown` para un documento `ai_writable`, `_reset_transient_run_state()` lo convierte en una lectura `mode="full"` antes del primer turno del planner.
+
+`content_json` puede viajar en el mismo payload para UX/editor futuro, pero el runtime actual no lo usa como base de patching; el contrato clínico seguro sigue siendo markdown/texto.
+
+Django mantiene ambos campos sincronizados antes de exponer el documento al agente:
+
+- editor/UI persisten `content_json + content_markdown`
+- patch apply y callbacks siguen operando sobre markdown
+- cuando un write path entra solo con markdown, Django regenera `content_json` sincrónicamente
+
+Así el runtime puede seguir leyendo solo markdown sin riesgo de drift con el editor rico.
 
 Eso permite que el planner llame `propose_*` en el turno 1 sin `read_document(...)`, pero trae dos invariantes importantes:
 

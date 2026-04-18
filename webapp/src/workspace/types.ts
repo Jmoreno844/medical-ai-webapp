@@ -1,5 +1,7 @@
 import { DocumentoOut } from "@/types/documento";
 
+export type DocumentJsonContent = Record<string, unknown> | null;
+
 export type WorkspaceDocumentType =
   | "note"
   | "transcription"
@@ -55,6 +57,7 @@ export type WorkspaceDocument = {
   userEditable: boolean;
   version: number;
   contentMarkdown: string;
+  contentJson?: DocumentJsonContent;
   metadata: Record<string, unknown>;
   summaryShort?: string;
   summaryClinical?: string;
@@ -79,7 +82,7 @@ export type DocumentSnapshot = {
   documentId: string;
   version: number;
   contentMarkdown: string;
-  lexicalJson?: unknown;
+  contentJson?: DocumentJsonContent;
   sections?: DocumentSection[];
   savedAt: string;
 };
@@ -87,6 +90,7 @@ export type DocumentSnapshot = {
 export type DocumentDraftState = {
   documentId: string;
   localUnsavedContent: string | null;
+  localUnsavedContentJson?: DocumentJsonContent;
   localSections?: DocumentSection[];
   isDirty: boolean;
   lastEditedAt?: string;
@@ -177,6 +181,7 @@ export type WorkspaceIndex = {
     // the frontend decides to pre-load (open + ai_writable). Read-only or
     // hidden docs never carry this field.
     contentMarkdown?: string;
+    contentJson?: DocumentJsonContent;
   }>;
 };
 

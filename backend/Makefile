@@ -33,8 +33,8 @@ sync-frozen: ## uv sync --frozen (CI-style, fails if lock drifts)
 sync-dev-frozen: ## frozen sync including dev group
 	$(UV) sync --frozen --group dev
 
-runserver: ## Django runserver 0.0.0.0:8000
-	$(PY) manage.py runserver 0.0.0.0:8000
+runserver: ## Django runserver 0.0.0.0:8001
+	$(PY) manage.py runserver 0.0.0.0:8001
 
 run: runserver ## alias: same as runserver
 

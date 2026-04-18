@@ -29,6 +29,7 @@ Ese orden importa porque los providers se consumen entre sí.
   - kickoff de transcripción, SSE y flags compartidos del encounter
 - `GenerationContext`
   - plantillas, kickoff de generación y SSE
+  - al completar generación, refresca el documento desde backend para rehidratar `contentJson` canónico además del markdown final
 
 ## Qué es dueño de cada store del workspace
 
@@ -36,8 +37,10 @@ Ese orden importa porque los providers se consumen entre sí.
   - tabs, orden de documentos, documento activo y visibilidad para AI
 - `DocumentSnapshotStore`
   - contenido canónico conocido por documento y versión frontend
+  - ahora guarda `contentJson` (canónico del editor) + `contentMarkdown` derivado/compat
 - `DocumentDraftStore`
   - draft local editable, `isDirty`, `lastEditedAt` y `userEditedSinceLastCopilotTurn`
+  - persiste tanto markdown como JSON del editor para recuperar drafts locales
 - `DocumentDerivedStore`
   - streaming, modo del editor y estado transitorio de generación/transcripción
 - `PatchStore`
@@ -56,6 +59,7 @@ Ese orden importa porque los providers se consumen entre sí.
 - `DocumentDerivedStore` ya es el owner del streaming y del modo efectivo del
   editor.
 - `snapshot` es la capa canónica frontend del contenido cargado.
+- `snapshot.contentJson` es el canónico del editor rico; `snapshot.contentMarkdown` se mantiene como derivado/compat para saves legacy y pre-seed del copiloto.
 - `draft` es la capa editable local del editor.
 - `derived` es la capa transitoria para streaming y preview.
 - `patch` sigue siendo preparación interna; todavía no hay write path AI final.
@@ -86,17 +90,17 @@ Ese orden importa porque los providers se consumen entre sí.
 
 `isDirty` sigue usándose, pero ya no debe interpretarse como “el draft definitivamente difiere del snapshot”. En la práctica significa “hubo actividad local reciente del editor”.
 
-Lexical puede volver a disparar `onChange` al refrescar contenido desde snapshot y re-marcar el draft como dirty aunque el markdown sea el mismo. Por eso los caminos sensibles al copiloto deben comparar contenido normalizado, no basarse solo en el booleano.
+Tiptap puede volver a disparar `update` al refrescar contenido desde snapshot y re-marcar el draft como dirty aunque el markdown derivado sea el mismo. Por eso los caminos sensibles al copiloto deben comparar contenido normalizado, no basarse solo en el booleano.
 
 ### Save path del editor
 
-1. `AutoSavePlugin` serializa Lexical a markdown.
-2. `onDraftChange` actualiza el draft store.
+1. `TextArea` monta Tiptap 3 como editor principal.
+2. cada `update` publica `draft.contentJson` inmediato y deriva `draft.contentMarkdown`.
 3. el draft local se persiste en navegador con debounce corto (~400 ms).
-4. `AutoSavePlugin` dispara autosave backend con debounce corto (~1 s).
-5. `saveContent(...)` compara contra snapshot con normalización de whitespace.
+4. el editor dispara autosave backend con debounce corto (~1 s).
+5. `saveContent(...)` compara contra snapshot por markdown normalizado y JSON canónico.
 6. Si el contenido es igual, evita el save HTTP y solo limpia el draft.
-7. Si el contenido cambió, persiste, actualiza snapshot y limpia el draft.
+7. Si el contenido cambió, persiste `content_json` + `content_markdown`, actualiza snapshot y limpia el draft.
 
 ### Flush de salida / navegación
 

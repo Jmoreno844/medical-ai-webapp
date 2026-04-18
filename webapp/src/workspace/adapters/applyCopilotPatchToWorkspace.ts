@@ -45,7 +45,7 @@ export function applyCopilotPatchToWorkspace({
     contentLength: content.length,
   });
 
-  snapshotStore.setSnapshot(documentId, content, nextVersion);
+  snapshotStore.setSnapshot(documentId, content, null, nextVersion);
 
   if (
     !existingDraft?.isDirty ||
@@ -67,8 +67,8 @@ export function applyCopilotPatchToWorkspace({
 
   derivedStore.clearPatchPreview(documentId);
 
-  // Clear the entire patch set store so PatchInlineDiffView unmounts and the
-  // Lexical editor re-renders with the new (markdown-parsed) content.
+  // Clear the entire patch set store so the review UI unmounts and the
+  // Tiptap editor re-renders with the new canonical content.
   log.debug("clearing all patches from state store");
   patchSetStore.clearAll();
 

@@ -34,6 +34,77 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+.medical-document-editor {
+  height: 100%;
+}
+
+.medical-document-editor .ProseMirror {
+  height: 100%;
+  overflow: auto;
+}
+
+.medical-document-editor .ProseMirror h1,
+.medical-document-editor .ProseMirror h2,
+.medical-document-editor .ProseMirror h3 {
+  color: #0f172a;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 1rem 0 0.5rem;
+}
+
+.medical-document-editor .ProseMirror h1 {
+  font-size: 1.5rem;
+}
+
+.medical-document-editor .ProseMirror h2 {
+  font-size: 1.25rem;
+}
+
+.medical-document-editor .ProseMirror h3 {
+  font-size: 1.125rem;
+}
+
+.medical-document-editor .ProseMirror p {
+  margin: 0.5rem 0;
+}
+
+.medical-document-editor .ProseMirror ul,
+.medical-document-editor .ProseMirror ol {
+  margin: 0.5rem 0 0.75rem 1.5rem;
+  padding-left: 1.25rem;
+}
+
+.medical-document-editor .ProseMirror ul {
+  list-style: disc;
+}
+
+.medical-document-editor .ProseMirror ol {
+  list-style: decimal;
+}
+
+.medical-document-editor .ProseMirror li {
+  margin: 0.25rem 0;
+  padding-left: 0.25rem;
+}
+
+.medical-document-editor .ProseMirror strong {
+  font-weight: 700;
+}
+
+.medical-document-editor .ProseMirror blockquote {
+  border-left: 3px solid #cbd5e1;
+  color: #475569;
+  margin: 0.75rem 0;
+  padding-left: 0.75rem;
+}
+
+.medical-document-editor .ProseMirror code {
+  background: #f1f5f9;
+  border-radius: 0.25rem;
+  color: #334155;
+  padding: 0.1rem 0.25rem;
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

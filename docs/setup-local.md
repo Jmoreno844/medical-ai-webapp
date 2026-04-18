@@ -28,6 +28,9 @@ Variables clave:
 - `COPILOT_BACKEND_AUDIENCE=medical-api`
 - `COPILOT_AGENT_TIMEOUT_SECONDS=60`
 - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`
+
+Para local, el backend y el contenedor Docker de PostgreSQL usan `5433` por defecto para evitar choques con una instalación nativa en `5432`.
+
 - `GCS_BUCKET_NAME`
 - `GCP_PROJECT_ID`
 - `GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT`
@@ -44,7 +47,7 @@ cp webapp/.env.example webapp/.env.local
 
 Por defecto:
 
-- `VITE_API_URL=http://localhost:8000`
+- `VITE_API_URL=http://localhost:8001`
 
 ### Cloud Functions
 
@@ -58,7 +61,7 @@ Variables clave:
 - `GCP_PROJECT`
 - `GCP_REGION`
 - `GEMINI_MODEL`
-- `DJANGO_API_BASE_URL=http://localhost:8000/`
+- `DJANGO_API_BASE_URL=http://localhost:8001/`
 - `LANGSMITH_TRACING=true` si quieres tracing local en LangSmith
 - `LANGSMITH_API_KEY`
 - `LANGSMITH_PROJECT=cloud-functions-local`
@@ -82,7 +85,7 @@ Variables clave:
 - `LANGSMITH_PROJECT=copilot-agent-local`
 - `COPILOT_AGENT_DATABASE_URL`
 - `COPILOT_LONG_TERM_DATABASE_URL`
-- `BACKEND_INTERNAL_BASE_URL=http://localhost:8000`
+- `BACKEND_INTERNAL_BASE_URL=http://localhost:8001`
 - `BACKEND_INTERNAL_TIMEOUT_SECONDS=15`
 - `COPILOT_SERVICE_SHARED_JWT`
 - `COPILOT_ALLOWED_AUDIENCE=app-api-service`
@@ -120,6 +123,8 @@ make -C backend migrate
 make -C backend runserver
 ```
 
+Backend: `http://localhost:8001`
+
 Opcional:
 
 ```bash
@@ -150,7 +155,7 @@ Puertos locales:
 
 1. Abrir el frontend en `http://localhost:5173`.
 2. Crear o abrir un `Encuentro`.
-3. Verificar que Django responda en `http://localhost:8000/api/health/`.
+3. Verificar que Django responda en `http://localhost:8001/api/health/`.
 4. Confirmar que el flujo de transcripción apunte a `http://localhost:8082`.
 5. Confirmar que la generación documental apunte a `http://localhost:8083`.
 6. Confirmar que `copilot_agent` responda en `http://localhost:8090/healthz`.
@@ -158,22 +163,26 @@ Puertos locales:
 ## 7. Checks rápidos
 
 Backend:
+
 ```bash
 make -C backend check
 ```
 
 Frontend:
+
 ```bash
 npm --prefix webapp run lint
 npm --prefix webapp run build
 ```
 
 Cloud Functions:
+
 ```bash
 python -m pytest cloud_functions/functions/tests
 ```
 
 Copilot agent:
+
 ```bash
 docker compose -f copilot_agent/docker-compose.yml up --build
 ```
@@ -199,8 +208,8 @@ Detalle completo en [`docs/backend/tracing.md`](backend/tracing.md).
 ## Puertos locales
 
 - `5173` — frontend Vite
-- `8000` — backend Django
-- `5432` — PostgreSQL local
+- `8001` — backend Django
+- `5433` — PostgreSQL local
 - `8082` — Cloud Function de transcripción
 - `8083` — Cloud Function de generación
 - `8090` — copilot agent service

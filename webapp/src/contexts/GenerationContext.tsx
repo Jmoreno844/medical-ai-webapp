@@ -66,7 +66,7 @@ export function GenerationProvider({
   encounterId: number;
 }) {
   const { documents, createDocument } = useDocumentContext();
-  const { updateDocumentContent } = useContentContext();
+  const { fetchDocumentContent, updateDocumentContent } = useContentContext();
   const { hasBeenTranscribed } = useTranscriptionContext();
 
   const activeGenerationDocumentId = useDocumentDerivedStore(
@@ -233,7 +233,7 @@ export function GenerationProvider({
           );
         };
 
-        eventSource.onmessage = (event) => {
+        eventSource.onmessage = async (event) => {
           try {
             const data = JSON.parse(event.data);
             logger.debug(`📩 SSE message received: ${data.event}`);
@@ -260,7 +260,13 @@ export function GenerationProvider({
                 );
 
                 streamedContentRef.current = finalContent;
-                updateDocumentContent(targetDocumentId, finalContent);
+                const refreshedContent = await fetchDocumentContent(
+                  targetDocumentId,
+                  true,
+                );
+                if (refreshedContent === null) {
+                  updateDocumentContent(targetDocumentId, finalContent);
+                }
                 resetDraftFromSnapshot(String(targetDocumentId));
                 markDraftClean(String(targetDocumentId));
                 completeGeneration(String(targetDocumentId), finalContent);
@@ -304,6 +310,7 @@ export function GenerationProvider({
       closeEventSource,
       completeGeneration,
       failGeneration,
+      fetchDocumentContent,
       markDraftClean,
       resetDraftFromSnapshot,
       updateDocumentContent,

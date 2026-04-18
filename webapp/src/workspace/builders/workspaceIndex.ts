@@ -31,6 +31,11 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
         draft?.localUnsavedContent ??
         snapshot?.contentMarkdown ??
         document.contentMarkdown;
+      const contentJsonForAgent =
+        draft?.localUnsavedContentJson ??
+        snapshot?.contentJson ??
+        document.contentJson ??
+        null;
 
       return {
         documentId: document.id,
@@ -68,10 +73,9 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
         // - the document is hidden or currently streaming.
         //
         // Note: isDirty can be true even if the draft content equals the
-        // snapshot because Lexical fires onChange after DocumentContentPlugin
-        // applies refreshed content. We compare the actual content strings so
-        // that a transient isDirty=true after a patch apply does not
-        // incorrectly exclude the pre-seed.
+        // snapshot because the editor may emit an update right after a refresh.
+        // We compare the actual content strings so that a transient isDirty=true
+        // after a patch apply does not incorrectly exclude the pre-seed.
         contentMarkdown: (() => {
           if (!document.aiWritable) return undefined;
           if (workspaceState.hiddenFromAgentDocumentIds.includes(document.id))
@@ -81,9 +85,8 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
             snapshot?.contentMarkdown ?? document.contentMarkdown ?? "";
           if (draft?.isDirty && draft.localUnsavedContent != null) {
             // Normalize with the same rules as saveContent in ContentContext so that
-            // Lexical re-fires (onChange after DocumentContentPlugin refresh) that
-            // produce slightly different whitespace do not incorrectly mark the
-            // content as "different" and exclude the pre-seed.
+            // harmless editor re-emits with slightly different whitespace do not
+            // incorrectly mark the content as "different" and exclude the pre-seed.
             const normalize = (s: string) =>
               s
                 .replace(/\r\n/g, "\n")
@@ -98,6 +101,7 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
           }
           return canonical || undefined;
         })(),
+        contentJson: contentJsonForAgent,
       };
     });
 

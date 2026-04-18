@@ -136,6 +136,9 @@ export const useWorkspaceStore = create<WorkspaceStoreState>((set) => ({
               ? (item.metadata.doctor_template_id as number | null)
               : null,
           content: item.contentMarkdown,
+          content_markdown: item.contentMarkdown,
+          content_json:
+            typeof item.contentJson === "undefined" ? null : (item.contentJson ?? null),
           created_on: String(item.metadata.created_on ?? item.createdAt),
           doctor_id: Number(item.metadata.doctor_id ?? 0),
         })),
@@ -194,6 +197,9 @@ export const useWorkspaceStore = create<WorkspaceStoreState>((set) => ({
               ? (item.metadata.doctor_template_id as number | null)
               : null,
           content: item.contentMarkdown,
+          content_markdown: item.contentMarkdown,
+          content_json:
+            typeof item.contentJson === "undefined" ? null : (item.contentJson ?? null),
           created_on: String(item.metadata.created_on ?? item.createdAt),
           doctor_id: Number(item.metadata.doctor_id ?? 0),
         })),

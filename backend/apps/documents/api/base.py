@@ -15,11 +15,52 @@ from apps.documents.schemas import (
     DocumentContentOut,
 )
 from apps.encounters.models import Encounter
+from apps.documents.services.rich_document_content import (
+    build_synced_document_content,
+    set_document_content_fields,
+)
 
 import logging
 
 logger = logging.getLogger(__name__)
 router = Router()
+
+
+def _resolve_payload_markdown(payload: DocumentCreateIn | DocumentContentUpdateIn) -> str:
+    if payload.content_markdown is not None:
+        return payload.content_markdown
+    if payload.content is not None:
+        return payload.content
+    return ""
+
+
+def _resolve_payload_json(
+    payload: DocumentCreateIn | DocumentContentUpdateIn,
+):
+    return payload.content_json
+
+
+def _editor_payload_source(
+    payload: DocumentCreateIn | DocumentContentUpdateIn,
+) -> str:
+    if payload.content_json is not None:
+        return "json"
+    return "markdown"
+
+
+def _serialize_document(doc: Document, doctor_id: int | None = None) -> dict:
+    return {
+        "id": doc.id,
+        "encounter_id": doc.encounter_id,
+        "kind": doc.kind,
+        "doctor_template_id": doc.doctor_template_id,
+        "doctor_template_name": doc.doctor_template.name if doc.doctor_template else None,
+        "content": doc.content_markdown,
+        "content_markdown": doc.content_markdown,
+        "content_json": doc.content_json,
+        "doctor_id": doctor_id if doctor_id is not None else doc.doctor_id,
+        "created_on": doc.created_on,
+    }
 
 
 @router.post("/documents", response=DocumentOut, auth=django_auth)
@@ -50,24 +91,22 @@ def create_document(request, payload: DocumentCreateIn):
         if payload.kind != "template":
             doctor_template_id = None
 
+        synced_content = build_synced_document_content(
+            content_markdown=_resolve_payload_markdown(payload),
+            content_json=_resolve_payload_json(payload),
+            preferred_source=_editor_payload_source(payload),
+        )
+
         doc = Document.objects.create(
             encounter_id=payload.encounter_id,
             kind=payload.kind,
             doctor_template_id=doctor_template_id,
-            content=payload.content if payload.content is not None else "",
+            content_markdown=synced_content.content_markdown,
+            content_json=synced_content.content_json,
             doctor=doctor,
         )
 
-        return {
-            "id": doc.id,
-            "encounter_id": doc.encounter_id,
-            "kind": doc.kind,
-            "doctor_template_id": doc.doctor_template_id,
-            "doctor_template_name": None,
-            "content": doc.content,
-            "doctor_id": doctor.id,
-            "created_on": doc.created_on,
-        }
+        return _serialize_document(doc, doctor.id)
     except Exception as e:
         logger.error(f"Error creating document: {str(e)}")
         raise HttpError(500, f"Error al crear documento: {str(e)}")
@@ -89,18 +128,7 @@ def get_documents_by_encounter(request, encounter_id: int):
 
         result = []
         for doc in docs:
-            result.append(
-                {
-                    "id": doc.id,
-                    "encounter_id": doc.encounter_id,
-                    "kind": doc.kind,
-                    "doctor_template_id": doc.doctor_template_id,
-                    "doctor_template_name": doc.doctor_template.name if doc.doctor_template else None,
-                    "content": doc.content,
-                    "doctor_id": doc.doctor_id,
-                    "created_on": doc.created_on,
-                }
-            )
+            result.append(_serialize_document(doc))
 
         return result
     except Http404:
@@ -121,8 +149,13 @@ def update_document_by_editor(
         if doc.doctor.id != doctor.id:
             raise HttpError(403, "No tienes permiso para modificar este documento")
 
-        doc.content = payload.content
-        doc.save()
+        set_document_content_fields(
+            doc,
+            content_markdown=_resolve_payload_markdown(payload),
+            content_json=_resolve_payload_json(payload),
+            preferred_source=_editor_payload_source(payload),
+        )
+        doc.save(update_fields=["content_markdown", "content_json"])
         logger.info(f"Successfully updated document {document_id} by user {doctor.id}")
 
         return {
@@ -153,7 +186,11 @@ def get_document_content(request, document_id: int):
         if doc.doctor.id != doctor.id:
             raise HttpError(403, "No tienes permiso para acceder a este documento")
 
-        return {"content": doc.content}
+        return {
+            "content": doc.content_markdown,
+            "content_markdown": doc.content_markdown,
+            "content_json": doc.content_json,
+        }
     except Http404:
         raise HttpError(404, "Documento no encontrado")
 

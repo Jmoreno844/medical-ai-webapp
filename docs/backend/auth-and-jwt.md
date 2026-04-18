@@ -17,7 +17,7 @@
 Verificado en:
 
 - `PATCH /api/documento_by_function/{id}`
-- `POST /api/document/generation-chunk`
+- `POST /api/documents/generation-chunk`
 - `POST /api/notify/transcription-complete`
 
 Firma: misma clave vía `get_jwt_signing_key()`.

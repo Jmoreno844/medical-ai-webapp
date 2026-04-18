@@ -20,6 +20,7 @@ from apps.documents.services.sse_hub import (
     notify_document_updated,
     notify_generation_progress,
 )
+from apps.documents.services.rich_document_content import set_document_content_fields
 from utils.auth import JWTAuth
 from utils.jwt_http import resolve_bearer_jwt_payload
 
@@ -60,8 +61,12 @@ def receive_generation_chunk(request, payload: GenerationChunkIn, auth=None):
 
         if payload.is_complete:
             if payload.chunk:
-                doc.content = payload.chunk
-            doc.save()
+                set_document_content_fields(
+                    doc,
+                    content_markdown=payload.chunk,
+                    preferred_source="markdown",
+                )
+                doc.save(update_fields=["content_markdown", "content_json"])
             notify_generation_progress(
                 document_id, process_id, chunk=payload.chunk, is_complete=True
             )
@@ -117,8 +122,17 @@ def update_document_by_function(
         if int(doc_id_from_token) != int(document_id):
             raise HttpError(403, "No tienes permiso para modificar este documento")
 
-        doc.content = payload.content
-        doc.save()
+        set_document_content_fields(
+            doc,
+            content_markdown=payload.content_markdown or payload.content or "",
+            content_json=payload.content_json,
+            preferred_source=(
+                "markdown"
+                if payload.content_markdown is not None or payload.content is not None
+                else "json"
+            ),
+        )
+        doc.save(update_fields=["content_markdown", "content_json"])
         notify_document_updated(document_id, "transcription_complete")
         return {
             "success": True,

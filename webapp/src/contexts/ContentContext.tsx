@@ -10,13 +10,16 @@ import { useDocumentContext } from "./DocumentContext";
 import { logger } from "@/lib/logger";
 import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
 import { useDocumentSnapshotStore } from "@/workspace/stores/documentSnapshotStore";
+import { DocumentJsonContent } from "@/workspace/types";
 import {
   hasMeaningfulDocumentChange,
+  hasMeaningfulDocumentJsonChange,
   normalizeDocumentContent,
 } from "@/workspace/utils/documentSave";
 
 type ContentContextType = {
   documentContent: string;
+  documentContentJson: DocumentJsonContent;
   isLoadingContent: boolean;
   fetchError: string | null;
   contentLoadedSuccessfully: boolean;
@@ -30,8 +33,16 @@ type ContentContextType = {
   ) => Promise<string | null>;
   reloadContent: (forceRefresh?: boolean) => Promise<void>;
   triggerEditorRefresh: () => void;
-  saveContent: (docId: number, content: string) => Promise<boolean>;
-  updateDocumentContent: (docId: number, content: string) => void; // New function
+  saveContent: (
+    docId: number,
+    content: string,
+    contentJson?: DocumentJsonContent,
+  ) => Promise<boolean>;
+  updateDocumentContent: (
+    docId: number,
+    content: string,
+    contentJson?: DocumentJsonContent,
+  ) => void;
 };
 
 const ContentContext = createContext<ContentContextType | undefined>(undefined);
@@ -87,6 +98,10 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
 
   const documentContent =
     activeDraft?.localUnsavedContent ?? activeSnapshot?.contentMarkdown ?? "";
+  const documentContentJson =
+    activeDraft?.localUnsavedContentJson ??
+    activeSnapshot?.contentJson ??
+    null;
   const isLoadingContent = activeDocumentKey
     ? Boolean(isLoadingByDocumentId[activeDocumentKey])
     : false;
@@ -180,21 +195,27 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
   );
 
   const saveContent = useCallback(
-    async (docId: number, content: string): Promise<boolean> => {
+    async (
+      docId: number,
+      content: string,
+      contentJson?: DocumentJsonContent,
+    ): Promise<boolean> => {
       try {
         const documentKey = String(docId);
         const snapshot = getSnapshot(documentKey);
         const cachedContent = snapshot?.contentMarkdown;
+        const cachedJson = snapshot?.contentJson;
 
         if (
           cachedContent &&
           normalizeDocumentContent(cachedContent) ===
-            normalizeDocumentContent(content)
+            normalizeDocumentContent(content) &&
+          !hasMeaningfulDocumentJsonChange(cachedJson, contentJson ?? null)
         ) {
           logger.debug(
             `[saveContent] doc ${docId} content matches snapshot \u2014 skipping HTTP save, marking clean`,
           );
-          setDraftContent(documentKey, content);
+          setDraftContent(documentKey, content, contentJson ?? null);
           resetDraftFromSnapshot(documentKey);
           markDraftClean(documentKey);
           return true;
@@ -203,10 +224,15 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
         logger.debug(
           `[saveContent] doc ${docId} has changes \u2014 saving to server`,
         );
-        const success = await saveDocument(docId, content);
+        const success = await saveDocument(docId, content, contentJson ?? null);
 
         if (success) {
-          setSnapshot(documentKey, content, snapshot?.version ?? 1);
+          setSnapshot(
+            documentKey,
+            content,
+            contentJson ?? null,
+            snapshot?.version ?? 1,
+          );
           resetDraftFromSnapshot(documentKey);
           markDraftClean(documentKey);
         }
@@ -263,12 +289,17 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateDocumentContent = useCallback(
-    (docId: number, content: string) => {
+    (docId: number, content: string, contentJson?: DocumentJsonContent) => {
       const documentKey = String(docId);
       const existingDraft = getDraft(documentKey);
       const snapshot = getSnapshot(documentKey);
 
-      setSnapshot(documentKey, content, snapshot?.version ?? 1);
+      setSnapshot(
+        documentKey,
+        content,
+        contentJson ?? snapshot?.contentJson ?? null,
+        snapshot?.version ?? 1,
+      );
 
       if (!existingDraft || !existingDraft.isDirty) {
         resetDraftFromSnapshot(documentKey);
@@ -279,6 +310,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
 
   const value: ContentContextType = {
     documentContent,
+    documentContentJson,
     isLoadingContent,
     fetchError,
     contentLoadedSuccessfully,

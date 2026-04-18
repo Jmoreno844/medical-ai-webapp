@@ -69,7 +69,8 @@ export function adaptDocumentoToWorkspaceDocument(
     aiWritable: isAiWritable,
     userEditable: !isReadOnly,
     version: 1,
-    contentMarkdown: doc.content ?? "",
+    contentMarkdown: doc.content_markdown ?? doc.content ?? "",
+    contentJson: doc.content_json ?? null,
     metadata: {
       kind: doc.kind,
       created_on: doc.created_on,
@@ -95,6 +96,9 @@ export function adaptWorkspaceDocumentToDocumentoOut(
         ? (doc.metadata.doctor_template_id as number | null)
         : null,
     content: doc.contentMarkdown,
+    content_markdown: doc.contentMarkdown,
+    content_json:
+      typeof doc.contentJson === "undefined" ? null : (doc.contentJson ?? null),
     created_on: String(doc.metadata.created_on ?? doc.createdAt),
     doctor_id: Number(doc.metadata.doctor_id ?? 0),
   };

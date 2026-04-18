@@ -250,7 +250,7 @@ try:
                 "PORT": (
                     ""
                     if db_host.startswith("/cloudsql/")
-                    else os.getenv("DB_PORT", "5432")
+                    else os.getenv("DB_PORT", "5433")
                 ),
                 "OPTIONS": _postgres_options_for_host(db_host),
             }
@@ -280,7 +280,11 @@ try:
                     "USER": db_user,
                     "PASSWORD": db_password,
                     "HOST": db_host,
-                    "PORT": ("" if db_host.startswith("/cloudsql/") else "5432"),
+                    "PORT": (
+                        ""
+                        if db_host.startswith("/cloudsql/")
+                        else os.getenv("DB_PORT", "5433")
+                    ),
                     "OPTIONS": _postgres_options_for_host(db_host),
                 }
             }

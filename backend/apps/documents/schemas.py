@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 from ninja import Schema
 from datetime import date
 from pydantic import BaseModel
@@ -9,6 +9,8 @@ class DocumentCreateIn(Schema):
     kind: str
     doctor_template_id: Optional[int] = None
     content: Optional[str] = ""
+    content_markdown: Optional[str] = None
+    content_json: Optional[dict[str, Any]] = None
 
 
 class DocumentOut(Schema):
@@ -18,16 +20,22 @@ class DocumentOut(Schema):
     doctor_template_id: Optional[int]
     doctor_template_name: Optional[str] = None
     content: str
+    content_markdown: str
+    content_json: Optional[dict[str, Any]] = None
     created_on: date
     doctor_id: int
 
 
 class DocumentContentUpdateIn(Schema):
-    content: str
+    content: Optional[str] = None
+    content_markdown: Optional[str] = None
+    content_json: Optional[dict[str, Any]] = None
 
 
 class DocumentContentOut(Schema):
     content: str
+    content_markdown: str
+    content_json: Optional[dict[str, Any]] = None
 
 
 class SuccessResponse(Schema):

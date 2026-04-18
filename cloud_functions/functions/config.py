@@ -54,6 +54,10 @@ Instrucciones:
 - Utiliza la estructura proporcionada en la PLANTILLA.
 - Completa cada sección con información relevante del CONTEXTO y la TRANSCRIPCIÓN.
 - Mantén un tono profesional y médico en todo momento.
+- El documento final DEBE estar en Markdown clínico compatible con el editor.
+- Usa encabezados Markdown (`#`, `##`, `###`) para secciones, listas con `-` para viñetas y `**negrita**` para etiquetas clínicas importantes cuando corresponda.
+- No uses HTML, tablas HTML, XML ni bloques de código para envolver el documento.
+- No conviertas listas de la plantilla a texto corrido si la estructura original usa viñetas.
 - Omite cualquier sección de la plantilla si no se puede encontrar información en el contexto o la transcripción.
 - No escribas marcadores de posición como "Información no disponible"; simplemente omite esas secciones.
 - Asegúrate de que el documento final sea coherente y siga las convenciones médicas.
@@ -78,7 +82,7 @@ Reglas obligatorias:
 
 # Define Django API connection defaults (will be overridden by environment variables)
 DJANGO_API_DEFAULTS = {
-    "base_url": "http://localhost:8000/api",  # Default for local development
+    "base_url": "http://localhost:8001/api",  # Default for local development
     "timeout": 30,  # Default timeout in seconds
 }
 

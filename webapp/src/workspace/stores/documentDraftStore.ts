@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { useDocumentSnapshotStore } from "@/workspace/stores/documentSnapshotStore";
-import { DocumentDraftState } from "@/workspace/types";
+import { DocumentDraftState, DocumentJsonContent } from "@/workspace/types";
 
 const DOCUMENT_DRAFT_STORAGE_KEY = "medical-web-app.document-drafts.v1";
 const DOCUMENT_DRAFT_PERSIST_DEBOUNCE_MS = 400;
@@ -9,6 +9,7 @@ type PersistedDocumentDraft = Pick<
   DocumentDraftState,
   | "documentId"
   | "localUnsavedContent"
+  | "localUnsavedContentJson"
   | "isDirty"
   | "lastEditedAt"
   | "userEditedSinceLastCopilotTurn"
@@ -45,6 +46,11 @@ function sanitizeDraft(
       candidate.localUnsavedContent === null
         ? candidate.localUnsavedContent
         : "",
+    localUnsavedContentJson:
+      typeof candidate.localUnsavedContentJson === "object" ||
+      candidate.localUnsavedContentJson === null
+        ? (candidate.localUnsavedContentJson as DocumentJsonContent)
+        : null,
     isDirty: Boolean(candidate.isDirty),
     lastEditedAt:
       typeof candidate.lastEditedAt === "string"
@@ -105,6 +111,10 @@ function persistDrafts(
     acc[documentId] = {
       documentId: draft.documentId,
       localUnsavedContent: draft.localUnsavedContent,
+      localUnsavedContentJson:
+        typeof draft.localUnsavedContentJson === "undefined"
+          ? null
+          : (draft.localUnsavedContentJson ?? null),
       isDirty: draft.isDirty,
       lastEditedAt: draft.lastEditedAt,
       userEditedSinceLastCopilotTurn: draft.userEditedSinceLastCopilotTurn,
@@ -148,7 +158,11 @@ type DocumentDraftStoreState = {
   draftsByDocumentId: Record<string, DocumentDraftState | null>;
   getDraft: (documentId: string) => DocumentDraftState | null;
   setDraft: (draft: DocumentDraftState) => void;
-  setDraftContent: (documentId: string, content: string) => void;
+  setDraftContent: (
+    documentId: string,
+    content: string,
+    contentJson?: DocumentJsonContent,
+  ) => void;
   resetDraftFromSnapshot: (documentId: string) => void;
   markDraftClean: (documentId: string) => void;
   markDraftDirty: (documentId: string) => void;
@@ -171,7 +185,7 @@ export const useDocumentDraftStore = create<DocumentDraftStoreState>(
         schedulePersistDrafts(draftsByDocumentId);
         return { draftsByDocumentId };
       }),
-    setDraftContent: (documentId, content) =>
+    setDraftContent: (documentId, content, contentJson) =>
       set((state) => {
         const existingDraft = state.draftsByDocumentId[documentId];
         const draftsByDocumentId = {
@@ -179,6 +193,10 @@ export const useDocumentDraftStore = create<DocumentDraftStoreState>(
           [documentId]: {
             documentId,
             localUnsavedContent: content,
+            localUnsavedContentJson:
+              typeof contentJson === "undefined"
+                ? (existingDraft?.localUnsavedContentJson ?? null)
+                : contentJson,
             isDirty: true,
             lastEditedAt: new Date().toISOString(),
             // Preserve the notice flag so it stays true even after autosave
@@ -205,6 +223,7 @@ export const useDocumentDraftStore = create<DocumentDraftStoreState>(
           [documentId]: {
             documentId,
             localUnsavedContent: snapshot.contentMarkdown,
+            localUnsavedContentJson: snapshot.contentJson ?? null,
             isDirty: false,
             lastEditedAt: existingDraft?.lastEditedAt,
             userEditedSinceLastCopilotTurn:

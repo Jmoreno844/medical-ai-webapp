@@ -29,6 +29,7 @@ class WorkspaceDocumentSummary(BaseModel):
     # Used in _build_initial_state to seed document_reads so the agent can
     # propose patches without a read_document round-trip.
     content_markdown: str | None = None
+    content_json: dict[str, Any] | None = None
 
 
 class WorkspaceIndexPayload(BaseModel):

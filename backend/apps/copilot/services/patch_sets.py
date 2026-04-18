@@ -8,6 +8,7 @@ from django.db import transaction
 
 from apps.copilot.models import CopilotPatch, CopilotPatchSet, CopilotRun
 from apps.documents.models import Document
+from apps.documents.services.rich_document_content import set_document_content_fields
 
 MAX_PATCHES_PER_SET = 12
 PATCH_TYPE_REWRITE_DOCUMENT = "rewrite_document"
@@ -722,8 +723,12 @@ def apply_accepted_patch_set(
         for patch in accepted_patches
     ]
     next_content = _apply_patches_to_content(document.content, patch_payloads)
-    document.content = next_content
-    document.save(update_fields=["content"])
+    set_document_content_fields(
+        document,
+        content_markdown=next_content,
+        preferred_source="markdown",
+    )
+    document.save(update_fields=["content_markdown", "content_json"])
 
     applied_patch_ids = [patch.patch_id for patch in accepted_patches]
     patch_set.patches.filter(pk__in=[patch.pk for patch in accepted_patches]).update(
@@ -761,7 +766,7 @@ def apply_accepted_patch_set(
     return CopilotPatchSetApplyResult(
         patch_set_id=patch_set.patch_set_id,
         document_id=str(document.id),
-        content=document.content,
+        content=document.content_markdown,
         applied_version=max(
             document_version or patch_set.base_version, patch_set.base_version
         )

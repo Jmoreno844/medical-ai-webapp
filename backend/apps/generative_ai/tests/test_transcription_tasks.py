@@ -9,6 +9,7 @@ from django.test import SimpleTestCase, TestCase, override_settings
 from apps.documents.api.callbacks import transcription_complete_notification
 from apps.documents.models import Document
 from apps.documents.schemas import TranscriptionNotificationIn
+from apps.documents.services.rich_document_content import build_synced_document_content
 from apps.encounters.models import Encounter
 from apps.generative_ai.api import start_transcription
 from apps.generative_ai.schemas import TranscriptionRequest
@@ -100,10 +101,12 @@ class TranscriptionFlowTests(TestCase):
             occurred_at=datetime.now(timezone.utc),
             audio_file_name="encounter_audio/1/audio.webm",
         )
+        empty_document_content = build_synced_document_content()
         self.document = Document.objects.create(
             encounter=self.encounter,
             kind="transcription",
-            content="",
+            content_markdown=empty_document_content.content_markdown,
+            content_json=empty_document_content.content_json,
             doctor=self.doctor,
         )
 

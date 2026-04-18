@@ -15,6 +15,7 @@ from .schemas import (
 )
 from datetime import datetime, timedelta
 from apps.documents.models import Document
+from apps.documents.services.rich_document_content import build_synced_document_content
 from django.conf import settings
 import uuid
 
@@ -70,17 +71,21 @@ def create_empty_encounter(request, payload: EmptyPayload = None):
         occurred_at=datetime.now(),
     )
 
+    empty_document_content = build_synced_document_content()
+
     Document.objects.create(
         encounter=enc,
         kind="context",
-        content="",
+        content_markdown=empty_document_content.content_markdown,
+        content_json=empty_document_content.content_json,
         doctor=request.user,
     )
 
     Document.objects.create(
         encounter=enc,
         kind="transcription",
-        content="",
+        content_markdown=empty_document_content.content_markdown,
+        content_json=empty_document_content.content_json,
         doctor=request.user,
     )
 

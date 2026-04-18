@@ -1,28 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { LexicalComposer } from "@lexical/react/LexicalComposer";
-import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
-import { ContentEditable } from "@lexical/react/LexicalContentEditable";
-import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
-import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
-import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin";
-import { TRANSFORMERS } from "@lexical/markdown";
-import { PatchInlineDiffView } from "./PatchInlineDiffView";
+import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import {
   flushAllDirtyDrafts,
   flushDirtyDrafts,
   flushDirtyDraftsWithKeepalive,
   registerForceSave,
 } from "@/workspace/forceSaveRegistry";
-
-// Import custom plugins
-import {
-  AutoFocusPlugin,
-  ReadOnlyPlugin,
-  DocumentContentPlugin,
-  AutoSavePlugin,
-} from "./plugins";
-
-// Import context hooks
 import { useDocumentContext } from "../../../contexts/DocumentContext";
 import { useContentContext } from "../../../contexts/ContentContext";
 import { useGenerationContext } from "../../../contexts/GenerationContext";
@@ -31,129 +14,212 @@ import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
 import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
 import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
 import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
-import { usePatchDecision } from "@/workspace/hooks/usePatchDecision";
-
-// Import utilities
-import { createEditorConfig } from "./utils/editorConfig";
 import { logger } from "@/lib/logger";
+import {
+  getEmptyTiptapDoc,
+  isTiptapJsonContent,
+  medicalEditorExtensions,
+} from "./tiptap/medicalEditor";
+
+type EditorSnapshot = {
+  markdown: string;
+  json: Record<string, unknown> | null;
+};
+
+function normalizeEditorText(value: string): string {
+  return value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+}
+
+function markdownLooksStructured(markdown: string): boolean {
+  return /(^|\n)\s{0,3}#{1,6}\s+/.test(markdown) ||
+    /(^|\n)\s*[-*+]\s+/.test(markdown) ||
+    /(^|\n)\s*\d+\.\s+/.test(markdown) ||
+    /\*\*[^*]+\*\*/.test(markdown);
+}
+
+function extractTiptapPlainText(value: unknown): string {
+  if (!value || typeof value !== "object") {
+    return "";
+  }
+
+  const node = value as {
+    type?: string;
+    text?: string;
+    content?: unknown[];
+  };
+
+  if (node.type === "text") {
+    return node.text ?? "";
+  }
+
+  if (node.type === "hardBreak") {
+    return "\n";
+  }
+
+  return (node.content ?? []).map(extractTiptapPlainText).join("");
+}
+
+function shouldPreferMarkdownOverJson(
+  markdown: string,
+  json: Record<string, unknown> | null,
+): boolean {
+  if (!json || !markdownLooksStructured(markdown)) {
+    return false;
+  }
+
+  return normalizeEditorText(extractTiptapPlainText(json)) ===
+    normalizeEditorText(markdown);
+}
+
+function readEditorSnapshot(editor: Editor): EditorSnapshot {
+  return {
+    markdown: editor.getMarkdown(),
+    json: (editor.getJSON() as Record<string, unknown>) ?? null,
+  };
+}
 
 const TextArea: React.FC = () => {
-  // Get state from contexts instead of props
   const { activeDocument, activeDocumentId } = useDocumentContext();
-
   const {
     documentContent,
+    documentContentJson,
     fetchError,
     isLoadingContent,
     contentLoadedSuccessfully,
     reloadContent,
     saveContent,
     editorRefreshTrigger,
-    documentContentCache, // Add this line
+    documentContentCache,
   } = useContentContext();
-
   const { generationStatus } = useGenerationContext();
   const { transcriptionCompleteTimestamp } = useTranscriptionContext();
-  const setDraftContent = useDocumentDraftStore(
-    (state) => state.setDraftContent,
-  );
+  const setDraftContent = useDocumentDraftStore((state) => state.setDraftContent);
   const derivedByDocumentId = useDocumentDerivedStore(
     (state) => state.derivedByDocumentId,
   );
-  // Keep patch review subscriptions stable; object selectors here can loop with
-  // useSyncExternalStore/Zustand when the editor is already rerendering often.
   const activePatchSetId = usePatchSetStore((state) => state.activePatchSetId);
   const patchSets = usePatchSetStore((state) => state.patchSets);
   const isCopilotRunning = useWorkspaceStore((state) => state.isCopilotRunning);
-  const { submitDecision: submitPatchDecisionFn } = usePatchDecision();
 
-  // Local state & refs
   const [showGenerationSuccess, setShowGenerationSuccess] = useState(false);
   const previousDocIdRef = useRef<number | null>(null);
   const previousRefreshTriggerRef = useRef(editorRefreshTrigger);
+  const ignoreEditorUpdatesRef = useRef(true);
+  const hasHydratedDocumentRef = useRef(false);
+  const saveTimerRef = useRef<number | null>(null);
+  const saveInFlightRef = useRef(false);
 
-  // Update refresh trigger when needed
+  const editor = useEditor({
+    immediatelyRender: false,
+    shouldRerenderOnTransaction: false,
+    extensions: medicalEditorExtensions,
+    content: getEmptyTiptapDoc(),
+    editable: false,
+    editorProps: {
+      attributes: {
+        class:
+          "h-full overflow-auto px-4 py-3 focus:outline-none leading-normal text-[15px] text-slate-800",
+        spellcheck: "true",
+      },
+    },
+  });
+
+  const triggerEditorSave = useCallback(
+    async (): Promise<void> => {
+      if (
+        !editor ||
+        !activeDocumentId ||
+        saveInFlightRef.current ||
+        !hasHydratedDocumentRef.current
+      ) {
+        return;
+      }
+
+      const snapshot = readEditorSnapshot(editor);
+
+      if (contentLoadedSuccessfully && snapshot.markdown.trim() === "") {
+        logger.warn(
+          "Skipped empty save because the document already has canonical content",
+        );
+        return;
+      }
+
+      try {
+        saveInFlightRef.current = true;
+        await saveContent(
+          activeDocumentId,
+          snapshot.markdown,
+          snapshot.json,
+        );
+      } catch (error) {
+        logger.error("[TIPTAP_SAVE] Failed to save document", {
+          activeDocumentId,
+          error,
+        });
+      } finally {
+        saveInFlightRef.current = false;
+      }
+    },
+    [activeDocumentId, contentLoadedSuccessfully, editor, saveContent],
+  );
+
+  const scheduleEditorSave = useCallback(() => {
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+
+    saveTimerRef.current = window.setTimeout(() => {
+      void triggerEditorSave();
+      saveTimerRef.current = null;
+    }, 1000);
+  }, [triggerEditorSave]);
+
+  const handleDraftChange = useCallback(
+    (docId: number, content: string, contentJson: Record<string, unknown> | null) => {
+      setDraftContent(String(docId), content, contentJson);
+    },
+    [setDraftContent],
+  );
+
   useEffect(() => {
     if (
       activeDocument &&
       editorRefreshTrigger !== previousRefreshTriggerRef.current
     ) {
-      logger.debug(
-        `[TEXT_AREA] Refresh trigger changed to ${editorRefreshTrigger} for document ${activeDocument.id}`,
-      );
       previousRefreshTriggerRef.current = editorRefreshTrigger;
 
-      // Check if the document is already in the cache
       if (documentContentCache.has(activeDocument.id)) {
-        logger.debug(
-          `[TEXT_AREA] Document ${activeDocument.id} already in cache, skipping reloadContent`,
-        );
-        return; // Skip reloadContent if already cached
+        return;
       }
 
-      if (typeof reloadContent === "function") {
-        logger.debug(
-          `[TEXT_AREA] Calling reloadContent for document ${activeDocument.id}`,
-        );
-        const forceRefresh = false;
-        reloadContent(forceRefresh);
-      }
+      void reloadContent(false);
     }
   }, [
-    editorRefreshTrigger,
     activeDocument,
-    reloadContent,
     documentContentCache,
+    editorRefreshTrigger,
+    reloadContent,
   ]);
 
-  // Enhanced logic to track transcription updates
   useEffect(() => {
     if (
       transcriptionCompleteTimestamp &&
       activeDocument?.kind === "transcription" &&
       activeDocument.id === previousDocIdRef.current
     ) {
-      logger.debug(
-        `[TEXT_AREA] Transcription completed at ${new Date(
-          transcriptionCompleteTimestamp,
-        ).toISOString()}`,
-      );
-      // Force refresh for transcription updates since we need the latest content
-      reloadContent(true);
+      void reloadContent(true);
     }
   }, [transcriptionCompleteTimestamp, activeDocument, reloadContent]);
 
-  // Custom save wrapper
-  const handleSave = useCallback(
-    async (docId: number, content: string): Promise<boolean> => {
-      // Prevent saving empty content for documents that previously had content
-      if (contentLoadedSuccessfully && content.trim() === "") {
-        logger.error(
-          "Prevented saving empty content for a document that previously had content",
-        );
-        return false;
-      }
-
-      return await saveContent(docId, content);
-    },
-    [saveContent, contentLoadedSuccessfully],
-  );
-
-  const handleDraftChange = useCallback(
-    (docId: number, content: string) => {
-      setDraftContent(String(docId), content);
-    },
-    [setDraftContent],
-  );
-
-  // Track document changes
   useEffect(() => {
-    if (!activeDocument) return;
+    if (!activeDocument) {
+      return;
+    }
+
+    ignoreEditorUpdatesRef.current = true;
+    hasHydratedDocumentRef.current = false;
 
     if (activeDocument.id !== previousDocIdRef.current) {
-      logger.debug(
-        `[DOC_SWITCH] Changed from document ${previousDocIdRef.current} to ${activeDocument.id}`,
-      );
       previousDocIdRef.current = activeDocument.id;
     }
   }, [activeDocument]);
@@ -186,13 +252,12 @@ const TextArea: React.FC = () => {
 
   useEffect(() => {
     return () => {
-      if (activeDocumentId) {
+      if (activeDocumentId && hasHydratedDocumentRef.current) {
         void flushDirtyDrafts([String(activeDocumentId)]);
       }
     };
   }, [activeDocumentId]);
 
-  // Show generation success indicator
   useEffect(() => {
     if (
       generationStatus?.isComplete &&
@@ -207,18 +272,9 @@ const TextArea: React.FC = () => {
     }
   }, [generationStatus, activeDocument]);
 
-  // Error handler for Lexical
-  function onError(error: Error) {
-    logger.error("Lexical Editor error:", error);
-  }
-
-  // Create editor configuration
-  const initialConfig = createEditorConfig(onError);
-
   const activeDerivedState = activeDocument
     ? (derivedByDocumentId[String(activeDocument.id)] ?? null)
     : null;
-
   const activePatchSet = activePatchSetId ? patchSets[activePatchSetId] : null;
   const patchesForDocument =
     activePatchSet && activeDocument
@@ -227,30 +283,13 @@ const TextArea: React.FC = () => {
         )
       : [];
 
-  const handlePatchDecision = useCallback(
-    (patchId: string, decision: "approve" | "reject") => {
-      if (!activePatchSet) return;
-      submitPatchDecisionFn(activePatchSet.id, patchId, decision);
-    },
-    [activePatchSet, submitPatchDecisionFn],
-  );
-
-  // Early return if no document
-  if (!activeDocument) {
-    return (
-      <div className="flex items-center justify-center h-full text-gray-600 text-xl font-medium">
-        Seleccione un documento
-      </div>
-    );
-  }
-
   const editorMode =
     patchesForDocument.length > 0
       ? "patch_review"
       : activeDerivedState?.editorMode === "streaming_preview" &&
           activeDerivedState.inProgress
         ? "streaming_preview"
-        : activeDocument.kind === "transcription"
+        : activeDocument?.kind === "transcription"
           ? "read_only"
           : "edit";
 
@@ -259,19 +298,144 @@ const TextArea: React.FC = () => {
       ? activeDerivedState?.streamingContent
       : undefined;
 
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+
+    editor.setEditable(editorMode === "edit");
+  }, [editor, editorMode]);
+
+  useEffect(() => {
+    if (!editor || !activeDocument) {
+      return;
+    }
+
+    const hasExternalContent =
+      derivedContent !== undefined || contentLoadedSuccessfully;
+    if (!hasExternalContent) {
+      return;
+    }
+
+    const nextMarkdown = derivedContent ?? documentContent ?? "";
+    const candidateJson =
+      derivedContent == null && isTiptapJsonContent(documentContentJson)
+        ? documentContentJson
+        : null;
+    const nextJson =
+      candidateJson &&
+      !shouldPreferMarkdownOverJson(nextMarkdown, candidateJson)
+        ? candidateJson
+        : null;
+
+    const current = readEditorSnapshot(editor);
+    const markdownMatches = current.markdown === nextMarkdown;
+    const jsonMatches =
+      JSON.stringify(current.json ?? null) === JSON.stringify(nextJson ?? null);
+
+    if ((nextJson && jsonMatches) || (!nextJson && markdownMatches)) {
+      if (!hasHydratedDocumentRef.current) {
+        hasHydratedDocumentRef.current = true;
+        window.setTimeout(() => {
+          ignoreEditorUpdatesRef.current = false;
+        }, 0);
+      }
+      return;
+    }
+
+    ignoreEditorUpdatesRef.current = true;
+    editor.commands.setContent(nextJson ?? nextMarkdown, {
+      contentType: nextJson ? "json" : "markdown",
+      emitUpdate: false,
+    });
+    hasHydratedDocumentRef.current = true;
+    window.setTimeout(() => {
+      ignoreEditorUpdatesRef.current = false;
+    }, 0);
+  }, [
+    activeDocument,
+    contentLoadedSuccessfully,
+    derivedContent,
+    documentContent,
+    documentContentJson,
+    editor,
+    editorRefreshTrigger,
+  ]);
+
+  useEffect(() => {
+    if (!editor || !activeDocument) {
+      return;
+    }
+
+    const handleUpdate = ({ editor: updatedEditor }: { editor: Editor }) => {
+      if (
+        ignoreEditorUpdatesRef.current ||
+        !hasHydratedDocumentRef.current ||
+        !contentLoadedSuccessfully ||
+        editorMode !== "edit"
+      ) {
+        return;
+      }
+
+      const snapshot = readEditorSnapshot(updatedEditor);
+      handleDraftChange(activeDocument.id, snapshot.markdown, snapshot.json);
+      scheduleEditorSave();
+    };
+
+    editor.on("update", handleUpdate);
+
+    return () => {
+      editor.off("update", handleUpdate);
+    };
+  }, [activeDocument, editor, editorMode, handleDraftChange, scheduleEditorSave]);
+
+  useEffect(() => {
+    if (!editor || !activeDocumentId || editorMode !== "edit") {
+      return;
+    }
+
+    const unregisterForceSave = registerForceSave(
+        String(activeDocumentId),
+        async () => {
+        await triggerEditorSave();
+        },
+    );
+
+    return unregisterForceSave;
+  }, [activeDocumentId, editor, editorMode, triggerEditorSave]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+
+      if (hasHydratedDocumentRef.current) {
+        void triggerEditorSave();
+      }
+    };
+  }, [triggerEditorSave]);
+
+  if (!activeDocument) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-600 text-xl font-medium">
+        Seleccione un documento
+      </div>
+    );
+  }
+
   const isStreamingActiveDocument = editorMode === "streaming_preview";
   const isPatchPreviewMode = editorMode === "patch_review";
 
   return (
     <div className="flex flex-col h-full">
-      {/* Loading indicator */}
       {isLoadingContent && (
         <div className="bg-gray-100 p-2 text-center text-gray-600 text-sm">
           Cargando contenido…
         </div>
       )}
 
-      {/* Streaming indicator */}
       {isStreamingActiveDocument && (
         <div className="bg-purple-100 p-2 border-b border-purple-200">
           <div className="flex items-center justify-between">
@@ -297,17 +461,13 @@ const TextArea: React.FC = () => {
         </div>
       )}
 
-      {/* Progress bar */}
       {isStreamingActiveDocument && (
         <div className="h-1 w-full bg-purple-200">
           <div
             className="h-1 bg-purple-600 transition-all duration-300"
             style={{
               width: `${Math.min(
-                Math.max(
-                  (((derivedContent ?? "").length || 0) / 500) * 100,
-                  10,
-                ),
+                Math.max((((derivedContent ?? "").length || 0) / 500) * 100, 10),
                 95,
               )}%`,
             }}
@@ -317,12 +477,11 @@ const TextArea: React.FC = () => {
 
       {isPatchPreviewMode && (
         <div className="bg-amber-50 p-2 border-b border-amber-200 text-amber-800 text-sm text-center">
-          Revisión de cambios — aprueba o rechaza cada modificación directamente
-          en el documento
+          Revisión de cambios activa. El documento queda visible en solo lectura y
+          las decisiones se toman desde las tarjetas del copiloto.
         </div>
       )}
 
-      {/* Generation success indicator */}
       {showGenerationSuccess && (
         <div className="bg-green-100 p-2 border-b border-green-200 text-green-800">
           <div className="flex items-center justify-center">
@@ -344,19 +503,13 @@ const TextArea: React.FC = () => {
         </div>
       )}
 
-      {/* Error display */}
       {fetchError && (
         <div className="bg-red-100 p-2 text-center text-red-600 text-sm">
           {fetchError}
         </div>
       )}
 
-      {/* Editor */}
       <div className="border rounded-md flex-1 bg-white overflow-hidden relative">
-        {/* Non-blocking AI indicator — shown when the agent is streaming.
-            pointer-events-none keeps it visual-only; the doctor can keep typing.
-            If a patch conflict occurs we handle it in the review layer rather than
-            locking the editor here. */}
         {isCopilotRunning && editorMode === "edit" && (
           <div className="absolute top-0 right-0 pointer-events-none z-10">
             <span className="m-2 px-2 py-0.5 bg-white/80 text-xs text-gray-400 rounded shadow-sm select-none flex items-center gap-1">
@@ -365,67 +518,17 @@ const TextArea: React.FC = () => {
             </span>
           </div>
         )}
-        {isPatchPreviewMode ? (
-          <PatchInlineDiffView
-            content={documentContent}
-            patches={patchesForDocument}
-            patchSetId={activePatchSet!.id}
-            onDecision={handlePatchDecision}
-          />
-        ) : (
-          <LexicalComposer
-            key={`editor-${activeDocumentId}-refresh-${editorRefreshTrigger}`}
-            initialConfig={initialConfig}
-          >
-            <div className="editor-container h-full">
-              <RichTextPlugin
-                contentEditable={
-                  <ContentEditable className="h-full px-4 py-3 focus:outline-none overflow-auto" />
-                }
-                placeholder={
-                  <div className="text-gray-400 absolute top-3 left-4 pointer-events-none">
-                    {activeDocument.kind === "transcription"
-                      ? ""
-                      : "Start typing..."}
-                  </div>
-                }
-                ErrorBoundary={LexicalErrorBoundary}
-              />
 
-              {/* Core plugins */}
-              <HistoryPlugin />
-              <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
-              <DocumentContentPlugin
-                documentId={activeDocument.id}
-                content={documentContent}
-                isLoading={isLoadingContent}
-                refreshTrigger={editorRefreshTrigger}
-                forceRefresh={false}
-                derivedContent={derivedContent}
-                documentType={activeDocument.kind}
-              />
-              <ReadOnlyPlugin isReadOnly={editorMode !== "edit"} />
-
-              {/* Conditional plugins for edit mode */}
-              {editorMode === "edit" && (
-                <>
-                  <AutoFocusPlugin />
-                  {/* Generated note content is owned by GenerationContext while
-                      SSE is active, so autosave should wait until streaming ends. */}
-                  <AutoSavePlugin
-                    onSave={handleSave}
-                    onDraftChange={handleDraftChange}
-                    documentId={activeDocument.id}
-                    hasInitialContent={contentLoadedSuccessfully}
-                    registerSaveFunction={(fn) =>
-                      registerForceSave(String(activeDocument.id), fn)
-                    }
-                  />
-                </>
-              )}
-            </div>
-          </LexicalComposer>
-        )}
+        <div className="h-full">
+          <EditorContent editor={editor} className="medical-document-editor h-full" />
+          {!documentContent.trim() &&
+            !derivedContent &&
+            editorMode === "edit" && (
+              <div className="text-gray-400 absolute top-3 left-4 pointer-events-none">
+                Start typing...
+              </div>
+            )}
+        </div>
       </div>
     </div>
   );

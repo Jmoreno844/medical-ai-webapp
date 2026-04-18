@@ -835,7 +835,7 @@ export function useCopilotPanelController(
           .map(([id]) => id);
         if (stillDirty.length > 0) {
           log.warn(
-            "[sendMessage] docs still dirty after flush — editor not mounted or re-dirtified by Lexical onChange; workspaceIndex will use content-equality check to decide pre-seed",
+            "[sendMessage] docs still dirty after flush — editor not mounted or re-dirtified by a follow-up editor update; workspaceIndex will use content-equality check to decide pre-seed",
             { stillDirty },
           );
         } else {

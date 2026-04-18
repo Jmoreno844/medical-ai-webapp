@@ -86,7 +86,12 @@ export function flushDirtyDraftsWithKeepalive(): void {
       continue;
     }
 
-    const started = sendKeepaliveDocumentSave(documentId, sanitizedContent);
+    const contentJson = draft.localUnsavedContentJson;
+    const started = sendKeepaliveDocumentSave(
+      documentId,
+      sanitizedContent,
+      contentJson,
+    );
     if (started) {
       log.debug("[forceSaveRegistry] started keepalive save", { documentId });
     }

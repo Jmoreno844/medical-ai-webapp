@@ -31,6 +31,9 @@ class WorkspaceDocumentSummaryIn(Schema):
     # Full markdown content for ai_writable docs pre-loaded by the frontend.
     # Django passes this through to the agent verbatim; it never persists it.
     content_markdown: Optional[str] = None
+    # Rich editor JSON pre-loaded by the frontend for future structured review
+    # flows. The current agent still operates on markdown.
+    content_json: Optional[dict[str, Any]] = None
 
 
 class WorkspaceIndexIn(Schema):

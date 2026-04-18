@@ -18,6 +18,7 @@ import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore
 import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
 import { useAiSessionStore } from "@/workspace/stores/aiSessionStore";
 import { sanitizeDocumentContentForSave } from "@/workspace/utils/documentSave";
+import { DocumentJsonContent } from "@/workspace/types";
 
 // Define the context type
 type DocumentContextType = {
@@ -32,10 +33,15 @@ type DocumentContextType = {
 
   // Actions
   selectDocument: (docId: number) => void;
-  saveDocument: (docId: number, content: string) => Promise<boolean>;
+  saveDocument: (
+    docId: number,
+    content: string,
+    contentJson?: DocumentJsonContent,
+  ) => Promise<boolean>;
   createDocument: (
     documentType: string,
-    content?: string
+    content?: string,
+    contentJson?: DocumentJsonContent,
   ) => Promise<DocumentoOut | null>;
   deleteDocument: (docId: number) => Promise<boolean>;
   addDocument: (newDocument: DocumentoOut) => void;
@@ -202,7 +208,7 @@ export function DocumentProvider({
    * Save document content to the server
    */
   const saveDocument = useCallback(
-    async (docId: number, content: string) => {
+    async (docId: number, content: string, contentJson?: DocumentJsonContent) => {
       try {
         setIsSaving(true);
         logger.debug(
@@ -217,12 +223,19 @@ export function DocumentProvider({
 
         await axiosInstance.patch(`/api/documents/by-editor/${docId}`, {
           content: finalContent,
+          content_markdown: finalContent,
+          content_json: contentJson ?? null,
         });
 
         const currentDocument = documents.find((doc) => doc.id === docId);
         if (currentDocument) {
           upsertDocumentInWorkspace(
-            { ...currentDocument, content: finalContent },
+            {
+              ...currentDocument,
+              content: finalContent,
+              content_markdown: finalContent,
+              content_json: contentJson ?? null,
+            },
             encounterId
           );
         }
@@ -248,13 +261,19 @@ export function DocumentProvider({
    * @returns The newly created document
    */
   const createDocument = useCallback(
-    async (documentType: string, content: string = "") => {
+    async (
+      documentType: string,
+      content: string = "",
+      contentJson?: DocumentJsonContent,
+    ) => {
       try {
         setWorkspaceLoading(true);
         const response = await axiosInstance.post("/api/documents", {
           encounter_id: encounterId,
           kind: documentType,
           content,
+          content_markdown: content,
+          content_json: contentJson ?? null,
         });
 
         const newDocument = response.data;

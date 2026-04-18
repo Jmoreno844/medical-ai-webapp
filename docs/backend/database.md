@@ -233,11 +233,26 @@ múltiples documentos de distinto tipo.
 | `id_medico_id`           | bigint      | FK → `users_user`, CASCADE                                | Médico propietario  |
 | `id_plantilla_doctor_id` | bigint      | FK → `plantillas_plantilladoctor`, SET_NULL, nullable     | Plantilla usada     |
 | `tipo`                   | varchar(20) | choices: `contexto`, `transcripcion`, `plantilla`, `nota` | Tipo de documento   |
-| `contenido`              | text        | not null (default `""`)                                   | Texto del documento |
+| `content_markdown`       | text        | not null (default `""`)                                   | Markdown derivado / compat |
+| `content_json`           | jsonb       | nullable                                                  | Canónico del editor Tiptap |
 | `fecha_creacion`         | date        | auto_now_add                                              | —                   |
 
 Al crear un nuevo `Encuentro`, Django crea automáticamente dos documentos vacíos:
 uno de tipo `contexto` y otro de tipo `transcripcion` (`encuentro/api.py` → `create_empty_encuentro`).
+
+### Nota de compatibilidad 2026-04
+
+- El backend ya no trata el documento clínico como un único string canónico.
+- `content_json` es la fuente de verdad del editor rico.
+- `content_markdown` se mantiene para:
+  - compatibilidad con endpoints/frontend legacy
+  - pre-seed del copilot
+  - apply/patching clínico, que todavía opera sobre markdown/texto
+- El backend ahora sincroniza ambos campos en todos los write paths soportados:
+  - si entra `content_json`, regenera `content_markdown`
+  - si entra solo markdown/texto, regenera `content_json`
+- La sincronización vive en `apps/documents/services/rich_document_content.py`; no se debe duplicar esta lógica en endpoints o servicios aislados.
+- `content` sigue existiendo como alias legacy de compat a `content_markdown`, pero ya no debe usarse como un segundo campo persistente.
 
 Sin índices adicionales definidos en `Meta` (aparte del PK y las FKs implícitas).
 

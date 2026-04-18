@@ -1,7 +1,7 @@
 import axios from "axios";
 import { create } from "zustand";
 import axiosInstance from "@/commons/utils/axiosInstance";
-import { DocumentSnapshot } from "@/workspace/types";
+import { DocumentJsonContent, DocumentSnapshot } from "@/workspace/types";
 
 type DocumentSnapshotStoreState = {
   snapshotsByDocumentId: Record<string, DocumentSnapshot | null>;
@@ -12,6 +12,7 @@ type DocumentSnapshotStoreState = {
   setSnapshot: (
     documentId: string,
     contentMarkdown: string,
+    contentJson?: DocumentJsonContent,
     version?: number
   ) => void;
   fetchSnapshot: (
@@ -47,7 +48,7 @@ export const useDocumentSnapshotStore =
     fetchErrorByDocumentId: {},
     loadedDocumentIds: [],
     getSnapshot: (documentId) => get().snapshotsByDocumentId[documentId] ?? null,
-    setSnapshot: (documentId, contentMarkdown, version) =>
+    setSnapshot: (documentId, contentMarkdown, contentJson, version) =>
       set((state) => {
         const existingSnapshot = state.snapshotsByDocumentId[documentId];
         const nextVersion =
@@ -65,6 +66,7 @@ export const useDocumentSnapshotStore =
               documentId,
               version: nextVersion,
               contentMarkdown,
+              contentJson: typeof contentJson === "undefined" ? null : contentJson,
               savedAt: new Date().toISOString(),
             },
           },
@@ -88,11 +90,17 @@ export const useDocumentSnapshotStore =
 
       try {
         const response = await axiosInstance.get(`/api/documents/${documentId}`);
-        const contentMarkdown = response.data.content || "";
+        const contentMarkdown =
+          response.data.content_markdown ?? response.data.content ?? "";
+        const contentJson =
+          typeof response.data.content_json === "undefined"
+            ? null
+            : (response.data.content_json as DocumentJsonContent);
         const snapshot: DocumentSnapshot = {
           documentId,
           version: 1,
           contentMarkdown,
+          contentJson,
           savedAt: new Date().toISOString(),
         };
 

@@ -6,6 +6,8 @@ export interface DocumentoOut {
   doctor_template_id?: number | null;
   doctor_template_name?: string | null;
   content: string;
+  content_markdown: string;
+  content_json?: Record<string, unknown> | null;
   created_on: string;
   doctor_id: number;
 }

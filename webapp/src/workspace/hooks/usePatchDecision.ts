@@ -125,7 +125,7 @@ export function usePatchDecision() {
               outcome,
               runStatus: run?.status,
             });
-            // Clear review state so the editor switches back to Lexical.
+            // Clear review state so the editor returns to the normal Tiptap view.
             clearAll();
           } catch (finalizeErr) {
             const conflictType = classifyFinalizeConflict(updated);

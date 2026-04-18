@@ -213,6 +213,7 @@ function serializeWorkspaceIndex(workspaceIndex: WorkspaceIndex) {
       estimated_tokens: document.estimatedTokens,
       has_pending_patches: document.hasPendingPatches,
       content_markdown: document.contentMarkdown,
+      content_json: document.contentJson,
     })),
   };
 }
