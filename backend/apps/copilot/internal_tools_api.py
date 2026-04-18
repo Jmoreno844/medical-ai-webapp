@@ -288,7 +288,6 @@ def _serialize_workspace_documents(
                 is_active=document.get("is_active", False),
                 is_open=document.get("is_open", False),
                 pinned_for_agent=document.get("pinned_for_agent", False),
-                short_summary=document.get("short_summary"),
             )
         )
     return serialized_documents
@@ -434,7 +433,6 @@ def read_document_summary_tool(request, payload: CopilotReadDocumentSummaryIn):
         encounter_id=payload.encounter_id,
         user_id=payload.user_id,
     )
-    short_summary = _build_excerpt(document.content, max_length=160)
     return {
         "document_id": str(document.id),
         "encounter_id": str(document.encounter_id),
@@ -443,7 +441,6 @@ def read_document_summary_tool(request, payload: CopilotReadDocumentSummaryIn):
         "version": _document_version(document),
         "content_hash": _content_hash(document.content),
         "updated_at": document.created_on.isoformat(),
-        "short_summary": short_summary,
     }
 
 

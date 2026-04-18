@@ -216,7 +216,7 @@ def _build_retrieved_context(
             "type": "context_fact",
             "document_id": fact["source_document_id"],
             "title": f"Fact {index + 1}",
-            "excerpt": fact["value"],
+            "content": fact["value"],
             "read_mode": "context_view",
         }
         for index, fact in enumerate((context_view or {}).get("facts") or [])
@@ -226,8 +226,8 @@ def _build_retrieved_context(
             "type": document.get("type", "document"),
             "document_id": document["document_id"],
             "title": document.get("title"),
-            "excerpt": _shorten_text(
-                document.get("content") or document.get("excerpt"),
+            "content": _shorten_text(
+                document.get("content") or "",
                 max_length=12000,
             ),
             "read_mode": document.get("mode"),
@@ -239,7 +239,7 @@ def _build_retrieved_context(
             "type": span.get("type", "document_span"),
             "document_id": span["document_id"],
             "title": span.get("title"),
-            "excerpt": _shorten_text(span.get("content"), max_length=12000),
+            "content": _shorten_text(span.get("content"), max_length=12000),
             "read_mode": "span",
         }
         for span in read_spans
@@ -730,6 +730,15 @@ def _normalize_section_name(value: Any) -> str:
     return str(value or "").strip().lower()
 
 
+def _patch_content_preview(patch: Any) -> str:
+    operation_type = str(getattr(patch, "operation_type", "") or "")
+    if operation_type in {"replace_span", "rewrite_document"}:
+        return str(getattr(patch, "replacement_text", "") or "")
+    if operation_type in {"insert_before", "insert_after_span"}:
+        return str(getattr(patch, "inserted_text", "") or "")
+    return str(getattr(patch, "content_preview", "") or "")
+
+
 def _validate_drafted_plan_against_clinical_plan(
     *,
     drafted_plan: DraftedPatchPlan,
@@ -834,9 +843,10 @@ def _build_patch_set_preview_payload(
     selection_reason = _selection_reason(state, target_document_id=target_document_id)
     patches: list[dict[str, Any]] = []
     for index, patch in enumerate(drafted_plan.patches):
+        content_preview = _patch_content_preview(patch)
         document_preview_after = (
             drafted_plan.document_preview_after
-            or patch.content_preview
+            or content_preview
         )
         patches.append(
             {
@@ -846,12 +856,12 @@ def _build_patch_set_preview_payload(
                 "order_index": index,
                 "anchor": patch.anchor.to_payload(),
                 "expected_hash": patch.expected_hash,
-                "old_text": patch.before_preview,
-                "new_text": patch.after_preview,
-                "before_preview": patch.before_preview,
-                "after_preview": patch.after_preview,
+                "replacement_text": patch.replacement_text,
+                "inserted_text": patch.inserted_text,
+                "old_text": None,
+                "new_text": None,
                 "document_preview_after": document_preview_after,
-                "content_preview": patch.content_preview,
+                "content_preview": content_preview,
                 "rationale": patch.rationale,
                 # Sección semántica indicada por el drafter, derivada del clinical_plan.
                 # Permite al frontend agrupar patches por sección y al auditor clínico

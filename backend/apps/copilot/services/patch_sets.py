@@ -156,20 +156,52 @@ def _normalize_patch_preview(preview: dict[str, Any]) -> dict[str, Any]:
         "order_index": int(preview.get("order_index") or 0),
         "anchor": preview.get("anchor") or {},
         "expected_hash": preview.get("expected_hash"),
-        "old_text": preview.get("old_text") or preview.get("before_preview"),
-        "new_text": preview.get("new_text") or preview.get("after_preview"),
-        "before_preview": preview.get("before_preview"),
-        "after_preview": preview.get("after_preview"),
+        "replacement_text": preview.get("replacement_text"),
+        "inserted_text": preview.get("inserted_text"),
+        "old_text": preview.get("old_text"),
+        "new_text": preview.get("new_text"),
         "document_preview_after": preview.get("document_preview_after"),
         "content_preview": str(
             preview.get("content_preview")
             or preview.get("document_preview_after")
-            or preview.get("after_preview")
+            or preview.get("replacement_text")
+            or preview.get("inserted_text")
+            or preview.get("new_text")
             or ""
         ),
         "rationale": preview.get("rationale"),
         "confidence": preview.get("confidence"),
     }
+
+
+def _require_text(value: Any, *, field_name: str, operation_type: str) -> str:
+    if not isinstance(value, str):
+        raise CopilotPatchSetConflictError(
+            f"{field_name} es requerido para {operation_type}"
+        )
+    return value
+
+
+def _replacement_repeats_anchor_context(
+    *,
+    replacement_text: str,
+    anchor: dict[str, Any],
+) -> str | None:
+    normalized_replacement = _normalize_ws(replacement_text)
+    prefix_text = anchor.get("prefixText")
+    suffix_text = anchor.get("suffixText")
+
+    if isinstance(prefix_text, str):
+        normalized_prefix = _normalize_ws(prefix_text)
+        if normalized_prefix and normalized_replacement.startswith(normalized_prefix):
+            return "replacement_repeats_prefix"
+
+    if isinstance(suffix_text, str):
+        normalized_suffix = _normalize_ws(suffix_text)
+        if normalized_suffix and normalized_replacement.endswith(normalized_suffix):
+            return "replacement_repeats_suffix"
+
+    return None
 
 
 def _resolve_patch_against_document(
@@ -182,35 +214,48 @@ def _resolve_patch_against_document(
     anchor = patch["anchor"]
 
     if patch["operation_type"] == PATCH_TYPE_REWRITE_DOCUMENT:
+        new_text = _require_text(
+            patch.get("replacement_text"),
+            field_name="replacement_text",
+            operation_type=PATCH_TYPE_REWRITE_DOCUMENT,
+        )
         return {
             **patch,
             "resolved_start": 0,
             "resolved_end": len(document_content),
             "old_text": document_content,
-            "new_text": patch.get("document_preview_after") or patch["content_preview"],
+            "new_text": new_text,
+            "content_preview": new_text,
             "status": "pending",
             "conflict_reason": None,
         }
 
     start, end = resolve_anchor_span(document_content, anchor)
-    old_text = patch.get("old_text")
-    if not isinstance(old_text, str):
-        old_text = document_content[start:end]
-
-    new_text = patch.get("new_text")
+    old_text = document_content[start:end]
     if patch_type == PATCH_TYPE_DELETE_SPAN:
         new_text = ""
     elif patch_type in (PATCH_TYPE_INSERT_AFTER, PATCH_TYPE_INSERT_BEFORE):
-        # For insert operations _apply_patches_to_content already keeps the anchor
-        # span from the document in place (content[cursor:end] for insert_after,
-        # content[start:end] for insert_before). Therefore new_text must be ONLY
-        # the inserted content, not anchor + inserted_content.
-        # The drafter often sets new_text = anchor + inserted_content for preview
-        # purposes, which would duplicate the anchor. content_preview is explicitly
-        # just the inserted content, so always use it here.
-        new_text = patch["content_preview"]
-    elif new_text is None:
-        new_text = patch["content_preview"]
+        new_text = _require_text(
+            patch.get("inserted_text"),
+            field_name="inserted_text",
+            operation_type=patch_type,
+        )
+    elif patch_type == PATCH_TYPE_REPLACE_SPAN:
+        new_text = _require_text(
+            patch.get("replacement_text"),
+            field_name="replacement_text",
+            operation_type=patch_type,
+        )
+        repeated_context = _replacement_repeats_anchor_context(
+            replacement_text=new_text,
+            anchor=anchor,
+        )
+        if repeated_context:
+            raise CopilotPatchSetConflictError(repeated_context)
+        if new_text == old_text:
+            raise CopilotPatchSetConflictError("patch_without_change")
+    else:
+        raise CopilotPatchSetConflictError(f"Tipo de patch no soportado: {patch_type}")
 
     return {
         **patch,
@@ -218,6 +263,7 @@ def _resolve_patch_against_document(
         "resolved_end": end,
         "old_text": old_text,
         "new_text": str(new_text),
+        "content_preview": str(new_text),
         "status": "pending",
         "conflict_reason": None,
     }
@@ -477,14 +523,14 @@ def persist_patch_set_preview(
                 "operation_type": resolved["operation_type"],
                 "anchor": resolved["anchor"],
                 "expected_hash": resolved.get("expected_hash"),
+                "replacement_text": resolved.get("replacement_text"),
+                "inserted_text": resolved.get("inserted_text"),
                 "old_text": resolved.get("old_text"),
                 "new_text": resolved.get("new_text"),
                 "resolved_start": resolved.get("resolved_start"),
                 "resolved_end": resolved.get("resolved_end"),
                 "confidence": resolved.get("confidence"),
                 "conflict_reason": resolved.get("conflict_reason"),
-                "before_preview": resolved.get("before_preview"),
-                "after_preview": resolved.get("after_preview"),
                 "document_preview_after": resolved.get("document_preview_after"),
                 "content_preview": resolved["content_preview"],
                 "rationale": resolved.get("rationale"),
@@ -511,7 +557,7 @@ def ensure_patch_set_for_legacy_patch(patch: CopilotPatch) -> CopilotPatchSet:
     if patch.patch_set_id:
         return patch.patch_set
 
-    base_content = patch.before_preview or patch.target_document.content
+    base_content = patch.old_text or patch.target_document.content
     patch_set, _created = CopilotPatchSet.objects.get_or_create(
         patch_set_id=f"legacy-{patch.patch_id}",
         defaults={
@@ -547,8 +593,17 @@ def ensure_patch_set_for_legacy_patch(patch: CopilotPatch) -> CopilotPatchSet:
                 patch.status = "conflicted"
                 patch.conflict_reason = "legacy_anchor_unresolved"
     patch.order_index = patch.order_index or 0
-    patch.old_text = patch.old_text or patch.before_preview
-    patch.new_text = patch.new_text or patch.after_preview or patch.content_preview
+    patch.old_text = patch.old_text or (
+        patch.target_document.content[patch.resolved_start : patch.resolved_end]
+        if patch.resolved_start is not None and patch.resolved_end is not None
+        else None
+    )
+    patch.new_text = (
+        patch.new_text
+        or patch.replacement_text
+        or patch.inserted_text
+        or patch.content_preview
+    )
     patch.save(
         update_fields=[
             "patch_set",

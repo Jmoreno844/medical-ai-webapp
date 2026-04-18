@@ -105,6 +105,147 @@ button:focus-visible {
   padding: 0.1rem 0.25rem;
 }
 
+.medical-document-editor .patch-review-highlight {
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0.05rem 0.1rem;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.medical-document-editor .patch-review-highlight-replace_span {
+  background: #fee2e2;
+  color: #991b1b;
+  text-decoration: line-through;
+  text-decoration-color: #b91c1c;
+  text-decoration-thickness: 2px;
+}
+
+.medical-document-editor .patch-review-highlight-delete_span {
+  background: #fee2e2;
+  color: #991b1b;
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+.medical-document-editor .patch-review-highlight-insert_before,
+.medical-document-editor .patch-review-highlight-insert_after {
+  background: #e0f2fe;
+  box-shadow: inset 0 -2px 0 #0284c7;
+}
+
+.medical-document-editor .patch-review-highlight-ambiguous {
+  background: #ffedd5;
+  box-shadow: inset 0 -2px 0 #f97316;
+}
+
+.medical-document-editor .patch-review-highlight-selected {
+  outline: 2px solid #0f766e;
+  outline-offset: 2px;
+}
+
+.medical-document-editor .patch-review-highlight-accepted {
+  background: #dcfce7;
+  box-shadow: inset 0 -2px 0 #16a34a;
+}
+
+.medical-document-editor .patch-review-highlight-rejected {
+  background: #f1f5f9;
+  color: #64748b;
+  box-shadow: inset 0 -2px 0 #cbd5e1;
+}
+
+.medical-document-editor .patch-review-inline-diff {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  color: #334155;
+  cursor: pointer;
+  display: inline-flex;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  gap: 0.25rem;
+  line-height: 1.25;
+  margin: 0 0.2rem;
+  max-width: min(44rem, 100%);
+  padding: 0.1rem 0.2rem;
+  vertical-align: middle;
+}
+
+.medical-document-editor .patch-review-inline-diff-selected {
+  outline: 2px solid #0f766e;
+  outline-offset: 1px;
+}
+
+.medical-document-editor .patch-review-inline-label {
+  color: #475569;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.medical-document-editor .patch-review-inline-label-delete {
+  color: #991b1b;
+}
+
+.medical-document-editor .patch-review-inline-addition {
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  border-radius: 4px;
+  color: #166534;
+  font-weight: 600;
+  padding: 0.05rem 0.25rem;
+  white-space: pre-wrap;
+}
+
+.medical-document-editor .patch-review-inline-actions {
+  display: inline-flex;
+  gap: 0.15rem;
+}
+
+.medical-document-editor .patch-review-inline-action {
+  align-items: center;
+  border: 0;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 800;
+  height: 1.2rem;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 1.2rem;
+}
+
+.medical-document-editor .patch-review-inline-action-approve {
+  background: #16a34a;
+}
+
+.medical-document-editor .patch-review-inline-action-reject {
+  background: #dc2626;
+}
+
+.medical-document-editor .patch-review-inline-status {
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.05rem 0.3rem;
+}
+
+.medical-document-editor .patch-review-inline-status-accepted {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.medical-document-editor .patch-review-inline-status-rejected {
+  background: #f1f5f9;
+  color: #475569;
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

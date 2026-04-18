@@ -90,7 +90,6 @@ class FakeToolsClient:
             "version": 3,
             "content_hash": "hash-demo",
             "updated_at": "2026-04-02T10:00:00Z",
-            "short_summary": content[:120],
             "excerpt": content,
         }
 
@@ -232,9 +231,7 @@ def default_drafted_patch() -> DraftedPatch:
             "endOffset": 29,
         },
         expected_hash="hash-demo",
-        before_preview="Paciente estable y con mejoria.",
-        after_preview="\n\nFecha: 2 abril 2026",
-        content_preview="Paciente estable y con mejoria.\n\nFecha: 2 abril 2026",
+        inserted_text="\n\nFecha: 2 abril 2026",
         rationale="Integrar fecha solicitada en la nota.",
     )
 
@@ -243,7 +240,7 @@ def default_drafted_patch_plan() -> DraftedPatchPlan:
     patch = default_drafted_patch()
     return DraftedPatchPlan(
         rationale=patch.rationale,
-        document_preview_after=patch.content_preview,
+        document_preview_after="Paciente estable y con mejoria.\n\nFecha: 2 abril 2026",
         patches=[patch],
     )
 

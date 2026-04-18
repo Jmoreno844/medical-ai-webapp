@@ -151,7 +151,6 @@ _CASES: tuple[LiveClinicalCase, ...] = (
                 "is_active": True,
                 "is_open": True,
                 "ai_writable": False,
-                "short_summary": "Beta hCG positiva del dia de la consulta.",
             },
             {
                 "document_id": "32",
@@ -162,7 +161,6 @@ _CASES: tuple[LiveClinicalCase, ...] = (
                 "is_active": True,
                 "is_open": True,
                 "ai_writable": False,
-                "short_summary": "Anafilaxia a penicilina documentada previamente.",
             },
             {
                 "document_id": "43",
@@ -173,7 +171,6 @@ _CASES: tuple[LiveClinicalCase, ...] = (
                 "is_active": True,
                 "is_open": True,
                 "ai_writable": True,
-                "short_summary": "Historia clinica ambulatoria de sintomas urinarios bajos.",
             },
         ),
     ),
@@ -361,7 +358,6 @@ _CASES: tuple[LiveClinicalCase, ...] = (
                 "is_active": True,
                 "is_open": True,
                 "ai_writable": False,
-                "short_summary": "Signos vitales de reevaluacion con hipoxemia y taquipnea.",
             },
             {
                 "document_id": "46",
@@ -372,7 +368,6 @@ _CASES: tuple[LiveClinicalCase, ...] = (
                 "is_active": True,
                 "is_open": True,
                 "ai_writable": False,
-                "short_summary": "Reevaluacion con mayor fatiga al hablar y somnolencia.",
             },
             {
                 "document_id": "49",
@@ -383,7 +378,6 @@ _CASES: tuple[LiveClinicalCase, ...] = (
                 "is_active": True,
                 "is_open": True,
                 "ai_writable": True,
-                "short_summary": "Historia clinica respiratoria con reevaluacion pendiente de reinterpretacion.",
             },
         ),
     ),
@@ -1020,7 +1014,6 @@ def build_document_read(case: LiveClinicalCase) -> dict[str, Any]:
         "mode": "full",
         "content": case.target_document_content,
         "excerpt": case.target_document_content,
-        "short_summary": case.summary,
     }
 
 
@@ -1041,7 +1034,6 @@ def build_eval_state(case: LiveClinicalCase) -> dict[str, Any]:
     workspace_documents = [dict(document) for document in case.workspace_documents] or [
         {
             **target_document,
-            "short_summary": case.summary,
         }
     ]
     document_summaries = {
@@ -1049,7 +1041,6 @@ def build_eval_state(case: LiveClinicalCase) -> dict[str, Any]:
             "title": document["title"],
             "type": document["type"],
             "version": document.get("version", 1),
-            "short_summary": str(document.get("short_summary") or case.summary),
         }
         for document in workspace_documents
     }

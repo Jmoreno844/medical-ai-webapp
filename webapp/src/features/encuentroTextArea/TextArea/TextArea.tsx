@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import {
   flushAllDirtyDrafts,
@@ -14,12 +14,18 @@ import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
 import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
 import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
 import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
+import { usePatchDecision } from "@/workspace/hooks/usePatchDecision";
 import { logger } from "@/lib/logger";
 import {
   getEmptyTiptapDoc,
   isTiptapJsonContent,
   medicalEditorExtensions,
 } from "./tiptap/medicalEditor";
+import {
+  PatchReviewDecorationExtension,
+  resolvePatchReviewPatches,
+  setPatchReviewDecorations,
+} from "./tiptap/patchReviewDecorations";
 
 type EditorSnapshot = {
   markdown: string;
@@ -99,7 +105,10 @@ const TextArea: React.FC = () => {
   );
   const activePatchSetId = usePatchSetStore((state) => state.activePatchSetId);
   const patchSets = usePatchSetStore((state) => state.patchSets);
+  const selectedPatchId = usePatchSetStore((state) => state.selectedPatchId);
+  const setSelectedPatch = usePatchSetStore((state) => state.setSelectedPatch);
   const isCopilotRunning = useWorkspaceStore((state) => state.isCopilotRunning);
+  const { submitDecision } = usePatchDecision();
 
   const [showGenerationSuccess, setShowGenerationSuccess] = useState(false);
   const previousDocIdRef = useRef<number | null>(null);
@@ -109,10 +118,58 @@ const TextArea: React.FC = () => {
   const saveTimerRef = useRef<number | null>(null);
   const saveInFlightRef = useRef(false);
 
+  const handlePatchApprove = useCallback(
+    (patchId: string) => {
+      const patchSetId = usePatchSetStore.getState().activePatchSetId;
+      if (!patchSetId) {
+        return;
+      }
+      void submitDecision(patchSetId, patchId, "approve").catch((error) => {
+        logger.error("[PATCH_REVIEW] Failed to approve patch", {
+          patchSetId,
+          patchId,
+          error,
+        });
+      });
+    },
+    [submitDecision],
+  );
+
+  const handlePatchReject = useCallback(
+    (patchId: string) => {
+      const patchSetId = usePatchSetStore.getState().activePatchSetId;
+      if (!patchSetId) {
+        return;
+      }
+      void submitDecision(patchSetId, patchId, "reject").catch((error) => {
+        logger.error("[PATCH_REVIEW] Failed to reject patch", {
+          patchSetId,
+          patchId,
+          error,
+        });
+      });
+    },
+    [submitDecision],
+  );
+
+  const editorExtensions = useMemo(
+    () => [
+      ...medicalEditorExtensions,
+      PatchReviewDecorationExtension.configure({
+        onSelectPatch: (patchId) => {
+          usePatchSetStore.getState().setSelectedPatch(patchId);
+        },
+        onApprovePatch: handlePatchApprove,
+        onRejectPatch: handlePatchReject,
+      }),
+    ],
+    [handlePatchApprove, handlePatchReject],
+  );
+
   const editor = useEditor({
     immediatelyRender: false,
     shouldRerenderOnTransaction: false,
-    extensions: medicalEditorExtensions,
+    extensions: editorExtensions,
     content: getEmptyTiptapDoc(),
     editable: false,
     editorProps: {
@@ -283,6 +340,47 @@ const TextArea: React.FC = () => {
         )
       : [];
 
+  const patchReviewResolutions = useMemo(
+    () =>
+      editor && patchesForDocument.length > 0
+        ? resolvePatchReviewPatches(editor, patchesForDocument)
+        : [],
+    [
+      documentContent,
+      documentContentJson,
+      editor,
+      editorRefreshTrigger,
+      patchesForDocument,
+    ],
+  );
+
+  const selectedPatchStillVisible = selectedPatchId
+    ? patchesForDocument.some((patch) => patch.id === selectedPatchId)
+    : false;
+
+  useEffect(() => {
+    if (patchesForDocument.length === 0) {
+      if (selectedPatchId) {
+        setSelectedPatch(null);
+      }
+      return;
+    }
+
+    if (!selectedPatchId || selectedPatchStillVisible) {
+      return;
+    }
+
+    const firstPending =
+      patchesForDocument.find((patch) => patch.status === "pending") ??
+      patchesForDocument[0];
+    setSelectedPatch(firstPending.id);
+  }, [
+    patchesForDocument,
+    selectedPatchId,
+    selectedPatchStillVisible,
+    setSelectedPatch,
+  ]);
+
   const editorMode =
     patchesForDocument.length > 0
       ? "patch_review"
@@ -297,6 +395,18 @@ const TextArea: React.FC = () => {
     editorMode === "streaming_preview"
       ? activeDerivedState?.streamingContent
       : undefined;
+
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+
+    setPatchReviewDecorations(
+      editor,
+      editorMode === "patch_review" ? patchReviewResolutions : [],
+      selectedPatchId,
+    );
+  }, [editor, editorMode, patchReviewResolutions, selectedPatchId]);
 
   useEffect(() => {
     if (!editor) {
@@ -427,6 +537,10 @@ const TextArea: React.FC = () => {
 
   const isStreamingActiveDocument = editorMode === "streaming_preview";
   const isPatchPreviewMode = editorMode === "patch_review";
+  const unresolvedPatchCount = patchReviewResolutions.filter(
+    (resolution) =>
+      resolution.status === "missing" || resolution.status === "unsupported",
+  ).length;
 
   return (
     <div className="flex flex-col h-full">
@@ -477,8 +591,43 @@ const TextArea: React.FC = () => {
 
       {isPatchPreviewMode && (
         <div className="bg-amber-50 p-2 border-b border-amber-200 text-amber-800 text-sm text-center">
-          Revisión de cambios activa. El documento queda visible en solo lectura y
-          las decisiones se toman desde las tarjetas del copiloto.
+          Revisión de cambios activa. El texto removido aparece tachado y la propuesta en verde junto al cambio.
+        </div>
+      )}
+
+      {isPatchPreviewMode && patchReviewResolutions.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto border-b border-amber-100 bg-white px-3 py-2 text-xs">
+          <span className="shrink-0 font-medium text-slate-600">
+            Cambios sugeridos:
+          </span>
+          {patchReviewResolutions.map((resolution, index) => {
+            const isSelected = resolution.patch.id === selectedPatchId;
+            const isUnresolved =
+              resolution.status === "missing" ||
+              resolution.status === "unsupported";
+            return (
+              <button
+                key={resolution.patch.id}
+                type="button"
+                className={`shrink-0 rounded border px-2 py-1 text-left ${
+                  isSelected
+                    ? "border-amber-500 bg-amber-100 text-amber-900"
+                    : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                }`}
+                onClick={() => setSelectedPatch(resolution.patch.id)}
+              >
+                #{index + 1}{" "}
+                <span className={isUnresolved ? "text-red-600" : ""}>
+                  {isUnresolved ? "no localizado" : resolution.patch.type}
+                </span>
+              </button>
+            );
+          })}
+          {unresolvedPatchCount > 0 && (
+            <span className="shrink-0 text-[11px] text-amber-700">
+              {unresolvedPatchCount} requieren revision desde el panel.
+            </span>
+          )}
         </div>
       )}
 
@@ -509,7 +658,9 @@ const TextArea: React.FC = () => {
         </div>
       )}
 
-      <div className="border rounded-md flex-1 bg-white overflow-hidden relative">
+      <div
+        className="border rounded-md flex-1 bg-white overflow-hidden relative"
+      >
         {isCopilotRunning && editorMode === "edit" && (
           <div className="absolute top-0 right-0 pointer-events-none z-10">
             <span className="m-2 px-2 py-0.5 bg-white/80 text-xs text-gray-400 rounded shadow-sm select-none flex items-center gap-1">

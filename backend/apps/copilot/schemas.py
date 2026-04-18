@@ -1,10 +1,33 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, TypeAlias
 
 from ninja import Schema
 from pydantic import Field
+
+CopilotPatchOperationType: TypeAlias = Literal[
+    "replace_span",
+    "insert_before",
+    "insert_after",
+    "insert_after_span",
+    "delete_span",
+    "rewrite_document",
+]
+CopilotNormalizedPatchOperationType: TypeAlias = Literal[
+    "replace_span",
+    "insert_before",
+    "insert_after",
+    "delete_span",
+]
+
+
+class CopilotPatchAnchor(Schema):
+    exactText: Optional[str] = None
+    prefixText: Optional[str] = None
+    suffixText: Optional[str] = None
+    startOffset: Optional[int] = None
+    endOffset: Optional[int] = None
 
 
 class WorkspaceDocumentSummaryIn(Schema):
@@ -24,8 +47,6 @@ class WorkspaceDocumentSummaryIn(Schema):
     has_streaming_state: bool
     hidden_from_agent: bool = False
     pinned_for_agent: bool = False
-    excerpt: Optional[str] = None
-    short_summary: Optional[str] = None
     estimated_tokens: Optional[int] = None
     has_pending_patches: bool = False
     # Full markdown content for ai_writable docs pre-loaded by the frontend.
@@ -85,18 +106,19 @@ class CopilotPatchOut(Schema):
     target_document_id: str
     base_version: int
     order_index: int = 0
-    patch_type: str
-    operation_type: str
-    anchor: dict[str, Any] = Field(default_factory=dict)
+    patch_type: CopilotPatchOperationType
+    operation_type: CopilotPatchOperationType
+    normalized_operation_type: CopilotNormalizedPatchOperationType
+    anchor: CopilotPatchAnchor = Field(default_factory=CopilotPatchAnchor)
     expected_hash: Optional[str] = None
+    replacement_text: Optional[str] = None
+    inserted_text: Optional[str] = None
     old_text: Optional[str] = None
     new_text: Optional[str] = None
     resolved_start: Optional[int] = None
     resolved_end: Optional[int] = None
     confidence: Optional[float] = None
     conflict_reason: Optional[str] = None
-    before_preview: Optional[str] = None
-    after_preview: Optional[str] = None
     document_preview_after: Optional[str] = None
     content_preview: str
     rationale: Optional[str] = None
@@ -199,7 +221,6 @@ class CopilotToolDocumentOut(Schema):
     is_active: bool = False
     is_open: bool = False
     pinned_for_agent: bool = False
-    short_summary: Optional[str] = None
 
 
 class CopilotListOpenDocumentsOut(Schema):
@@ -264,7 +285,6 @@ class CopilotReadDocumentSummaryOut(Schema):
     version: int
     content_hash: str
     updated_at: str
-    short_summary: Optional[str] = None
 
 
 class CopilotReadDocumentSpanIn(CopilotInternalToolRequest):

@@ -172,8 +172,6 @@ export type WorkspaceIndex = {
     hasStreamingState: boolean;
     hiddenFromAgent: boolean;
     pinnedForAgent: boolean;
-    excerpt?: string;
-    shortSummary?: string;
     estimatedTokens?: number;
     hasPendingPatches?: boolean;
     // Full markdown content for ai_writable docs — sent so the agent can propose

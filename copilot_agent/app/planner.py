@@ -10,7 +10,7 @@ from google.genai import types as genai_types
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.tools import BaseTool
 from langchain_core.utils.function_calling import convert_to_openai_tool
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.config import Settings
 from app.llm.context_rendering import render_patch_input, render_turn_context
@@ -79,13 +79,17 @@ class ClinicalPlan(BaseModel):
             "Usa nombres en snake_case del español clínico, por ejemplo: "
             "'enfermedad_actual', 'antecedentes_relevantes', 'impresion_diagnostica', "
             "'analisis_clinico', 'plan', 'revision_por_sistemas'. "
-            "El drafter debe emitir al menos un patch por cada sección listada aquí."
+            "El drafter debe emitir al menos un patch por cada sección listada aquí. "
+            "CRÍTICO: Si el cambio aplica a datos transversales (como la EDAD, sexo o "
+            "comorbilidades), DEBES incluir 'enfermedad_actual' y 'analisis_clinico' "
+            "para garantizar la consistencia narrativa en todo el documento."
         ),
     )
     needs_full_note: bool = Field(
         description=(
             "True si el cambio requiere leer la nota completa antes de proponer patches. "
-            "Siempre True para propagation y reinterpretation. "
+            "Siempre True para propagation y reinterpretation, o si se alteran datos "
+            "demográficos que requieren propagación a Análisis. "
             "El runtime rechazará propose_* si este campo es True y no hay lectura 'full' previa."
         )
     )
@@ -131,6 +135,8 @@ class DraftedPatchAnchor(BaseModel):
 
 
 class DraftedPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     operation_type: PatchOperationType = Field(
         description=(
             "Patch operation constant. Must be one of: replace_span, insert_before, "
@@ -140,9 +146,29 @@ class DraftedPatch(BaseModel):
     )
     anchor: DraftedPatchAnchor = Field(default_factory=DraftedPatchAnchor)
     expected_hash: str | None = None
-    before_preview: str | None = None
-    after_preview: str | None = None
-    content_preview: str
+    replacement_text: str | None = Field(
+        default=None,
+        description=(
+            "Only for replace_span and rewrite_document. The exact text that replaces "
+            "anchor.exactText, or the full new document for rewrite_document. Never include "
+            "prefixText, suffixText, bullets, labels, section headings, or surrounding "
+            "context unless that text is inside anchor.exactText."
+        ),
+    )
+    inserted_text: str | None = Field(
+        default=None,
+        description=(
+            "Only for insert_before and insert_after_span. The exact text to insert, "
+            "including any needed spaces or newlines. Never include the anchor text."
+        ),
+    )
+    content_preview: str = Field(
+        default="",
+        description=(
+            "Runtime-derived compatibility preview. The drafter should leave this empty; "
+            "the runtime will populate it from replacement_text or inserted_text."
+        ),
+    )
     rationale: str = Field(
         default="",
         description=(
@@ -161,6 +187,30 @@ class DraftedPatch(BaseModel):
             "Ejemplos: 'antecedentes_relevantes', 'plan', 'impresion_diagnostica'."
         ),
     )
+
+    @model_validator(mode="after")
+    def validate_applicable_text(self) -> "DraftedPatch":
+        operation_type = self.operation_type
+        replacement_text = self.replacement_text
+        inserted_text = self.inserted_text
+        if operation_type in {"replace_span", "rewrite_document"} and not isinstance(
+            replacement_text, str
+        ):
+            raise ValueError(
+                "replacement_text is required for replace_span and rewrite_document"
+            )
+        if operation_type in {"insert_before", "insert_after_span"} and not isinstance(
+            inserted_text, str
+        ):
+            raise ValueError(
+                "inserted_text is required for insert_before and insert_after_span"
+            )
+        if operation_type == "delete_span":
+            if replacement_text not in (None, "") or inserted_text not in (None, ""):
+                raise ValueError(
+                    "delete_span must not include replacement_text or inserted_text"
+                )
+        return self
 
 
 class DraftedPatchPlan(BaseModel):
@@ -673,7 +723,7 @@ class LangChainCopilotPlanner:
         # goes through patch drafting, validation, backend conflict checks and human review.
         if target_document_id and (
             clinical_plan.get("edit_scope")
-            or LangChainCopilotPlanner._looks_like_edit_request(user_query)
+            or LangChainCopilotPlanner._looks_like_edit_request(str(state.get("user_message") or ""))
         ):
             logger.warning(
                 "Planner quedo vacio 3 veces; sintetizando propose_replace_span fallback para %s.",
@@ -879,10 +929,15 @@ class LangChainCopilotPlanner:
     def _normalize_patch_plan(result: DraftedPatchPlan) -> DraftedPatchPlan:
         patches: list[DraftedPatch] = []
         for patch in result.patches:
+            content_preview = ""
+            if patch.operation_type in {"replace_span", "rewrite_document"}:
+                content_preview = patch.replacement_text or ""
+            elif patch.operation_type in {"insert_before", "insert_after_span"}:
+                content_preview = patch.inserted_text or ""
             patches.append(
                 patch.model_copy(
                     update={
-                        "content_preview": patch.content_preview or "",
+                        "content_preview": content_preview,
                     }
                 )
             )

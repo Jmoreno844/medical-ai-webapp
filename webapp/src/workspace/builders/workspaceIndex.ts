@@ -27,10 +27,6 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
         activePatchSet?.patches.filter(
           (p) => p.documentId === document.id && p.status === "pending",
         ) ?? [];
-      const contentForExcerpt =
-        draft?.localUnsavedContent ??
-        snapshot?.contentMarkdown ??
-        document.contentMarkdown;
       const contentJsonForAgent =
         draft?.localUnsavedContentJson ??
         snapshot?.contentJson ??
@@ -61,8 +57,6 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
           document.id,
         ),
         pinnedForAgent: workspaceState.pinnedDocumentIds.includes(document.id),
-        excerpt: contentForExcerpt.trim().slice(0, 160) || undefined,
-        shortSummary: document.summaryShort,
         estimatedTokens: document.estimatedTokens,
         hasPendingPatches: patches.length > 0,
         // Pre-load full content for open, writable documents so the agent can
@@ -80,7 +74,8 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
           if (!document.aiWritable) return undefined;
           if (workspaceState.hiddenFromAgentDocumentIds.includes(document.id))
             return undefined;
-          if (derived?.inProgress && derived?.streamingContent) return undefined;
+          if (derived?.inProgress && derived?.streamingContent)
+            return undefined;
           const canonical =
             snapshot?.contentMarkdown ?? document.contentMarkdown ?? "";
           if (draft?.isDirty && draft.localUnsavedContent != null) {
@@ -94,7 +89,10 @@ export function buildWorkspaceIndex(): WorkspaceIndex {
                 .replace(/\n\n+/g, "\n\n")
                 .replace(/[ \t]+/g, " ")
                 .trim();
-            if (normalize(draft.localUnsavedContent ?? "") !== normalize(canonical)) {
+            if (
+              normalize(draft.localUnsavedContent ?? "") !==
+              normalize(canonical)
+            ) {
               // Real unsaved changes — exclude to avoid base_version mismatch.
               return undefined;
             }

@@ -15,24 +15,35 @@ def xml_line(tag: str, value: Any, *, max_length: int = 320) -> str:
     return f"<{tag}>{escape(shorten_text(value, max_length=max_length))}</{tag}>"
 
 
-def _render_documents(documents: Sequence[Mapping[str, Any]]) -> str:
-    if not documents:
-        return "<available_documents />"
+def _has_value(value: Any) -> bool:
+    return value not in (None, "", [], {}, False)
+
+
+def _render_documents(
+    documents: Sequence[Mapping[str, Any]],
+    *,
+    exclude_document_ids: set[str] | None = None,
+) -> str:
+    rendered_documents = [
+        document
+        for document in documents
+        if str(document.get("document_id") or "") not in (exclude_document_ids or set())
+    ]
+    if not rendered_documents:
+        return ""
 
     lines = ["<available_documents>"]
-    for document in documents[:8]:
+    for document in rendered_documents[:8]:
         lines.extend(
             [
                 "  <document>",
                 f"    {xml_line('document_id', document.get('document_id'))}",
                 f"    {xml_line('title', document.get('title'))}",
-                f"    {xml_line('type', document.get('type'))}",
+                f"    {xml_line('doctype', document.get('type'))}",
                 f"    {xml_line('status', document.get('status'))}",
-                f"    {xml_line('version', document.get('version'))}",
                 f"    {xml_line('is_active', document.get('is_active'))}",
                 f"    {xml_line('is_open', document.get('is_open'))}",
                 f"    {xml_line('ai_writable', document.get('ai_writable'))}",
-                f"    {xml_line('short_summary', document.get('short_summary') or '(no summary)')}",
                 "  </document>",
             ]
         )
@@ -48,7 +59,7 @@ def _render_workspace_documents(
 ) -> str:
     documents = list(workspace_index.get("documents") or [])
     if not documents:
-        return "<workspace_documents />"
+        return ""
 
     relevant_ids: list[str] = []
     for candidate in [
@@ -66,42 +77,50 @@ def _render_workspace_documents(
         if not relevant_ids or str(document.get("document_id") or "") in relevant_ids
     ]
     if not rendered_documents:
-        return "<workspace_documents />"
+        return ""
 
     lines = ["<workspace_documents>"]
     for document in rendered_documents[:8]:
-        lines.extend(
-            [
-                "  <workspace_document>",
-                f"    {xml_line('document_id', document.get('document_id'))}",
-                f"    {xml_line('title', document.get('title'))}",
-                f"    {xml_line('type', document.get('type'))}",
-                f"    {xml_line('status', document.get('status'))}",
-                f"    {xml_line('is_active', document.get('is_active'))}",
-                f"    {xml_line('is_open', document.get('is_open'))}",
-                f"    {xml_line('ai_writable', document.get('ai_writable'))}",
-                f"    {xml_line('short_summary', document.get('short_summary') or '(no summary)')}",
-                "  </workspace_document>",
-            ]
-        )
+        document_lines = [
+            "  <workspace_document>",
+            f"    {xml_line('document_id', document.get('document_id'))}",
+            f"    {xml_line('title', document.get('title'))}",
+            f"    {xml_line('doctype', document.get('type'))}",
+            f"    {xml_line('status', document.get('status'))}",
+            f"    {xml_line('is_active', document.get('is_active'))}",
+            f"    {xml_line('is_open', document.get('is_open'))}",
+            f"    {xml_line('ai_writable', document.get('ai_writable'))}",
+        ]
+        for field_name in ("has_user_edits", "has_streaming_state", "has_pending_patches"):
+            if _has_value(document.get(field_name)):
+                document_lines.append(f"    {xml_line(field_name, document.get(field_name))}")
+        document_lines.append("  </workspace_document>")
+        lines.extend(document_lines)
     lines.append("</workspace_documents>")
     return "\n".join(lines)
 
 
-def _render_document_summaries(document_summaries: Mapping[str, Mapping[str, Any]]) -> str:
-    if not document_summaries:
-        return "<document_summaries />"
+def _render_document_summaries(
+    document_summaries: Mapping[str, Mapping[str, Any]],
+    *,
+    exclude_document_ids: set[str] | None = None,
+) -> str:
+    rendered_summaries = [
+        (document_id, summary)
+        for document_id, summary in document_summaries.items()
+        if str(document_id) not in (exclude_document_ids or set())
+    ]
+    if not rendered_summaries:
+        return ""
 
     lines = ["<document_summaries>"]
-    for document_id, summary in list(document_summaries.items())[:8]:
+    for document_id, summary in rendered_summaries[:8]:
         lines.extend(
             [
                 "  <document_summary>",
                 f"    {xml_line('document_id', document_id)}",
                 f"    {xml_line('title', summary.get('title'))}",
-                f"    {xml_line('type', summary.get('type'))}",
-                f"    {xml_line('version', summary.get('version'))}",
-                f"    {xml_line('short_summary', summary.get('short_summary') or '(no summary)')}",
+                f"    {xml_line('doctype', summary.get('type'))}",
                 "  </document_summary>",
             ]
         )
@@ -110,13 +129,13 @@ def _render_document_summaries(document_summaries: Mapping[str, Mapping[str, Any
 
 
 def _render_read_documents(read_documents: Sequence[Mapping[str, Any]]) -> str:
-    # excerpt here is intentionally capped at 900 chars. This block appears in the
+    # excerpt here is intentionally capped at 600 chars. This block appears in the
     # turn context header which is rebuilt and injected on EVERY planner iteration.
     # The full document content is already visible to the LLM via the ToolMessage
     # history (capped at 12000). Repeating the full text here would bloat the
     # context window across multi-turn runs with multiple document reads.
     if not read_documents:
-        return "<read_documents />"
+        return ""
 
     lines = ["<read_documents>"]
     for document in read_documents[:6]:
@@ -125,9 +144,8 @@ def _render_read_documents(read_documents: Sequence[Mapping[str, Any]]) -> str:
                 "  <read_document>",
                 f"    {xml_line('document_id', document.get('document_id'))}",
                 f"    {xml_line('title', document.get('title'))}",
-                f"    {xml_line('type', document.get('type'))}",
+                f"    {xml_line('doctype', document.get('type'))}",
                 f"    {xml_line('mode', document.get('mode'))}",
-                f"    {xml_line('short_summary', document.get('short_summary') or document.get('content'), max_length=900)}",
                 "  </read_document>",
             ]
         )
@@ -137,7 +155,7 @@ def _render_read_documents(read_documents: Sequence[Mapping[str, Any]]) -> str:
 
 def _render_read_spans(read_spans: Sequence[Mapping[str, Any]]) -> str:
     if not read_spans:
-        return "<read_spans />"
+        return ""
 
     lines = ["<read_spans>"]
     for span in read_spans[:4]:
@@ -158,17 +176,20 @@ def _render_read_spans(read_spans: Sequence[Mapping[str, Any]]) -> str:
 
 def _render_context_view(context_view: Mapping[str, Any] | None) -> str:
     if not context_view:
-        return "<context_view />"
+        return ""
+
+    facts = list(context_view.get("facts") or [])[:6]
+    if not facts:
+        return ""
 
     lines = ["<context_view>"]
-    for fact in (context_view.get("facts") or [])[:6]:
+    for fact in facts:
         lines.extend(
             [
                 "  <fact>",
                 f"    {xml_line('category', fact.get('category'))}",
                 f"    {xml_line('value', fact.get('value'))}",
                 f"    {xml_line('source_document_id', fact.get('source_document_id'))}",
-                f"    {xml_line('confidence', fact.get('confidence'))}",
                 "  </fact>",
             ]
         )
@@ -178,7 +199,7 @@ def _render_context_view(context_view: Mapping[str, Any] | None) -> str:
 
 def _render_patch_history(patch_history: Mapping[str, list[Mapping[str, Any]]]) -> str:
     if not patch_history:
-        return "<patch_history />"
+        return ""
 
     lines = ["<patch_history>"]
     for document_id, patches in list(patch_history.items())[:4]:
@@ -187,7 +208,6 @@ def _render_patch_history(patch_history: Mapping[str, list[Mapping[str, Any]]]) 
             lines.extend(
                 [
                     "    <patch>",
-                    f"      {xml_line('patch_id', patch.get('patch_id'))}",
                     f"      {xml_line('status', patch.get('status'))}",
                     f"      {xml_line('operation_type', patch.get('operation_type'))}",
                     f"      {xml_line('rationale', patch.get('rationale'))}",
@@ -203,7 +223,7 @@ def _render_search_results(
     search_results: Sequence[Mapping[str, Any]],
 ) -> str:
     if not search_results:
-        return "<search_results />"
+        return ""
 
     lines = ["<search_results>"]
     for result in search_results[:4]:
@@ -214,7 +234,6 @@ def _render_search_results(
                     "    <match>",
                     f"      {xml_line('document_id', match.get('document_id'))}",
                     f"      {xml_line('title', match.get('title'))}",
-                    f"      {xml_line('score', match.get('score'))}",
                     f"      {xml_line('snippet', match.get('snippet'))}",
                     "    </match>",
                 ]
@@ -258,6 +277,21 @@ def _render_user_edit_notices(workspace_index: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _render_planning_state(state: Mapping[str, Any]) -> str:
+    next_required_action = state.get("next_required_action")
+    planned_target_document_id = state.get("planned_target_document_id")
+    if not next_required_action and not planned_target_document_id:
+        return ""
+
+    lines = ["<planning_state>"]
+    if next_required_action:
+        lines.append(f"  {xml_line('next_required_action', next_required_action)}")
+    if planned_target_document_id:
+        lines.append(f"  {xml_line('planned_target_document_id', planned_target_document_id)}")
+    lines.append("</planning_state>")
+    return "\n".join(lines)
+
+
 
 # Context is rendered as XML rather than JSON for two reasons:
 # 1. Clinical text contains colons, braces, and quotes that require escaping in JSON,
@@ -267,6 +301,16 @@ def _render_user_edit_notices(workspace_index: Mapping[str, Any]) -> str:
 def render_turn_context(state: Mapping[str, Any]) -> str:
     workspace_index = state.get("workspace_index") or {}
     selected_document_ids = list(state.get("selected_document_ids") or [])
+    workspace_document_ids = {
+        str(document.get("document_id") or "")
+        for document in (workspace_index.get("documents") or [])
+        if document.get("document_id") is not None
+    }
+    read_document_ids = {
+        str(document.get("document_id") or "")
+        for document in (state.get("read_documents") or [])
+        if document.get("document_id") is not None
+    }
     search_results = list(state.get("search_results") or [])
     if not search_results and state.get("search_matches"):
         search_results = [
@@ -282,37 +326,40 @@ def render_turn_context(state: Mapping[str, Any]) -> str:
                 "<copilot_turn_context>",
                 f"  {xml_line('user_query', state.get('user_message'), max_length=1200)}",
                 "  <workspace_index>",
-                f"    {xml_line('encounter_id', workspace_index.get('encounter_id'))}",
-                f"    {xml_line('workspace_version', workspace_index.get('workspace_version'))}",
                 f"    {xml_line('active_document_id', state.get('active_document_id'))}",
                 f"    {xml_line('selected_document_ids', ', '.join(selected_document_ids))}",
                 "  </workspace_index>",
                 _render_user_edit_notices(workspace_index) or None,
                 _render_workspace_documents(
-                workspace_index,
-                active_document_id=state.get("active_document_id"),
-                selected_document_ids=selected_document_ids,
-            ),
-            _render_documents(state.get("available_documents") or []),
-            _render_document_summaries(state.get("document_summaries") or {}),
-            _render_read_documents(state.get("read_documents") or []),
-            _render_read_spans(state.get("read_spans") or []),
-            _render_context_view(state.get("context_view")),
-            _render_search_results(search_results),
-            _render_patch_history(state.get("patch_history") or {}),
-            "  <planning_state>",
-            f"    {xml_line('next_required_action', state.get('next_required_action'))}",
-            f"    {xml_line('planned_target_document_id', state.get('planned_target_document_id'))}",
-            "  </planning_state>",
-            "  <budgets>",
-            f"    {xml_line('iteration_count', state.get('iteration_count'))}",
-            f"    {xml_line('max_iterations', state.get('max_iterations'))}",
-            f"    {xml_line('patch_operations_count', state.get('patch_operations_count'))}",
-            f"    {xml_line('max_patch_operations', state.get('max_patch_operations'))}",
-            "  </budgets>",
-            f"  {xml_line('last_tool_error', state.get('last_tool_error'))}",
-            f"  {xml_line('last_planner_error', state.get('last_planner_error'))}",
-            "</copilot_turn_context>",
+                    workspace_index,
+                    active_document_id=state.get("active_document_id"),
+                    selected_document_ids=selected_document_ids,
+                ),
+                _render_documents(
+                    state.get("available_documents") or [],
+                    exclude_document_ids=workspace_document_ids,
+                ),
+                _render_document_summaries(
+                    state.get("document_summaries") or {},
+                    exclude_document_ids=read_document_ids,
+                ),
+                _render_read_documents(state.get("read_documents") or []),
+                _render_read_spans(state.get("read_spans") or []),
+                _render_context_view(state.get("context_view")),
+                _render_search_results(search_results),
+                _render_patch_history(state.get("patch_history") or {}),
+                _render_planning_state(state),
+                (
+                    f"  {xml_line('last_tool_error', state.get('last_tool_error'))}"
+                    if state.get("last_tool_error")
+                    else None
+                ),
+                (
+                    f"  {xml_line('last_planner_error', state.get('last_planner_error'))}"
+                    if state.get("last_planner_error")
+                    else None
+                ),
+                "</copilot_turn_context>",
             ]
         )
     )
@@ -361,7 +408,7 @@ def render_patch_input(
                 f"      {xml_line('title', item.get('title'))}",
                 f"      {xml_line('type', item.get('type'))}",
                 f"      {xml_line('read_mode', item.get('read_mode'))}",
-                f"      {xml_line('excerpt', item.get('excerpt'), max_length=800)}",
+                f"      {xml_line('content', item.get('content'), max_length=12000)}",
                 "    </context_item>",
             ]
         )

@@ -183,6 +183,24 @@ El runtime ya no depende de que el frontend mande ese hash. Si falta en `workspa
 
 En otras palabras: el pre-seed del frontend reemplaza la lectura remota, pero no puede omitir la metadata que vuelve aplicable el patch set.
 
+### Contexto renderizado al planner
+
+`render_turn_context()` no serializa todo el estado del grafo. El `workspace_index`
+completo se conserva en state para tools, sincronización y debug, pero el prompt del
+planner solo recibe metadata semántica útil para decidir el siguiente paso.
+
+En particular, el prompt omite metadata operacional como `workspace_version`,
+`encounter_id`, budgets (`max_iterations`, `max_patch_operations`), versiones de
+documentos, scores de búsqueda, confidence de facts y IDs internos de patches. El
+runtime sigue aplicando esos límites fuera del LLM.
+
+El renderer también evita bloques vacíos y duplicados: `available_documents` no repite
+documentos que ya están en `workspace_documents`, y `document_summaries` no repite
+documentos que ya aparecen en `read_documents`. Los excerpts de `read_documents` se
+mantienen acotados a 600 caracteres porque este header se reinyecta en cada iteración
+del planner; el texto completo sigue disponible en lecturas/tool messages y para el
+drafter.
+
 ---
 
 ## Herramientas disponibles
@@ -282,15 +300,23 @@ El `patch_set_preview` que se emite al finalizar una propose tool:
         "startOffset": int | None,   # Ayuda secundaria
         "endOffset": int | None      # Ayuda secundaria
       },
-      "content_preview": str,        # Texto nuevo a insertar/reemplazar
-      "before_preview": str | None,
-      "after_preview": str | None,
+      "replacement_text": str | None, # Requerido para replace_span/rewrite_document
+      "inserted_text": str | None,    # Requerido para insert_before/insert_after_span
+      "old_text": str | None,         # Calculado por Django al resolver el anchor
+      "new_text": str | None,         # Calculado por Django desde replacement/insert/delete
+      "content_preview": str,         # Compat derivada de new_text; no la emite el LLM
       "rationale": str,
       "clinical_impact": str | None  # "cosmetic" | "factual" | "clinical" (P1 futuro)
     }
   ]
 }
 ```
+
+El drafter ya no emite previews contextuales (`before_preview` / `after_preview`).
+Para `replace_span`, `replacement_text` debe reemplazar únicamente
+`anchor.exactText`; si incluye `prefixText`, `suffixText`, bullets o labels que
+quedan fuera del anchor, Django marca el patch como conflictivo para evitar
+duplicaciones. Para inserciones, `inserted_text` contiene solo el texto nuevo.
 
 ### Requisito de `base_hash`
 
@@ -304,6 +330,14 @@ Eso suele significar una de estas dos cosas:
 Los cambios recientes del runtime cubren explícitamente el segundo caso.
 
 Django recibe este payload, resuelve los anchors a offsets reales en el documento canónico, persiste un `CopilotPatchSet` + `CopilotPatch` por cada entrada en `patches`, y marca los patches como `pending` o `conflicted` según el resultado de la resolución.
+
+En las respuestas de Django hacia el frontend cada patch conserva `operation_type`
+tal como lo emitió el agente y además expone `normalized_operation_type`, que es
+el valor que debe usar la UI para renderizar diffs. Hoy normaliza:
+
+- `insert_after_span` -> `insert_after`
+- `rewrite_document` -> `replace_span`
+- `replace_span`, `insert_before` y `delete_span` quedan iguales
 
 ---
 
@@ -489,8 +523,8 @@ tools + consolidate
 
 call_model
   → planner: identifica reinterpretation clínica
+  → llama set_edit_plan(affected_sections, ...)
   → llama propose_replace_span(target_document_id)
-  → [futuro P0] emite structured_plan con affected_sections
 
 tools (propose_replace_span)
   → drafter recibe nota completa + affected_sections

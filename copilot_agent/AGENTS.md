@@ -37,7 +37,7 @@ forma de transmitir contexto que no se puede inferir leyendo el código.
 - Decisiones que descartan una alternativa más obvia (ej. por qué json_schema y no function_calling)
 - Invariantes que el agente rompería si no los conoce (ej. RESET_MARKER, AFC disable, thread checkpoint scope)
 - Workarounds o stubs temporales con una nota de qué los reemplazaría (ej. `apply_patch` vacío)
-- Límites de tamaño o presupuesto con la razón (ej. excerpt:900 en turn context vs 12000 en ToolMessage)
+- Límites de tamaño o presupuesto con la razón (ej. excerpt:600 en turn context vs 12000 en ToolMessage)
 - Cualquier comportamiento del proveedor LLM que sea sorprendente (ej. Gemini empty response, AFC side loop)
 - Flujo de ownership inter-servicio cuando no está en el nombre del módulo (ej. Django es quien escribe, no el agente)
 

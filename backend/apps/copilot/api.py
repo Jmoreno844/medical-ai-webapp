@@ -62,6 +62,17 @@ PATCH_SET_PREVIEW_REQUIRED_FIELDS = {
 }
 
 
+def _normalized_patch_operation_type(value: str | None) -> str:
+    operation_type = str(value or "").strip().lower()
+    if operation_type in {"insert_after", "insert_after_span"}:
+        return "insert_after"
+    if operation_type in {"replace_span", "rewrite_document"}:
+        return "replace_span"
+    if operation_type in {"insert_before", "delete_span"}:
+        return operation_type
+    return "replace_span"
+
+
 def _serialize_run(
     run: CopilotRun, remote_run: dict[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -109,6 +120,9 @@ def _serialize_run(
 
 
 def _serialize_patch(patch: CopilotPatch) -> dict[str, Any]:
+    normalized_operation_type = _normalized_patch_operation_type(
+        patch.patch_type or patch.operation_type
+    )
     return {
         "patch_id": patch.patch_id,
         "patch_set_id": patch.patch_set.patch_set_id if patch.patch_set_id else None,
@@ -118,16 +132,17 @@ def _serialize_patch(patch: CopilotPatch) -> dict[str, Any]:
         "order_index": patch.order_index,
         "patch_type": patch.patch_type,
         "operation_type": patch.operation_type,
+        "normalized_operation_type": normalized_operation_type,
         "anchor": getattr(patch, "anchor", {}) or {},
         "expected_hash": getattr(patch, "expected_hash", None),
+        "replacement_text": getattr(patch, "replacement_text", None),
+        "inserted_text": getattr(patch, "inserted_text", None),
         "old_text": getattr(patch, "old_text", None),
         "new_text": getattr(patch, "new_text", None),
         "resolved_start": getattr(patch, "resolved_start", None),
         "resolved_end": getattr(patch, "resolved_end", None),
         "confidence": getattr(patch, "confidence", None),
         "conflict_reason": getattr(patch, "conflict_reason", None),
-        "before_preview": getattr(patch, "before_preview", None),
-        "after_preview": getattr(patch, "after_preview", None),
         "document_preview_after": getattr(patch, "document_preview_after", None),
         "content_preview": patch.content_preview,
         "rationale": patch.rationale,
@@ -136,6 +151,7 @@ def _serialize_patch(patch: CopilotPatch) -> dict[str, Any]:
         "target_selection_reason": getattr(patch, "target_selection_reason", None),
         "status": patch.status,
         "review_comment": patch.review_comment,
+        "section": getattr(patch, "section", None),
         "created_at": patch.created_at,
         "updated_at": patch.updated_at,
     }
@@ -318,10 +334,10 @@ def _normalize_legacy_patch_set_preview(
                 "order_index": patch_preview.get("order_index") or 0,
                 "anchor": patch_preview.get("anchor") or {},
                 "expected_hash": patch_preview.get("expected_hash"),
+                "replacement_text": patch_preview.get("replacement_text"),
+                "inserted_text": patch_preview.get("inserted_text"),
                 "old_text": patch_preview.get("old_text"),
                 "new_text": patch_preview.get("new_text"),
-                "before_preview": patch_preview.get("before_preview"),
-                "after_preview": patch_preview.get("after_preview"),
                 "document_preview_after": patch_preview.get("document_preview_after"),
                 "content_preview": patch_preview.get("content_preview"),
                 "rationale": patch_preview.get("rationale"),

@@ -60,12 +60,38 @@ export type CopilotPatchStatus =
   | "applied"
   | "stale";
 
+export type CopilotPatchOperationType =
+  | "replace_span"
+  | "insert_before"
+  | "insert_after"
+  | "insert_after_span"
+  | "delete_span"
+  | "rewrite_document";
+
+export type CopilotNormalizedPatchOperationType =
+  | "replace_span"
+  | "insert_before"
+  | "insert_after"
+  | "delete_span";
+
+export type CopilotPatchAnchor = {
+  exactText?: string | null;
+  prefixText?: string | null;
+  suffixText?: string | null;
+  startOffset?: number | null;
+  endOffset?: number | null;
+};
+
 export type CopilotPatchResponse = {
   id: string;
   patchSetId: string;
   documentId: string;
-  type: string;
-  anchor: Record<string, unknown>;
+  type: CopilotNormalizedPatchOperationType;
+  operationType: CopilotPatchOperationType;
+  normalizedOperationType: CopilotNormalizedPatchOperationType;
+  anchor: CopilotPatchAnchor;
+  replacementText?: string | null;
+  insertedText?: string | null;
   oldText: string;
   newText: string;
   resolvedRange: { start: number; end: number } | null;

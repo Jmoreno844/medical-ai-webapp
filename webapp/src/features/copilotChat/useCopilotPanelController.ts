@@ -5,6 +5,9 @@ import { useCopilotDebug } from "@/features/copilotChat/useCopilotDebug";
 import {
   CopilotChatMessage,
   CopilotMessageRequest,
+  CopilotNormalizedPatchOperationType,
+  CopilotPatchAnchor,
+  CopilotPatchOperationType,
   CopilotPatchResponse,
   CopilotPatchSetResponse,
 } from "@/features/copilotChat/types";
@@ -17,6 +20,55 @@ import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
 import { flushDirtyDrafts } from "@/workspace/forceSaveRegistry";
 
 const COPILOT_PATCH_REVIEW_FINALIZED_EVENT = "copilot:patch-review-finalized";
+
+function normalizePatchOperationType(value: unknown): CopilotNormalizedPatchOperationType {
+  const operationType = String(value ?? "").trim().toLowerCase();
+  if (operationType === "insert_after" || operationType === "insert_after_span") {
+    return "insert_after";
+  }
+  if (operationType === "insert_before") {
+    return "insert_before";
+  }
+  if (operationType === "delete_span") {
+    return "delete_span";
+  }
+  return "replace_span";
+}
+
+function normalizeLegacyPatchOperationType(value: unknown): CopilotPatchOperationType {
+  const operationType = String(value ?? "").trim().toLowerCase();
+  if (
+    operationType === "replace_span" ||
+    operationType === "insert_before" ||
+    operationType === "insert_after" ||
+    operationType === "insert_after_span" ||
+    operationType === "delete_span" ||
+    operationType === "rewrite_document"
+  ) {
+    return operationType;
+  }
+  return "replace_span";
+}
+
+function normalizePatchAnchor(anchor: unknown): CopilotPatchAnchor {
+  if (!anchor || typeof anchor !== "object") {
+    return {};
+  }
+
+  const candidate = anchor as Record<string, unknown>;
+  return {
+    exactText:
+      typeof candidate.exactText === "string" ? candidate.exactText : null,
+    prefixText:
+      typeof candidate.prefixText === "string" ? candidate.prefixText : null,
+    suffixText:
+      typeof candidate.suffixText === "string" ? candidate.suffixText : null,
+    startOffset:
+      typeof candidate.startOffset === "number" ? candidate.startOffset : null,
+    endOffset:
+      typeof candidate.endOffset === "number" ? candidate.endOffset : null,
+  };
+}
 
 type UseCopilotPanelControllerResult = {
   state: ReturnType<typeof useCopilotDebug>["state"];
@@ -330,6 +382,14 @@ export function useCopilotPanelController(
                   : payload.resolved_start,
             }
           : null;
+    const operationType = normalizeLegacyPatchOperationType(
+      payload.operation_type ?? payload.patch_type,
+    );
+    const normalizedOperationType = normalizePatchOperationType(
+      payload.normalized_operation_type ??
+        payload.patch_type ??
+        payload.operation_type,
+    );
 
     return {
       id: patchId,
@@ -338,30 +398,24 @@ export function useCopilotPanelController(
           ? payload.patch_set_id
           : "event-derived",
       documentId: targetDocumentId,
-      type:
-        typeof payload.patch_type === "string"
-          ? payload.patch_type
-          : typeof payload.operation_type === "string"
-            ? payload.operation_type
-            : "replace_span",
-      anchor:
-        typeof payload.anchor === "object" && payload.anchor !== null
-          ? (payload.anchor as Record<string, unknown>)
-          : {},
+      type: normalizedOperationType,
+      operationType,
+      normalizedOperationType,
+      anchor: normalizePatchAnchor(payload.anchor),
       oldText:
         typeof payload.old_text === "string"
           ? payload.old_text
-          : typeof payload.before_preview === "string"
-            ? payload.before_preview
-            : "",
+          : "",
       newText:
         typeof payload.new_text === "string"
           ? payload.new_text
-          : typeof payload.after_preview === "string"
-            ? payload.after_preview
-            : typeof payload.content_preview === "string"
-              ? payload.content_preview
-              : "",
+          : "",
+      replacementText:
+        typeof payload.replacement_text === "string"
+          ? payload.replacement_text
+          : null,
+      insertedText:
+        typeof payload.inserted_text === "string" ? payload.inserted_text : null,
       resolvedRange,
       orderIndex:
         typeof payload.order_index === "number" ? payload.order_index : 0,

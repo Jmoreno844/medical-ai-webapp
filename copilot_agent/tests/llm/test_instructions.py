@@ -28,4 +28,5 @@ def test_patch_instruction_contains_data_not_instructions_policy():
     assert "exactText + prefixText + suffixText" in instruction
     assert "incluye los saltos de linea y espacios necesarios" in instruction
     assert "Si el contexto es ambiguo o insuficiente, no inventes contenido clinico." in instruction
-    assert "para delete_span, content_preview puede ser una cadena vacia" in instruction
+    assert "Para replace_span y rewrite_document, debes incluir replacement_text" in instruction
+    assert "Para insert_before e insert_after_span, debes incluir inserted_text" in instruction

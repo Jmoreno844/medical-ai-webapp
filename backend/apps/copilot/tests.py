@@ -25,6 +25,7 @@ from apps.copilot.services.patch_sets import (
     _apply_patches_to_content,
     _detect_internal_conflicts,
     _resolve_patch_against_document,
+    CopilotPatchSetConflictError,
     content_hash,
 )
 from apps.copilot.internal_tools_api import (
@@ -489,8 +490,8 @@ class CopilotClientTests(SimpleTestCase):
             resolved_end=None,
             confidence=None,
             conflict_reason=None,
-            before_preview=None,
-            after_preview=None,
+            replacement_text="## Propuesta",
+            inserted_text=None,
             document_preview_after=None,
             content_preview="## Propuesta",
             rationale="Actualizar",
@@ -953,7 +954,6 @@ class CopilotInternalToolsTests(SimpleTestCase):
                         ai_readable=True,
                         hidden_from_agent=False,
                         pinned_for_agent=False,
-                        excerpt="ok",
                     ),
                     _WorkspaceDocumentStub(
                         document_id="100",
@@ -1023,7 +1023,6 @@ class CopilotInternalToolsTests(SimpleTestCase):
         self.assertEqual(response["document_id"], "99")
         self.assertEqual(response["mode"], "full")
         self.assertIn("dolor abdominal", response["content"])
-        self.assertNotIn("excerpt", response)
 
     def test_list_encounter_documents_marks_only_transcriptions_read_only(self):
         payload = SimpleNamespace(
@@ -1209,7 +1208,7 @@ class CopilotPatchSetServiceTests(SimpleTestCase):
                     "prefixText": "Motivo: dolor abdominal. ",
                     "suffixText": "",
                 },
-                "after_preview": "Plan: hidratacion intensiva.",
+                "replacement_text": "Plan: hidratacion intensiva.",
                 "content_preview": "Plan: hidratacion intensiva.",
             },
             document_content="Motivo: dolor abdominal. Plan: hidratacion.",
@@ -1266,9 +1265,6 @@ class CopilotPatchSetServiceTests(SimpleTestCase):
         )
 
     def test_insert_after_does_not_duplicate_anchor(self):
-        # The drafter sets new_text = anchor + inserted_content for diff-preview
-        # purposes. _resolve_patch_against_document must use content_preview
-        # (inserted-only text) so the apply step doesn't double the anchor.
         resolved = _resolve_patch_against_document(
             preview={
                 "patch_id": "patch-1",
@@ -1279,10 +1275,8 @@ class CopilotPatchSetServiceTests(SimpleTestCase):
                     "exactText": "# TÍTULO",
                     "suffixText": " ## Sección",
                 },
-                "new_text": "# TÍTULO\n6 de abril de 2026",
+                "inserted_text": "\n6 de abril de 2026",
                 "content_preview": "\n6 de abril de 2026",
-                "after_preview": "# TÍTULO\n6 de abril de 2026",
-                "before_preview": "# TÍTULO",
             },
             document_content="# TÍTULO\n\n## Sección\nContenido.",
         )
@@ -1293,8 +1287,6 @@ class CopilotPatchSetServiceTests(SimpleTestCase):
         self.assertEqual(result, "# TÍTULO\n6 de abril de 2026\n\n## Sección\nContenido.")
 
     def test_insert_before_does_not_duplicate_anchor(self):
-        # Same invariant for insert_before: new_text contains anchor + insert for
-        # preview purposes; only content_preview (the inserted text) should be used.
         resolved = _resolve_patch_against_document(
             preview={
                 "patch_id": "patch-2",
@@ -1306,10 +1298,8 @@ class CopilotPatchSetServiceTests(SimpleTestCase):
                     "prefixText": "",
                     "suffixText": " ## Sección",
                 },
-                "new_text": "Fecha: 06/04/2026\n# TÍTULO",
+                "inserted_text": "Fecha: 06/04/2026\n",
                 "content_preview": "Fecha: 06/04/2026\n",
-                "after_preview": "Fecha: 06/04/2026\n# TÍTULO",
-                "before_preview": "# TÍTULO",
             },
             document_content="# TÍTULO\n\n## Sección\nContenido.",
         )
@@ -1318,6 +1308,46 @@ class CopilotPatchSetServiceTests(SimpleTestCase):
             [resolved],
         )
         self.assertEqual(result, "Fecha: 06/04/2026\n# TÍTULO\n\n## Sección\nContenido.")
+
+    def test_replace_span_rejects_repeated_prefix_in_replacement_text(self):
+        with self.assertRaisesRegex(
+            CopilotPatchSetConflictError,
+            "replacement_repeats_prefix",
+        ):
+            _resolve_patch_against_document(
+                preview={
+                    "patch_id": "patch-3",
+                    "patch_type": "replace_span",
+                    "operation_type": "replace_span",
+                    "order_index": 0,
+                    "anchor": {
+                        "exactText": "Hace cinco días inicia con tos",
+                        "prefixText": "- Descripción cronológica del problema: ",
+                    },
+                    "replacement_text": (
+                        "- Descripción cronológica del problema: "
+                        "Hace cinco días inicia con cefalea severa"
+                    ),
+                },
+                document_content=(
+                    "- Descripción cronológica del problema: "
+                    "Hace cinco días inicia con tos."
+                ),
+            )
+
+    def test_replace_span_rejects_noop_replacement(self):
+        with self.assertRaisesRegex(CopilotPatchSetConflictError, "patch_without_change"):
+            _resolve_patch_against_document(
+                preview={
+                    "patch_id": "patch-4",
+                    "patch_type": "replace_span",
+                    "operation_type": "replace_span",
+                    "order_index": 0,
+                    "anchor": {"exactText": "Plan: hidratacion."},
+                    "replacement_text": "Plan: hidratacion.",
+                },
+                document_content="Motivo: dolor abdominal. Plan: hidratacion.",
+            )
 
     def test_content_hash_is_stable_for_same_text(self):
         self.assertEqual(content_hash("abc"), content_hash("abc"))

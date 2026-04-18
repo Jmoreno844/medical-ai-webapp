@@ -66,6 +66,8 @@ class PatchSetPatchPreview(BaseModel):
     order_index: int
     anchor: dict[str, Any] = Field(default_factory=dict)
     expected_hash: str | None = None
+    replacement_text: str | None = None
+    inserted_text: str | None = None
     old_text: str | None = None
     new_text: str | None = None
     resolved_start: int | None = None
@@ -73,8 +75,6 @@ class PatchSetPatchPreview(BaseModel):
     confidence: float | None = None
     conflict_reason: str | None = None
     status: str = "pending"
-    before_preview: str | None = None
-    after_preview: str | None = None
     document_preview_after: str | None = None
     rationale: str | None = None
     content_preview: str

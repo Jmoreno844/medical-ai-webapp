@@ -67,7 +67,6 @@ class EncounterRegressionToolsClient(FakeToolsClient):
             "version": 7,
             "content_hash": "note-hash",
             "updated_at": "2026-04-02T10:00:00Z",
-            "short_summary": "Nota clinica activa del encounter.",
             "excerpt": "**HISTORIA CLINICA**\nMotivo de consulta: Dolor de estomago.",
         }
 
@@ -498,9 +497,7 @@ def test_patch_drafting_uses_only_json_schema():
                         "endOffset": 29,
                     },
                     expected_hash="hash-demo",
-                    before_preview="Paciente estable y con mejoria.",
-                    after_preview="Fecha: 2 abril 2026\n\n",
-                    content_preview="Fecha: 2 abril 2026\n\nPaciente estable y con mejoria.",
+                    inserted_text="Fecha: 2 abril 2026\n\n",
                     rationale="Agregar fecha al inicio.",
                 )
             ],
@@ -798,7 +795,7 @@ def test_drafted_patch_schema_rejects_tool_names_and_defaults_rationale():
                     "anchor": {
                         "exactText": "Paciente estable.",
                     },
-                    "content_preview": "Fecha: 24/07/2024\n",
+                    "inserted_text": "Fecha: 24/07/2024\n",
                 }
             ]
         }
@@ -812,10 +809,10 @@ def test_drafted_patch_schema_rejects_tool_names_and_defaults_rationale():
                 "patches": [
                     {
                         "operation_type": "propose_insert_after_span",
-                        "anchor": {
-                            "exactText": "Paciente estable.",
-                        },
-                        "content_preview": "Fecha: 24/07/2024\n",
+                    "anchor": {
+                        "exactText": "Paciente estable.",
+                    },
+                    "inserted_text": "Fecha: 24/07/2024\n",
                     }
                 ]
             }
@@ -1398,9 +1395,7 @@ def test_regression_edit_note_request_stays_in_waiting_review_path():
                         "endOffset": 62,
                     },
                     expected_hash="note-hash",
-                    before_preview="**HISTORIA CLINICA**\n\nMotivo de consulta: Dolor de estomago.",
-                    after_preview="Fecha: 2 abril 2026\n\n",
-                    content_preview="Fecha: 2 abril 2026\n\n**HISTORIA CLINICA**\n\nMotivo de consulta: Dolor de estomago.",
+                    inserted_text="Fecha: 2 abril 2026\n\n",
                     rationale="Agregar fecha al inicio.",
                 )
             ],
@@ -1533,9 +1528,7 @@ def test_multi_patch_plan_is_preserved_in_patch_set_preview():
                         "endOffset": 29,
                     },
                     expected_hash="hash-demo",
-                    before_preview="Paciente estable y con mejoria.",
-                    after_preview="Fecha: 2 abril 2026\n\n",
-                    content_preview="Fecha: 2 abril 2026\n\nPaciente estable y con mejoria.",
+                    inserted_text="Fecha: 2 abril 2026\n\n",
                     rationale="Agregar fecha al inicio.",
                 ),
                 DraftedPatch(
@@ -1548,9 +1541,7 @@ def test_multi_patch_plan_is_preserved_in_patch_set_preview():
                         "endOffset": 29,
                     },
                     expected_hash="hash-demo",
-                    before_preview="Paciente estable y con mejoria.",
-                    after_preview="\n\nFirma:\nJuan Moreno",
-                    content_preview="Fecha: 2 abril 2026\n\nPaciente estable y con mejoria.\n\nFirma:\nJuan Moreno",
+                    inserted_text="\n\nFirma:\nJuan Moreno",
                     rationale="Agregar firma al final.",
                 ),
             ],
@@ -1586,7 +1577,7 @@ def test_validate_drafted_plan_rejects_partial_propagation_plan():
                     anchor={
                         "exactText": "Paciente estable y con mejoria.",
                     },
-                    content_preview="Paciente con fiebre y con mejoria.",
+                    replacement_text="Paciente con fiebre y con mejoria.",
                     rationale="Actualizar enfermedad actual.",
                     section=None,
                 )
@@ -1623,9 +1614,6 @@ def test_direct_propose_with_affected_sections_passes_local_scope_guardrail():
                         "endOffset": 29,
                     },
                     expected_hash="hash-demo",
-                    before_preview="- Paciente estable y con mejoria.",
-                    after_preview="Paciente estable y con mejoria.",
-                    content_preview="Paciente estable y con mejoria.",
                     rationale="Quitar solo el bullet point.",
                     section="analisis_clinico",
                 )
@@ -1651,7 +1639,6 @@ def test_direct_propose_with_affected_sections_passes_local_scope_guardrail():
     state["read_documents"] = [
         {
             **state["document_reads"][0],
-            "short_summary": "Paciente estable y con mejoria.",
         }
     ]
 
@@ -1682,9 +1669,6 @@ def test_direct_propose_with_affected_sections_fails_closed_on_extra_section():
                     operation_type="delete_span",
                     anchor={"exactText": "Paciente estable y con mejoria."},
                     expected_hash="hash-demo",
-                    before_preview="- Paciente estable y con mejoria.",
-                    after_preview="Paciente estable y con mejoria.",
-                    content_preview="Paciente estable y con mejoria.",
                     rationale="Cambio correcto en analisis clinico.",
                     section="analisis_clinico",
                 ),
@@ -1692,9 +1676,7 @@ def test_direct_propose_with_affected_sections_fails_closed_on_extra_section():
                     operation_type="replace_span",
                     anchor={"exactText": "Paciente estable y con mejoria."},
                     expected_hash="hash-demo",
-                    before_preview="Paciente estable y con mejoria.",
-                    after_preview="Paciente egresa estable.",
-                    content_preview="Paciente egresa estable.",
+                    replacement_text="Paciente egresa estable.",
                     rationale="Cambio extra fuera de scope.",
                     section="plan",
                 ),
@@ -1720,7 +1702,6 @@ def test_direct_propose_with_affected_sections_fails_closed_on_extra_section():
     state["read_documents"] = [
         {
             **state["document_reads"][0],
-            "short_summary": "Paciente estable y con mejoria.",
         }
     ]
 
@@ -1747,9 +1728,7 @@ def test_set_edit_plan_auto_drafts_without_second_planner_turn_when_full_note_is
                     operation_type="replace_span",
                     anchor={"exactText": "Paciente estable y con mejoria."},
                     expected_hash="preseed-hash",
-                    before_preview="Paciente estable y con mejoria.",
-                    after_preview="Paciente estable, sin bullets duplicados.",
-                    content_preview="Paciente estable, sin bullets duplicados.",
+                    replacement_text="Paciente estable, sin bullets duplicados.",
                     rationale="Ajuste en analisis clinico.",
                     section="analisis_clinico",
                 ),
@@ -1757,9 +1736,7 @@ def test_set_edit_plan_auto_drafts_without_second_planner_turn_when_full_note_is
                     operation_type="insert_after_span",
                     anchor={"exactText": "Paciente estable y con mejoria."},
                     expected_hash="preseed-hash",
-                    before_preview="Paciente estable y con mejoria.",
-                    after_preview="\n\nPlan actualizado.",
-                    content_preview="Paciente estable y con mejoria.\n\nPlan actualizado.",
+                    inserted_text="\n\nPlan actualizado.",
                     rationale="Ajuste en plan.",
                     section="plan",
                 ),
@@ -1806,7 +1783,6 @@ def test_set_edit_plan_auto_drafts_without_second_planner_turn_when_full_note_is
     state["read_documents"] = [
         {
             **state["document_reads"][0],
-            "short_summary": "Paciente estable y con mejoria.",
         }
     ]
     state["clinical_plan"] = {
@@ -1888,9 +1864,7 @@ def test_partial_propagation_plan_fails_closed_before_review():
                         "endOffset": 29,
                     },
                     expected_hash="hash-demo",
-                    before_preview="Paciente estable y con mejoria.",
-                    after_preview="Paciente con fiebre y con mejoria.",
-                    content_preview="Paciente con fiebre y con mejoria.",
+                    replacement_text="Paciente con fiebre y con mejoria.",
                     rationale="Actualizar solo enfermedad actual.",
                     section=None,
                 )

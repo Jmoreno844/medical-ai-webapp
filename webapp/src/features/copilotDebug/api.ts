@@ -1,6 +1,9 @@
 import axiosInstance from "@/commons/utils/axiosInstance";
 import {
   CopilotMessageRequest,
+  CopilotNormalizedPatchOperationType,
+  CopilotPatchAnchor,
+  CopilotPatchOperationType,
   CopilotPatchResponse,
   CopilotPatchSetResponse,
   CopilotRunResponse,
@@ -21,13 +24,14 @@ type CopilotPatchApi = {
   type?: string;
   patch_type?: string;
   operation_type?: string;
+  normalized_operation_type?: string;
   anchor?: Record<string, unknown>;
+  replacement_text?: string;
+  inserted_text?: string;
   oldText?: string;
   old_text?: string;
-  before_preview?: string;
   newText?: string;
   new_text?: string;
-  after_preview?: string;
   resolvedRange?: { start: number; end: number };
   resolved_range?: { start: number; end: number };
   resolved_start?: number;
@@ -56,6 +60,66 @@ type CopilotPatchSetApi = {
   updated_at?: string;
 };
 
+function normalizePatchOperationType(
+  value: unknown,
+): CopilotNormalizedPatchOperationType {
+  const operationType = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (
+    operationType === "insert_after" ||
+    operationType === "insert_after_span"
+  ) {
+    return "insert_after";
+  }
+  if (operationType === "insert_before") {
+    return "insert_before";
+  }
+  if (operationType === "delete_span") {
+    return "delete_span";
+  }
+  return "replace_span";
+}
+
+function normalizeLegacyPatchOperationType(
+  value: unknown,
+): CopilotPatchOperationType {
+  const operationType = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (
+    operationType === "replace_span" ||
+    operationType === "insert_before" ||
+    operationType === "insert_after" ||
+    operationType === "insert_after_span" ||
+    operationType === "delete_span" ||
+    operationType === "rewrite_document"
+  ) {
+    return operationType;
+  }
+  return "replace_span";
+}
+
+function normalizePatchAnchor(anchor: unknown): CopilotPatchAnchor {
+  if (!anchor || typeof anchor !== "object") {
+    return {};
+  }
+
+  const candidate = anchor as Record<string, unknown>;
+  return {
+    exactText:
+      typeof candidate.exactText === "string" ? candidate.exactText : null,
+    prefixText:
+      typeof candidate.prefixText === "string" ? candidate.prefixText : null,
+    suffixText:
+      typeof candidate.suffixText === "string" ? candidate.suffixText : null,
+    startOffset:
+      typeof candidate.startOffset === "number" ? candidate.startOffset : null,
+    endOffset:
+      typeof candidate.endOffset === "number" ? candidate.endOffset : null,
+  };
+}
+
 function normalizePatch(
   apiPatch: CopilotPatchApi,
   parentPatchSetId: string,
@@ -72,6 +136,15 @@ function normalizePatch(
               : apiPatch.resolved_start,
         }
       : null);
+  const operationType = normalizeLegacyPatchOperationType(
+    apiPatch.operation_type ?? apiPatch.patch_type ?? apiPatch.type,
+  );
+  const normalizedOperationType = normalizePatchOperationType(
+    apiPatch.normalized_operation_type ??
+      apiPatch.patch_type ??
+      apiPatch.operation_type ??
+      apiPatch.type,
+  );
 
   return {
     id: String(apiPatch.id ?? apiPatch.patch_id ?? ""),
@@ -81,19 +154,14 @@ function normalizePatch(
     documentId: String(
       apiPatch.documentId ?? apiPatch.target_document_id ?? "",
     ),
-    type: String(
-      apiPatch.type ??
-        apiPatch.patch_type ??
-        apiPatch.operation_type ??
-        "replace_span",
-    ),
-    anchor: apiPatch.anchor ?? {},
-    oldText: String(
-      apiPatch.oldText ?? apiPatch.old_text ?? apiPatch.before_preview ?? "",
-    ),
-    newText: String(
-      apiPatch.newText ?? apiPatch.new_text ?? apiPatch.after_preview ?? "",
-    ),
+    type: normalizedOperationType,
+    operationType,
+    normalizedOperationType,
+    anchor: normalizePatchAnchor(apiPatch.anchor),
+    replacementText: apiPatch.replacement_text ?? null,
+    insertedText: apiPatch.inserted_text ?? null,
+    oldText: String(apiPatch.oldText ?? apiPatch.old_text ?? ""),
+    newText: String(apiPatch.newText ?? apiPatch.new_text ?? ""),
     resolvedRange,
     orderIndex: Number(apiPatch.orderIndex ?? apiPatch.order_index ?? 0),
     status: apiPatch.status ?? "pending",
@@ -200,8 +268,6 @@ function serializeWorkspaceIndex(workspaceIndex: WorkspaceIndex) {
       has_streaming_state: document.hasStreamingState,
       hidden_from_agent: document.hiddenFromAgent,
       pinned_for_agent: document.pinnedForAgent,
-      excerpt: document.excerpt,
-      short_summary: document.shortSummary,
       estimated_tokens: document.estimatedTokens,
       has_pending_patches: document.hasPendingPatches,
       content_markdown: document.contentMarkdown,
