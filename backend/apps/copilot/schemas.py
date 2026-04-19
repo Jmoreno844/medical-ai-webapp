@@ -232,6 +232,20 @@ class CopilotReadDocumentIn(CopilotInternalToolRequest):
     mode: Literal["full"] = "full"
 
 
+class CopilotDocumentSectionOut(Schema):
+    section_id: str
+    label: str
+    heading: str
+    normalized_heading: str
+    heading_level: Optional[int] = None
+    heading_style: str
+    resolution_source: str
+    start_offset: int
+    content_start_offset: int
+    end_offset: int
+    content_preview: str = ""
+
+
 class CopilotReadDocumentOut(Schema):
     document_id: str
     encounter_id: str
@@ -242,6 +256,8 @@ class CopilotReadDocumentOut(Schema):
     updated_at: str
     mode: Literal["full"]
     content: Optional[str] = None
+    structure_mode: Literal["structured", "unstructured"] = "unstructured"
+    sections: list[CopilotDocumentSectionOut] = Field(default_factory=list)
 
 
 class CopilotSearchDocumentsIn(CopilotInternalToolRequest):
@@ -285,6 +301,8 @@ class CopilotReadDocumentSummaryOut(Schema):
     version: int
     content_hash: str
     updated_at: str
+    structure_mode: Literal["structured", "unstructured"] = "unstructured"
+    sections: list[CopilotDocumentSectionOut] = Field(default_factory=list)
 
 
 class CopilotReadDocumentSpanIn(CopilotInternalToolRequest):

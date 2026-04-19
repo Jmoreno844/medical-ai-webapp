@@ -16,6 +16,11 @@ def test_planner_instruction_contains_data_not_instructions_policy():
     assert "prefiere `propose_delete_span`" in instruction
     assert "varias herramientas no-write en paralelo" in instruction
     assert "NUNCA mezcles tools de lectura con propose_* en el mismo turno." in instruction
+    assert "Esa frase explicativa NO sustituye la tool" in instruction
+    assert "tanto entre secciones como dentro de una misma sección" in instruction
+    assert "incluye `factual_replacements`" in instruction
+    assert "sections son la referencia preferente del documento" in instruction
+    assert "NO inventes `affected_sections` semanticas alternativas" in instruction
 
 
 def test_patch_instruction_contains_data_not_instructions_policy():
@@ -30,3 +35,8 @@ def test_patch_instruction_contains_data_not_instructions_policy():
     assert "Si el contexto es ambiguo o insuficiente, no inventes contenido clinico." in instruction
     assert "Para replace_span y rewrite_document, debes incluir replacement_text" in instruction
     assert "Para insert_before e insert_after_span, debes incluir inserted_text" in instruction
+    assert "Una seccion NO cuenta como resuelta" in instruction
+    assert "<factual_replacements>" in instruction
+    assert "solo aplica a bloques consecutivos" in instruction
+    assert "mapa literal de headings detectados" in instruction
+    assert "guia operativa preferente" in instruction

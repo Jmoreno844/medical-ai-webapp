@@ -32,6 +32,7 @@ from apps.copilot.internal_tools_api import (
     list_encounter_documents_tool,
     list_open_documents_tool,
     read_document_tool,
+    read_document_summary_tool,
     search_documents_tool,
 )
 
@@ -736,16 +737,21 @@ class CopilotClientTests(SimpleTestCase):
                 "apps.copilot.api.CopilotPatch.objects.filter",
                 return_value=[],
             ),
-            patch(
-                "apps.copilot.api.CopilotPatchSet.objects.filter",
-                return_value=SimpleNamespace(
-                    select_related=lambda *args, **kwargs: [patch_set]
-                ),
-            ),
+            patch("apps.copilot.api.CopilotPatchSet.objects.filter") as filter_mock,
         ):
+            ordered_qs = Mock()
+            ordered_qs.__iter__ = Mock(return_value=iter([patch_set]))
+            select_related_qs = Mock()
+            select_related_qs.order_by.return_value = ordered_qs
+            filter_mock.return_value.select_related.return_value = select_related_qs
             response = list_copilot_patch_sets(request, "run-123")
 
         self.assertEqual(response[0]["patch_set_id"], "pset-123")
+        filter_mock.return_value.select_related.assert_called_once_with(
+            "run",
+            "target_document",
+        )
+        select_related_qs.order_by.assert_called_once_with("-created_at", "-id")
 
     def test_apply_patch_set_endpoint_resumes_agent_after_apply(self):
         request = SimpleNamespace(user=self.doctor)
@@ -1023,6 +1029,68 @@ class CopilotInternalToolsTests(SimpleTestCase):
         self.assertEqual(response["document_id"], "99")
         self.assertEqual(response["mode"], "full")
         self.assertIn("dolor abdominal", response["content"])
+        self.assertEqual(response["structure_mode"], "unstructured")
+
+    def test_read_document_tool_returns_detected_sections(self):
+        payload = SimpleNamespace(
+            run_id="run-123",
+            thread_id=self.thread_id,
+            encounter_id=12,
+            user_id=7,
+            document_id=99,
+            mode="full",
+        )
+        document = SimpleNamespace(
+            id=99,
+            encounter_id=12,
+            doctor_id=7,
+            kind="note",
+            doctor_template=None,
+            content="## Enfermedad actual\n\nPaciente estable.\n\n## Conducta\n\nControl.",
+            content_json=None,
+            created_on=SimpleNamespace(isoformat=lambda: "2026-04-02T10:00:00Z"),
+        )
+
+        with patch(
+            "apps.copilot.internal_tools_api._get_owned_document",
+            return_value=document,
+        ):
+            response = read_document_tool(self.request, payload)
+
+        self.assertEqual(response["structure_mode"], "structured")
+        self.assertEqual(
+            [section["section_id"] for section in response["sections"]],
+            ["enfermedad_actual", "conducta"],
+        )
+        self.assertEqual(response["sections"][1]["resolution_source"], "literal_heading")
+
+    def test_read_document_summary_tool_includes_detected_sections(self):
+        payload = SimpleNamespace(
+            run_id="run-123",
+            thread_id=self.thread_id,
+            encounter_id=12,
+            user_id=7,
+            document_id=99,
+        )
+        document = SimpleNamespace(
+            id=99,
+            encounter_id=12,
+            doctor_id=7,
+            kind="note",
+            doctor_template=None,
+            content="## Plan\n\nSeguimiento.",
+            content_json=None,
+            created_on=SimpleNamespace(isoformat=lambda: "2026-04-02T10:00:00Z"),
+        )
+
+        with patch(
+            "apps.copilot.internal_tools_api._get_owned_document",
+            return_value=document,
+        ):
+            response = read_document_summary_tool(self.request, payload)
+
+        self.assertEqual(response["structure_mode"], "structured")
+        self.assertEqual(response["sections"][0]["section_id"], "plan")
 
     def test_list_encounter_documents_marks_only_transcriptions_read_only(self):
         payload = SimpleNamespace(

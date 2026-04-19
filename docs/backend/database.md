@@ -226,16 +226,16 @@ Orden por defecto: `-created_at`.
 Contenedor de texto clínico asociado a un encuentro. Un encuentro puede tener
 múltiples documentos de distinto tipo.
 
-| Campo                    | Tipo        | Restricciones                                             | Descripción         |
-| ------------------------ | ----------- | --------------------------------------------------------- | ------------------- |
-| `id`                     | bigint      | PK, auto                                                  | —                   |
-| `id_encuentro_id`        | bigint      | FK → `encuentro_encuentro`, CASCADE                       | Encuentro padre     |
-| `id_medico_id`           | bigint      | FK → `users_user`, CASCADE                                | Médico propietario  |
-| `id_plantilla_doctor_id` | bigint      | FK → `plantillas_plantilladoctor`, SET_NULL, nullable     | Plantilla usada     |
-| `tipo`                   | varchar(20) | choices: `contexto`, `transcripcion`, `plantilla`, `nota` | Tipo de documento   |
+| Campo                    | Tipo        | Restricciones                                             | Descripción                |
+| ------------------------ | ----------- | --------------------------------------------------------- | -------------------------- |
+| `id`                     | bigint      | PK, auto                                                  | —                          |
+| `id_encuentro_id`        | bigint      | FK → `encuentro_encuentro`, CASCADE                       | Encuentro padre            |
+| `id_medico_id`           | bigint      | FK → `users_user`, CASCADE                                | Médico propietario         |
+| `id_plantilla_doctor_id` | bigint      | FK → `plantillas_plantilladoctor`, SET_NULL, nullable     | Plantilla usada            |
+| `tipo`                   | varchar(20) | choices: `contexto`, `transcripcion`, `plantilla`, `nota` | Tipo de documento          |
 | `content_markdown`       | text        | not null (default `""`)                                   | Markdown derivado / compat |
 | `content_json`           | jsonb       | nullable                                                  | Canónico del editor Tiptap |
-| `fecha_creacion`         | date        | auto_now_add                                              | —                   |
+| `fecha_creacion`         | date        | auto_now_add                                              | —                          |
 
 Al crear un nuevo `Encuentro`, Django crea automáticamente dos documentos vacíos:
 uno de tipo `contexto` y otro de tipo `transcripcion` (`encuentro/api.py` → `create_empty_encuentro`).
@@ -253,6 +253,7 @@ uno de tipo `contexto` y otro de tipo `transcripcion` (`encuentro/api.py` → `c
   - si entra solo markdown/texto, regenera `content_json`
 - La sincronización vive en `apps/documents/services/rich_document_content.py`; no se debe duplicar esta lógica en endpoints o servicios aislados.
 - `content` sigue existiendo como alias legacy de compat a `content_markdown`, pero ya no debe usarse como un segundo campo persistente.
+- La estructura de secciones todavía no se persiste en una tabla propia. El backend la extrae de forma determinista al leer el documento para el copilot usando headings reales del markdown.
 
 Sin índices adicionales definidos en `Meta` (aparte del PK y las FKs implícitas).
 
@@ -333,16 +334,16 @@ Persisten el broker del runtime del copiloto, el review humano y el apply seguro
 
 #### `copilot_copilotrun`
 
-| Campo | Tipo | Restricciones | Descripción |
-| --- | --- | --- | --- |
-| `run_id` | varchar(64) | unique, not null | Identificador del run brokered con `copilot-agent-service` |
-| `thread_id` | varchar(255) | not null | Thread estable por `encounter + doctor` |
-| `doctor_id` | bigint | FK → `users_user`, CASCADE | Médico dueño del run |
-| `encounter_id` | bigint | FK → `encuentro_encuentro`, CASCADE | Encuentro dueño del run |
-| `status` | varchar(32) | `created`, `running`, `waiting_review`, `completed`, `failed` | Estado público del run |
-| `intent` | varchar(64) | nullable | Intención canónica inferida por el runtime |
-| `requires_human_review` | bool | default false | Flag de pausa para writer flow |
-| `created_at`, `updated_at` | datetime | auto | Trazabilidad básica |
+| Campo                      | Tipo         | Restricciones                                                 | Descripción                                                |
+| -------------------------- | ------------ | ------------------------------------------------------------- | ---------------------------------------------------------- |
+| `run_id`                   | varchar(64)  | unique, not null                                              | Identificador del run brokered con `copilot-agent-service` |
+| `thread_id`                | varchar(255) | not null                                                      | Thread estable por `encounter + doctor`                    |
+| `doctor_id`                | bigint       | FK → `users_user`, CASCADE                                    | Médico dueño del run                                       |
+| `encounter_id`             | bigint       | FK → `encuentro_encuentro`, CASCADE                           | Encuentro dueño del run                                    |
+| `status`                   | varchar(32)  | `created`, `running`, `waiting_review`, `completed`, `failed` | Estado público del run                                     |
+| `intent`                   | varchar(64)  | nullable                                                      | Intención canónica inferida por el runtime                 |
+| `requires_human_review`    | bool         | default false                                                 | Flag de pausa para writer flow                             |
+| `created_at`, `updated_at` | datetime     | auto                                                          | Trazabilidad básica                                        |
 
 Índices:
 
@@ -353,22 +354,22 @@ Persisten el broker del runtime del copiloto, el review humano y el apply seguro
 
 Unidad de review del writer flow. En v1 apunta a **un solo documento target por run** y agrupa hasta ~12 cambios pequeños propuestos por el agente.
 
-| Campo | Tipo | Restricciones | Descripción |
-| --- | --- | --- | --- |
-| `patch_set_id` | varchar(64) | unique, not null | ID externo del conjunto de sugerencias |
-| `run_id` | bigint | FK → `copilot_copilotrun`, CASCADE | Run que originó el set |
-| `doctor_id` | bigint | FK → `users_user`, CASCADE | Dueño |
-| `encounter_id` | bigint | FK → `encuentro_encuentro`, CASCADE | Encounter asociado |
-| `target_document_id` | bigint | FK → `documentos_documento`, CASCADE | Documento canónico que puede mutarse |
-| `base_version` | int | not null | Versión lógica del documento usada al proponer |
-| `base_hash` | varchar(128) | not null | Hash del contenido base para stale detection |
-| `rationale` | text | nullable | Justificación general del set |
-| `source_context_document_ids` | json | default `[]` | IDs de documentos usados como contexto |
-| `target_document_title` | varchar(255) | nullable | Título usado para review/debug |
-| `target_selection_reason` | text | nullable | Motivo determinístico de selección del target |
-| `document_preview_after` | text | nullable | Preview combinado del documento tras aplicar los cambios válidos |
-| `status` | varchar(32) | `pending`, `partially_accepted`, `accepted`, `rejected`, `stale`, `applied` | Estado agregado del set |
-| `review_comment` | text | nullable | Comentario humano final del review/apply |
+| Campo                         | Tipo         | Restricciones                                                               | Descripción                                                      |
+| ----------------------------- | ------------ | --------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `patch_set_id`                | varchar(64)  | unique, not null                                                            | ID externo del conjunto de sugerencias                           |
+| `run_id`                      | bigint       | FK → `copilot_copilotrun`, CASCADE                                          | Run que originó el set                                           |
+| `doctor_id`                   | bigint       | FK → `users_user`, CASCADE                                                  | Dueño                                                            |
+| `encounter_id`                | bigint       | FK → `encuentro_encuentro`, CASCADE                                         | Encounter asociado                                               |
+| `target_document_id`          | bigint       | FK → `documentos_documento`, CASCADE                                        | Documento canónico que puede mutarse                             |
+| `base_version`                | int          | not null                                                                    | Versión lógica del documento usada al proponer                   |
+| `base_hash`                   | varchar(128) | not null                                                                    | Hash del contenido base para stale detection                     |
+| `rationale`                   | text         | nullable                                                                    | Justificación general del set                                    |
+| `source_context_document_ids` | json         | default `[]`                                                                | IDs de documentos usados como contexto                           |
+| `target_document_title`       | varchar(255) | nullable                                                                    | Título usado para review/debug                                   |
+| `target_selection_reason`     | text         | nullable                                                                    | Motivo determinístico de selección del target                    |
+| `document_preview_after`      | text         | nullable                                                                    | Preview combinado del documento tras aplicar los cambios válidos |
+| `status`                      | varchar(32)  | `pending`, `partially_accepted`, `accepted`, `rejected`, `stale`, `applied` | Estado agregado del set                                          |
+| `review_comment`              | text         | nullable                                                                    | Comentario humano final del review/apply                         |
 
 Índices:
 
@@ -380,26 +381,26 @@ Unidad de review del writer flow. En v1 apunta a **un solo documento target por 
 
 Unidad granular de cambio. Cada fila representa un cambio anclado que Django puede aceptar, rechazar, marcar como conflictivo o aplicar.
 
-| Campo | Tipo | Restricciones | Descripción |
-| --- | --- | --- | --- |
-| `patch_id` | varchar(64) | unique, not null | ID externo del cambio |
-| `patch_set_id` | bigint | FK → `copilot_copilotpatchset`, nullable | Set padre; los rows legacy pueden nacer sin set y se normalizan al vuelo |
-| `run_id` | bigint | FK → `copilot_copilotrun`, CASCADE | Run que originó el cambio |
-| `target_document_id` | bigint | FK → `documentos_documento`, CASCADE | Documento objetivo |
-| `base_version` | int | not null | Versión lógica usada al proponer |
-| `order_index` | int | default 0 | Orden estable de aplicación dentro del set |
-| `patch_type` | varchar(64) | not null | `replace_span`, `insert_before`, `insert_after`, `delete_span` o legado normalizado |
-| `operation_type` | varchar(64) | not null | Valor bruto del runtime para compatibilidad |
-| `anchor` | json | default `{}` | Anchor textual del cambio |
-| `expected_hash` | varchar(128) | nullable | Hash esperado del span/ancla |
-| `old_text`, `new_text` | text | nullable | Texto previo y propuesto |
-| `resolved_start`, `resolved_end` | int | nullable | Rango resuelto por Django sobre el contenido base |
-| `confidence` | float | nullable | Confianza del runtime cuando exista |
-| `conflict_reason` | text | nullable | Motivo de conflicto interno o stale |
-| `before_preview`, `after_preview` | text | nullable | Preview corto del cambio |
-| `document_preview_after` | text | nullable | Preview del documento luego de aplicar ese cambio |
-| `content_preview` | text | not null | Fallback legacy para previews |
-| `status` | varchar(32) | `pending`, `accepted`, `rejected`, `conflicted`, `applied`, `stale` | Estado por cambio |
+| Campo                             | Tipo         | Restricciones                                                       | Descripción                                                                         |
+| --------------------------------- | ------------ | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `patch_id`                        | varchar(64)  | unique, not null                                                    | ID externo del cambio                                                               |
+| `patch_set_id`                    | bigint       | FK → `copilot_copilotpatchset`, nullable                            | Set padre; los rows legacy pueden nacer sin set y se normalizan al vuelo            |
+| `run_id`                          | bigint       | FK → `copilot_copilotrun`, CASCADE                                  | Run que originó el cambio                                                           |
+| `target_document_id`              | bigint       | FK → `documentos_documento`, CASCADE                                | Documento objetivo                                                                  |
+| `base_version`                    | int          | not null                                                            | Versión lógica usada al proponer                                                    |
+| `order_index`                     | int          | default 0                                                           | Orden estable de aplicación dentro del set                                          |
+| `patch_type`                      | varchar(64)  | not null                                                            | `replace_span`, `insert_before`, `insert_after`, `delete_span` o legado normalizado |
+| `operation_type`                  | varchar(64)  | not null                                                            | Valor bruto del runtime para compatibilidad                                         |
+| `anchor`                          | json         | default `{}`                                                        | Anchor textual del cambio                                                           |
+| `expected_hash`                   | varchar(128) | nullable                                                            | Hash esperado del span/ancla                                                        |
+| `old_text`, `new_text`            | text         | nullable                                                            | Texto previo y propuesto                                                            |
+| `resolved_start`, `resolved_end`  | int          | nullable                                                            | Rango resuelto por Django sobre el contenido base                                   |
+| `confidence`                      | float        | nullable                                                            | Confianza del runtime cuando exista                                                 |
+| `conflict_reason`                 | text         | nullable                                                            | Motivo de conflicto interno o stale                                                 |
+| `before_preview`, `after_preview` | text         | nullable                                                            | Preview corto del cambio                                                            |
+| `document_preview_after`          | text         | nullable                                                            | Preview del documento luego de aplicar ese cambio                                   |
+| `content_preview`                 | text         | not null                                                            | Fallback legacy para previews                                                       |
+| `status`                          | varchar(32)  | `pending`, `accepted`, `rejected`, `conflicted`, `applied`, `stale` | Estado por cambio                                                                   |
 
 Índices:
 

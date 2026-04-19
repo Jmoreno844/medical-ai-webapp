@@ -32,6 +32,7 @@ from apps.copilot.schemas import (
 )
 from apps.copilot.services.tools_auth import CopilotToolsJWTAuth
 from apps.documents.models import Document
+from apps.documents.services.document_sections import extract_document_sections
 from apps.encounters.models import Encounter
 
 router = Router(tags=["copilot-internal-tools"])
@@ -108,6 +109,13 @@ def _get_owned_document(
     if document.encounter_id != encounter_id or document.doctor_id != user_id:
         raise HttpError(403, "No tienes permiso para acceder a este documento")
     return document
+
+
+def _document_sections_payload(document: Document) -> dict[str, Any]:
+    return extract_document_sections(
+        content_markdown=document.content,
+        content_json=getattr(document, "content_json", None),
+    )
 
 
 def _document_title(kind: str, document_id: int, *, template_name: str | None = None) -> str:
@@ -401,6 +409,7 @@ def read_document_tool(request, payload: CopilotReadDocumentIn):
         encounter_id=payload.encounter_id,
         user_id=payload.user_id,
     )
+    sections_payload = _document_sections_payload(document)
 
     return {
         "document_id": str(document.id),
@@ -412,6 +421,8 @@ def read_document_tool(request, payload: CopilotReadDocumentIn):
         "updated_at": document.created_on.isoformat(),
         "mode": payload.mode,
         "content": document.content,
+        "structure_mode": sections_payload["structure_mode"],
+        "sections": sections_payload["sections"],
     }
 
 
@@ -433,6 +444,7 @@ def read_document_summary_tool(request, payload: CopilotReadDocumentSummaryIn):
         encounter_id=payload.encounter_id,
         user_id=payload.user_id,
     )
+    sections_payload = _document_sections_payload(document)
     return {
         "document_id": str(document.id),
         "encounter_id": str(document.encounter_id),
@@ -441,6 +453,8 @@ def read_document_summary_tool(request, payload: CopilotReadDocumentSummaryIn):
         "version": _document_version(document),
         "content_hash": _content_hash(document.content),
         "updated_at": document.created_on.isoformat(),
+        "structure_mode": sections_payload["structure_mode"],
+        "sections": sections_payload["sections"],
     }
 
 

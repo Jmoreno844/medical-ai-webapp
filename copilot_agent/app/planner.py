@@ -44,6 +44,33 @@ class PlannerDecision(BaseModel):
     tool_calls: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class FactualReplacement(BaseModel):
+    replacement_id: str = Field(
+        description=(
+            "Stable identifier for one literal factual replacement declared by the planner. "
+            "Use a short explicit id like 'edad_paciente' or 'fecha_ingreso'."
+        )
+    )
+    find_text: str = Field(
+        description=(
+            "Literal text that should disappear from the scoped sections after the edit. "
+            "Use the exact factual wording to replace, not a regex or a broad summary."
+        )
+    )
+    replace_text: str = Field(
+        description=(
+            "Literal factual wording that should replace find_text in the scoped sections."
+        )
+    )
+    scope_sections: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Subset of affected_sections where this deterministic factual replacement applies. "
+            "Keep it narrow and explicit."
+        ),
+    )
+
+
 class ClinicalPlan(BaseModel):
     """Señales estructuradas de alcance clínico emitidas por el planner antes de redactar patches.
 
@@ -75,11 +102,17 @@ class ClinicalPlan(BaseModel):
     affected_sections: list[str] = Field(
         default_factory=list,
         description=(
-            "Secciones semánticas del documento que el drafter debe tocar. "
-            "Usa nombres en snake_case del español clínico, por ejemplo: "
+            "Secciones del documento que el drafter debe tocar. "
+            "Si el documento leído trae headings detectados, usa preferentemente los ids devueltos por esa estructura. "
+            "Mientras el documento esté en modo structured, no inventes affected_sections semánticas alternativas si una sección detectada ya representa el bloque real a tocar. "
+            "Solo si el documento esta en modo no estructurado usa nombres semánticos en snake_case del español clínico, por ejemplo: "
             "'enfermedad_actual', 'antecedentes_relevantes', 'impresion_diagnostica', "
             "'analisis_clinico', 'plan', 'revision_por_sistemas'. "
             "El drafter debe emitir al menos un patch por cada sección listada aquí. "
+            "Si un mismo dato factual se repite dos o más veces dentro de una sección, "
+            "la sección sigue contando como una sola affected_section, pero el drafter debe "
+            "actualizar TODAS las menciones dentro de esa sección. "
+            "Cuando exista estructura detectada, prioriza ids derivados del documento real sobre taxonomías clínicas genéricas. "
             "CRÍTICO: Si el cambio aplica a datos transversales (como la EDAD, sexo o "
             "comorbilidades), DEBES incluir 'enfermedad_actual' y 'analisis_clinico' "
             "para garantizar la consistencia narrativa en todo el documento."
@@ -98,6 +131,14 @@ class ClinicalPlan(BaseModel):
             "True si el cambio requiere conocimiento externo (guías clínicas, farmacología) "
             "que no está presente en la nota del encuentro. Señal para RAG futuro."
         )
+    )
+    factual_replacements: list[FactualReplacement] = Field(
+        default_factory=list,
+        description=(
+            "Lista opcional de reemplazos factuales literales declarados por el planner para "
+            "cambios mecánicos de alto riesgo, como edad, sexo, fecha, dosis o wording clínico exacto. "
+            "El runtime la usa para validar que no sobrevivan menciones viejas dentro del scope."
+        ),
     )
 
 
@@ -182,9 +223,10 @@ class DraftedPatch(BaseModel):
     section: str | None = Field(
         default=None,
         description=(
-            "Sección semántica del documento a la que pertenece este patch. "
+            "Sección del documento a la que pertenece este patch. "
             "Debe coincidir con uno de los valores de affected_sections del plan clínico. "
-            "Ejemplos: 'antecedentes_relevantes', 'plan', 'impresion_diagnostica'."
+            "Si existe estructura detectada del documento, usa el section_id derivado de ese heading y no una etiqueta semántica distinta. "
+            "Ejemplos comunes en fallback semántico: 'antecedentes_relevantes', 'plan', 'impresion_diagnostica'."
         ),
     )
 
@@ -213,8 +255,37 @@ class DraftedPatch(BaseModel):
         return self
 
 
+class DraftedSectionOutcome(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    section: str = Field(
+        description=(
+            "One affected section reviewed by the drafter. Must match one value "
+            "from affected_sections."
+        )
+    )
+    status: Literal[
+        "patched",
+        "no_change_needed",
+        "section_not_found",
+        "unsafe_to_change",
+    ] = Field(
+        description=(
+            "patched if patches modify this section; no_change_needed if the "
+            "section was reviewed but already correct or has no relevant mention; "
+            "section_not_found if the requested section is absent; unsafe_to_change "
+            "if the section cannot be changed safely with the available context."
+        )
+    )
+    rationale: str = Field(
+        default="",
+        description="Brief explanation for this section outcome.",
+    )
+
+
 class DraftedPatchPlan(BaseModel):
     patches: list[DraftedPatch] = Field(default_factory=list)
+    section_outcomes: list[DraftedSectionOutcome] = Field(default_factory=list)
     rationale: str | None = None
     document_preview_after: str | None = None
 
@@ -946,6 +1017,7 @@ class LangChainCopilotPlanner:
             document_preview_after = patches[-1].content_preview or None
         return DraftedPatchPlan(
             patches=patches,
+            section_outcomes=result.section_outcomes,
             rationale=result.rationale,
             document_preview_after=document_preview_after,
         )

@@ -13,6 +13,7 @@ from apps.documents.services.rich_document_content import (
     set_document_content_fields,
     tiptap_json_to_markdown,
 )
+from apps.documents.services.document_sections import extract_document_sections
 
 
 class RichDocumentContentServiceTests(SimpleTestCase):
@@ -58,6 +59,46 @@ class RichDocumentContentServiceTests(SimpleTestCase):
         )
         self.assertIsInstance(document.content_json, dict)
         self.assertEqual(document.content_json["type"], "doc")
+
+    def test_extract_document_sections_detects_literal_headings(self):
+        sections_payload = extract_document_sections(
+            content_markdown=(
+                "## Enfermedad actual\n\n"
+                "Paciente con dolor abdominal.\n\n"
+                "## Conducta\n\n"
+                "Analgesia y control.\n"
+            ),
+        )
+
+        self.assertEqual(sections_payload["structure_mode"], "structured")
+        self.assertEqual(
+            [section["section_id"] for section in sections_payload["sections"]],
+            ["enfermedad_actual", "conducta"],
+        )
+        self.assertEqual(
+            sections_payload["sections"][1]["resolution_source"],
+            "literal_heading",
+        )
+
+    def test_extract_document_sections_falls_back_to_derived_heading_ids(self):
+        sections_payload = extract_document_sections(
+            content_markdown=(
+                "## Valoracion integral\n\n"
+                "Paciente estable.\n\n"
+                "## Recomendaciones de alta\n\n"
+                "Control ambulatorio.\n"
+            ),
+        )
+
+        self.assertEqual(sections_payload["structure_mode"], "structured")
+        self.assertEqual(
+            [section["section_id"] for section in sections_payload["sections"]],
+            ["valoracion_integral", "recomendaciones_de_alta"],
+        )
+        self.assertEqual(
+            sections_payload["sections"][0]["resolution_source"],
+            "literal_heading",
+        )
 
 
 class DocumentDualContentApiTests(SimpleTestCase):

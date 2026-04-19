@@ -84,6 +84,15 @@ def test_render_turn_context_keeps_workspace_and_relevant_context_sections():
             "type": "note",
             "mode": "full",
             "content": "Paciente estable.",
+            "structure_mode": "structured",
+            "sections": [
+                {
+                    "section_id": "enfermedad_actual",
+                    "label": "Enfermedad actual",
+                    "heading": "Enfermedad actual",
+                    "resolution_source": "literal_heading",
+                }
+            ],
         }
     ]
     state["read_spans"] = [
@@ -115,6 +124,12 @@ def test_render_turn_context_keeps_workspace_and_relevant_context_sections():
             }
         ]
     }
+    state["run_memory_notes"] = [
+        {
+            "source": "last_tool_error",
+            "message": "El anchor anterior fue ambiguo.",
+        }
+    ]
     state["search_results"] = [
         {
             "query": "abdomen",
@@ -146,6 +161,9 @@ def test_render_turn_context_keeps_workspace_and_relevant_context_sections():
     assert "<document_summaries>" in rendered
     assert "<version>" not in rendered
     assert "<read_documents>" in rendered
+    assert "<structure_mode>structured</structure_mode>" in rendered
+    assert "<document_sections>" in rendered
+    assert "<section_id>enfermedad_actual</section_id>" in rendered
     assert "<read_spans>" in rendered
     assert "<context_view>" in rendered
     assert "<confidence>" not in rendered
@@ -154,13 +172,61 @@ def test_render_turn_context_keeps_workspace_and_relevant_context_sections():
     assert "<score>" not in rendered
     assert "<patch_history>" in rendered
     assert "<patch_id>" not in rendered
+    assert "<run_memory_notes>" in rendered
+    assert "El anchor anterior fue ambiguo." in rendered
     assert "<budgets>" not in rendered
     assert "<max_patch_operations>" not in rendered
 
 
 def test_render_patch_input_keeps_target_span_and_supporting_context():
     rendered = render_patch_input(
-        state=build_state("agrega el antecedente relevante"),
+        state={
+            **build_state("agrega el antecedente relevante"),
+            "read_documents": [
+                {
+                    "document_id": "99",
+                    "title": "Nota clinica",
+                    "type": "note",
+                    "mode": "full",
+                    "content": "Paciente estable.",
+                    "structure_mode": "structured",
+                    "sections": [
+                        {
+                            "section_id": "enfermedad_actual",
+                            "label": "Enfermedad actual",
+                            "heading": "Enfermedad actual",
+                            "start_offset": 0,
+                            "end_offset": 120,
+                            "resolution_source": "literal_heading",
+                            "content_preview": "Paciente estable.",
+                        },
+                        {
+                            "section_id": "analisis_clinico",
+                            "label": "Analisis clinico",
+                            "heading": "Analisis clinico",
+                            "start_offset": 121,
+                            "end_offset": 240,
+                            "resolution_source": "literal_heading",
+                            "content_preview": "Analisis estable.",
+                        },
+                    ],
+                }
+            ],
+            "clinical_plan": {
+                "edit_scope": "propagation",
+                "clinical_impact_level": "factual",
+                "affected_sections": ["enfermedad_actual", "analisis_clinico"],
+                "needs_full_note": True,
+                "factual_replacements": [
+                    {
+                        "replacement_id": "edad_paciente",
+                        "find_text": "45 años",
+                        "replace_text": "46 años",
+                        "scope_sections": ["enfermedad_actual", "analisis_clinico"],
+                    }
+                ],
+            },
+        },
         target_document={
             "document_id": "99",
             "title": "Nota clinica",
@@ -189,5 +255,12 @@ def test_render_patch_input_keeps_target_span_and_supporting_context():
     assert "<requested_tool_name>propose_replace_span</requested_tool_name>" in rendered
     assert "<target_document>" in rendered
     assert "<selected_span>" in rendered
+    assert "<target_document_sections>" in rendered
+    assert "<available_document_sections>enfermedad_actual, analisis_clinico</available_document_sections>" in rendered
     assert "<supporting_context>" in rendered
     assert "Alergia a penicilina." in rendered
+    assert "<edit_plan>" in rendered
+    assert "<factual_replacements>" in rendered
+    assert "<replacement_id>edad_paciente</replacement_id>" in rendered
+    assert "<find_text>45 años</find_text>" in rendered
+    assert "<replace_text>46 años</replace_text>" in rendered

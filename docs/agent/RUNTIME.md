@@ -68,20 +68,21 @@ call_model draft_patch_from_plan interrupt_for_review finalize_response
 
 ### Nodos
 
-| Nodo                     | Responsabilidad                                                                                                                      |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `call_model`             | Invoca al planner. Si hay tool_calls → tools. Si hay patch_set_preview válido + requires_human_review → interrupt. Si no → finalize. |
-| `tools`                  | Executa las tools del batch actual (ToolNode). Errores se devuelven como ToolMessage al planner para que corrija.                    |
-| `consolidate_tool_state` | Deriva `read_documents`, `retrieved_context`, `selected_document_ids` del batch de resultados. Entonces re-routea.                   |
+| Nodo                     | Responsabilidad                                                                                                                        |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `call_model`             | Invoca al planner. Si hay tool_calls → tools. Si hay patch_set_preview válido + requires_human_review → interrupt. Si no → finalize.   |
+| `tools`                  | Executa las tools del batch actual (ToolNode). Errores se devuelven como ToolMessage al planner para que corrija.                      |
+| `consolidate_tool_state` | Deriva `read_documents`, `retrieved_context`, `selected_document_ids` del batch de resultados. Entonces re-routea.                     |
 | `draft_patch_from_plan`  | Si `set_edit_plan` ya dejó `next_required_action='draft_patch_set'` y las precondiciones están listas, invoca al drafter directamente. |
-| `interrupt_for_review`   | Pausa el grafo. Espera `review_result` externo (`approve` / `reject`). LangGraph interrupt.                                          |
-| `apply_patch`            | Placeholder — el apply real ocurre en Django, no aquí.                                                                               |
-| `finalize_response`      | Construye el `final_response` del run.                                                                                               |
+| `interrupt_for_review`   | Pausa el grafo. Espera `review_result` externo (`approve` / `reject`). LangGraph interrupt.                                            |
+| `apply_patch`            | Placeholder — el apply real ocurre en Django, no aquí.                                                                                 |
+| `finalize_response`      | Construye el `final_response` del run.                                                                                                 |
 
 ### Routing
 
 `_route_after_model`:
 
+- `next_required_action='draft_patch_set'` + target/full note listos → `"draft_patch_from_plan"`
 - `tool_calls` presentes → `"tools"`
 - `patch_set_preview` válido + `requires_human_review=True` → `"interrupt_for_review"`
 - otherwise → `"finalize_response"`
@@ -93,6 +94,15 @@ call_model draft_patch_from_plan interrupt_for_review finalize_response
 - `run_error` presente → `"finalize_response"`
 - `next_required_action='draft_patch_set'` + target/full note listos → `"draft_patch_from_plan"`
 - otherwise → `"call_model"`
+
+Cuando `set_edit_plan` deja un plan pendiente, el runtime no debe depender de otra
+decisión libre del planner para redactar. Si el documento target se puede resolver por
+estado fresco (`target_document_id`, lectura única, selección única, o documento activo
+editable inequívoco) y la full note requerida ya existe, el grafo salta directo a
+`draft_patch_from_plan`. Si la full note falta pero el target está resuelto, el runtime
+sintetiza un `read_document(mode="full")` y continúa. Esto evita terminar un run con
+mensajes de control como "plan registrado" o "edit_plan pendiente" cuando todavía hay
+un paso estructurado posible.
 
 ### Límites de iteración
 
@@ -109,33 +119,33 @@ El estado completo es `CopilotState` en `app/graph/state.py`. Los campos relevan
 
 ### Contexto del workspace (entra por el primer mensaje)
 
-| Campo                 | Tipo                 | Descripción                                                                                                         |
-| --------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Campo                 | Tipo                 | Descripción                                                                                                                                                                                                                                                                                      |
+| --------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `workspace_index`     | `dict`               | Vista ligera del workspace: documento activo, abiertos, writable, versiones y opcionalmente `content_markdown` pre-seedeado por el frontend. Puede incluir `content_json`, pero hoy el runtime lo ignora deliberadamente y sigue operando sobre markdown. Entra desde Django en el primer turno. |
-| `available_documents` | `list[dict]`         | Documentos disponibles en el workspace. Se va enriqueciendo con lecturas. Merge inteligente por `document_id`.      |
-| `document_summaries`  | `dict[doc_id, dict]` | Summaries de documentos leídos. Merge por doc_id, score por completitud.                                            |
+| `available_documents` | `list[dict]`         | Documentos disponibles en el workspace. Se va enriqueciendo con lecturas. Merge inteligente por `document_id`.                                                                                                                                                                                   |
+| `document_summaries`  | `dict[doc_id, dict]` | Summaries de documentos leídos. Merge por doc_id, score por completitud.                                                                                                                                                                                                                         |
 
 ### Artefactos de lectura (acumulados en el run)
 
-| Campo            | Tipo                 | Descripción                                                                                  |
-| ---------------- | -------------------- | -------------------------------------------------------------------------------------------- |
-| `document_reads` | `list[dict]`         | Resultados de `read_document(mode=*)`. Incluye `content` cuando `mode="full"`.               |
-| `read_documents` | `list[dict]`         | Vista derivada de `document_reads` enriquecida por summaries. Usada por el planner.          |
-| `read_spans`     | `list[dict]`         | Resultados de `read_document_span`. Keyed por (doc_id, start_offset, end_offset, exactText). |
-| `context_view`   | `dict \| None`       | Resultado de `build_context_view`. Contexto estructurado del encounter.                      |
-| `search_results` | `list[dict]`         | Resultados de `search_documents`.                                                            |
-| `patch_history`  | `dict[doc_id, list]` | Patches aplicados previamente al documento target. Entra desde `read_patch_history`.         |
+| Campo            | Tipo                 | Descripción                                                                                                                                            |
+| ---------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `document_reads` | `list[dict]`         | Resultados de `read_document(mode=*)`. Incluye `content` cuando `mode="full"`.                                                                         |
+| `read_documents` | `list[dict]`         | Vista derivada de `document_reads` enriquecida por summaries. Usada por el planner. Puede incluir `structure_mode` + `sections` detectadas por Django. |
+| `read_spans`     | `list[dict]`         | Resultados de `read_document_span`. Keyed por (doc_id, start_offset, end_offset, exactText).                                                           |
+| `context_view`   | `dict \| None`       | Resultado de `build_context_view`. Contexto estructurado del encounter.                                                                                |
+| `search_results` | `list[dict]`         | Resultados de `search_documents`.                                                                                                                      |
+| `patch_history`  | `dict[doc_id, list]` | Patches aplicados previamente al documento target. Entra desde `read_patch_history`.                                                                   |
 
 ### Estado del run actual
 
-| Campo                    | Tipo          | Descripción                                                                        |
-| ------------------------ | ------------- | ---------------------------------------------------------------------------------- |
-| `iteration_count`        | `int`         | Iteraciones del loop principal. Cap en `max_iterations`.                           |
-| `patch_operations_count` | `int`         | Cuántas propose\_\* tools se han ejecutado. Cap en `max_patch_operations`.         |
-| `current_plan_step`      | `str`         | Última acción del planner (`"start"`, `"call_tool"`, `"respond"`).                 |
-| `run_error`              | `str \| None` | Si hay error irrecuperable, se setea aquí y el run termina en `finalize_response`. |
-| `last_tool_error`        | `str \| None` | Error del último batch de tools. Se pasa al planner para que corrija.              |
-| `next_required_action`   | `str \| None` | Señal runtime. Hoy usa `draft_patch_set` para continuar automáticamente tras `set_edit_plan`. |
+| Campo                        | Tipo          | Descripción                                                                                      |
+| ---------------------------- | ------------- | ------------------------------------------------------------------------------------------------ |
+| `iteration_count`            | `int`         | Iteraciones del loop principal. Cap en `max_iterations`.                                         |
+| `patch_operations_count`     | `int`         | Cuántas propose\_\* tools se han ejecutado. Cap en `max_patch_operations`.                       |
+| `current_plan_step`          | `str`         | Última acción del planner (`"start"`, `"call_tool"`, `"respond"`).                               |
+| `run_error`                  | `str \| None` | Si hay error irrecuperable, se setea aquí y el run termina en `finalize_response`.               |
+| `last_tool_error`            | `str \| None` | Error del último batch de tools. Se pasa al planner para que corrija.                            |
+| `next_required_action`       | `str \| None` | Señal runtime. Hoy usa `draft_patch_set` para continuar automáticamente tras `set_edit_plan`.    |
 | `planned_target_document_id` | `str \| None` | Documento target congelado por `set_edit_plan` cuando el runtime lo puede inferir con seguridad. |
 
 ### Artefactos del patch set
@@ -158,7 +168,17 @@ El estado completo es `CopilotState` en `app/graph/state.py`. Los campos relevan
 
 ### Reset entre runs
 
-Cuando Django inicia un nuevo run en el mismo thread (misma conversación), `_reset_transient_run_state()` limpia todos los artefactos del run anterior (reads, spans, patches, errores) pero conserva `messages` y la historia del hilo LangGraph. Esto evita que un patch propuesto en turno anterior contamine el siguiente turno.
+Cuando Django inicia un nuevo run en el mismo thread (misma conversación), `_reset_transient_run_state()` limpia artefactos de control del run anterior (patches, errores activos, contadores, planes clínicos pendientes), pero conserva `messages` y lecturas clínicas que siguen frescas contra el `workspace_index` actual.
+
+Una lectura previa (`document_reads`, `read_spans`, summaries derivados) se conserva solo si:
+
+- el `document_id` sigue presente en `workspace_index.documents`
+- `read.version == workspace_document.version`
+- el documento no tiene `has_user_edits`, `has_streaming_state` ni `has_pending_patches`
+
+Si el frontend envía `content_markdown` para el mismo `document_id`, ese pre-seed reemplaza cualquier lectura full cacheada del mismo documento. `version` es la señal primaria de freshness; `content_hash` sigue siendo útil para `base_hash` y validaciones de apply, pero no se exige en `workspace_index`.
+
+Los errores activos (`last_tool_error`, `last_planner_error`, `run_error`) se resetean por run para no contaminar el routing del siguiente mensaje. Cuando son útiles para recuperación/debug, el runtime conserva un resumen acotado en `run_memory_notes` y lo renderiza como contexto informativo, no como estado de control.
 
 ### Pre-seed desde frontend (`workspace_index.documents[].content_markdown`)
 
@@ -182,6 +202,20 @@ Eso permite que el planner llame `propose_*` en el turno 1 sin `read_document(..
 El runtime ya no depende de que el frontend mande ese hash. Si falta en `workspace_index`, el agente calcula `sha256(content_markdown)` al pre-seedear la lectura full. Esto mantiene consistente el contrato con Django, que valida conflictos de apply usando `base_hash`.
 
 En otras palabras: el pre-seed del frontend reemplaza la lectura remota, pero no puede omitir la metadata que vuelve aplicable el patch set.
+
+### Secciones estructuradas en `read_document`
+
+Cuando Django puede detectar headings reales del documento, `read_document` y `read_document_summary` devuelven:
+
+- `structure_mode = "structured"`
+- `sections = [{section_id, label, heading, start_offset, end_offset, resolution_source, ...}]`
+
+Contrato operativo:
+
+- Si `structure_mode="structured"`, el planner debe tratar esos `section_id` como la referencia preferente para `affected_sections` y evitar inventar nombres alternativos mientras la estructura detectada cubra el pedido.
+- El drafter recibe ese mismo mapa en `<read_documents>` y `<target_document_sections>`.
+- Si no hay estructura confiable, Django devuelve `structure_mode="unstructured"` y `sections=[]`; en ese caso el runtime sigue permitiendo fallback semántico.
+- En este slice la estructura se calcula on-read a partir de headings literales; todavía no existe cache persistido por documento.
 
 ### Contexto renderizado al planner
 
@@ -246,9 +280,12 @@ Cuando llegan esas secciones, el runtime construye un scope mínimo local y acti
 guardrail semántico del drafter.
 Para `edit_scope in {propagation, reinterpretation}` o para cualquier `propose_*` con
 `affected_sections`, el runtime valida además que el
-`DraftedPatchPlan` cubra todas las `affected_sections` del `edit_plan` y que cada patch
-declare `section`. Si el drafter devuelve un subconjunto parcial, la tool falla cerrada y
-no abre review humana con un patch set incompleto.
+`DraftedPatchPlan` cubra todas las `affected_sections` del `edit_plan`. Cobertura no
+significa "un patch obligatorio por sección": cada sección debe tener al menos un patch
+con `section` matching, o un `section_outcome` explícito (`no_change_needed`,
+`section_not_found`, `unsafe_to_change`) con rationale breve. Si el drafter devuelve un
+subconjunto parcial sin outcome para las secciones omitidas, la tool falla cerrada y no
+abre review humana con un patch set incompleto.
 
 Ese guardrail también aplica cuando el planner fija `affected_sections` en un
 `edit_scope="local"` para follow-ups ambiguos resueltos por contexto conversacional
@@ -256,8 +293,8 @@ previo. Si el scope declarado contiene una sola sección y el drafter devuelve p
 para secciones extra, el runtime falla cerrado y obliga a regenerar el patch set dentro
 del scope correcto.
 
-| Tool                                                          | Operación del drafter                            |
-| ------------------------------------------------------------- | ------------------------------------------------ |
+| Tool                                                                              | Operación del drafter                            |
+| --------------------------------------------------------------------------------- | ------------------------------------------------ |
 | `propose_replace_span(target_document_id, instruction?, affected_sections?)`      | Reemplaza un span existente por contenido nuevo. |
 | `propose_insert_after_span(target_document_id, instruction?, affected_sections?)` | Inserta contenido nuevo después de un span.      |
 | `propose_insert_before(target_document_id, instruction?, affected_sections?)`     | Inserta contenido nuevo antes de un anchor.      |

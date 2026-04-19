@@ -77,6 +77,14 @@ En el sidechat actual, `thread_id` ya identifica una conversación real: Django 
 - **Owner:** `copilot_agent/app/runtime.py` + `backend/apps/copilot/` + `webapp/`.
 - **Trigger para pagarla:** cuando la latencia total del run (planner + drafter) llegue a 8-12 segundos con modelos más potentes o cuando se abra el copiloto fuera del debug panel a usuarios reales.
 
+### 8. Posible capa semántica opcional para secciones, archivada por ahora
+
+- **Impacto:** por un momento se exploró persistir un `section_schema` por plantilla para mapear headings libres a ids clínicos más estables.
+- **Por qué se archivó:** hoy agrega complejidad en DB, prompts y mantenimiento sin evidencia suficiente de que mejore el writer flow sobre headings literales reales. Juan no es fan de esta dirección y no quedó convencido de que valga el costo operativo ahora.
+- **Decisión actual:** el runtime sigue trabajando con headings detectados del documento y fallback contextual; no existe schema persistido por plantilla en el camino activo.
+- **Owner:** `backend/apps/documents/` + `backend/apps/copilot/` + `copilot_agent/`.
+- **Trigger para revisitarla:** solo si aparecen casos reales y repetidos donde headings libres rompan la edición y una capa semántica opcional demuestre valor claro sin imponerse al documento literal.
+
 ## Referencias
 
 - [`../architecture/ai-agent-workspace.md`](../architecture/ai-agent-workspace.md)

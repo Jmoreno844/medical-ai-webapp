@@ -146,11 +146,36 @@ def _render_read_documents(read_documents: Sequence[Mapping[str, Any]]) -> str:
                 f"    {xml_line('title', document.get('title'))}",
                 f"    {xml_line('doctype', document.get('type'))}",
                 f"    {xml_line('mode', document.get('mode'))}",
+                f"    {xml_line('structure_mode', document.get('structure_mode') or 'unstructured')}",
                 "  </read_document>",
             ]
         )
+        sections = list(document.get("sections") or [])
+        if sections:
+            lines.insert(-1, "    <document_sections>")
+            for section in sections[:8]:
+                lines.insert(-1, "      <section>")
+                lines.insert(-1, f"        {xml_line('section_id', section.get('section_id'))}")
+                lines.insert(-1, f"        {xml_line('label', section.get('label'))}")
+                lines.insert(-1, f"        {xml_line('heading', section.get('heading'))}")
+                lines.insert(-1, f"        {xml_line('resolution_source', section.get('resolution_source'))}")
+                lines.insert(-1, "      </section>")
+            lines.insert(-1, "    </document_sections>")
     lines.append("</read_documents>")
     return "\n".join(lines)
+
+
+def _target_document_sections(state: Mapping[str, Any], document_id: Any) -> list[Mapping[str, Any]]:
+    wanted_id = str(document_id or "").strip()
+    if not wanted_id:
+        return []
+    for document in state.get("read_documents") or []:
+        if str(document.get("document_id") or "") != wanted_id:
+            continue
+        sections = list(document.get("sections") or [])
+        if sections:
+            return sections
+    return []
 
 
 def _render_read_spans(read_spans: Sequence[Mapping[str, Any]]) -> str:
@@ -216,6 +241,24 @@ def _render_patch_history(patch_history: Mapping[str, list[Mapping[str, Any]]]) 
             )
         lines.append("  </document_patches>")
     lines.append("</patch_history>")
+    return "\n".join(lines)
+
+
+def _render_run_memory_notes(notes: Sequence[Mapping[str, Any]]) -> str:
+    if not notes:
+        return ""
+
+    lines = ["<run_memory_notes>"]
+    for note in notes[-5:]:
+        lines.extend(
+            [
+                "  <note>",
+                f"    {xml_line('source', note.get('source'))}",
+                f"    {xml_line('message', note.get('message'))}",
+                "  </note>",
+            ]
+        )
+    lines.append("</run_memory_notes>")
     return "\n".join(lines)
 
 
@@ -348,6 +391,7 @@ def render_turn_context(state: Mapping[str, Any]) -> str:
                 _render_context_view(state.get("context_view")),
                 _render_search_results(search_results),
                 _render_patch_history(state.get("patch_history") or {}),
+                _render_run_memory_notes(state.get("run_memory_notes") or []),
                 _render_planning_state(state),
                 (
                     f"  {xml_line('last_tool_error', state.get('last_tool_error'))}"
@@ -389,6 +433,27 @@ def render_patch_input(
         "  </target_document>",
         f"  {xml_line('target_document_content', target_document_content, max_length=12000)}",
     ]
+    target_sections = _target_document_sections(
+        state,
+        target_document.get("document_id"),
+    )
+    if target_sections:
+        lines.append("  <target_document_sections>")
+        for section in target_sections[:12]:
+            lines.extend(
+                [
+                    "    <section>",
+                    f"      {xml_line('section_id', section.get('section_id'))}",
+                    f"      {xml_line('label', section.get('label'))}",
+                    f"      {xml_line('heading', section.get('heading'))}",
+                    f"      {xml_line('start_offset', section.get('start_offset'))}",
+                    f"      {xml_line('end_offset', section.get('end_offset'))}",
+                    f"      {xml_line('resolution_source', section.get('resolution_source'))}",
+                    f"      {xml_line('content_preview', section.get('content_preview'), max_length=240)}",
+                    "    </section>",
+                ]
+            )
+        lines.append("  </target_document_sections>")
     if span_payload:
         lines.extend(
             [
@@ -439,6 +504,10 @@ def render_patch_input(
             lines.append(
                 f"    {xml_line('requested_affected_sections', ', '.join(requested_affected_sections))}"
             )
+        if target_sections:
+            lines.append(
+                f"    {xml_line('available_document_sections', ', '.join(str(section.get('section_id') or '') for section in target_sections if str(section.get('section_id') or '').strip()))}"
+            )
         if clinical_plan.get("reasoning"):
             # Razonamiento clínico interno del planner: explica el hilo causal del cambio.
             lines.append(f"    {xml_line('reasoning', clinical_plan.get('reasoning'), max_length=800)}")
@@ -450,6 +519,22 @@ def render_patch_input(
             for section_name, instruction in section_instructions.items():
                 lines.append(f"      <instruction section=\"{section_name}\">{instruction}</instruction>")
             lines.append("    </section_instructions>")
+        factual_replacements = clinical_plan.get("factual_replacements") or []
+        if factual_replacements:
+            lines.append("    <factual_replacements>")
+            for replacement in factual_replacements:
+                replacement_sections = ", ".join(replacement.get("scope_sections") or [])
+                lines.extend(
+                    [
+                        "      <replacement>",
+                        f"        {xml_line('replacement_id', replacement.get('replacement_id'))}",
+                        f"        {xml_line('find_text', replacement.get('find_text'))}",
+                        f"        {xml_line('replace_text', replacement.get('replace_text'))}",
+                        f"        {xml_line('scope_sections', replacement_sections)}",
+                        "      </replacement>",
+                    ]
+                )
+            lines.append("    </factual_replacements>")
         lines.append("  </edit_plan>")
     lines.append("</patch_drafting_input>")
     return "\n".join(lines)

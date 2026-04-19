@@ -6,6 +6,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from app.graph.tools import build_graph_tools
 from app.graph.tools import draft_patch_set_from_state
 from app.graph.tools import _is_valid_patch_preview as tool_patch_preview_is_valid
+from app.graph.tools import _normalize_factual_replacements
 from app.graph.tools import _validate_drafted_plan_against_clinical_plan
 from app.graph.workflow import build_clinical_copilot_graph
 from app.graph.state import materialize_state_snapshot, reset_dict_state, reset_list_state
@@ -14,12 +15,16 @@ from app.llm.providers import LlmProviderSpec
 from app.planner import (
     DraftedPatch,
     DraftedPatchPlan,
+    DraftedSectionOutcome,
     LangChainCopilotPlanner,
     _filter_parallel_tool_calls,
 )
 from app.graph.nodes import (
     NODE_DRAFT_PATCH_FROM_PLAN,
+    _derive_read_documents,
     _is_valid_patch_preview as node_patch_preview_is_valid,
+    _read_document_view,
+    _reset_transient_run_state,
     make_draft_patch_from_plan_node,
     route_after_tool_execution,
 )
@@ -208,6 +213,17 @@ class _RecordingPlanner:
 
     def draft_patch_preview(self, **_kwargs):  # pragma: no cover - defensive
         raise AssertionError("draft_patch_preview should not be called in this test")
+
+
+class _RetryingDraftPlanner(ScriptedPlanner):
+    def __init__(self, *, responses: list[AIMessage], drafted_plans: list[DraftedPatchPlan]):
+        super().__init__(responses=responses)
+        self._drafted_plans = list(drafted_plans)
+
+    def draft_patch_preview(self, **_kwargs):
+        if not self._drafted_plans:
+            raise RuntimeError("Retrying draft planner ran out of drafted plans")
+        return self._drafted_plans.pop(0)
 
 
 def test_langchain_planner_retries_once_before_raising():
@@ -954,6 +970,418 @@ def test_same_thread_keeps_messages_but_resets_run_scoped_traces():
     assert second_state["planner_decisions"][0]["action_type"] == "respond"
 
 
+def _workspace_doc(
+    *,
+    version: int = 3,
+    has_user_edits: bool = False,
+    has_streaming_state: bool = False,
+    has_pending_patches: bool = False,
+    content_markdown: str | None = None,
+) -> dict:
+    document = {
+        "document_id": "99",
+        "title": "Nota clinica",
+        "type": "note",
+        "status": "draft",
+        "source": "user",
+        "ai_readable": True,
+        "ai_writable": True,
+        "version": version,
+        "updated_at": "2026-04-02",
+        "is_active": True,
+        "is_open": True,
+        "has_dirty_draft": False,
+        "has_user_edits": has_user_edits,
+        "has_streaming_state": has_streaming_state,
+        "hidden_from_agent": False,
+        "pinned_for_agent": False,
+        "has_pending_patches": has_pending_patches,
+    }
+    if content_markdown is not None:
+        document["content_markdown"] = content_markdown
+    return document
+
+
+def _without_reset_marker(items: list[dict]) -> list[dict]:
+    return [item for item in items if not item.get("__reset__")]
+
+
+def test_reset_transient_run_state_carries_fresh_full_read():
+    state = build_state("continua")
+    state["document_reads"] = [FakeToolsClient().read_document("99", mode="full")]
+    state["document_summaries"] = {"99": FakeToolsClient().read_document_summary("99")}
+    state["read_spans"] = [FakeToolsClient().read_document_span("99")]
+    workspace_index = {
+        **state["workspace_index"],
+        "documents": [_workspace_doc(version=3)],
+    }
+
+    updates = _reset_transient_run_state(state=state, workspace_index=workspace_index)
+
+    reads = _without_reset_marker(updates["document_reads"])
+    spans = _without_reset_marker(updates["read_spans"])
+    assert [read["document_id"] for read in reads] == ["99"]
+    assert reads[0]["mode"] == "full"
+    assert updates["document_summaries"]["99"]["version"] == 3
+    assert spans[0]["document_id"] == "99"
+    assert updates["read_documents"][0]["mode"] == "full"
+
+
+def test_reset_transient_run_state_discards_stale_or_unsafe_reads():
+    stale_state = build_state("continua")
+    stale_state["document_reads"] = [FakeToolsClient().read_document("99", mode="full")]
+
+    version_updates = _reset_transient_run_state(
+        state=stale_state,
+        workspace_index={
+            **stale_state["workspace_index"],
+            "documents": [_workspace_doc(version=4)],
+        },
+    )
+    user_edit_updates = _reset_transient_run_state(
+        state=stale_state,
+        workspace_index={
+            **stale_state["workspace_index"],
+            "documents": [_workspace_doc(has_user_edits=True)],
+        },
+    )
+    streaming_updates = _reset_transient_run_state(
+        state=stale_state,
+        workspace_index={
+            **stale_state["workspace_index"],
+            "documents": [_workspace_doc(has_streaming_state=True)],
+        },
+    )
+    pending_patch_updates = _reset_transient_run_state(
+        state=stale_state,
+        workspace_index={
+            **stale_state["workspace_index"],
+            "documents": [_workspace_doc(has_pending_patches=True)],
+        },
+    )
+
+    assert _without_reset_marker(version_updates["document_reads"]) == []
+    assert _without_reset_marker(user_edit_updates["document_reads"]) == []
+    assert _without_reset_marker(streaming_updates["document_reads"]) == []
+    assert _without_reset_marker(pending_patch_updates["document_reads"]) == []
+
+
+def test_reset_transient_run_state_preseed_replaces_cached_full_read():
+    state = build_state("continua")
+    state["document_reads"] = [FakeToolsClient().read_document("99", mode="full")]
+    workspace_index = {
+        **state["workspace_index"],
+        "documents": [
+            _workspace_doc(
+                version=3,
+                content_markdown="Contenido canonico fresco desde workspace.",
+            )
+        ],
+    }
+
+    updates = _reset_transient_run_state(state=state, workspace_index=workspace_index)
+
+    reads = _without_reset_marker(updates["document_reads"])
+    assert len(reads) == 1
+    assert reads[0]["content"] == "Contenido canonico fresco desde workspace."
+    assert updates["read_documents"][0]["content"] == "Contenido canonico fresco desde workspace."
+
+
+def test_reset_transient_run_state_moves_active_errors_to_run_memory_notes():
+    state = build_state("continua")
+    state["last_tool_error"] = "El anchor es ambiguo; agrega prefixText."
+    state["run_error"] = "No pude completar el run anterior."
+
+    updates = _reset_transient_run_state(
+        state=state,
+        workspace_index=state["workspace_index"],
+    )
+
+    assert updates["last_tool_error"] is None
+    assert updates["run_error"] is None
+    assert {
+        "source": "last_tool_error",
+        "message": "El anchor es ambiguo; agrega prefixText.",
+    } in updates["run_memory_notes"]
+    assert {
+        "source": "run_error",
+        "message": "No pude completar el run anterior.",
+    } in updates["run_memory_notes"]
+
+
+def test_same_thread_preserves_fresh_full_read_for_set_edit_plan_auto_draft():
+    planner = ScriptedPlanner(
+        responses=[
+            make_ai_tool_call(
+                tool_name="read_document",
+                args={"document_id": "99", "mode": "full"},
+                tool_call_id="call-1",
+            ),
+            make_ai_response("Documento leído."),
+            make_ai_tool_call(
+                tool_name="set_edit_plan",
+                args={
+                    "edit_scope": "propagation",
+                    "clinical_impact_level": "factual",
+                    "affected_sections": ["analisis_clinico"],
+                    "needs_full_note": True,
+                    "needs_external_knowledge": False,
+                },
+                tool_call_id="call-2",
+            ),
+        ],
+        drafted_patch=DraftedPatchPlan(
+            rationale="Propagar edad correcta.",
+            document_preview_after="Paciente estable, edad corregida.",
+            patches=[
+                DraftedPatch(
+                    operation_type="replace_span",
+                    anchor={"exactText": "Paciente estable y con mejoria."},
+                    expected_hash="hash-demo",
+                    replacement_text="Paciente estable, edad corregida.",
+                    rationale="Corregir edad en analisis.",
+                    section="analisis_clinico",
+                ),
+            ],
+        ),
+    )
+    graph = build_clinical_copilot_graph(
+        tools_client=FakeToolsClient(),
+        planner=planner,
+        checkpointer=InMemorySaver(),
+    )
+    thread_id = "copilot:encounter:12:doctor:7:chat:fresh-cache"
+    first_state = build_state("lee la nota")
+    first_state["workspace_index"]["documents"] = [_workspace_doc()]
+    second_state = build_state("corrige la edad en toda la nota")
+    second_state["workspace_index"]["documents"] = [_workspace_doc()]
+
+    graph.invoke(first_state, config={"configurable": {"thread_id": thread_id}})
+    next_state = graph.invoke(second_state, config={"configurable": {"thread_id": thread_id}})
+
+    assert next_state["requires_human_review"] is True
+    assert next_state["patch_set_preview"]["affected_sections"] == ["analisis_clinico"]
+    assert [call["tool_name"] for call in next_state["tool_calls"]] == [
+        "set_edit_plan",
+    ]
+
+
+def test_pending_edit_plan_reads_full_note_instead_of_finishing_with_text():
+    planner = ScriptedPlanner(
+        responses=[
+            make_ai_tool_call(
+                tool_name="read_document_summary",
+                args={"document_id": "99"},
+                tool_call_id="call-1",
+            ),
+            make_ai_response("Resumen leído."),
+            make_ai_tool_call(
+                tool_name="set_edit_plan",
+                args={
+                    "edit_scope": "propagation",
+                    "clinical_impact_level": "factual",
+                    "affected_sections": ["analisis_clinico"],
+                    "needs_full_note": True,
+                    "needs_external_knowledge": False,
+                },
+                tool_call_id="call-2",
+            ),
+        ],
+        drafted_patch=DraftedPatchPlan(
+            rationale="Propagar edad correcta.",
+            document_preview_after="Paciente estable, edad corregida.",
+            patches=[
+                DraftedPatch(
+                    operation_type="replace_span",
+                    anchor={"exactText": "Paciente estable y con mejoria."},
+                    expected_hash="hash-demo",
+                    replacement_text="Paciente estable, edad corregida.",
+                    rationale="Corregir edad en analisis.",
+                    section="analisis_clinico",
+                ),
+            ],
+        ),
+    )
+    graph = build_clinical_copilot_graph(
+        tools_client=FakeToolsClient(),
+        planner=planner,
+        checkpointer=InMemorySaver(),
+    )
+    thread_id = "copilot:encounter:12:doctor:7:chat:pending-plan-read"
+    first_state = build_state("lee resumen de la nota")
+    first_state["workspace_index"]["documents"] = [_workspace_doc()]
+    second_state = build_state("corrige la edad en toda la nota")
+    second_state["workspace_index"]["documents"] = [_workspace_doc()]
+
+    graph.invoke(first_state, config={"configurable": {"thread_id": thread_id}})
+    next_state = graph.invoke(second_state, config={"configurable": {"thread_id": thread_id}})
+
+    assert next_state["requires_human_review"] is True
+    assert [call["tool_name"] for call in next_state["tool_calls"]] == [
+        "set_edit_plan",
+        "read_document",
+    ]
+    assert next_state["tool_calls"][1]["tool_input"] == {
+        "document_id": "99",
+        "mode": "full",
+    }
+
+
+def test_pending_edit_plan_uses_active_writable_target_when_no_read_exists():
+    planner = ScriptedPlanner(
+        responses=[
+            make_ai_tool_call(
+                tool_name="set_edit_plan",
+                args={
+                    "edit_scope": "propagation",
+                    "clinical_impact_level": "factual",
+                    "affected_sections": ["datos_demograficos"],
+                    "needs_full_note": True,
+                    "needs_external_knowledge": False,
+                },
+                tool_call_id="call-1",
+            ),
+        ],
+        drafted_patch=DraftedPatchPlan(
+            rationale="Corregir edad en datos demograficos.",
+            document_preview_after="Paciente de 50 años.",
+            patches=[
+                DraftedPatch(
+                    operation_type="replace_span",
+                    anchor={"exactText": "Paciente estable y con mejoria."},
+                    expected_hash="hash-demo",
+                    replacement_text="Paciente de 50 años.",
+                    rationale="Corregir edad.",
+                    section="datos_demograficos",
+                ),
+            ],
+        ),
+    )
+    graph = build_clinical_copilot_graph(
+        tools_client=FakeToolsClient(),
+        planner=planner,
+    )
+    state = build_state("en la historia clinica cambia la edad del paciente a 50 años")
+    state["workspace_index"]["documents"] = [_workspace_doc()]
+
+    next_state = graph.invoke(
+        state,
+        config={"configurable": {"thread_id": "copilot:encounter:12:doctor:7"}},
+    )
+
+    assert next_state["requires_human_review"] is True
+    assert [call["tool_name"] for call in next_state["tool_calls"]] == [
+        "set_edit_plan",
+        "read_document",
+    ]
+    assert next_state["patch_set_preview"]["target_document_id"] == "99"
+
+
+def test_direct_propose_incomplete_scope_retries_once_and_opens_review():
+    planner = _RetryingDraftPlanner(
+        responses=[
+            make_ai_tool_call(
+                tool_name="propose_replace_span",
+                args={
+                    "target_document_id": "99",
+                    "instruction": "Corrige la edad a 67 años en todas sus menciones.",
+                    "affected_sections": [
+                        "datos_demograficos",
+                        "enfermedad_actual",
+                        "impresion_diagnostica",
+                    ],
+                },
+                tool_call_id="call-1",
+            ),
+        ],
+        drafted_plans=[
+            DraftedPatchPlan(
+                rationale="Primer intento incompleto.",
+                document_preview_after="Paciente estable y con mejoria.",
+                patches=[
+                    DraftedPatch(
+                        operation_type="replace_span",
+                        anchor={"exactText": "Paciente estable y con mejoria."},
+                        expected_hash="preseed-hash",
+                        replacement_text="Paciente de 67 años estable y con mejoria.",
+                        rationale="Corregir edad en datos demográficos.",
+                        section="datos_demograficos",
+                    ),
+                    DraftedPatch(
+                        operation_type="replace_span",
+                        anchor={"exactText": "Paciente estable y con mejoria."},
+                        expected_hash="preseed-hash",
+                        replacement_text="Paciente de 67 años estable y con mejoria.",
+                        rationale="Corregir edad en enfermedad actual.",
+                        section="enfermedad_actual",
+                    ),
+                ],
+            ),
+            DraftedPatchPlan(
+                rationale="Segundo intento cubre todas las secciones revisadas.",
+                document_preview_after="Paciente estable y con mejoria.",
+                patches=[
+                    DraftedPatch(
+                        operation_type="replace_span",
+                        anchor={"exactText": "Paciente estable y con mejoria."},
+                        expected_hash="preseed-hash",
+                        replacement_text="Paciente de 67 años estable y con mejoria.",
+                        rationale="Corregir edad en datos demográficos.",
+                        section="datos_demograficos",
+                    ),
+                    DraftedPatch(
+                        operation_type="replace_span",
+                        anchor={"exactText": "Paciente estable y con mejoria."},
+                        expected_hash="preseed-hash",
+                        replacement_text="Paciente de 67 años estable y con mejoria.",
+                        rationale="Corregir edad en enfermedad actual.",
+                        section="enfermedad_actual",
+                    ),
+                ],
+                section_outcomes=[
+                    DraftedSectionOutcome(
+                        section="impresion_diagnostica",
+                        status="no_change_needed",
+                        rationale="La sección no contiene una mención de edad que requiera corrección.",
+                    )
+                ],
+            ),
+        ],
+    )
+    graph = build_clinical_copilot_graph(
+        tools_client=FakeToolsClient(),
+        planner=planner,
+    )
+    state = build_state("corrige la edad a 67 años en toda la historia")
+    state["workspace_index"]["documents"] = [
+        _workspace_doc(
+            version=3,
+            content_markdown="Paciente estable y con mejoria.",
+        )
+    ]
+
+    next_state = graph.invoke(
+        state,
+        config={"configurable": {"thread_id": "copilot:encounter:12:doctor:7:retry-scope"}},
+    )
+
+    assert next_state["requires_human_review"] is True
+    assert next_state["patch_set_preview"]["affected_sections"] == [
+        "datos_demograficos",
+        "enfermedad_actual",
+        "impresion_diagnostica",
+    ]
+    assert len(next_state["patch_set_preview"]["patches"]) == 2
+    assert next_state["patch_set_preview"]["section_outcomes"] == [
+        {
+            "section": "impresion_diagnostica",
+            "status": "no_change_needed",
+            "rationale": "La sección no contiene una mención de edad que requiera corrección.",
+        }
+    ]
+    assert next_state["patch_validation_retry_used"] is False
+
+
 def test_summary_request_uses_tool_loop_with_minimal_reads():
     planner = ScriptedPlanner(
         responses=[
@@ -1211,6 +1639,45 @@ def test_read_document_full_populates_read_documents_state():
         document["document_id"] == "99" and document["mode"] == "full"
         for document in next_state["read_documents"]
     )
+
+
+def test_read_document_view_and_derived_reads_preserve_detected_sections():
+    read_payload = {
+        "document_id": "99",
+        "title": "Nota clinica",
+        "type": "note",
+        "version": 3,
+        "mode": "full",
+        "content": "Paciente estable.",
+        "content_hash": "hash-demo",
+        "structure_mode": "structured",
+        "sections": [
+            {
+                "section_id": "enfermedad_actual",
+                "label": "Enfermedad actual",
+                "heading": "Enfermedad actual",
+                "normalized_heading": "enfermedad actual",
+                "heading_level": 2,
+                "heading_style": "markdown_heading",
+                "resolution_source": "literal_heading",
+                "start_offset": 0,
+                "content_start_offset": 0,
+                "end_offset": 120,
+                "content_preview": "Paciente estable.",
+            }
+        ],
+    }
+
+    view = _read_document_view(read_payload)
+    state = build_state("lee la nota completa")
+    state["document_reads"] = [view]
+
+    derived_reads = _derive_read_documents(state)
+
+    assert view["structure_mode"] == "structured"
+    assert view["sections"][0]["section_id"] == "enfermedad_actual"
+    assert derived_reads[0]["structure_mode"] == "structured"
+    assert derived_reads[0]["sections"][0]["section_id"] == "enfermedad_actual"
 
 
 def test_full_document_read_can_unlock_insert_after_proposal():
@@ -1595,7 +2062,213 @@ def test_validate_drafted_plan_rejects_partial_propagation_plan():
 
     assert validation_error is not None
     assert "patches sin section" in validation_error
-    assert "faltan secciones obligatorias: enfermedad_actual, analisis, plan." in validation_error
+    assert (
+        "faltan secciones obligatorias sin patch ni section_outcome: "
+        "enfermedad_actual, analisis, plan."
+    ) in validation_error
+
+
+def test_validate_drafted_plan_accepts_section_outcome_without_patch():
+    validation_error = _validate_drafted_plan_against_clinical_plan(
+        drafted_plan=DraftedPatchPlan(
+            rationale="La edad solo aparece en dos secciones.",
+            patches=[
+                DraftedPatch(
+                    operation_type="replace_span",
+                    anchor={"exactText": "80 años"},
+                    replacement_text="67 años",
+                    rationale="Corregir edad en datos demográficos.",
+                    section="datos_demograficos",
+                ),
+                DraftedPatch(
+                    operation_type="replace_span",
+                    anchor={"exactText": "80 años"},
+                    replacement_text="67 años",
+                    rationale="Corregir edad en enfermedad actual.",
+                    section="enfermedad_actual",
+                ),
+            ],
+            section_outcomes=[
+                DraftedSectionOutcome(
+                    section="impresion_diagnostica",
+                    status="no_change_needed",
+                    rationale="La sección no contiene una mención de edad que requiera corrección.",
+                )
+            ],
+        ),
+        clinical_plan={
+            "edit_scope": "local",
+            "affected_sections": [
+                "datos_demograficos",
+                "enfermedad_actual",
+                "impresion_diagnostica",
+            ],
+        },
+    )
+
+    assert validation_error is None
+
+
+def test_draft_patch_set_from_state_drops_individual_noop_patch_and_keeps_valid_patch_set():
+    planner = ScriptedPlanner(
+        drafted_patch=DraftedPatchPlan(
+            rationale="El drafter emitió un replace válido y otro no-op.",
+            patches=[
+                DraftedPatch(
+                    operation_type="replace_span",
+                    anchor={"exactText": "Paciente de 70 años"},
+                    replacement_text="Paciente de 50 años",
+                    rationale="Corregir edad en analisis clinico.",
+                    section="analisis_clinico",
+                ),
+                DraftedPatch(
+                    operation_type="replace_span",
+                    anchor={"exactText": "Paciente de 50 años"},
+                    replacement_text="Paciente de 50 años",
+                    rationale="No-op accidental.",
+                    section="analisis_clinico",
+                ),
+            ],
+        )
+    )
+    state = build_state("corrige la edad en analisis clinico")
+    state["available_documents"] = [
+        make_document(
+            "99",
+            title="Nota clinica",
+            document_type="note",
+            is_active=True,
+            version=3,
+        )
+    ]
+    state["document_summaries"] = {
+        "99": FakeToolsClient().read_document_summary("99"),
+    }
+    state["document_reads"] = [
+        FakeToolsClient().read_document("99", mode="full"),
+    ]
+    state["read_documents"] = [
+        {
+            **state["document_reads"][0],
+        }
+    ]
+
+    result = draft_patch_set_from_state(
+        planner=planner,
+        state=state,
+        tool_name="propose_replace_span",
+        target_document_id="99",
+        instruction="Corrige la edad solo en analisis_clinico.",
+        affected_sections=["analisis_clinico"],
+        retry_validation_error=True,
+    )
+
+    assert result["ok"] is True
+    assert len(result["payload"]["patches"]) == 1
+    assert result["payload"]["patches"][0]["replacement_text"] == "Paciente de 50 años"
+    assert result["updates"]["patch_validation_retry_used"] is False
+
+
+def test_draft_patch_set_from_state_retries_when_all_drafter_patches_are_noop_replace():
+    planner = ScriptedPlanner(
+        drafted_patch=DraftedPatchPlan(
+            rationale="El drafter emitió solo replaces sin cambio.",
+            patches=[
+                DraftedPatch(
+                    operation_type="replace_span",
+                    anchor={"exactText": "Paciente de 50 años"},
+                    replacement_text="Paciente de 50 años",
+                    rationale="No-op accidental.",
+                    section="analisis_clinico",
+                ),
+            ],
+        )
+    )
+    state = build_state("corrige la edad en analisis clinico")
+    state["available_documents"] = [
+        make_document(
+            "99",
+            title="Nota clinica",
+            document_type="note",
+            is_active=True,
+            version=3,
+        )
+    ]
+    state["document_summaries"] = {
+        "99": FakeToolsClient().read_document_summary("99"),
+    }
+    state["document_reads"] = [
+        FakeToolsClient().read_document("99", mode="full"),
+    ]
+    state["read_documents"] = [
+        {
+            **state["document_reads"][0],
+        }
+    ]
+
+    result = draft_patch_set_from_state(
+        planner=planner,
+        state=state,
+        tool_name="propose_replace_span",
+        target_document_id="99",
+        instruction="Corrige la edad solo en analisis_clinico.",
+        affected_sections=["analisis_clinico"],
+        retry_validation_error=True,
+    )
+
+    assert result["ok"] is False
+    assert "El drafter devolvio solo patches replace_span sin cambio real en posiciones: 1." in result["error_message"]
+    assert "Esto normalmente significa que el documento ya contiene el texto pedido" in result["error_message"]
+    assert "si ya lo esta, responde al medico" in result["error_message"]
+    assert result["updates"]["next_required_action"] == "draft_patch_set"
+    assert result["updates"]["patch_validation_retry_used"] is True
+
+
+def test_normalize_factual_replacements_filters_invalid_and_out_of_scope_items():
+    normalized = _normalize_factual_replacements(
+        [
+            {
+                "replacement_id": "edad_paciente",
+                "find_text": "45 años",
+                "replace_text": "46 años",
+                "scope_sections": ["enfermedad_actual", "fuera_de_scope"],
+            },
+            {
+                "replacement_id": "sin_scope_explicito",
+                "find_text": "1 tableta",
+                "replace_text": "2 tabletas",
+                "scope_sections": [],
+            },
+            {
+                "replacement_id": "texto_igual",
+                "find_text": "estable",
+                "replace_text": "estable",
+                "scope_sections": ["enfermedad_actual"],
+            },
+            {
+                "replacement_id": "solo_fuera",
+                "find_text": "2024",
+                "replace_text": "2025",
+                "scope_sections": ["fuera_de_scope"],
+            },
+        ],
+        allowed_sections=["enfermedad_actual", "analisis_clinico"],
+    )
+
+    assert normalized == [
+        {
+            "replacement_id": "edad_paciente",
+            "find_text": "45 años",
+            "replace_text": "46 años",
+            "scope_sections": ["enfermedad_actual"],
+        },
+        {
+            "replacement_id": "sin_scope_explicito",
+            "find_text": "1 tableta",
+            "replace_text": "2 tabletas",
+            "scope_sections": ["enfermedad_actual", "analisis_clinico"],
+        },
+    ]
 
 
 def test_direct_propose_with_affected_sections_passes_local_scope_guardrail():
