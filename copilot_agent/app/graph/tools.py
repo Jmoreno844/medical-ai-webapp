@@ -580,6 +580,15 @@ def _fallback_target_document_id_from_state(state: CopilotState) -> str | None:
     if explicit_target:
         return explicit_target
 
+    known_documents = [
+        document
+        for document in [
+            *(state.get("available_documents") or []),
+            *((state.get("workspace_index") or {}).get("documents") or []),
+        ]
+        if document.get("document_id") is not None
+    ]
+
     full_read_ids: list[str] = []
     seen_full_read_ids: set[str] = set()
     for document in state.get("read_documents") or []:
@@ -606,6 +615,36 @@ def _fallback_target_document_id_from_state(state: CopilotState) -> str | None:
     selected_ids = _default_selected_document_ids(state)
     if len(selected_ids) == 1:
         return selected_ids[0]
+
+    active_document_id = str(
+        state.get("active_document_id")
+        or (state.get("workspace_index") or {}).get("active_document_id")
+        or ""
+    ).strip()
+    if active_document_id:
+        active_writable_documents = [
+            document
+            for document in known_documents
+            if str(document.get("document_id") or "") == active_document_id
+            and document.get("ai_writable") is not False
+        ]
+        if len(active_writable_documents) == 1:
+            return active_document_id
+
+    writable_documents = [
+        document
+        for document in known_documents
+        if document.get("ai_writable") is not False
+        and document.get("hidden_from_agent") is not True
+    ]
+    writable_ids = {
+        str(document.get("document_id") or "").strip()
+        for document in writable_documents
+        if str(document.get("document_id") or "").strip()
+    }
+    if len(writable_ids) == 1:
+        return next(iter(writable_ids))
+
     return None
 
 
@@ -629,6 +668,48 @@ def _normalize_affected_sections(affected_sections: Sequence[str] | None) -> lis
     return normalized
 
 
+def _normalize_factual_replacements(
+    factual_replacements: Sequence[Mapping[str, Any]] | None,
+    *,
+    allowed_sections: Sequence[str] | None,
+) -> list[dict[str, Any]]:
+    normalized_allowed_sections = _normalize_affected_sections(allowed_sections)
+    allowed_set = set(normalized_allowed_sections)
+    normalized: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+
+    for item in factual_replacements or []:
+        replacement_id = str(item.get("replacement_id") or "").strip()
+        find_text = str(item.get("find_text") or "").strip()
+        replace_text = str(item.get("replace_text") or "").strip()
+        if not replacement_id or not find_text or not replace_text or find_text == replace_text:
+            continue
+        if replacement_id in seen_ids:
+            continue
+
+        requested_scope = _normalize_affected_sections(item.get("scope_sections"))
+        if requested_scope:
+            scope_sections = [
+                section for section in requested_scope if not allowed_set or section in allowed_set
+            ]
+            if not scope_sections:
+                continue
+        else:
+            scope_sections = list(normalized_allowed_sections)
+
+        seen_ids.add(replacement_id)
+        normalized.append(
+            {
+                "replacement_id": replacement_id,
+                "find_text": find_text,
+                "replace_text": replace_text,
+                "scope_sections": scope_sections,
+            }
+        )
+
+    return normalized
+
+
 def _build_runtime_instruction(
     *,
     state: Mapping[str, Any],
@@ -641,6 +722,7 @@ def _build_runtime_instruction(
     )
     reasoning = str(clinical_plan.get("reasoning") or "").strip()
     section_instructions = clinical_plan.get("section_instructions") or {}
+    factual_replacements = clinical_plan.get("factual_replacements") or []
 
     parts: list[str] = []
     if user_query:
@@ -665,6 +747,20 @@ def _build_runtime_instruction(
             parts.append(
                 "Instrucciones quirurgicas por seccion: "
                 + " | ".join(scoped_instructions)
+                + "."
+            )
+    if factual_replacements:
+        factual_parts: list[str] = []
+        for replacement in factual_replacements:
+            scope = ", ".join(replacement.get("scope_sections") or [])
+            factual_parts.append(
+                f"{replacement.get('find_text')} -> {replacement.get('replace_text')}"
+                + (f" [{scope}]" if scope else "")
+            )
+        if factual_parts:
+            parts.append(
+                "Reemplazos factuales literales declarados: "
+                + " | ".join(factual_parts)
                 + "."
             )
     if sections:
@@ -739,6 +835,42 @@ def _patch_content_preview(patch: Any) -> str:
     return str(getattr(patch, "content_preview", "") or "")
 
 
+def _is_noop_replace_patch(patch: Any) -> bool:
+    operation_type = str(getattr(patch, "operation_type", "") or "")
+    if operation_type != "replace_span":
+        return False
+
+    anchor = getattr(patch, "anchor", None)
+    anchor_exact_text = str(getattr(anchor, "exact_text", "") or "")
+    replacement_text = str(getattr(patch, "replacement_text", "") or "")
+    return bool(anchor_exact_text) and replacement_text == anchor_exact_text
+
+
+def _prune_noop_replace_patches(
+    drafted_plan: DraftedPatchPlan,
+) -> tuple[DraftedPatchPlan, list[int]]:
+    kept_patches: list[Any] = []
+    removed_positions: list[int] = []
+
+    for index, patch in enumerate(drafted_plan.patches, start=1):
+        if _is_noop_replace_patch(patch):
+            removed_positions.append(index)
+            continue
+        kept_patches.append(patch)
+
+    if not removed_positions:
+        return drafted_plan, []
+
+    return (
+        drafted_plan.model_copy(
+            update={
+                "patches": kept_patches,
+            }
+        ),
+        removed_positions,
+    )
+
+
 def _validate_drafted_plan_against_clinical_plan(
     *,
     drafted_plan: DraftedPatchPlan,
@@ -776,10 +908,38 @@ def _validate_drafted_plan_against_clinical_plan(
             continue
         patch_sections.add(normalized_section)
 
+    outcome_sections: set[str] = set()
+    invalid_outcome_sections: set[str] = set()
+    outcomes_without_rationale: set[str] = set()
+    patched_outcome_without_patch: set[str] = set()
+    for outcome in drafted_plan.section_outcomes:
+        normalized_section = _normalize_section_name(outcome.section)
+        if not normalized_section:
+            continue
+        if normalized_section not in seen_expected:
+            invalid_outcome_sections.add(normalized_section)
+            continue
+        if not str(outcome.rationale or "").strip():
+            outcomes_without_rationale.add(normalized_section)
+        if outcome.status == "patched":
+            if normalized_section not in patch_sections:
+                patched_outcome_without_patch.add(normalized_section)
+            continue
+        outcome_sections.add(normalized_section)
+
     missing_sections = [
-        section for section in expected_sections if section not in patch_sections
+        section
+        for section in expected_sections
+        if section not in patch_sections and section not in outcome_sections
     ]
-    if not patches_without_section and not invalid_sections and not missing_sections:
+    if (
+        not patches_without_section
+        and not invalid_sections
+        and not invalid_outcome_sections
+        and not outcomes_without_rationale
+        and not patched_outcome_without_patch
+        and not missing_sections
+    ):
         return None
 
     issues: list[str] = []
@@ -795,18 +955,37 @@ def _validate_drafted_plan_against_clinical_plan(
             + ", ".join(sorted(invalid_sections))
             + "."
         )
+    if invalid_outcome_sections:
+        issues.append(
+            "section_outcomes fuera del plan clínico: "
+            + ", ".join(sorted(invalid_outcome_sections))
+            + "."
+        )
+    if outcomes_without_rationale:
+        issues.append(
+            "section_outcomes sin rationale: "
+            + ", ".join(sorted(outcomes_without_rationale))
+            + "."
+        )
+    if patched_outcome_without_patch:
+        issues.append(
+            "section_outcomes status=patched sin patch correspondiente: "
+            + ", ".join(sorted(patched_outcome_without_patch))
+            + "."
+        )
     if missing_sections:
         issues.append(
-            "faltan secciones obligatorias: "
+            "faltan secciones obligatorias sin patch ni section_outcome: "
             + ", ".join(missing_sections)
             + "."
         )
 
     return (
         "El drafter devolvió un patch set fuera del scope declarado por el planner. "
+        "El patch set incompleto para el plan clínico actual no puede abrir review. "
         f"Scope={edit_scope or 'local'}. Se esperaban patches para: {', '.join(expected_sections)}. "
         + " ".join(issues)
-        + " Regenera el patch set completo y asigna section a cada patch antes de abrir review."
+        + " Regenera el patch set completo y asigna section a cada patch, o section_outcome explícito cuando no haya cambio necesario."
     )
 
 
@@ -901,6 +1080,10 @@ def _build_patch_set_preview_payload(
         "edit_scope": clinical_plan.get("edit_scope"),
         "clinical_impact_level": clinical_plan.get("clinical_impact_level"),
         "affected_sections": list(clinical_plan.get("affected_sections") or []),
+        "section_outcomes": [
+            outcome.model_dump(mode="python")
+            for outcome in drafted_plan.section_outcomes
+        ],
         "patches": patches,
     }
 
@@ -913,6 +1096,7 @@ def draft_patch_set_from_state(
     target_document_id: str,
     instruction: str | None = None,
     affected_sections: Sequence[str] | None = None,
+    retry_validation_error: bool = False,
 ) -> dict[str, Any]:
     effective_scope_plan = _effective_scope_plan(
         state=state,
@@ -1072,6 +1256,38 @@ def draft_patch_set_from_state(
             },
         }
 
+    drafted_plan, pruned_noop_positions = _prune_noop_replace_patches(drafted_plan)
+    if pruned_noop_positions and not drafted_plan.patches:
+        error_message = (
+            "El drafter devolvio solo patches replace_span sin cambio real en posiciones: "
+            + ", ".join(str(index) for index in pruned_noop_positions)
+            + ". Esto normalmente significa que el documento ya contiene el texto pedido en esas menciones. "
+            "Antes de reproponer, verifica si la nota ya esta correcta; si ya lo esta, responde al medico explicando "
+            "que el cambio solicitado ya se encuentra reflejado y no propongas patches nuevos. "
+            "Solo regenera el patch set si todavia encuentras menciones viejas pendientes y omite las que ya esten correctas."
+        )
+        if retry_validation_error and not state.get("patch_validation_retry_used"):
+            return {
+                "ok": False,
+                "error_message": error_message,
+                "updates": {
+                    "last_tool_error": error_message,
+                    "clinical_plan": effective_scope_plan,
+                    "next_required_action": "draft_patch_set",
+                    "planned_target_document_id": target_document_id,
+                    "patch_validation_retry_used": True,
+                },
+            }
+        return {
+            "ok": False,
+            "error_message": error_message,
+            "updates": {
+                "last_tool_error": error_message,
+                "next_required_action": None,
+                "planned_target_document_id": None,
+            },
+        }
+
     if not drafted_plan.patches:
         error_message = (
             "No se pudo redactar un patch clinico revisable para esta solicitud. "
@@ -1092,6 +1308,18 @@ def draft_patch_set_from_state(
         clinical_plan=effective_scope_plan,
     )
     if drafted_plan_validation_error:
+        if retry_validation_error and not state.get("patch_validation_retry_used"):
+            return {
+                "ok": False,
+                "error_message": drafted_plan_validation_error,
+                "updates": {
+                    "last_tool_error": drafted_plan_validation_error,
+                    "clinical_plan": effective_scope_plan,
+                    "next_required_action": "draft_patch_set",
+                    "planned_target_document_id": target_document_id,
+                    "patch_validation_retry_used": True,
+                },
+            }
         return {
             "ok": False,
             "error_message": drafted_plan_validation_error,
@@ -1141,6 +1369,7 @@ def draft_patch_set_from_state(
             "last_tool_error": None,
             "next_required_action": None,
             "planned_target_document_id": None,
+            "patch_validation_retry_used": False,
             "patch_operations_count": int(state.get("patch_operations_count") or 0) + 1,
         },
     }
@@ -1496,6 +1725,7 @@ def build_graph_tools(
         reasoning: str | None = None,
         doctor_summary: str | None = None,
         section_instructions: dict[str, str] | None = None,
+        factual_replacements: list[dict[str, Any]] | None = None,
     ) -> Command:
         """Registra el plan de edición clínica y transfiere el run al drafting runtime.
 
@@ -1552,22 +1782,27 @@ def build_graph_tools(
             if clinical_impact_level in ("cosmetic", "factual", "clinical")
             else "factual"
         )
+        safe_sections = _normalize_affected_sections(affected_sections)
 
         safe_section_instructions: dict[str, str] | None = None
         if section_instructions and isinstance(section_instructions, dict):
             # Solo conservar entradas cuya clave coincida con affected_sections para
             # evitar que el planner inyecte instrucciones para secciones no declaradas.
-            allowed = set(affected_sections or [])
+            allowed = set(safe_sections)
             safe_section_instructions = {
                 k: str(v)
                 for k, v in section_instructions.items()
                 if isinstance(k, str) and isinstance(v, str) and (not allowed or k in allowed)
             } or None
+        safe_factual_replacements = _normalize_factual_replacements(
+            factual_replacements,
+            allowed_sections=safe_sections,
+        )
 
         plan = {
             "edit_scope": safe_scope,
             "clinical_impact_level": safe_impact,
-            "affected_sections": list(affected_sections or []),
+            "affected_sections": safe_sections,
             "needs_full_note": bool(needs_full_note),
             "needs_external_knowledge": bool(needs_external_knowledge),
             # reasoning: razonamiento interno para el drafter.
@@ -1576,6 +1811,7 @@ def build_graph_tools(
             "reasoning": (reasoning or "").strip() or None,
             "doctor_summary": (doctor_summary or "").strip() or None,
             "section_instructions": safe_section_instructions,
+            "factual_replacements": safe_factual_replacements,
         }
         payload = {**plan, "max_patch_operations": max_ops}
 
@@ -1610,7 +1846,7 @@ def build_graph_tools(
         (ai_writable=true) porque se pre-carga al inicio de cada run — en ese caso NO necesitas
         llamar read_document antes de propose_*. Solo llama read_document si el documento NO
         aparece aun en <read_documents> con mode='full'. Nunca combinas read tools y propose_*
-        en el mismo turno.
+        en el mismo turno. Never call this in the same turn as read tools.
         
         Optional 'instruction': Describe exactamente QUE texto quieres localizar y por QUE 
         nuevo texto reemplazarlo. Si tienes multiples reemplazos para este documento localizados,
@@ -1634,6 +1870,7 @@ def build_graph_tools(
             target_document_id=validated.target_document_id,
             instruction=validated.instruction,
             affected_sections=validated.affected_sections,
+            retry_validation_error=True,
         )
         if not result["ok"]:
             return _error_command(
@@ -1665,7 +1902,7 @@ def build_graph_tools(
         (ai_writable=true) porque se pre-carga al inicio de cada run — en ese caso NO necesitas
         llamar read_document antes de propose_*. Solo llama read_document si el documento NO
         aparece aun en <read_documents> con mode='full'. Nunca combinas read tools y propose_*
-        en el mismo turno.
+        en el mismo turno. Never call this in the same turn as read tools.
         
         Optional 'instruction': Describe exactly WHAT text to insert and WHERE (after which span).
         If you have multiple insertions for this document, consolidate them into ONE tool call
@@ -1689,6 +1926,7 @@ def build_graph_tools(
             target_document_id=validated.target_document_id,
             instruction=validated.instruction,
             affected_sections=validated.affected_sections,
+            retry_validation_error=True,
         )
         if not result["ok"]:
             return _error_command(
@@ -1718,7 +1956,7 @@ def build_graph_tools(
         Sequential precondition: el documento target debe aparecer en `<read_documents>` del
         contexto con mode='full'. Esto se cumple automaticamente si el documento es editable
         (ai_writable=true) porque se pre-carga al inicio de cada run — en ese caso NO necesitas
-        llamar read_document antes de propose_*. Solo llama read_document si el documento NO
+        llamar read_document antes de propose_*. Solo llama read_document(mode="full") si el documento NO
         aparece aun en <read_documents> con mode='full'. Nunca combinas read tools y propose_*
         en el mismo turno.
         
@@ -1744,6 +1982,7 @@ def build_graph_tools(
             target_document_id=validated.target_document_id,
             instruction=validated.instruction,
             affected_sections=validated.affected_sections,
+            retry_validation_error=True,
         )
         if not result["ok"]:
             return _error_command(
@@ -1799,6 +2038,7 @@ def build_graph_tools(
             target_document_id=validated.target_document_id,
             instruction=validated.instruction,
             affected_sections=validated.affected_sections,
+            retry_validation_error=True,
         )
         if not result["ok"]:
             return _error_command(

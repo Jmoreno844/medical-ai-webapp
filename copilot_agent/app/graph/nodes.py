@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import uuid
 from typing import Any, Sequence
 
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.tools import BaseTool
 
 from app.graph.state import (
+    RESET_MARKER,
     CopilotState,
     materialize_state_snapshot,
     reset_dict_state,
@@ -65,55 +67,223 @@ def _append_state_items(
     return [*(current or []), *(updates or [])]
 
 
-def _reset_transient_run_state(workspace_index: dict[str, Any] | None = None) -> dict[str, Any]:
-    # LangGraph checkpoints are thread-scoped, so a new run on the same thread
-    # inherits the full prior checkpoint (tool reads, proposals, counters).
-    # This function clears all per-run transient state so each new HTTP request
-    # starts clean without losing conversational history from the messages list.
-    # Called only when iteration_count == 0 (first call_model invocation per run).
+def _workspace_document_map(workspace_index: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    return {
+        str(document.get("document_id") or ""): document
+        for document in ((workspace_index or {}).get("documents") or [])
+        if document.get("document_id") is not None
+    }
 
-    # Pre-seed writable documents from the workspace_index content sent by the
-    # frontend. Docs with ai_writable=True carry their full markdown so the agent
-    # can call propose_* on turn 1 without needing a read_document round-trip.
-    # The RESET_MARKER at position 0 tells merge_document_reads to discard the
-    # prior run's reads before inserting the newly seeded entries.
+
+def _workspace_document_is_read_safe(document: dict[str, Any]) -> bool:
+    return not (
+        document.get("has_user_edits")
+        or document.get("has_streaming_state")
+        or document.get("has_pending_patches")
+    )
+
+
+def _versions_match(read_payload: dict[str, Any], workspace_document: dict[str, Any]) -> bool:
+    try:
+        read_version = int(read_payload.get("version"))
+        workspace_version = int(workspace_document.get("version"))
+    except (TypeError, ValueError):
+        return False
+    return read_version == workspace_version
+
+
+def _is_fresh_document_artifact(
+    artifact: dict[str, Any],
+    *,
+    workspace_documents: dict[str, dict[str, Any]],
+) -> bool:
+    document_id = str(artifact.get("document_id") or "")
+    workspace_document = workspace_documents.get(document_id)
+    if not workspace_document:
+        return False
+    return _workspace_document_is_read_safe(workspace_document) and _versions_match(
+        artifact,
+        workspace_document,
+    )
+
+
+def _preseed_document_reads(workspace_index: dict[str, Any] | None) -> list[dict[str, Any]]:
     pre_reads: list[dict[str, Any]] = []
     for doc in ((workspace_index or {}).get("documents") or []):
         content = doc.get("content_markdown")
         if doc.get("ai_writable") and content:
             content_hash = doc.get("content_hash") or _content_hash(str(content))
-            pre_reads.append({
-                "document_id": str(doc["document_id"]),
-                "title": doc.get("title"),
-                "type": doc.get("type"),
-                "version": doc.get("version"),
-                "mode": "full",
-                "content": content,
-                "content_hash": content_hash,
-            })
+            pre_reads.append(
+                {
+                    "document_id": str(doc["document_id"]),
+                    "title": doc.get("title"),
+                    "type": doc.get("type"),
+                    "version": doc.get("version"),
+                    "mode": "full",
+                    "content": content,
+                    "content_hash": content_hash,
+                }
+            )
+    return pre_reads
 
-    doc_reads_update: list[dict[str, Any]] = [{"__reset__": True}, *pre_reads]
+
+def _read_document_view(read_payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "document_id": str(read_payload.get("document_id") or ""),
+        "title": read_payload.get("title"),
+        "type": read_payload.get("type"),
+        "version": read_payload.get("version"),
+        "mode": read_payload.get("mode"),
+        "content": read_payload.get("content"),
+        "content_hash": read_payload.get("content_hash"),
+        "structure_mode": read_payload.get("structure_mode"),
+        "sections": list(read_payload.get("sections") or []),
+    }
+
+
+def _carry_fresh_reads(
+    *,
+    state: CopilotState,
+    workspace_documents: dict[str, dict[str, Any]],
+    pre_reads: Sequence[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    pre_read_keys = {
+        (str(read.get("document_id") or ""), str(read.get("mode") or ""))
+        for read in pre_reads
+    }
+    carried_reads = [
+        read
+        for read in (state.get("document_reads") or [])
+        if _is_fresh_document_artifact(read, workspace_documents=workspace_documents)
+        and (str(read.get("document_id") or ""), str(read.get("mode") or ""))
+        not in pre_read_keys
+    ]
+    carried_summaries = {
+        str(document_id): summary
+        for document_id, summary in (state.get("document_summaries") or {}).items()
+        if _is_fresh_document_artifact(
+            {"document_id": str(document_id), **summary},
+            workspace_documents=workspace_documents,
+        )
+    }
+    carried_spans = [
+        span
+        for span in (state.get("read_spans") or [])
+        if _is_fresh_document_artifact(span, workspace_documents=workspace_documents)
+    ]
+    return carried_reads, carried_summaries, carried_spans
+
+
+def _short_memory_text(value: Any, *, max_length: int = 240) -> str:
+    return " ".join(str(value or "").split())[:max_length]
+
+
+def _append_memory_note(
+    notes: list[dict[str, Any]],
+    *,
+    source: str,
+    message: Any,
+) -> None:
+    text = _short_memory_text(message)
+    if not text:
+        return
+    candidate = {"source": source, "message": text}
+    if candidate not in notes:
+        notes.append(candidate)
+
+
+def _next_run_memory_notes(state: CopilotState) -> list[dict[str, Any]]:
+    notes = [
+        note
+        for note in (state.get("run_memory_notes") or [])
+        if isinstance(note, dict) and note.get("message")
+    ][-5:]
+
+    for field_name in ("last_tool_error", "last_planner_error", "run_error"):
+        if state.get(field_name):
+            _append_memory_note(
+                notes,
+                source=field_name,
+                message=state.get(field_name),
+            )
+
+    for result in (state.get("tool_results") or [])[-8:]:
+        payload = result.get("payload") or {}
+        if payload.get("error"):
+            _append_memory_note(
+                notes,
+                source=str(result.get("tool_name") or "tool_error"),
+                message=payload.get("error"),
+            )
+
+    patch_set_preview = state.get("patch_set_preview") or {}
+    for patch in (patch_set_preview.get("patches") or [])[-5:]:
+        if patch.get("conflict_reason"):
+            _append_memory_note(
+                notes,
+                source="patch_conflict",
+                message=patch.get("conflict_reason"),
+            )
+
+    if state.get("review_result") in {"reject", "edit"} and state.get("review_comment"):
+        _append_memory_note(
+            notes,
+            source=f"review_{state.get('review_result')}",
+            message=state.get("review_comment"),
+        )
+
+    return notes[-5:]
+
+
+def _reset_transient_run_state(
+    *,
+    state: CopilotState,
+    workspace_index: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    # LangGraph checkpoints are thread-scoped, so a new run on the same thread
+    # inherits the full prior checkpoint (tool reads, proposals, counters).
+    # This function clears per-run control state while preserving read artifacts
+    # that are still fresh against the current workspace version/flags.
+    # Called only when iteration_count == 0 (first call_model invocation per run).
+
+    # Pre-seed writable documents from the workspace_index content sent by the
+    # frontend. Docs with ai_writable=True carry their full markdown so the agent
+    # can call propose_* on turn 1 without needing a read_document round-trip.
+    workspace_documents = _workspace_document_map(workspace_index)
+    pre_reads = _preseed_document_reads(workspace_index)
+    carried_reads, carried_summaries, carried_spans = _carry_fresh_reads(
+        state=state,
+        workspace_documents=workspace_documents,
+        pre_reads=pre_reads,
+    )
+
+    doc_reads_update: list[dict[str, Any]] = [
+        {RESET_MARKER: True},
+        *carried_reads,
+        *pre_reads,
+    ]
+    document_summaries_update = {
+        RESET_MARKER: True,
+        **carried_summaries,
+    }
+    read_spans_update = [
+        {RESET_MARKER: True},
+        *carried_spans,
+    ]
 
     # Derive the read_documents view up-front so the planner context already
     # shows these documents as read on turn 1, before reconcile_tool_state runs.
     pre_read_documents: list[dict[str, Any]] = [
-        {
-            "document_id": r["document_id"],
-            "title": r.get("title"),
-            "type": r.get("type"),
-            "mode": "full",
-            "content": r["content"],
-            "content_hash": r.get("content_hash"),
-        }
-        for r in pre_reads
+        _read_document_view(read)
+        for read in [*carried_reads, *pre_reads]
     ]
 
     return {
         "available_documents": reset_list_state(),
         "context_view": None,
-        "document_summaries": reset_dict_state(),
+        "document_summaries": document_summaries_update,
         "document_reads": doc_reads_update,
-        "read_spans": reset_list_state(),
+        "read_spans": read_spans_update,
         "retrieved_context": [],
         "read_documents": pre_read_documents,
         "encounter_context": None,
@@ -123,6 +293,7 @@ def _reset_transient_run_state(workspace_index: dict[str, Any] | None = None) ->
         "patch_history": reset_dict_state(),
         "tool_calls": [],
         "tool_results": reset_list_state(),
+        "run_memory_notes": _next_run_memory_notes(state),
         "planner_decisions": [],
         "current_plan_step": "start",
         "iteration_count": 0,
@@ -147,6 +318,7 @@ def _reset_transient_run_state(workspace_index: dict[str, Any] | None = None) ->
         "clinical_plan": None,
         "next_required_action": None,
         "planned_target_document_id": None,
+        "patch_validation_retry_used": False,
     }
 
 
@@ -258,6 +430,58 @@ def _current_messages(state: CopilotState) -> Sequence[BaseMessage]:
     return tuple(state.get("messages") or [])
 
 
+def _pending_plan_full_read_message(state: CopilotState) -> AIMessage | None:
+    if state.get("next_required_action") != "draft_patch_set":
+        return None
+
+    clinical_plan = state.get("clinical_plan") or {}
+    if not clinical_plan.get("needs_full_note"):
+        return None
+
+    target_document_id = str(
+        state.get("planned_target_document_id")
+        or _fallback_target_document_id_from_state(state)
+        or ""
+    ).strip()
+    if not target_document_id or _has_full_read_for_document(
+        state,
+        document_id=target_document_id,
+    ):
+        return None
+
+    return AIMessage(
+        content="Leeré la nota completa requerida por el plan clínico antes de redactar los patches.",
+        tool_calls=[
+            {
+                "name": "read_document",
+                "args": {
+                    "document_id": target_document_id,
+                    "mode": "full",
+                },
+                "id": f"runtime-read-full-{uuid.uuid4()}",
+                "type": "tool_call",
+            }
+        ],
+    )
+
+
+def _pending_plan_ready_to_draft(state: CopilotState) -> bool:
+    if state.get("next_required_action") != "draft_patch_set":
+        return False
+    target_document_id = str(
+        state.get("planned_target_document_id")
+        or _fallback_target_document_id_from_state(state)
+        or ""
+    ).strip()
+    if not target_document_id:
+        return False
+    clinical_plan = state.get("clinical_plan") or {}
+    return (
+        not clinical_plan.get("needs_full_note")
+        or _has_full_read_for_document(state, document_id=target_document_id)
+    )
+
+
 def _tool_batch_size(state: CopilotState) -> int:
     # LangGraph delivers all results from a parallel tool batch as a single state
     # update. Counting the tool_calls on the latest AIMessage tells us exactly
@@ -303,9 +527,12 @@ def _derive_read_documents(state: CopilotState) -> list[dict[str, Any]]:
             "document_id": key[0],
             "title": document.get("title"),
             "type": document.get("type"),
+            "version": document.get("version"),
             "mode": key[1],
             "content": document.get("content"),
             "content_hash": document.get("content_hash"),
+            "structure_mode": document.get("structure_mode"),
+            "sections": list(document.get("sections") or []),
         }
 
     for document_id, summary in (state.get("document_summaries") or {}).items():
@@ -316,9 +543,12 @@ def _derive_read_documents(state: CopilotState) -> list[dict[str, Any]]:
                 "document_id": str(document_id),
                 "title": summary.get("title"),
                 "type": summary.get("type"),
+                "version": summary.get("version"),
                 "mode": "summary",
                 "content": None,
                 "content_hash": summary.get("content_hash"),
+                "structure_mode": summary.get("structure_mode"),
+                "sections": list(summary.get("sections") or []),
             },
         )
 
@@ -328,9 +558,12 @@ def _derive_read_documents(state: CopilotState) -> list[dict[str, Any]]:
             "document_id": str(span.get("document_id") or ""),
             "title": span.get("title"),
             "type": span.get("type"),
+            "version": span.get("version"),
             "mode": "span",
             "content": span.get("content"),
             "content_hash": span.get("content_hash"),
+            "structure_mode": span.get("structure_mode"),
+            "sections": list(span.get("sections") or []),
         }
         existing = by_key.get(key)
         if existing is None or len(str(candidate.get("content") or "")) >= len(
@@ -387,6 +620,8 @@ def route_after_planner_turn(state: CopilotState) -> str:
         state.get("patch_set_preview")
     ):
         return NODE_WAIT_FOR_HUMAN_REVIEW
+    if _pending_plan_ready_to_draft(state):
+        return NODE_DRAFT_PATCH_FROM_PLAN
 
     messages = state.get("messages") or []
     last_message = messages[-1] if messages else None
@@ -465,6 +700,7 @@ def make_planner_turn_node(
 
         if int(state.get("iteration_count") or 0) == 0:
             updates.update(_reset_transient_run_state(
+                state=state,
                 workspace_index=state.get("workspace_index"),
             ))
 
@@ -478,23 +714,32 @@ def make_planner_turn_node(
             }
 
         current_state = materialize_state_snapshot({**state, **updates})
-        try:
-            ai_message = planner.invoke_model(
-                state=current_state,
-                messages=_current_messages(current_state),
-                tools=tools,
-            )
-        except Exception as error:
-            logger.exception("Falla real al invocar planner con tools paralelas")
-            last_tool_error = str(current_state.get("last_tool_error") or "").strip()
+        ai_message = _pending_plan_full_read_message(current_state)
+        if ai_message is None and _pending_plan_ready_to_draft(current_state):
             return {
                 **updates,
-                "last_planner_error": str(error),
-                **_mark_run_error(
-                    last_tool_error
-                    or "El planner del copiloto fallo al decidir el siguiente paso."
-                ),
+                "current_plan_step": "draft_patch_set",
+                "proposed_action": "draft_patch_set",
+                "iteration_count": int(state.get("iteration_count") or 0) + 1,
             }
+        if ai_message is None:
+            try:
+                ai_message = planner.invoke_model(
+                    state=current_state,
+                    messages=_current_messages(current_state),
+                    tools=tools,
+                )
+            except Exception as error:
+                logger.exception("Falla real al invocar planner con tools paralelas")
+                last_tool_error = str(current_state.get("last_tool_error") or "").strip()
+                return {
+                    **updates,
+                    "last_planner_error": str(error),
+                    **_mark_run_error(
+                        last_tool_error
+                        or "El planner del copiloto fallo al decidir el siguiente paso."
+                    ),
+                }
 
         planner_decision = _planner_decision_from_message(ai_message, intent=state.get("intent"))
         new_iteration_count = int(state.get("iteration_count") or 0) + 1
@@ -521,6 +766,14 @@ def make_planner_turn_node(
 
         if tool_calls:
             return updates
+
+        if current_state.get("next_required_action") == "draft_patch_set":
+            return {
+                **updates,
+                **_mark_run_error(
+                    "Existe un edit_plan pendiente, pero el planner no avanzo con lectura ni drafting."
+                ),
+            }
 
         if not response_text:
             return {

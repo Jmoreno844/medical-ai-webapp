@@ -57,6 +57,7 @@ def build_clinical_copilot_graph(*, tools_client, planner, checkpointer=None):
         NODE_PLANNER_TURN,
         route_after_planner_turn,
         {
+            NODE_DRAFT_PATCH_FROM_PLAN: NODE_DRAFT_PATCH_FROM_PLAN,
             NODE_EXECUTE_TOOLS: NODE_EXECUTE_TOOLS,
             NODE_WAIT_FOR_HUMAN_REVIEW: NODE_WAIT_FOR_HUMAN_REVIEW,
             NODE_FINALIZE_RUN: NODE_FINALIZE_RUN,

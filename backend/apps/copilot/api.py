@@ -560,7 +560,7 @@ def list_copilot_patch_sets(request, run_id: str):
     ).select_related(
         "run",
         "target_document",
-    )
+    ).order_by("-created_at", "-id")
     return [_serialize_patch_set(patch_set) for patch_set in patch_sets]
 
 

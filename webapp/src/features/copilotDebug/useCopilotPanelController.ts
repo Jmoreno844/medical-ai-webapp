@@ -16,9 +16,16 @@ import { useAiSessionStore } from "@/workspace/stores/aiSessionStore";
 import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
 import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
 
-function normalizePatchOperationType(value: unknown): CopilotNormalizedPatchOperationType {
-  const operationType = String(value ?? "").trim().toLowerCase();
-  if (operationType === "insert_after" || operationType === "insert_after_span") {
+function normalizePatchOperationType(
+  value: unknown,
+): CopilotNormalizedPatchOperationType {
+  const operationType = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (
+    operationType === "insert_after" ||
+    operationType === "insert_after_span"
+  ) {
     return "insert_after";
   }
   if (operationType === "insert_before") {
@@ -30,8 +37,12 @@ function normalizePatchOperationType(value: unknown): CopilotNormalizedPatchOper
   return "replace_span";
 }
 
-function normalizeLegacyPatchOperationType(value: unknown): CopilotPatchOperationType {
-  const operationType = String(value ?? "").trim().toLowerCase();
+function normalizeLegacyPatchOperationType(
+  value: unknown,
+): CopilotPatchOperationType {
+  const operationType = String(value ?? "")
+    .trim()
+    .toLowerCase();
   if (
     operationType === "replace_span" ||
     operationType === "insert_before" ||
@@ -115,6 +126,32 @@ function buildChatMessage(
     createdAt: new Date().toISOString(),
     runId,
   };
+}
+
+function patchSetHasPendingPatches(
+  patchSet: CopilotPatchSetResponse | null | undefined,
+): boolean {
+  return !!patchSet?.patches.some((patch) => patch.status === "pending");
+}
+
+function pickPreferredPatchSet(
+  patchSets: CopilotPatchSetResponse[],
+  preferredPatchSetId?: string | null,
+): CopilotPatchSetResponse | null {
+  if (preferredPatchSetId) {
+    const preferred = patchSets.find(
+      (patchSet) => patchSet.id === preferredPatchSetId,
+    );
+    if (preferred) {
+      return preferred;
+    }
+  }
+
+  return (
+    patchSets.find((patchSet) => patchSetHasPendingPatches(patchSet)) ??
+    patchSets[0] ??
+    null
+  );
 }
 
 export function useCopilotPanelController(
@@ -268,20 +305,16 @@ export function useCopilotPanelController(
       operationType,
       normalizedOperationType,
       anchor: normalizePatchAnchor(payload.anchor),
-      oldText:
-        typeof payload.old_text === "string"
-          ? payload.old_text
-          : "",
-      newText:
-        typeof payload.new_text === "string"
-          ? payload.new_text
-          : "",
+      oldText: typeof payload.old_text === "string" ? payload.old_text : "",
+      newText: typeof payload.new_text === "string" ? payload.new_text : "",
       replacementText:
         typeof payload.replacement_text === "string"
           ? payload.replacement_text
           : null,
       insertedText:
-        typeof payload.inserted_text === "string" ? payload.inserted_text : null,
+        typeof payload.inserted_text === "string"
+          ? payload.inserted_text
+          : null,
       resolvedRange,
       orderIndex:
         typeof payload.order_index === "number" ? payload.order_index : 0,
@@ -297,7 +330,7 @@ export function useCopilotPanelController(
     if (!Array.isArray(state.patchSets) || state.patchSets.length === 0) {
       return null;
     }
-    return state.patchSets[0] ?? null;
+    return pickPreferredPatchSet(state.patchSets);
   }, [state.patchSets]);
 
   const reviewPatches = useMemo(
@@ -423,35 +456,49 @@ export function useCopilotPanelController(
       return;
     }
 
-    const activePatchSet = state.patchSets[0];
-    const patchIds = new Set(activePatchSet.patches.map((patch) => patch.id));
-    const pendingInActiveSet = activePatchSet.patches.find(
-      (patch) => patch.status === "pending",
-    );
-    const nextSelectedPatchId =
-      selectedReviewPatchId && patchIds.has(selectedReviewPatchId)
-        ? selectedReviewPatchId
-        : (pendingInActiveSet?.id ?? activePatchSet.patches[0]?.id ?? null);
-
     usePatchSetStore.setState((storeState) => {
-      const existingPatchSet = storeState.patchSets[activePatchSet.id];
-      const existingPatchCount = existingPatchSet?.patches.length ?? -1;
-      const shouldUpsertPatchSet =
-        !existingPatchSet ||
-        existingPatchCount !== activePatchSet.patches.length ||
-        existingPatchSet.updated_at !== activePatchSet.updated_at ||
-        existingPatchSet.status !== activePatchSet.status;
+      const nextPatchSets = state.patchSets.reduce<
+        Record<string, CopilotPatchSetResponse>
+      >((accumulator, patchSet) => {
+        const existingPatchSet = storeState.patchSets[patchSet.id];
+        const existingPatchCount = existingPatchSet?.patches.length ?? -1;
+        const shouldUseIncoming =
+          !existingPatchSet ||
+          existingPatchCount !== patchSet.patches.length ||
+          existingPatchSet.updated_at !== patchSet.updated_at ||
+          existingPatchSet.status !== patchSet.status;
 
-      const nextPatchSets = shouldUpsertPatchSet
-        ? {
-            ...storeState.patchSets,
-            [activePatchSet.id]: activePatchSet,
-          }
-        : storeState.patchSets;
+        accumulator[patchSet.id] = shouldUseIncoming
+          ? patchSet
+          : existingPatchSet;
+        return accumulator;
+      }, {});
 
-      const nextActivePatchSetId = activePatchSet.id;
+      const activePatchSet = pickPreferredPatchSet(
+        Object.values(nextPatchSets),
+        storeState.activePatchSetId,
+      );
+      const patchIds = new Set(
+        activePatchSet?.patches.map((patch) => patch.id) ?? [],
+      );
+      const pendingInActiveSet = activePatchSet?.patches.find(
+        (patch) => patch.status === "pending",
+      );
+      const nextSelectedPatchId =
+        selectedReviewPatchId && patchIds.has(selectedReviewPatchId)
+          ? selectedReviewPatchId
+          : (pendingInActiveSet?.id ?? activePatchSet?.patches[0]?.id ?? null);
+      const nextActivePatchSetId = activePatchSet?.id ?? null;
+      const sameKeys =
+        Object.keys(storeState.patchSets).length ===
+          Object.keys(nextPatchSets).length &&
+        Object.entries(nextPatchSets).every(
+          ([patchSetId, patchSet]) =>
+            storeState.patchSets[patchSetId] === patchSet,
+        );
+
       if (
-        nextPatchSets === storeState.patchSets &&
+        sameKeys &&
         storeState.activePatchSetId === nextActivePatchSetId &&
         storeState.selectedPatchId === nextSelectedPatchId
       ) {
@@ -465,6 +512,18 @@ export function useCopilotPanelController(
         selectedPatchId: nextSelectedPatchId,
       };
     });
+
+    const activePatchSet = pickPreferredPatchSet(state.patchSets);
+    const patchIds = new Set(
+      activePatchSet?.patches.map((patch) => patch.id) ?? [],
+    );
+    const pendingInActiveSet = activePatchSet?.patches.find(
+      (patch) => patch.status === "pending",
+    );
+    const nextSelectedPatchId =
+      selectedReviewPatchId && patchIds.has(selectedReviewPatchId)
+        ? selectedReviewPatchId
+        : (pendingInActiveSet?.id ?? activePatchSet?.patches[0]?.id ?? null);
     setSelectedReviewPatchId(nextSelectedPatchId);
   }, [patchSetSyncSignature, selectedReviewPatchId, state.patchSets]);
 

@@ -1,8 +1,13 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 
+import { CopilotPanelController } from "@/features/copilotDebug/useCopilotPanelController";
 import {
-  CopilotPanelController,
-} from "@/features/copilotDebug/useCopilotPanelController";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/commons/components/ui/dialog";
 
 type CopilotDebugPanelProps = {
   encounterId?: number;
@@ -13,9 +18,13 @@ export default function CopilotDebugPanel({
   controller,
 }: CopilotDebugPanelProps) {
   const [message, setMessage] = useState(
-    "Hazme un resumen breve del encounter actual"
+    "Hazme un resumen breve del encounter actual",
   );
   const [reviewComment, setReviewComment] = useState("");
+  const [expandedBox, setExpandedBox] = useState<{
+    title: string;
+    content: string;
+  } | null>(null);
   const activeController = controller;
   const {
     state,
@@ -47,6 +56,13 @@ export default function CopilotDebugPanel({
     submitPatchSetDecision,
     finalizeReview,
   } = activeController;
+
+  const expandedBoxDescription = useMemo(() => {
+    if (!expandedBox) {
+      return "";
+    }
+    return "Vista expandida del payload para inspeccion detallada.";
+  }, [expandedBox]);
 
   const handleInitSession = async () => {
     await ensureSession();
@@ -81,6 +97,13 @@ export default function CopilotDebugPanel({
     setReviewComment("");
   };
 
+  const openExpandedBox = (title: string, payload: unknown) => {
+    setExpandedBox({
+      title,
+      content: JSON.stringify(payload, null, 2),
+    });
+  };
+
   return (
     <section className="border rounded-md bg-slate-50 p-4 space-y-4">
       <div className="flex items-center justify-between">
@@ -89,7 +112,8 @@ export default function CopilotDebugPanel({
             Copilot Debug Panel
           </h2>
           <p className="text-xs text-slate-600">
-            Vertical slice interno para validar review y apply seguro del copiloto.
+            Vertical slice interno para validar review y apply seguro del
+            copiloto.
           </p>
         </div>
         <div className="flex gap-2">
@@ -198,9 +222,7 @@ export default function CopilotDebugPanel({
       </div>
 
       <div className="rounded border bg-white p-3 space-y-3">
-        <div className="text-xs font-medium text-slate-700">
-          Patch review
-        </div>
+        <div className="text-xs font-medium text-slate-700">Patch review</div>
         {reviewPatchSet ? (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-700">
@@ -223,13 +245,16 @@ export default function CopilotDebugPanel({
             </div>
             <div className="grid grid-cols-3 gap-3 text-xs text-slate-700">
               <div className="rounded border bg-slate-50 p-2">
-                <span className="font-medium">pending:</span> {pendingPatchCount}
+                <span className="font-medium">pending:</span>{" "}
+                {pendingPatchCount}
               </div>
               <div className="rounded border bg-green-50 p-2">
-                <span className="font-medium">accepted:</span> {acceptedPatchCount}
+                <span className="font-medium">accepted:</span>{" "}
+                {acceptedPatchCount}
               </div>
               <div className="rounded border bg-red-50 p-2">
-                <span className="font-medium">rejected:</span> {rejectedPatchCount}
+                <span className="font-medium">rejected:</span>{" "}
+                {rejectedPatchCount}
               </div>
             </div>
             <div className="space-y-2">
@@ -238,7 +263,9 @@ export default function CopilotDebugPanel({
               </div>
               <div className="space-y-2">
                 {reviewPatches.map((patch) => {
-                  const isSelected = patch.id === (selectedReviewPatchId ?? selectedReviewPatch?.id);
+                  const isSelected =
+                    patch.id ===
+                    (selectedReviewPatchId ?? selectedReviewPatch?.id);
                   return (
                     <button
                       key={patch.id}
@@ -328,7 +355,10 @@ export default function CopilotDebugPanel({
               <button
                 type="button"
                 onClick={() => void handlePatchDecision("approve")}
-                disabled={!selectedReviewPatch || selectedReviewPatch.status !== "pending"}
+                disabled={
+                  !selectedReviewPatch ||
+                  selectedReviewPatch.status !== "pending"
+                }
                 className="px-3 py-2 text-sm rounded bg-green-700 text-white hover:bg-green-600"
               >
                 Approve patch
@@ -336,7 +366,10 @@ export default function CopilotDebugPanel({
               <button
                 type="button"
                 onClick={() => void handlePatchDecision("reject")}
-                disabled={!selectedReviewPatch || selectedReviewPatch.status !== "pending"}
+                disabled={
+                  !selectedReviewPatch ||
+                  selectedReviewPatch.status !== "pending"
+                }
                 className="px-3 py-2 text-sm rounded bg-red-700 text-white hover:bg-red-600"
               >
                 Reject patch
@@ -420,9 +453,19 @@ export default function CopilotDebugPanel({
       </div>
 
       <div className="rounded border bg-white p-3">
-          <div className="text-xs font-medium text-slate-700 mb-2">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="text-xs font-medium text-slate-700">
             Stream events
           </div>
+          <button
+            type="button"
+            onClick={() => openExpandedBox("Stream events", state.events)}
+            disabled={state.events.length === 0}
+            className="shrink-0 rounded border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Expandir
+          </button>
+        </div>
         <div className="space-y-2 max-h-72 overflow-auto">
           {state.events.length === 0 ? (
             <div className="text-xs text-slate-500">No events yet.</div>
@@ -432,7 +475,7 @@ export default function CopilotDebugPanel({
                 key={`${event.event}-${event.sequence ?? index}`}
                 className="rounded border border-slate-200 p-2"
               >
-                <div className="text-xs font-medium text-slate-800">
+                <div className="mb-2 text-xs font-medium text-slate-800">
                   {event.event}
                 </div>
                 <pre className="text-[11px] whitespace-pre-wrap text-slate-600">
@@ -446,44 +489,93 @@ export default function CopilotDebugPanel({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="rounded border bg-white p-3">
-          <div className="text-xs font-medium text-slate-700 mb-2">
-            Tool calls
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="text-xs font-medium text-slate-700">Tool calls</div>
+            <button
+              type="button"
+              onClick={() => openExpandedBox("Tool calls", latestToolCalls)}
+              disabled={latestToolCalls.length === 0}
+              className="shrink-0 rounded border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Expandir
+            </button>
           </div>
           <div className="space-y-2 max-h-52 overflow-auto">
             {latestToolCalls.length === 0 ? (
               <div className="text-xs text-slate-500">No tool calls yet.</div>
             ) : (
               latestToolCalls.map((payload, index) => (
-                <pre
+                <div
                   key={`tool-call-${index}`}
-                  className="rounded border border-slate-200 p-2 text-[11px] whitespace-pre-wrap text-slate-600"
+                  className="rounded border border-slate-200 p-2"
                 >
-                  {JSON.stringify(payload, null, 2)}
-                </pre>
+                  <div className="mb-2 text-xs font-medium text-slate-800">
+                    Tool call {index + 1}
+                  </div>
+                  <pre className="text-[11px] whitespace-pre-wrap text-slate-600">
+                    {JSON.stringify(payload, null, 2)}
+                  </pre>
+                </div>
               ))
             )}
           </div>
         </div>
         <div className="rounded border bg-white p-3">
-          <div className="text-xs font-medium text-slate-700 mb-2">
-            Tool results
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="text-xs font-medium text-slate-700">
+              Tool results
+            </div>
+            <button
+              type="button"
+              onClick={() => openExpandedBox("Tool results", latestToolResults)}
+              disabled={latestToolResults.length === 0}
+              className="shrink-0 rounded border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Expandir
+            </button>
           </div>
           <div className="space-y-2 max-h-52 overflow-auto">
             {latestToolResults.length === 0 ? (
               <div className="text-xs text-slate-500">No tool results yet.</div>
             ) : (
               latestToolResults.map((payload, index) => (
-                <pre
+                <div
                   key={`tool-result-${index}`}
-                  className="rounded border border-slate-200 p-2 text-[11px] whitespace-pre-wrap text-slate-600"
+                  className="rounded border border-slate-200 p-2"
                 >
-                  {JSON.stringify(payload, null, 2)}
-                </pre>
+                  <div className="mb-2 text-xs font-medium text-slate-800">
+                    Tool result {index + 1}
+                  </div>
+                  <pre className="text-[11px] whitespace-pre-wrap text-slate-600">
+                    {JSON.stringify(payload, null, 2)}
+                  </pre>
+                </div>
               ))
             )}
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={expandedBox !== null}
+        onOpenChange={(open) => !open && setExpandedBox(null)}
+      >
+        <DialogContent className="h-[85vh] max-w-[90vw] w-[90vw] overflow-hidden p-0">
+          <DialogHeader className="border-b border-slate-200 px-6 py-4">
+            <DialogTitle className="text-xl font-semibold text-slate-900">
+              {expandedBox?.title ?? "Detalle"}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-slate-500">
+              {expandedBoxDescription}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="h-[calc(85vh-88px)] overflow-auto bg-slate-950 px-8 py-6">
+            <pre className="font-mono text-sm leading-6 whitespace-pre-wrap break-words text-slate-100">
+              {expandedBox?.content ?? ""}
+            </pre>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

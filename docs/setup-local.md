@@ -85,7 +85,7 @@ Variables clave:
 - `LANGSMITH_PROJECT=copilot-agent-local`
 - `COPILOT_AGENT_DATABASE_URL`
 - `COPILOT_LONG_TERM_DATABASE_URL`
-- `BACKEND_INTERNAL_BASE_URL=http://localhost:8001`
+- `BACKEND_INTERNAL_BASE_URL=http://localhost:8001` si corres el agente en el host, o `http://host.docker.internal:8001` si corres `copilot_agent` con Docker. En modo Docker, Django debe escuchar en `0.0.0.0:8001`, no solo en `127.0.0.1:8001`.
 - `BACKEND_INTERNAL_TIMEOUT_SECONDS=15`
 - `COPILOT_SERVICE_SHARED_JWT`
 - `COPILOT_ALLOWED_AUDIENCE=app-api-service`

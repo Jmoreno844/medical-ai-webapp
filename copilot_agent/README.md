@@ -22,7 +22,8 @@ Servicio dedicado para el copiloto clínico basado en LangGraph.
 1. Levanta PostgreSQL local con `make -C backend db-up`
 2. Copia `.env.example` a `.env.local`
 3. Por defecto, el agent reutiliza la misma base local `medical_web_app` del backend para no exigir una DB extra en local
-4. Corre:
+4. Si corres el agent en Docker, `BACKEND_INTERNAL_BASE_URL` debe apuntar al backend del host como `http://host.docker.internal:8001` y Django debe estar levantado con `0.0.0.0:8001`
+5. Corre:
 
 ```bash
 cp copilot_agent/.env.example copilot_agent/.env.local

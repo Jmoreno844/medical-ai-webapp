@@ -282,6 +282,7 @@ def build_set_edit_plan_tool() -> Any:
         affected_sections: list[str],
         needs_full_note: bool,
         needs_external_knowledge: bool,
+        factual_replacements: list[dict[str, object]] | None = None,
     ) -> str:
         """Stub schema used to evaluate the live planner clinical classification contract."""
         del (
@@ -290,6 +291,7 @@ def build_set_edit_plan_tool() -> Any:
             affected_sections,
             needs_full_note,
             needs_external_knowledge,
+            factual_replacements,
         )
         return "not executed in eval"
 

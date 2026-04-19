@@ -23,14 +23,14 @@ def reset_dict_state() -> dict[str, Any]:
 
 def materialize_state_value(value: Any) -> Any:
     if isinstance(value, dict) and value.get(RESET_MARKER) is True:
-        return {}
+        return {key: item for key, item in value.items() if key != RESET_MARKER}
     if (
         isinstance(value, list)
         and value
         and isinstance(value[0], dict)
         and value[0].get(RESET_MARKER) is True
     ):
-        return []
+        return list(value[1:])
     return value
 
 
@@ -303,6 +303,7 @@ class CopilotState(TypedDict):
     retrieved_context: NotRequired[list[dict[str, Any]]]
     tool_calls: NotRequired[list[dict[str, Any]]]
     tool_results: NotRequired[Annotated[list[dict[str, Any]], _append_items]]
+    run_memory_notes: NotRequired[list[dict[str, Any]]]
     planner_decisions: NotRequired[list[dict[str, Any]]]
     available_documents: NotRequired[
         Annotated[list[dict[str, Any]], merge_available_documents]
@@ -355,3 +356,4 @@ class CopilotState(TypedDict):
     # Documento target congelado por set_edit_plan cuando el runtime puede inferirlo
     # con seguridad. Evita una segunda "decisión libre" del planner antes de draft.
     planned_target_document_id: NotRequired[str | None]
+    patch_validation_retry_used: NotRequired[bool]
