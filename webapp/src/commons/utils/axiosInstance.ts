@@ -20,6 +20,25 @@ const axiosInstance = axios.create({
   },
 });
 
+let refreshRequest: Promise<void> | null = null;
+
+const shouldAttemptRefresh = (url?: string): boolean => {
+  if (!url) return true;
+  return !url.includes("/api/v1/auth/login") && !url.includes("/api/v1/auth/refresh");
+};
+
+const refreshSession = async (): Promise<void> => {
+  if (!refreshRequest) {
+    refreshRequest = axiosInstance
+      .post("/api/v1/auth/refresh")
+      .then(() => undefined)
+      .finally(() => {
+        refreshRequest = null;
+      });
+  }
+  await refreshRequest;
+};
+
 // Add request interceptor to include CSRF token in every request
 axiosInstance.interceptors.request.use(
   async (config) => {
@@ -29,8 +48,8 @@ axiosInstance.interceptors.request.use(
     // Only fetch CSRF token if not already available
     if (!csrfToken) {
       try {
-        logger.debug("🔄 No CSRF token found. Fetching from /api/csrf...");
-        await axios.get(`${API_URL}/api/csrf`, {
+        logger.debug("🔄 No CSRF token found. Fetching from /api/v1/csrf...");
+        await axios.get(`${API_URL}/api/v1/csrf`, {
           withCredentials: true,
         });
         //   logger.debug("📥 CSRF Response:", csrfResponse.data);
@@ -74,6 +93,21 @@ axiosInstance.interceptors.response.use(
     return response;
   },
   (error) => {
+    const originalRequest = error.config;
+
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      shouldAttemptRefresh(originalRequest.url)
+    ) {
+      originalRequest._retry = true;
+
+      return refreshSession()
+        .then(() => axiosInstance(originalRequest))
+        .catch((refreshError) => Promise.reject(refreshError));
+    }
+
     // Enhanced error handling with specific CORS error detection
     if (error.message === "Network Error" || error.code === "ERR_NETWORK") {
       //   logger.error("CORS or network error detected. Check your CORS configuration.");

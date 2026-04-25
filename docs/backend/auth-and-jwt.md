@@ -12,6 +12,22 @@
 - Firma: `utils.jwt_settings.get_jwt_signing_key()` (misma clave que `JWT_SECRET_KEY` cuando está definida).
 - Revocación: `jti` en caché / blacklist (`apps/users/api.py`).
 
+## FastAPI browser JWTs (`/api/v1/auth/*`)
+
+- FastAPI uses HttpOnly browser cookies for `browser_access` and
+  `browser_refresh` tokens, plus `_xsrf` for double-submit CSRF protection.
+- Revocation is persisted in PostgreSQL table `fastapi_revoked_token`, managed by
+  Alembic in `backend_fastapi/`. Refresh rotation and logout insert token `jti`
+  values until their original expiry.
+- Browser refresh is silent on the SPA side: when an authenticated request gets
+  `401`, the frontend attempts one `POST /api/v1/auth/refresh` and retries the
+  original request before treating the session as logged out.
+- Browser tokens also include a password-state fingerprint claim derived from
+  the current Django password hash. If the password changes, existing FastAPI
+  access and refresh tokens become invalid without waiting for normal expiry.
+- Settings are environment-variable driven through `backend_fastapi/app/core/config.py`;
+  `backend_fastapi/.env` may override values loaded from `backend/.env`.
+
 ## JWT de callbacks Cloud Functions (`utils.auth.JWTAuth`)
 
 Verificado en:

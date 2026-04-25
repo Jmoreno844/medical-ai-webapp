@@ -1,0 +1,41 @@
+from __future__ import annotations
+
+from datetime import date
+from typing import Any
+
+from pydantic import BaseModel
+
+
+class DocumentCreate(BaseModel):
+    encounter_id: int
+    kind: str
+    doctor_template_id: int | None = None
+    content: str | None = ""
+    content_markdown: str | None = None
+    content_json: dict[str, Any] | None = None
+
+
+class DocumentOut(BaseModel):
+    id: int
+    encounter_id: int
+    kind: str
+    doctor_template_id: int | None
+    doctor_template_name: str | None = None
+    content: str
+    content_markdown: str
+    content_json: dict[str, Any] | None = None
+    created_on: date
+    doctor_id: int
+
+
+class DocumentContentUpdate(BaseModel):
+    content: str | None = None
+    content_markdown: str | None = None
+    content_json: dict[str, Any] | None = None
+
+
+class DocumentContentOut(BaseModel):
+    content: str
+    content_markdown: str
+    content_json: dict[str, Any] | None = None
+

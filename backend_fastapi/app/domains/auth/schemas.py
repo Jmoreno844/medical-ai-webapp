@@ -1,0 +1,24 @@
+from pydantic import BaseModel
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UserProfile(BaseModel):
+    id: int
+    email: str
+    name: str
+    last_name: str
+    role: str
+
+
+class AuthResponse(BaseModel):
+    success: bool = True
+    user: UserProfile
+
+
+class LogoutResponse(BaseModel):
+    success: bool = True
+

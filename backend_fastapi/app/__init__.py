@@ -1,0 +1,2 @@
+"""FastAPI ASGI application package."""
+

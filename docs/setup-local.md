@@ -5,7 +5,7 @@ Esta guía busca dejar un entorno local repetible para volver al proyecto rápid
 ## Requisitos
 
 - Docker y Docker Compose
-- Python 3.10+ y `uv`
+- Python 3.14+ y `uv`
 - Node.js 20+ y `npm`
 - `gcloud auth application-default login`
 - Acceso a un proyecto GCP con Vertex AI y bucket de audio
@@ -131,7 +131,26 @@ Opcional:
 make -C backend createsuperuser
 ```
 
-## 4. Frontend
+## 4. Backend FastAPI en migracion
+
+`backend_fastapi/` tiene su propio proyecto `uv` y se ejecuta en paralelo a
+Django durante la migracion. Usa `8001` solo si Django esta apagado; si necesitas
+ambos procesos a la vez, usa `8002` para FastAPI.
+
+```bash
+cd backend_fastapi
+uv sync --group dev
+ENVIRONMENT=local uv run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+```
+
+Healthcheck: `http://localhost:8001/api/v1/health`
+
+FastAPI lee settings segun `ENVIRONMENT`. En local carga primero
+`backend/.env`, luego `backend_fastapi/.env` y finalmente
+`backend_fastapi/.env.local`, de modo que los overrides especificos de FastAPI
+pueden vivir junto a ese servicio.
+
+## 5. Frontend
 
 ```bash
 npm --prefix webapp install
@@ -140,7 +159,7 @@ npm --prefix webapp run dev
 
 Frontend: `http://localhost:5173`
 
-## 5. Cloud Functions locales
+## 6. Cloud Functions locales
 
 ```bash
 docker compose -f cloud_functions/docker-compose.yml up --build
@@ -151,7 +170,7 @@ Puertos locales:
 - `8082` — `transcription-endpoint`
 - `8083` — `document-workflow`
 
-## 6. Smoke test recomendado
+## 7. Smoke test recomendado
 
 1. Abrir el frontend en `http://localhost:5173`.
 2. Crear o abrir un `Encuentro`.
@@ -160,12 +179,18 @@ Puertos locales:
 5. Confirmar que la generación documental apunte a `http://localhost:8083`.
 6. Confirmar que `copilot_agent` responda en `http://localhost:8090/healthz`.
 
-## 7. Checks rápidos
+## 8. Checks rápidos
 
 Backend:
 
 ```bash
 make -C backend check
+```
+
+Backend FastAPI:
+
+```bash
+uv --project backend_fastapi run pytest -q backend_fastapi/tests
 ```
 
 Frontend:
@@ -189,7 +214,7 @@ docker compose -f copilot_agent/docker-compose.yml up --build
 
 Para el slice actual del broker, backend y `copilot_agent` deben compartir el mismo valor de `COPILOT_SERVICE_SHARED_JWT`. El runtime también usa `COPILOT_BACKEND_AUDIENCE` para firmar las tools internas read-only hacia Django. En local, el path más simple es apuntar `COPILOT_AGENT_DATABASE_URL` y `COPILOT_LONG_TERM_DATABASE_URL` a `medical_web_app`. La migración futura a OIDC/ID token está documentada en [`docs/debt/copilot-agent-runtime.md`](debt/copilot-agent-runtime.md).
 
-## 8. Trazas distribuidas opcionales
+## 9. Trazas distribuidas opcionales
 
 Para un trace local de `webapp -> Django -> Cloud Functions -> Django`:
 
