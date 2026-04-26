@@ -10,6 +10,10 @@ _channels: dict[str, set[asyncio.Queue[str]]] = defaultdict(set)
 _lock = asyncio.Lock()
 
 
+def get_processing_id(document_id: int) -> str:
+    return f"gen_{document_id}_{int(datetime.now(timezone.utc).timestamp())}"
+
+
 # Queues live in process memory; Cloud Run must stay on one backend instance
 # until a shared broker such as Redis/Pub/Sub is introduced.
 async def subscribe(document_id: int) -> asyncio.Queue[str]:

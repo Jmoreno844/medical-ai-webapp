@@ -39,3 +39,33 @@ class DocumentContentOut(BaseModel):
     content_markdown: str
     content_json: dict[str, Any] | None = None
 
+
+class DocumentGenerationWorkflowRequest(BaseModel):
+    context_document_id: int
+    transcription_document_id: int
+    doctor_template_id: int
+    new_document_id: int
+
+
+class DocumentGenerationWorkflowResponse(BaseModel):
+    success: bool
+    process_id: str | None = None
+    sse_token: str | None = None
+    new_document_id: int | None = None
+    message: str | None = None
+    error: str | None = None
+
+
+class GenerationChunkIn(BaseModel):
+    document_id: int
+    process_id: str
+    chunk: str | None = ""
+    is_complete: bool = False
+    is_error: bool = False
+    error: str | None = None
+
+
+class TranscriptionNotificationIn(BaseModel):
+    document_id: int
+    status: str | None = None
+

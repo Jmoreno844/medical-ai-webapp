@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from .models import User
+from apps.users.models import User
 
 
 @pytest.fixture
@@ -60,7 +60,7 @@ def test_login(client, test_user_data):
         content_type="application/json",
     )
     assert response.status_code == 200
-    assert "token" in response.json()
+    assert response.json()["message"] == "Successfully logged in"
 
 
 @pytest.mark.django_db

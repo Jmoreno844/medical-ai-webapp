@@ -75,7 +75,7 @@ call_model draft_patch_from_plan interrupt_for_review finalize_response
 | `consolidate_tool_state` | Deriva `read_documents`, `retrieved_context`, `selected_document_ids` del batch de resultados. Entonces re-routea.                     |
 | `draft_patch_from_plan`  | Si `set_edit_plan` ya dejó `next_required_action='draft_patch_set'` y las precondiciones están listas, invoca al drafter directamente. |
 | `interrupt_for_review`   | Pausa el grafo. Espera `review_result` externo (`approve` / `reject`). LangGraph interrupt.                                            |
-| `apply_patch`            | Placeholder — el apply real ocurre en Django, no aquí.                                                                                 |
+| `apply_patch`            | Placeholder — el apply real ocurre en el backend broker (FastAPI; Django legacy durante transición), no aquí.                          |
 | `finalize_response`      | Construye el `final_response` del run.                                                                                                 |
 
 ### Routing
@@ -121,7 +121,7 @@ El estado completo es `CopilotState` en `app/graph/state.py`. Los campos relevan
 
 | Campo                 | Tipo                 | Descripción                                                                                                                                                                                                                                                                                      |
 | --------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `workspace_index`     | `dict`               | Vista ligera del workspace: documento activo, abiertos, writable, versiones y opcionalmente `content_markdown` pre-seedeado por el frontend. Puede incluir `content_json`, pero hoy el runtime lo ignora deliberadamente y sigue operando sobre markdown. Entra desde Django en el primer turno. |
+| `workspace_index`     | `dict`               | Vista ligera del workspace: documento activo, abiertos, writable, versiones y opcionalmente `content_markdown` pre-seedeado por el frontend. Puede incluir `content_json`, pero hoy el runtime lo ignora deliberadamente y sigue operando sobre markdown. Entra desde el broker backend en el primer turno. |
 | `available_documents` | `list[dict]`         | Documentos disponibles en el workspace. Se va enriqueciendo con lecturas. Merge inteligente por `document_id`.                                                                                                                                                                                   |
 | `document_summaries`  | `dict[doc_id, dict]` | Summaries de documentos leídos. Merge por doc_id, score por completitud.                                                                                                                                                                                                                         |
 
@@ -130,7 +130,7 @@ El estado completo es `CopilotState` en `app/graph/state.py`. Los campos relevan
 | Campo            | Tipo                 | Descripción                                                                                                                                            |
 | ---------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `document_reads` | `list[dict]`         | Resultados de `read_document(mode=*)`. Incluye `content` cuando `mode="full"`.                                                                         |
-| `read_documents` | `list[dict]`         | Vista derivada de `document_reads` enriquecida por summaries. Usada por el planner. Puede incluir `structure_mode` + `sections` detectadas por Django. |
+| `read_documents` | `list[dict]`         | Vista derivada de `document_reads` enriquecida por summaries. Usada por el planner. Puede incluir `structure_mode` + `sections` detectadas por el backend. |
 | `read_spans`     | `list[dict]`         | Resultados de `read_document_span`. Keyed por (doc_id, start_offset, end_offset, exactText).                                                           |
 | `context_view`   | `dict \| None`       | Resultado de `build_context_view`. Contexto estructurado del encounter.                                                                                |
 | `search_results` | `list[dict]`         | Resultados de `search_documents`.                                                                                                                      |
@@ -154,8 +154,8 @@ El estado completo es `CopilotState` en `app/graph/state.py`. Los campos relevan
 | ----------------------- | -------------- | ------------------------------------------------------------------------------------------------- |
 | `target_document_id`    | `str \| None`  | ID del documento target del patch set.                                                            |
 | `target_document_title` | `str \| None`  | Título del documento target.                                                                      |
-| `base_version`          | `int \| None`  | Versión del documento en el momento de la lectura. Django valida conflictos contra esta versión.  |
-| `patch_set_preview`     | `dict \| None` | El patch set completo listo para review. Enviado a Django para persisitir como `CopilotPatchSet`. |
+| `base_version`          | `int \| None`  | Versión del documento en el momento de la lectura. El backend broker valida conflictos contra esta versión. |
+| `patch_set_preview`     | `dict \| None` | El patch set completo listo para review. Enviado al backend broker para persisitir como `CopilotPatchSet`. |
 | `patch_preview`         | `dict \| None` | Mirror del primer patch del set (compatibilidad con frontend legacy).                             |
 | `requires_human_review` | `bool`         | Si es True y hay `patch_set_preview` válido, el grafo pausa en `interrupt_for_review`.            |
 
@@ -163,12 +163,12 @@ El estado completo es `CopilotState` en `app/graph/state.py`. Los campos relevan
 
 | Campo            | Tipo          | Descripción                                                                                                  |
 | ---------------- | ------------- | ------------------------------------------------------------------------------------------------------------ |
-| `review_result`  | `str \| None` | `"approve"` / `"reject"`. Entra cuando el médico responde en el frontend y Django llama `/runs/{id}/resume`. |
+| `review_result`  | `str \| None` | `"approve"` / `"reject"`. Entra cuando el médico responde en el frontend y el backend broker llama `/runs/{id}/resume`. |
 | `review_comment` | `str \| None` | Comentario opcional del médico al aprobar o rechazar.                                                        |
 
 ### Reset entre runs
 
-Cuando Django inicia un nuevo run en el mismo thread (misma conversación), `_reset_transient_run_state()` limpia artefactos de control del run anterior (patches, errores activos, contadores, planes clínicos pendientes), pero conserva `messages` y lecturas clínicas que siguen frescas contra el `workspace_index` actual.
+Cuando el backend broker inicia un nuevo run en el mismo thread (misma conversación), `_reset_transient_run_state()` limpia artefactos de control del run anterior (patches, errores activos, contadores, planes clínicos pendientes), pero conserva `messages` y lecturas clínicas que siguen frescas contra el `workspace_index` actual.
 
 Una lectura previa (`document_reads`, `read_spans`, summaries derivados) se conserva solo si:
 
@@ -184,13 +184,20 @@ Los errores activos (`last_tool_error`, `last_planner_error`, `run_error`) se re
 
 Si el frontend envía `content_markdown` para un documento `ai_writable`, `_reset_transient_run_state()` lo convierte en una lectura `mode="full"` antes del primer turno del planner.
 
+Decisión actual del runtime:
+
+- el workspace inicial del run NO pre-seedea `structure_mode` ni `sections` para ningún documento
+- la razón no es costo de CPU del extractor, sino diseño del contexto: mandar sections solo para algunos documentos añade contexto desigual y sesga al planner hacia ese subconjunto
+- mandar sections para todos los documentos desde el bootstrap también añade ruido y contexto que el planner no siempre necesita para decidir su primera lectura
+- por ahora, la estructura de secciones sigue siendo información derivada on-read del backend, no metadata base del `workspace_index`
+
 `content_json` puede viajar en el mismo payload para UX/editor futuro, pero el runtime actual no lo usa como base de patching; el contrato clínico seguro sigue siendo markdown/texto.
 
-Django mantiene ambos campos sincronizados antes de exponer el documento al agente:
+FastAPI mantiene ambos campos sincronizados antes de exponer el documento al agente:
 
 - editor/UI persisten `content_json + content_markdown`
 - patch apply y callbacks siguen operando sobre markdown
-- cuando un write path entra solo con markdown, Django regenera `content_json` sincrónicamente
+- cuando un write path entra solo con markdown, FastAPI regenera `content_json` sincrónicamente
 
 Así el runtime puede seguir leyendo solo markdown sin riesgo de drift con el editor rico.
 
@@ -199,13 +206,15 @@ Eso permite que el planner llame `propose_*` en el turno 1 sin `read_document(..
 1. el contenido debe representar el estado canónico que el médico ve realmente
 2. la lectura pre-seedeada necesita `content_hash` para que el patch set tenga `base_hash`
 
-El runtime ya no depende de que el frontend mande ese hash. Si falta en `workspace_index`, el agente calcula `sha256(content_markdown)` al pre-seedear la lectura full. Esto mantiene consistente el contrato con Django, que valida conflictos de apply usando `base_hash`.
+El runtime ya no depende de que el frontend mande ese hash. Si falta en `workspace_index`, el agente calcula `sha256(content_markdown)` al pre-seedear la lectura full. Esto mantiene consistente el contrato con el backend broker, que valida conflictos de apply usando `base_hash`.
 
 En otras palabras: el pre-seed del frontend reemplaza la lectura remota, pero no puede omitir la metadata que vuelve aplicable el patch set.
 
+También implica que un documento puede estar disponible como lectura `full` por pre-seed y aun así no traer estructura detectada. Si el planner necesita `sections`, debe obtenerlas por una lectura backend real.
+
 ### Secciones estructuradas en `read_document`
 
-Cuando Django puede detectar headings reales del documento, `read_document` y `read_document_summary` devuelven:
+Cuando el backend puede detectar headings reales del documento, `read_document` y `read_document_summary` devuelven:
 
 - `structure_mode = "structured"`
 - `sections = [{section_id, label, heading, start_offset, end_offset, resolution_source, ...}]`
@@ -214,8 +223,23 @@ Contrato operativo:
 
 - Si `structure_mode="structured"`, el planner debe tratar esos `section_id` como la referencia preferente para `affected_sections` y evitar inventar nombres alternativos mientras la estructura detectada cubra el pedido.
 - El drafter recibe ese mismo mapa en `<read_documents>` y `<target_document_sections>`.
-- Si no hay estructura confiable, Django devuelve `structure_mode="unstructured"` y `sections=[]`; en ese caso el runtime sigue permitiendo fallback semántico.
-- En este slice la estructura se calcula on-read a partir de headings literales; todavía no existe cache persistido por documento.
+- Si no hay estructura confiable, el backend devuelve `structure_mode="unstructured"` y `sections=[]`; en ese caso el runtime sigue permitiendo fallback semántico.
+- En este slice la estructura se calcula on-read a partir de headings literales; todavía no existe cache persistido por documento, ni se pre-seedea en el bootstrap inicial del workspace.
+
+#### Qué viene del backend vs qué puede inventar el planner
+
+- `sections` solo viene del backend cuando detecta headings reales en el markdown.
+- Si el documento está `unstructured`, cualquier `affected_sections` que aparezca en `set_edit_plan` es una construcción del planner, no una sección extraída del documento.
+- En ese modo, labels como `nota_clinica`, `documento_completo` o similares deben leerse como pseudo-scope de fallback. Sirven para no bloquear el run, pero no equivalen a una estructura real del documento.
+- El planner sí ve metadata del documento además del contenido: `title`, `type`, `mode`, `structure_mode` y, cuando existen, las `sections` detectadas. Por eso nombres inventados como `nota_clinica` pueden reflejar el título del target aunque no exista un heading con ese nombre.
+- Operativamente, `structured` es fuerte y `unstructured` es débil: en `structured` el scope ideal debe anclarse a headings reales; en `unstructured` el runtime todavía tolera fallback semántico, pero con menos garantía.
+
+#### `factual_replacements` como contrato literal
+
+- `factual_replacements` no es una heurística semántica. Es un contrato literal planner → runtime → drafter para cambios de alto riesgo como edad, sexo, fecha o dosis.
+- Cada item declara qué texto viejo debe desaparecer (`find_text`) y con qué texto nuevo debe reemplazarse (`replace_text`), opcionalmente acotado por `scope_sections`.
+- Este mecanismo solo aporta valor si `find_text` es realmente literal. Ejemplo útil: `40 años -> 50 años`. Ejemplo débil: `edad actual -> 50 años`.
+- Si el planner envía `factual_replacements` con shape incompleto, el runtime puede normalizarlos a vacío y entonces se pierde ese guardrail determinista; en ese caso solo queda la validación más general por `affected_sections`.
 
 ### Contexto renderizado al planner
 
@@ -287,6 +311,14 @@ con `section` matching, o un `section_outcome` explícito (`no_change_needed`,
 subconjunto parcial sin outcome para las secciones omitidas, la tool falla cerrada y no
 abre review humana con un patch set incompleto.
 
+#### Qué es y qué no es `section_outcome`
+
+- `section_outcome` es texto generado por el drafter para justificar el estado final de una sección dentro del patch plan.
+- No sustituye un patch real cuando la sección sí debía cambiar.
+- No autoriza por sí solo dejar viva una mención ambigua o saltarse una ocurrencia que el usuario pidió cambiar.
+- Su uso correcto es explicar por qué una sección ya estaba bien (`no_change_needed`), no existe (`section_not_found`) o no puede tocarse con seguridad (`unsafe_to_change`).
+- Si la instrucción del usuario implica conservar una ocurrencia específica y borrar otras, esa decisión debe quedar representada por patches anclados sobre las ocurrencias correctas. `section_outcome` solo puede justificar por qué una sección revisada no necesitó patch adicional.
+
 Ese guardrail también aplica cuando el planner fija `affected_sections` en un
 `edit_scope="local"` para follow-ups ambiguos resueltos por contexto conversacional
 previo. Si el scope declarado contiene una sola sección y el drafter devuelve patches
@@ -339,8 +371,8 @@ El `patch_set_preview` que se emite al finalizar una propose tool:
       },
       "replacement_text": str | None, # Requerido para replace_span/rewrite_document
       "inserted_text": str | None,    # Requerido para insert_before/insert_after_span
-      "old_text": str | None,         # Calculado por Django al resolver el anchor
-      "new_text": str | None,         # Calculado por Django desde replacement/insert/delete
+      "old_text": str | None,         # Calculado por el backend al resolver el anchor
+      "new_text": str | None,         # Calculado por el backend desde replacement/insert/delete
       "content_preview": str,         # Compat derivada de new_text; no la emite el LLM
       "rationale": str,
       "clinical_impact": str | None  # "cosmetic" | "factual" | "clinical" (P1 futuro)
@@ -352,7 +384,7 @@ El `patch_set_preview` que se emite al finalizar una propose tool:
 El drafter ya no emite previews contextuales (`before_preview` / `after_preview`).
 Para `replace_span`, `replacement_text` debe reemplazar únicamente
 `anchor.exactText`; si incluye `prefixText`, `suffixText`, bullets o labels que
-quedan fuera del anchor, Django marca el patch como conflictivo para evitar
+quedan fuera del anchor, el backend marca el patch como conflictivo para evitar
 duplicaciones. Para inserciones, `inserted_text` contiene solo el texto nuevo.
 
 ### Requisito de `base_hash`
@@ -366,9 +398,9 @@ Eso suele significar una de estas dos cosas:
 
 Los cambios recientes del runtime cubren explícitamente el segundo caso.
 
-Django recibe este payload, resuelve los anchors a offsets reales en el documento canónico, persiste un `CopilotPatchSet` + `CopilotPatch` por cada entrada en `patches`, y marca los patches como `pending` o `conflicted` según el resultado de la resolución.
+FastAPI recibe este payload, resuelve los anchors a offsets reales en el documento canónico, persiste un `CopilotPatchSet` + `CopilotPatch` por cada entrada en `patches`, y marca los patches como `pending` o `conflicted` según el resultado de la resolución.
 
-En las respuestas de Django hacia el frontend cada patch conserva `operation_type`
+En las respuestas del backend hacia el frontend cada patch conserva `operation_type`
 tal como lo emitió el agente y además expone `normalized_operation_type`, que es
 el valor que debe usar la UI para renderizar diffs. Hoy normaliza:
 
@@ -380,11 +412,11 @@ el valor que debe usar la UI para renderizar diffs. Hoy normaliza:
 
 ## Estrategia de anchors
 
-Los patches no dependen de offsets exactos para ser aplicados porque los offsets se vuelven obsoletos si el documento cambia entre que el agente leyó y cuando Django aplica.
+Los patches no dependen de offsets exactos para ser aplicados porque los offsets se vuelven obsoletos si el documento cambia entre que el agente leyó y cuando el backend aplica.
 
 | Campo anchor                | Rol                                                                                              |
 | --------------------------- | ------------------------------------------------------------------------------------------------ |
-| `exactText`                 | Primario — Django busca este substring en el documento actual                                    |
+| `exactText`                 | Primario — el backend busca este substring en el documento actual                                |
 | `prefixText`                | Desambiguación — si `exactText` aparece más de una vez, `prefixText` reduce falsas coincidencias |
 | `suffixText`                | Desambiguación — igual que `prefixText` pero hacia adelante                                      |
 | `startOffset` / `endOffset` | Secundarios — ayudan cuando el texto no se encuentra pero los offsets siguen siendo válidos      |
@@ -615,7 +647,7 @@ finalize_response
 
 ## Invariantes de seguridad
 
-- El agente **nunca escribe directamente** al documento canónico. Solo emite `patch_set_preview`. Django hace el apply.
+- El agente **nunca escribe directamente** al documento canónico. Solo emite `patch_set_preview`. FastAPI hace el apply.
 - Si el drafter emite un `DraftedPatchPlan` vacío (`patches=[]`) o inválido, la propose tool retorna un error al planner y el run termina en `finalize_response` con `run_error`.
 - Si Vertex falla o devuelve JSON inválido, el run cierra en `failed`. No hay fallback a heurísticas.
 - Los datos clínicos en documentos son tratados como **datos**, no como instrucciones ejecutables. El system instruction del planner lo refuerza explícitamente para proteger contra prompt injection.

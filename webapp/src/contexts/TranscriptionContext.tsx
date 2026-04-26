@@ -263,7 +263,7 @@ export function TranscriptionProvider({
 
       try {
         const response = await axiosInstance.post(
-          `/api/generate-sse-token/${documentId}`
+          `/api/v1/documents/${documentId}/sse-token`
         );
 
         if (response.data.success && response.data.token) {
@@ -298,7 +298,7 @@ export function TranscriptionProvider({
         }
 
         const apiBaseUrl = API_URL.endsWith("/") ? API_URL.slice(0, -1) : API_URL;
-        const sseUrl = `${apiBaseUrl}/api/sse/document/${documentId}/${token}`;
+        const sseUrl = `${apiBaseUrl}/api/v1/sse/documents/${documentId}/${token}`;
         const eventSource = new EventSource(sseUrl);
         eventSourceRef.current = eventSource;
         startTranscriptionStream(String(documentId));
@@ -379,7 +379,7 @@ export function TranscriptionProvider({
         }
 
         const response = await axiosInstance.post(
-          `/api/transcription/start`,
+          `/api/v1/transcription/start`,
           {
             document_id: id_documento_transcripcion,
             encounter_id: id_encuentro,
@@ -434,7 +434,7 @@ export function TranscriptionProvider({
 
     try {
       const response = await axiosInstance.get(
-        `/api/documents/${transcriptionDocId}`
+        `/api/v1/documents/${transcriptionDocId}`
       );
       const content = response.data?.content || "";
 

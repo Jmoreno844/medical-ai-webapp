@@ -9,6 +9,7 @@ dependencies = [
   "fastapi>=0.136.1,<0.137",
   "google-auth>=2.38.0,<3",
   "google-cloud-storage>=2.19.0,<4",
+  "google-cloud-tasks>=2.22.0",
   "markdown-it-py>=4.0.0,<5",
   "psycopg2-binary>=2.9.10,<3",
   "pydantic-settings>=2.7.0,<3",

@@ -162,7 +162,7 @@ export function DocumentProvider({
 
     try {
       const response = await axiosInstance.get(
-        `/api/documents/encounter/${encounterId}`
+        `/api/v1/documents/encounter/${encounterId}`
       );
       const data = response.data;
 
@@ -221,7 +221,7 @@ export function DocumentProvider({
           `[DOC_SAVE] Document ${docId}: Final content length: ${finalContent.length} chars`
         );
 
-        await axiosInstance.patch(`/api/documents/by-editor/${docId}`, {
+        await axiosInstance.patch(`/api/v1/documents/by-editor/${docId}`, {
           content: finalContent,
           content_markdown: finalContent,
           content_json: contentJson ?? null,
@@ -268,7 +268,7 @@ export function DocumentProvider({
     ) => {
       try {
         setWorkspaceLoading(true);
-        const response = await axiosInstance.post("/api/documents", {
+        const response = await axiosInstance.post("/api/v1/documents", {
           encounter_id: encounterId,
           kind: documentType,
           content,
@@ -303,7 +303,7 @@ export function DocumentProvider({
     async (docId: number) => {
       try {
         setWorkspaceLoading(true);
-        await axiosInstance.delete(`/api/documents/${docId}`);
+        await axiosInstance.delete(`/api/v1/documents/${docId}`);
         removeDocumentFromWorkspace(String(docId));
 
         return true;

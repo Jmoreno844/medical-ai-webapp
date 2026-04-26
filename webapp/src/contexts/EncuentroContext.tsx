@@ -277,7 +277,7 @@ export function EncuentroProvider({
           data
         );
         const response = await axiosInstance.patch(
-          `/api/encounters/${encounterId}`,
+          `/api/v1/encounters/${encounterId}`,
           data
         );
 
@@ -314,7 +314,7 @@ export function EncuentroProvider({
         logger.debug(`Updating encounter date to: ${isoDate}`);
 
         const response = await axiosInstance.patch(
-          `/api/encounters/${encounterId}`,
+          `/api/v1/encounters/${encounterId}`,
           {
             occurred_at: isoDate,
           }

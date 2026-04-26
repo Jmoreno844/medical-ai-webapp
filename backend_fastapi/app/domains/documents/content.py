@@ -4,7 +4,12 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from markdown_it import MarkdownIt
+from markdown_it.token import Token
+
 PreferredContentSource = Literal["markdown", "json"]
+
+_MARKDOWN_PARSER = MarkdownIt("commonmark")
 
 _EMPTY_DOC: dict[str, Any] = {
     "type": "doc",
@@ -81,37 +86,341 @@ def set_document_content_fields(
 
 
 def markdown_to_tiptap_json(markdown: str | None) -> dict[str, Any]:
-    normalized = normalize_markdown(markdown)
-    if normalized == "":
+    normalized_markdown = normalize_markdown(markdown)
+    if normalized_markdown == "":
         return get_empty_tiptap_doc()
 
-    paragraphs = []
-    for block in normalized.split("\n\n"):
-        text = block.strip()
-        if not text:
-            continue
-        paragraphs.append(
-            {
-                "type": "paragraph",
-                "content": [{"type": "text", "text": text}],
-            }
-        )
-    return {"type": "doc", "content": paragraphs or [{"type": "paragraph"}]}
+    tokens = _MARKDOWN_PARSER.parse(normalized_markdown)
+    content, _ = _parse_block_tokens(tokens, 0, set())
+    if not content:
+        return get_empty_tiptap_doc()
+    return {"type": "doc", "content": content}
 
 
 def tiptap_json_to_markdown(content_json: dict[str, Any] | None) -> str:
     document = normalize_tiptap_document(content_json)
-    blocks: list[str] = []
-    for node in document.get("content") or []:
-        blocks.append(_node_text(node))
-    return "\n\n".join(block for block in blocks if block).rstrip("\n")
+    return _render_block_list(document.get("content") or []).rstrip("\n")
 
 
-def _node_text(node: dict[str, Any]) -> str:
-    if node.get("type") == "text":
-        return str(node.get("text") or "")
-    content = node.get("content")
-    if not isinstance(content, list):
-        return ""
-    return "".join(_node_text(child) for child in content if isinstance(child, dict))
+def _parse_block_tokens(
+    tokens: list[Token],
+    index: int,
+    stop_types: set[str],
+) -> tuple[list[dict[str, Any]], int]:
+    nodes: list[dict[str, Any]] = []
+
+    while index < len(tokens):
+        token = tokens[index]
+        if token.type in stop_types:
+            return nodes, index + 1
+
+        if token.type == "paragraph_open":
+            inline_token = tokens[index + 1] if index + 1 < len(tokens) else None
+            content = _parse_inline_token(inline_token)
+            paragraph: dict[str, Any] = {"type": "paragraph"}
+            if content:
+                paragraph["content"] = content
+            nodes.append(paragraph)
+            index += 3
+            continue
+
+        if token.type == "heading_open":
+            inline_token = tokens[index + 1] if index + 1 < len(tokens) else None
+            content = _parse_inline_token(inline_token)
+            level = int(token.tag[1]) if token.tag.startswith("h") else 1
+            heading: dict[str, Any] = {"type": "heading", "attrs": {"level": level}}
+            if content:
+                heading["content"] = content
+            nodes.append(heading)
+            index += 3
+            continue
+
+        if token.type == "bullet_list_open":
+            content, index = _parse_block_tokens(tokens, index + 1, {"bullet_list_close"})
+            nodes.append({"type": "bulletList", "content": content})
+            continue
+
+        if token.type == "ordered_list_open":
+            attrs: dict[str, Any] = {}
+            start = _token_attr(token, "start")
+            if start not in (None, "", "1", 1):
+                attrs["start"] = int(start)
+            content, index = _parse_block_tokens(
+                tokens,
+                index + 1,
+                {"ordered_list_close"},
+            )
+            ordered_list: dict[str, Any] = {"type": "orderedList", "content": content}
+            if attrs:
+                ordered_list["attrs"] = attrs
+            nodes.append(ordered_list)
+            continue
+
+        if token.type == "list_item_open":
+            content, index = _parse_block_tokens(tokens, index + 1, {"list_item_close"})
+            nodes.append(
+                {
+                    "type": "listItem",
+                    "content": content or [{"type": "paragraph"}],
+                }
+            )
+            continue
+
+        if token.type == "blockquote_open":
+            content, index = _parse_block_tokens(tokens, index + 1, {"blockquote_close"})
+            nodes.append({"type": "blockquote", "content": content})
+            continue
+
+        if token.type in {"fence", "code_block"}:
+            attrs: dict[str, Any] = {}
+            language = (token.info or "").strip().split(" ", 1)[0]
+            if language:
+                attrs["language"] = language
+            code_block: dict[str, Any] = {"type": "codeBlock"}
+            if attrs:
+                code_block["attrs"] = attrs
+            if token.content:
+                code_block["content"] = [{"type": "text", "text": token.content}]
+            nodes.append(code_block)
+            index += 1
+            continue
+
+        if token.type == "hr":
+            nodes.append({"type": "horizontalRule"})
+            index += 1
+            continue
+
+        if token.type == "inline":
+            content = _parse_inline_token(token)
+            paragraph: dict[str, Any] = {"type": "paragraph"}
+            if content:
+                paragraph["content"] = content
+            nodes.append(paragraph)
+            index += 1
+            continue
+
+        index += 1
+
+    return nodes, index
+
+
+def _parse_inline_token(inline_token: Token | None) -> list[dict[str, Any]]:
+    children = inline_token.children if inline_token and inline_token.children else []
+    nodes, _ = _parse_inline_children(children, 0, set(), [])
+    return nodes
+
+
+def _parse_inline_children(
+    tokens: list[Token],
+    index: int,
+    stop_types: set[str],
+    active_marks: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], int]:
+    nodes: list[dict[str, Any]] = []
+
+    while index < len(tokens):
+        token = tokens[index]
+        if token.type in stop_types:
+            return nodes, index + 1
+
+        if token.type == "text":
+            if token.content:
+                text_node: dict[str, Any] = {"type": "text", "text": token.content}
+                if active_marks:
+                    text_node["marks"] = deepcopy(active_marks)
+                nodes.append(text_node)
+            index += 1
+            continue
+
+        if token.type == "code_inline":
+            text_node = {"type": "text", "text": token.content}
+            text_node["marks"] = deepcopy([*active_marks, {"type": "code"}])
+            nodes.append(text_node)
+            index += 1
+            continue
+
+        if token.type in {"softbreak", "hardbreak"}:
+            nodes.append({"type": "hardBreak"})
+            index += 1
+            continue
+
+        mark = _mark_from_inline_token(token)
+        if mark is not None and token.nesting == 1:
+            close_type = token.type.replace("_open", "_close")
+            nested_nodes, index = _parse_inline_children(
+                tokens,
+                index + 1,
+                {close_type},
+                [*active_marks, mark],
+            )
+            nodes.extend(nested_nodes)
+            continue
+
+        index += 1
+
+    return nodes, index
+
+
+def _mark_from_inline_token(token: Token) -> dict[str, Any] | None:
+    if token.type == "strong_open":
+        return {"type": "bold"}
+    if token.type == "em_open":
+        return {"type": "italic"}
+    if token.type == "s_open":
+        return {"type": "strike"}
+    if token.type == "link_open":
+        href = _token_attr(token, "href")
+        return {"type": "link", "attrs": {"href": href or ""}}
+    return None
+
+
+def _token_attr(token: Token, key: str) -> Any:
+    attrs = getattr(token, "attrs", None)
+    if attrs is None:
+        return None
+    if isinstance(attrs, dict):
+        return attrs.get(key)
+    if isinstance(attrs, list):
+        for attr_key, attr_value in attrs:
+            if attr_key == key:
+                return attr_value
+    return None
+
+
+def _render_block_list(nodes: list[dict[str, Any]]) -> str:
+    rendered_blocks: list[str] = []
+    for node in nodes:
+        rendered = _render_block(node).rstrip("\n")
+        if rendered.strip():
+            rendered_blocks.append(rendered)
+    return "\n\n".join(rendered_blocks)
+
+
+def _render_block(node: dict[str, Any]) -> str:
+    node_type = node.get("type")
+
+    if node_type == "paragraph":
+        return _render_inline_nodes(node.get("content") or [])
+
+    if node_type == "heading":
+        level = int((node.get("attrs") or {}).get("level") or 1)
+        return f"{'#' * max(level, 1)} {_render_inline_nodes(node.get('content') or [])}".rstrip()
+
+    if node_type == "bulletList":
+        return _render_list(node.get("content") or [], ordered=False, start=1)
+
+    if node_type == "orderedList":
+        start = int((node.get("attrs") or {}).get("start") or 1)
+        return _render_list(node.get("content") or [], ordered=True, start=start)
+
+    if node_type == "blockquote":
+        child = _render_block_list(node.get("content") or [])
+        if child == "":
+            return "> "
+        return "\n".join(f"> {line}" if line else ">" for line in child.splitlines())
+
+    if node_type == "codeBlock":
+        language = (node.get("attrs") or {}).get("language") or ""
+        text = "".join(
+            child.get("text", "")
+            for child in node.get("content") or []
+            if child.get("type") == "text"
+        )
+        return f"```{language}\n{text}\n```"
+
+    if node_type == "horizontalRule":
+        return "---"
+
+    return ""
+
+
+def _render_list(
+    items: list[dict[str, Any]],
+    *,
+    ordered: bool,
+    start: int,
+) -> str:
+    lines: list[str] = []
+    counter = start
+    for item in items:
+        marker = f"{counter}." if ordered else "-"
+        lines.append(_render_list_item(item, marker))
+        if ordered:
+            counter += 1
+    return "\n".join(lines)
+
+
+def _render_list_item(node: dict[str, Any], marker: str) -> str:
+    blocks = node.get("content") or [{"type": "paragraph"}]
+    prefix = f"{marker} "
+    continuation = " " * len(prefix)
+    lines: list[str] = []
+
+    for block_index, block in enumerate(blocks):
+        rendered_block = _render_block(block)
+        if rendered_block == "":
+            if block_index == 0:
+                lines.append(prefix.rstrip())
+            continue
+
+        block_lines = rendered_block.splitlines() or [""]
+        if block_index == 0:
+            lines.append(f"{prefix}{block_lines[0]}".rstrip())
+            for extra_line in block_lines[1:]:
+                lines.append(f"{continuation}{extra_line}".rstrip())
+            continue
+
+        for extra_line in block_lines:
+            lines.append(f"{continuation}{extra_line}".rstrip())
+
+    return "\n".join(lines)
+
+
+def _render_inline_nodes(nodes: list[dict[str, Any]]) -> str:
+    parts: list[str] = []
+    for node in nodes:
+        node_type = node.get("type")
+        if node_type == "hardBreak":
+            parts.append("  \n")
+            continue
+        if node_type != "text":
+            continue
+
+        parts.append(_apply_marks(node.get("text", ""), node.get("marks") or []))
+    return "".join(parts)
+
+
+def _apply_marks(text: str, marks: list[dict[str, Any]]) -> str:
+    if not marks:
+        return text
+
+    ordered_marks = sorted(
+        marks,
+        key=lambda mark: {
+            "code": 0,
+            "italic": 1,
+            "bold": 2,
+            "strike": 3,
+            "link": 4,
+        }.get(mark.get("type", ""), 99),
+    )
+    rendered = text
+    for mark in ordered_marks:
+        mark_type = mark.get("type")
+        if mark_type == "code":
+            rendered = f"`{rendered}`"
+            continue
+        if mark_type == "italic":
+            rendered = f"*{rendered}*"
+            continue
+        if mark_type == "bold":
+            rendered = f"**{rendered}**"
+            continue
+        if mark_type == "strike":
+            rendered = f"~~{rendered}~~"
+            continue
+        if mark_type == "link":
+            href = (mark.get("attrs") or {}).get("href") or ""
+            rendered = f"[{rendered}]({href})"
+    return rendered
 

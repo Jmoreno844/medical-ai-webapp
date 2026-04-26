@@ -152,7 +152,7 @@ export function GenerationProvider({
       setIsLoadingPlantillas(true);
       setPlantillasError(null);
 
-      const response = await axiosInstance.get("/api/doctor-templates/short");
+      const response = await axiosInstance.get("/api/v1/doctor-templates/short");
       setPlantillas(response.data || []);
 
       if (response.data && response.data.length > 0) {
@@ -196,7 +196,7 @@ export function GenerationProvider({
   const getSSEToken = useCallback(async (documentId: number) => {
     try {
       const response = await axiosInstance.post(
-        `/api/generate-sse-token/${documentId}`
+        `/api/v1/documents/${documentId}/sse-token`
       );
 
       if (response.data.success && response.data.token) {
@@ -219,7 +219,7 @@ export function GenerationProvider({
       closeEventSource();
 
       const apiBaseUrl = API_URL.endsWith("/") ? API_URL.slice(0, -1) : API_URL;
-      const sseUrl = `${apiBaseUrl}/api/sse/document/${documentId}/${sseToken}`;
+      const sseUrl = `${apiBaseUrl}/api/v1/sse/documents/${documentId}/${sseToken}`;
 
       logger.debug(`🔌 Connecting to SSE endpoint: ${sseUrl}`);
 
@@ -384,7 +384,7 @@ export function GenerationProvider({
       connectToSSE(newDocument.id, sseToken);
       setIsModalOpen(false);
 
-      const response = await axiosInstance.post("/api/documents/generate", {
+      const response = await axiosInstance.post("/api/v1/documents/generate", {
         context_document_id: contextDoc.id,
         transcription_document_id: transcriptionDoc.id,
         doctor_template_id: selectedPlantillaId,
@@ -402,7 +402,7 @@ export function GenerationProvider({
 
       try {
         const usageResponse = await axiosInstance.post(
-          `/api/doctor-templates/${selectedPlantillaId}/usage`
+          `/api/v1/doctor-templates/${selectedPlantillaId}/usage`
         );
         logger.debug("📊 Uso de plantilla registrado:", usageResponse.data);
       } catch (usageErr) {

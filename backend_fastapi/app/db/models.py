@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -139,3 +139,99 @@ class RevokedToken(Base):
     jti: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class CopilotRun(Base):
+    __tablename__ = "copilot_copilotrun"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[str] = mapped_column(String(64), unique=True)
+    thread_id: Mapped[str] = mapped_column(String(255))
+    doctor_id: Mapped[int] = mapped_column(ForeignKey("users_user.id"))
+    encounter_id: Mapped[int] = mapped_column(ForeignKey("encounters_encounter.id"))
+    status: Mapped[str] = mapped_column(String(32))
+    intent: Mapped[str | None] = mapped_column(String(64))
+    requires_human_review: Mapped[bool] = mapped_column(Boolean)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    doctor: Mapped[User] = relationship()
+    encounter: Mapped[Encounter] = relationship()
+    patch_sets: Mapped[list["CopilotPatchSet"]] = relationship(back_populates="run")
+    patches: Mapped[list["CopilotPatch"]] = relationship(back_populates="run")
+
+
+class CopilotPatchSet(Base):
+    __tablename__ = "copilot_copilotpatchset"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    patch_set_id: Mapped[str] = mapped_column(String(64), unique=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("copilot_copilotrun.id"))
+    encounter_id: Mapped[int] = mapped_column(ForeignKey("encounters_encounter.id"))
+    doctor_id: Mapped[int] = mapped_column(ForeignKey("users_user.id"))
+    target_document_id: Mapped[int] = mapped_column(ForeignKey("documents_document.id"))
+    base_version: Mapped[int] = mapped_column(Integer)
+    base_hash: Mapped[str] = mapped_column(String(128))
+    rationale: Mapped[str | None] = mapped_column(Text)
+    source_context_document_ids: Mapped[list[str]] = mapped_column(JSONB)
+    target_document_title: Mapped[str | None] = mapped_column(String(255))
+    target_selection_reason: Mapped[str | None] = mapped_column(Text)
+    document_preview_after: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32))
+    edit_scope: Mapped[str | None] = mapped_column(String(32))
+    clinical_impact_level: Mapped[str | None] = mapped_column(String(32))
+    affected_sections: Mapped[list[str]] = mapped_column(JSONB)
+    review_comment: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    run: Mapped[CopilotRun] = relationship(back_populates="patch_sets")
+    encounter: Mapped[Encounter] = relationship()
+    doctor: Mapped[User] = relationship()
+    target_document: Mapped[Document] = relationship()
+    patches: Mapped[list["CopilotPatch"]] = relationship(back_populates="patch_set")
+
+
+class CopilotPatch(Base):
+    __tablename__ = "copilot_copilotpatch"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    patch_id: Mapped[str] = mapped_column(String(64), unique=True)
+    patch_set_id: Mapped[int | None] = mapped_column(
+        ForeignKey("copilot_copilotpatchset.id")
+    )
+    run_id: Mapped[int] = mapped_column(ForeignKey("copilot_copilotrun.id"))
+    encounter_id: Mapped[int] = mapped_column(ForeignKey("encounters_encounter.id"))
+    doctor_id: Mapped[int] = mapped_column(ForeignKey("users_user.id"))
+    target_document_id: Mapped[int] = mapped_column(ForeignKey("documents_document.id"))
+    base_version: Mapped[int] = mapped_column(Integer)
+    order_index: Mapped[int] = mapped_column(Integer)
+    patch_type: Mapped[str] = mapped_column(String(64))
+    operation_type: Mapped[str] = mapped_column(String(64))
+    anchor: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    expected_hash: Mapped[str | None] = mapped_column(String(128))
+    replacement_text: Mapped[str | None] = mapped_column(Text)
+    inserted_text: Mapped[str | None] = mapped_column(Text)
+    old_text: Mapped[str | None] = mapped_column(Text)
+    new_text: Mapped[str | None] = mapped_column(Text)
+    resolved_start: Mapped[int | None] = mapped_column(Integer)
+    resolved_end: Mapped[int | None] = mapped_column(Integer)
+    confidence: Mapped[float | None] = mapped_column(Float)
+    conflict_reason: Mapped[str | None] = mapped_column(Text)
+    document_preview_after: Mapped[str | None] = mapped_column(Text)
+    content_preview: Mapped[str] = mapped_column(Text)
+    rationale: Mapped[str | None] = mapped_column(Text)
+    source_context_document_ids: Mapped[list[str]] = mapped_column(JSONB)
+    target_document_title: Mapped[str | None] = mapped_column(String(255))
+    target_selection_reason: Mapped[str | None] = mapped_column(Text)
+    section: Mapped[str | None] = mapped_column(String(128))
+    status: Mapped[str] = mapped_column(String(32))
+    review_comment: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    patch_set: Mapped[CopilotPatchSet | None] = relationship(back_populates="patches")
+    run: Mapped[CopilotRun] = relationship(back_populates="patches")
+    encounter: Mapped[Encounter] = relationship()
+    doctor: Mapped[User] = relationship()
+    target_document: Mapped[Document] = relationship()

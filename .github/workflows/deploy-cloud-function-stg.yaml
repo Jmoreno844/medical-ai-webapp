@@ -90,7 +90,7 @@ jobs:
             --memory=1024MB \
             --timeout=300s \
             --service-account=cloud-functions-runner@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com \
-            --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=${{ env.GEMINI_MODEL }},ENVIRONMENT=stg,DJANGO_API_BASE_URL=${{ vars.VITE_API_URL }}
+            --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=${{ env.GEMINI_MODEL }},ENVIRONMENT=stg,BACKEND_API_BASE_URL=${{ vars.VITE_API_URL }},BACKEND_API_VERSION=v1
 
       - name: Bind transcription invokers
         run: |
@@ -116,7 +116,7 @@ jobs:
             --memory=1024MB \
             --timeout=300s \
             --service-account=cloud-functions-runner@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com \
-            --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=${{ env.GEMINI_MODEL }},ENVIRONMENT=stg,DJANGO_API_BASE_URL=${{ vars.VITE_API_URL }}
+            --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=${{ env.GEMINI_MODEL }},ENVIRONMENT=stg,BACKEND_API_BASE_URL=${{ vars.VITE_API_URL }},BACKEND_API_VERSION=v1
 
       - name: Bind document workflow invokers
         run: |

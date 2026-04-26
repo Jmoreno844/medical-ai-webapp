@@ -76,7 +76,7 @@ export function sendKeepaliveDocumentSave(
     headers["X-CSRFToken"] = csrfToken;
   }
 
-  const url = `${API_URL}/api/documents/by-editor/${documentId}`;
+  const url = `${API_URL}/api/v1/documents/by-editor/${documentId}`;
 
   void fetch(url, {
     method: "PATCH",

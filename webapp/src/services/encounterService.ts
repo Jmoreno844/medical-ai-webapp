@@ -8,7 +8,7 @@ import { logger } from "@/lib/logger";
  */
 export const getDoctorEncounters = async (): Promise<Encuentro[]> => {
   try {
-    const response = await axiosInstance.get<Encuentro[]>(`/api/encounters`);
+    const response = await axiosInstance.get<Encuentro[]>(`/api/v1/encounters`);
     return response.data;
   } catch (error) {
     logger.error("Error fetching doctor encounters:", error);
@@ -26,7 +26,7 @@ export const getEncounterById = async (
 ): Promise<Encuentro> => {
   try {
     const response = await axiosInstance.get<Encuentro>(
-      `/api/encounters/${encounterId}`
+      `/api/v1/encounters/${encounterId}`
     );
     return response.data;
   } catch (error) {

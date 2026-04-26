@@ -78,7 +78,7 @@ export const useAuth = () => {
     setError(null);
     try {
       logAuth("info", "Requesting password reset for email", email);
-      const response = await axiosInstance.post("/api/auth/forgot-password", {
+      const response = await axiosInstance.post("/api/v1/auth/forgot-password", {
         email,
       });
       return response.data;
@@ -105,7 +105,7 @@ export const useAuth = () => {
     setError(null);
     try {
       logAuth("info", "Attempting signup");
-      const response = await axiosInstance.post("/api/auth/register", {
+      const response = await axiosInstance.post("/api/v1/auth/register", {
         email,
         name,
         last_name: lastName,

@@ -14,12 +14,16 @@ from app.domains.auth.service import (
     authenticate_user,
     get_current_user,
     issue_browser_tokens,
+    register_doctor_user,
     refresh_browser_session,
 )
 from app.domains.auth.schemas import (
     AuthResponse,
+    ForgotPasswordRequest,
     LoginRequest,
     LogoutResponse,
+    MessageResponse,
+    RegisterRequest,
     UserProfile,
 )
 
@@ -49,6 +53,37 @@ async def login(
 
     issue_browser_tokens(response, user, settings)
     return AuthResponse(user=_profile(user))
+
+
+@router.post("/register", response_model=UserProfile, status_code=status.HTTP_201_CREATED)
+async def register(
+    payload: RegisterRequest,
+    session: AsyncSession = Depends(get_db_session),
+) -> UserProfile:
+    try:
+        user = await register_doctor_user(
+            session,
+            email=payload.email,
+            password=payload.password,
+            name=payload.name,
+            last_name=payload.last_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+    await session.commit()
+    await session.refresh(user)
+    return _profile(user)
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+async def forgot_password(_payload: ForgotPasswordRequest) -> MessageResponse:
+    return MessageResponse(
+        message=(
+            "Si el correo existe en el sistema, recibirás instrucciones para "
+            "restablecer tu contraseña."
+        )
+    )
 
 
 @router.post("/refresh", response_model=AuthResponse)

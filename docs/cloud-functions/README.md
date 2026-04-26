@@ -8,8 +8,8 @@ El directorio `cloud_functions/` contiene las funciones serverless que hacen el 
 - `functions/endpoints/document_workflow.py` — entrypoint HTTP para generación de documentos.
 - `functions/services/transcription/` — procesamiento de audio desde `gs://`.
 - `functions/services/document_generation/` — prompt building, streaming y formateo.
-- `functions/services/django_api.py` — callbacks hacia Django (`PATCH` de contenido, chunks de generación, notify complete).
-- `functions/tracing.py` — OpenTelemetry (span por request + propagación en `requests` hacia Django). Variables: [`../backend/tracing.md`](../backend/tracing.md).
+- `functions/services/django_api.py` — cliente legacy de callbacks hacia el backend versionado (`PATCH` de contenido, chunks de generación, notify complete).
+- `functions/tracing.py` — OpenTelemetry (span por request + propagación en `requests` hacia el backend). Variables: [`../backend/tracing.md`](../backend/tracing.md).
 - `functions/langsmith_tracing.py` — LangSmith local-first para request/model spans con metadata sanitizada.
 
 ## Modelo de despliegue en `stg`
@@ -23,7 +23,9 @@ El directorio `cloud_functions/` contiene las funciones serverless que hacen el 
 
 | Variable                         | Uso                                                                 |
 | -------------------------------- | ------------------------------------------------------------------- |
-| `DJANGO_API_BASE_URL`            | URL base del backend Django para callbacks.                         |
+| `BACKEND_API_BASE_URL`           | URL base del backend para callbacks versionados.                     |
+| `BACKEND_API_VERSION`            | Versión del API backend para callbacks; default local: `v1`.         |
+| `DJANGO_API_BASE_URL`            | Fallback temporal legacy si `BACKEND_API_BASE_URL` no está definido. |
 | `GCP_PROJECT`                    | Proyecto usado para inicializar Vertex AI.                          |
 | `GCP_REGION`                     | Región de Vertex AI.                                                |
 | `GEMINI_MODEL`                   | Modelo de Gemini a usar.                                            |
@@ -61,11 +63,12 @@ Tu usuario de GCP debe tener permisos suficientes en el proyecto (p. ej. Vertex 
 
 Si el archivo de ADC no existe aún, ejecuta en el host: `gcloud auth application-default login`. Si `docker compose up` falla al montar `/app/adc.json`, comprueba que exista `~/.config/gcloud/application_default_credentials.json`.
 
-## Contrato con Django
+## Contrato con el backend
 
-- Django encola la transcripción en Cloud Tasks y llama la generación de documentos por HTTP directo.
-- Las funciones devuelven resultados a Django usando `Authorization: Bearer <jwt>`.
-- Los chunks de generación se envían de vuelta a Django y luego salen al navegador por SSE.
+- El backend encola la transcripción en Cloud Tasks y llama la generación de documentos por HTTP directo.
+- Las funciones devuelven resultados al backend usando `Authorization: Bearer <jwt>`.
+- Los chunks de generación se envían de vuelta al backend y luego salen al navegador por SSE.
+- Durante la migración actual, los callbacks clínicos apuntan a FastAPI bajo `/api/v1`.
 
 ## Logging
 

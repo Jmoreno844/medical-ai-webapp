@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Function to update CSRF token
   const updateCsrfToken = useCallback(() => {
-    const token = getCookie("csrftoken");
+    const token = getCookie("_xsrf") || getCookie("csrftoken");
     if (token) {
       setCsrfToken(token);
     }
@@ -81,7 +81,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     try {
       logAuth("info", "Fetching user data");
-      const response = await axiosInstance.get("/api/auth/me/data");
+      const response = await axiosInstance.get("/api/v1/auth/me");
       logAuth("info", "User data fetched successfully", response.data);
       setUserData(response.data);
     } catch (error: any) {
@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         logAuth("info", "Attempting login with email", { email });
         logger.debug("🔐 AUTH-CONTEXT: Before API call");
-        const response = await axiosInstance.post("/api/auth/login", {
+        const response = await axiosInstance.post("/api/v1/auth/login", {
           email,
           password,
         });
@@ -112,6 +112,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           status: response.status,
         });
         setIsAuthenticated(true);
+        if (response.data?.user) {
+          setUserData(response.data.user);
+        }
         updateCsrfToken();
         await refreshUserData();
         logAuth("info", "Redirecting to home page");
@@ -132,7 +135,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = useCallback(async () => {
     try {
       logAuth("info", "Attempting logout");
-      await axiosInstance.post("/api/auth/logout");
+      await axiosInstance.post("/api/v1/auth/logout");
       logAuth("info", "Logout successful");
     } catch (error: any) {
       logAuth("error", "Logout error", {
@@ -151,14 +154,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     logAuth("info", "Checking authentication status");
     updateCsrfToken();
 
-    // Check if there's a session cookie before making the request
+    // Check whether either the FastAPI JWT cookie or legacy Django session exists.
     const hasCookie = document.cookie
       .split(";")
-      .some((item) => item.trim().startsWith("sessionid="));
-    logAuth("info", "Session cookie exists:", hasCookie);
+      .some((item) => {
+        const cookie = item.trim();
+        return (
+          cookie.startsWith("medical_access_token=") ||
+          cookie.startsWith("sessionid=")
+        );
+      });
+    logAuth("info", "Auth cookie exists:", hasCookie);
 
     axiosInstance
-      .get("/api/auth/me")
+      .get("/api/v1/auth/me")
       .then((response) => {
         logAuth("info", "User is authenticated", response.data);
         setIsAuthenticated(true);

@@ -13,7 +13,7 @@ export const useEncuentroList = () => {
     setError(null);
 
     try {
-      const response = await axiosInstance.get("/api/encounters");
+      const response = await axiosInstance.get("/api/v1/encounters");
       setEncuentros(response.data);
     } catch (err) {
       logger.error("Error fetching encuentros:", err);

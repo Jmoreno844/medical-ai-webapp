@@ -24,7 +24,7 @@ export const useNuevoEncuentro = () => {
       setLoading(true);
       logger.debug("Creating new encounter: Initiating API call");
 
-      const response = await axiosInstance.post("/api/encounters");
+      const response = await axiosInstance.post("/api/v1/encounters");
       const data = response.data;
 
       logger.debug(`New encounter created successfully with ID: ${data.id}`);

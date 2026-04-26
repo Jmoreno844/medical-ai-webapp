@@ -51,7 +51,7 @@ export function usePlantillas() {
   const fetchPlantillas = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axiosInstance.get("/api/doctor-templates/short");
+      const response = await axiosInstance.get("/api/v1/doctor-templates/short");
       setPlantillas(response.data);
       setFilteredPlantillas(response.data);
       setError(null);
@@ -92,7 +92,7 @@ export function usePlantillas() {
 
     try {
       const response = await axiosInstance.get(
-        `/api/doctor-templates/${templateId}`
+        `/api/v1/doctor-templates/${templateId}`
       );
       setCurrentPlantillaDetails(response.data);
       return response.data;
@@ -136,7 +136,7 @@ export function usePlantillas() {
       if (newPlantilla.base_template_id != null) {
         body.base_template_id = newPlantilla.base_template_id;
       }
-      await axiosInstance.post("/api/doctor-templates", body);
+      await axiosInstance.post("/api/v1/doctor-templates", body);
       await fetchPlantillas();
       closeModals();
       return true;
@@ -151,7 +151,7 @@ export function usePlantillas() {
     updatedData: Partial<NewPlantilla>
   ) => {
     try {
-      await axiosInstance.patch(`/api/doctor-templates/${templateId}`, {
+      await axiosInstance.patch(`/api/v1/doctor-templates/${templateId}`, {
         name: updatedData.name,
         document_kind: updatedData.document_kind,
         content: updatedData.content ?? "",
@@ -167,7 +167,7 @@ export function usePlantillas() {
 
   const deletePlantilla = async (templateId: number) => {
     try {
-      await axiosInstance.delete(`/api/doctor-templates/${templateId}`);
+      await axiosInstance.delete(`/api/v1/doctor-templates/${templateId}`);
       await fetchPlantillas();
       closeModals();
       return true;

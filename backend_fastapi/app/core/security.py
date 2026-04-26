@@ -39,6 +39,19 @@ def verify_django_password(password: str, encoded: str) -> bool:
     return hmac.compare_digest(calculated, stored_hash)
 
 
+def make_django_password(password: str, *, iterations: int = 720000) -> str:
+    """Create a Django-compatible pbkdf2_sha256 password hash."""
+    salt = secrets.token_urlsafe(12)
+    derived = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        iterations,
+    )
+    encoded_hash = base64.b64encode(derived).decode("ascii").strip()
+    return f"pbkdf2_sha256${iterations}${salt}${encoded_hash}"
+
+
 def create_token(
     *,
     subject: str,

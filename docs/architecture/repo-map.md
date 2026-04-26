@@ -7,6 +7,7 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 | Carpeta | Rol | Fuente de verdad |
 |--------|-----|------------------|
 | `backend/` | API central, modelos, auth, JWT, SSE y orquestación | Sí |
+| `backend_fastapi/` | Nueva API FastAPI en migración paralela; no reemplaza a Django hasta completar contratos | Sí |
 | `cloud_functions/` | Transcripción y generación documental con Gemini | Sí |
 | `webapp/` | SPA del médico | Sí |
 | `infra/` | Infra GCP, IAM, budgets, deploy base | Sí |
@@ -31,6 +32,14 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
   - Dueño del modelo de paciente y relación médico-paciente.
 - `backend/apps/users/`
   - Dueño de sesión Django y JWT de usuario.
+- `backend_fastapi/`
+  - Implementación paralela de la migración Django -> FastAPI.
+  - Tiene su propio proyecto `uv` (`pyproject.toml` y `uv.lock`) separado del
+    entorno Django.
+  - Organiza endpoints, schemas y servicios por dominio en `app/domains/*`;
+    `app/api/v1/router.py` solo compone routers.
+  - Expone rutas nuevas bajo `/api/v1` y conserva SSE en memoria durante la primera fase.
+  - No debe introducir nuevas responsabilidades clínicas que aún no estén cubiertas por tests de contrato contra Django.
 - `cloud_functions/functions/endpoints/`
   - Adaptadores HTTP; validan request y delegan.
 - `cloud_functions/functions/services/`
@@ -85,7 +94,7 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 
 - En `stg/prod`, la transcripción debe salir por Cloud Tasks cuando la configuración esté presente.
 - La generación documental hoy usa un thread en Django para disparar la Cloud Function.
-- SSE depende de un hub en memoria; eso limita la escala horizontal hasta moverlo a Redis/Pub/Sub.
+- SSE depende de un hub en memoria; por decisión actual se mantiene sin Redis en la primera migración FastAPI y limita Cloud Run a una instancia.
 
 ### Integraciones externas
 

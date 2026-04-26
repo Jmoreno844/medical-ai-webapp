@@ -30,3 +30,4 @@ make -C backend check
 - `apps/documents/` y `apps/generative_ai/` comparten el flujo de IA, pero no son intercambiables: documentos maneja SSE/generación; `generative_ai` inicia transcripción.
 - `apps/encounters/services/storage.py` es el lugar correcto para cambios de GCS, signed URLs o credenciales.
 - Antes de tocar auth, tokens o callbacks, revisa [`../docs/backend/auth-and-jwt.md`](../docs/backend/auth-and-jwt.md).
+- Para la migracion total Django -> FastAPI, usa el plan de arquitectura en [`../docs/architecture/backend-fastapi-migration.md`](../docs/architecture/backend-fastapi-migration.md).

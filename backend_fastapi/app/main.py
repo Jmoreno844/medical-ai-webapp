@@ -7,6 +7,7 @@ from app.api.v1.router import api_v1_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.core.middleware import SecurityHeadersMiddleware
+from app.domains.copilot.internal_tools_api import router as copilot_internal_tools_router
 
 
 configure_logging()
@@ -38,4 +39,5 @@ app.add_middleware(
 )
 
 app.include_router(api_v1_router, prefix=settings.api_v1_prefix)
+app.include_router(copilot_internal_tools_router, prefix="/api")
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import * as encountersApi from "@/api/encounters";
 import { logger } from "@/lib/logger";
 
-/** Single encounter from GET /api/encounters/:id (matches EncuentroContext shape). */
+/** Single encounter from GET /api/v1/encounters/:id (matches EncuentroContext shape). */
 export interface EncuentroDetail {
   id: number;
   encounter_name: string;

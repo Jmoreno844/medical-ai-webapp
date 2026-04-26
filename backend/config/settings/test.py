@@ -216,7 +216,7 @@ ALLOWED_HOSTS = ["*"]
 
 def _postgres_options_for_host(host: str) -> dict:
     """Cloud SQL Unix socket under /cloudsql/ does not use TLS like a public IP."""
-    if host.startswith("/cloudsql/"):
+    if host.startswith("/cloudsql/") or host in {"localhost", "127.0.0.1"}:
         return {}
     return {"sslmode": "require"}
 

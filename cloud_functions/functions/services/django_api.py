@@ -1,22 +1,32 @@
 """
-Service for interacting with the Django API.
+Service for interacting with the transactional backend API.
+
+The module name is legacy. During the FastAPI migration these callbacks target
+the versioned FastAPI `/api/{version}` contract. DJANGO_API_BASE_URL remains a
+temporary fallback while platform environment variables are migrated.
 """
 
-import os
-import requests
-import logging
 import json
-from typing import Dict, Any, Optional
+import logging
+import os
+import re
 import time
+from typing import Any, Dict, Optional
+
+import requests
 
 logger = logging.getLogger(__name__)
 
 
-def build_django_request_headers(
+DEFAULT_BACKEND_API_BASE_URL = "http://localhost:8000"
+DEFAULT_BACKEND_API_VERSION = "v1"
+
+
+def build_backend_request_headers(
     token_auth: Optional[str] = None, json_body: bool = True
 ) -> Dict[str, str]:
     """
-    Build HTTP headers for Django API calls.
+    Build HTTP headers for backend API calls.
     JWTs (three dot-separated segments) get Authorization: Bearer <token>.
     """
     headers: Dict[str, str] = {}
@@ -34,18 +44,49 @@ def build_django_request_headers(
     return headers
 
 
-def get_api_base_url():
-    """Get the Django API base URL from environment variables."""
-    api_base_url = os.environ.get("DJANGO_API_BASE_URL")
+def build_django_request_headers(
+    token_auth: Optional[str] = None, json_body: bool = True
+) -> Dict[str, str]:
+    """Legacy alias kept for callers that still import the Django-named helper."""
+    return build_backend_request_headers(token_auth, json_body)
+
+
+def _backend_api_version() -> str:
+    version = os.environ.get("BACKEND_API_VERSION", DEFAULT_BACKEND_API_VERSION).strip()
+    if not version:
+        version = DEFAULT_BACKEND_API_VERSION
+    return version if version.startswith("v") else f"v{version}"
+
+
+def _normalize_backend_base_url(api_base_url: str) -> str:
+    api_base_url = api_base_url.rstrip("/")
+    versioned_api_match = re.search(r"/api/v[^/]+$", api_base_url)
+    if versioned_api_match:
+        return api_base_url[: versioned_api_match.start()]
+    if api_base_url.endswith("/api"):
+        return api_base_url[: -len("/api")]
+    return api_base_url
+
+
+def get_backend_api_base_url() -> str:
+    """Get the versioned backend API base URL used by Cloud Function callbacks."""
+    api_base_url = os.environ.get("BACKEND_API_BASE_URL") or os.environ.get(
+        "DJANGO_API_BASE_URL"
+    )
     if not api_base_url:
-        default_url = "http://localhost:8001/api"
-        logger.warning(f"DJANGO_API_BASE_URL not set, using default: {default_url}")
-        return default_url
+        logger.warning(
+            "BACKEND_API_BASE_URL/DJANGO_API_BASE_URL not set, using default: %s",
+            DEFAULT_BACKEND_API_BASE_URL,
+        )
+        api_base_url = DEFAULT_BACKEND_API_BASE_URL
 
-    if api_base_url.endswith("/"):
-        api_base_url = api_base_url[:-1]
+    root_url = _normalize_backend_base_url(api_base_url)
+    return f"{root_url}/api/{_backend_api_version()}"
 
-    return f"{api_base_url}/api"
+
+def get_api_base_url():
+    """Legacy alias for the FastAPI v1 backend base URL."""
+    return get_backend_api_base_url()
 
 
 def notify_transcription_complete(
@@ -54,7 +95,7 @@ def notify_transcription_complete(
     base_url = get_api_base_url()
     api_url = f"{base_url}/transcription/notify-complete"
 
-    headers = build_django_request_headers(token_auth)
+    headers = build_backend_request_headers(token_auth)
 
     payload = {
         "document_id": document_id,
@@ -99,7 +140,7 @@ def update_document_content(
     base_url = get_api_base_url()
     api_url = f"{base_url}/documents/by-function/{document_id}"
 
-    headers = build_django_request_headers(token_auth)
+    headers = build_backend_request_headers(token_auth)
     if "Authorization" not in headers:
         logger.error("No authorization header for update_document_content")
 
@@ -144,9 +185,7 @@ def update_document_content(
 
     except requests.exceptions.ConnectionError as e:
         error_msg = f"Connection error while updating document {document_id}: {str(e)}"
-        logger.error(
-            f"{error_msg}. Check if Django server is running and accessible at {api_url}"
-        )
+        logger.error(f"{error_msg}. Check if backend is accessible at {api_url}")
         return {"success": False, "error": error_msg}
 
     except requests.exceptions.RequestException as e:
@@ -200,7 +239,7 @@ def send_generation_chunk(
     if not token_auth:
         return {"success": False, "error": "No authentication token available"}
 
-    headers = build_django_request_headers(token_auth)
+    headers = build_backend_request_headers(token_auth)
 
     payload = {
         "document_id": int(document_id),
@@ -218,7 +257,7 @@ def send_generation_chunk(
 
     chunk_len = len(payload.get("chunk") or "")
     logger.info(
-        "Sending generation chunk to Django: document_id=%s process_id=%s "
+        "Sending generation chunk to backend: document_id=%s process_id=%s "
         "is_complete=%s is_error=%s chunk_len=%s",
         payload.get("document_id"),
         payload.get("process_id"),

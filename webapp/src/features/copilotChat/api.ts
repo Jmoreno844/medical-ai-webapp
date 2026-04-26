@@ -286,7 +286,7 @@ function serializeWorkspaceIndex(workspaceIndex: WorkspaceIndex) {
 
 export async function createCopilotSession(encounterId: number) {
   const response = await axiosInstance.post<CopilotSessionResponse>(
-    "/api/copilot/sessions",
+    "/api/v1/copilot/sessions",
     {
       encounter_id: encounterId,
     },
@@ -297,7 +297,7 @@ export async function createCopilotSession(encounterId: number) {
 
 export async function sendCopilotMessage(payload: CopilotMessageRequest) {
   const response = await axiosInstance.post<CopilotRunResponse>(
-    "/api/copilot/messages",
+    "/api/v1/copilot/messages",
     {
       encounter_id: payload.encounter_id,
       thread_id: payload.thread_id,
@@ -313,7 +313,7 @@ export async function sendCopilotMessage(payload: CopilotMessageRequest) {
 
 export async function getCopilotRun(runId: string) {
   const response = await axiosInstance.get<CopilotRunResponse>(
-    `/api/copilot/runs/${runId}`,
+    `/api/v1/copilot/runs/${runId}`,
   );
 
   return response.data;
@@ -321,7 +321,7 @@ export async function getCopilotRun(runId: string) {
 
 export async function listCopilotPatchSets(runId: string) {
   const response = await axiosInstance.get<unknown>(
-    `/api/copilot/runs/${runId}/patch-sets`,
+    `/api/v1/copilot/runs/${runId}/patch-sets`,
   );
 
   return normalizePatchSets(response.data);
@@ -337,7 +337,7 @@ export async function reviewCopilotPatch(
   },
 ) {
   const response = await axiosInstance.post<CopilotRunResponse>(
-    `/api/copilot/runs/${runId}/review`,
+    `/api/v1/copilot/runs/${runId}/review`,
     payload,
   );
 
@@ -352,7 +352,7 @@ export async function acceptCopilotPatch(
   },
 ) {
   const response = await axiosInstance.post<CopilotPatchSetResponse>(
-    `/api/copilot/patch-sets/${patchSetId}/accept-patch`,
+    `/api/v1/copilot/patch-sets/${patchSetId}/accept-patch`,
     payload,
   );
 
@@ -367,7 +367,7 @@ export async function rejectCopilotPatch(
   },
 ) {
   const response = await axiosInstance.post<CopilotPatchSetResponse>(
-    `/api/copilot/patch-sets/${patchSetId}/reject-patch`,
+    `/api/v1/copilot/patch-sets/${patchSetId}/reject-patch`,
     payload,
   );
 
@@ -381,7 +381,7 @@ export async function acceptAllCopilotPatches(
   },
 ) {
   const response = await axiosInstance.post<CopilotPatchSetResponse>(
-    `/api/copilot/patch-sets/${patchSetId}/accept-all`,
+    `/api/v1/copilot/patch-sets/${patchSetId}/accept-all`,
     payload,
   );
 
@@ -395,7 +395,7 @@ export async function rejectAllCopilotPatches(
   },
 ) {
   const response = await axiosInstance.post<CopilotPatchSetResponse>(
-    `/api/copilot/patch-sets/${patchSetId}/reject-all`,
+    `/api/v1/copilot/patch-sets/${patchSetId}/reject-all`,
     payload,
   );
 
@@ -410,7 +410,7 @@ export async function applyAcceptedCopilotPatchSet(
   },
 ) {
   const response = await axiosInstance.post<CopilotRunResponse>(
-    `/api/copilot/patch-sets/${patchSetId}/apply-accepted`,
+    `/api/v1/copilot/patch-sets/${patchSetId}/apply-accepted`,
     payload,
   );
 
@@ -425,7 +425,7 @@ export async function finalizeCopilotPatchSetReview(
   },
 ) {
   const response = await axiosInstance.post<CopilotRunResponse>(
-    `/api/copilot/patch-sets/${patchSetId}/finalize-review`,
+    `/api/v1/copilot/patch-sets/${patchSetId}/finalize-review`,
     payload,
   );
 
@@ -445,7 +445,7 @@ export function streamCopilotRun(
   if (afterSequence > 0) {
     params.set("after_sequence", String(afterSequence));
   }
-  const streamUrl = `${API_URL}/api/copilot/runs/${runId}/stream${
+  const streamUrl = `${API_URL}/api/v1/copilot/runs/${runId}/stream${
     params.size > 0 ? `?${params.toString()}` : ""
   }`;
   const eventSource = new EventSource(streamUrl, { withCredentials: true });

@@ -12,12 +12,13 @@ from app.core.security import (
     create_token,
     decode_token,
     generate_csrf_token,
+    make_django_password,
     password_session_fingerprint,
     set_auth_cookies,
     verify_csrf,
     verify_django_password,
 )
-from app.db.models import User
+from app.db.models import BaseTemplate, DoctorTemplate, TemplateUsage, User
 from app.db.session import get_db_session
 from app.domains.auth.revocation import (
     is_token_id_revoked,
@@ -37,6 +38,67 @@ async def authenticate_user(
     user = result.scalar_one_or_none()
     if not user or not verify_django_password(password, user.password):
         return None
+    return user
+
+
+def validate_registration_password(password: str) -> None:
+    if len(password) < 8:
+        raise ValueError("Password must contain at least 8 characters")
+
+
+async def register_doctor_user(
+    session: AsyncSession,
+    *,
+    email: str,
+    password: str,
+    name: str,
+    last_name: str,
+) -> User:
+    normalized_email = email.strip().lower()
+    result = await session.execute(select(User.id).where(User.email == normalized_email))
+    if result.scalar_one_or_none() is not None:
+        raise ValueError("Email already registered")
+
+    validate_registration_password(password)
+    now = datetime.now(timezone.utc)
+    user = User(
+        email=normalized_email,
+        password=make_django_password(password),
+        name=name,
+        last_name=last_name,
+        role="doctor",
+        is_active=True,
+        is_staff=False,
+        is_superuser=False,
+        last_login=None,
+        date_joined=now,
+    )
+    session.add(user)
+    await session.flush()
+
+    base_templates = (await session.execute(select(BaseTemplate))).scalars().all()
+    for base_template in base_templates:
+        doctor_template = DoctorTemplate(
+            name=base_template.name,
+            document_kind=base_template.document_kind,
+            uses_base_content=True,
+            base_template_id=base_template.id,
+            content=None,
+            created_at=now,
+            doctor_id=user.id,
+        )
+        session.add(doctor_template)
+        await session.flush()
+        session.add(
+            TemplateUsage(
+                doctor_template_id=doctor_template.id,
+                doctor_id=user.id,
+                use_count=0,
+                last_used_at=None,
+            )
+        )
+
+    await session.flush()
     return user
 
 

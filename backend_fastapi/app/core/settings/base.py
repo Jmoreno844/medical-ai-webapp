@@ -56,9 +56,53 @@ class Settings(BaseSettings):
     jwt_issuer: str = "medical-web-app-fastapi"
     browser_jwt_audience: str = "medical-api-browser"
     sse_jwt_audience: str = "medical-api-sse"
+    callback_jwt_audience: str = "medical-api-callbacks"
     access_token_minutes: int = 15
     refresh_token_days: int = 7
     sse_token_minutes: int = 5
+    transcription_callback_token_minutes: int = 15
+    generation_callback_token_minutes: int = 30
+
+    transcription_cloud_function_url: str | None = Field(
+        default=None,
+        alias="TRANSCRIPTION_CLOUD_FUNCTION_URL",
+    )
+    generate_document_cloud_function_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "GENERATE_DOCUMENT_CLOUD_FUNCTION_URL",
+            "GENERATE_DOCUMENT_CLOUD_FUNCTION_BASE_URL",
+        ),
+    )
+    copilot_agent_base_url: str = Field(
+        default="http://localhost:8010",
+        alias="COPILOT_AGENT_BASE_URL",
+    )
+    copilot_service_shared_jwt: str = Field(
+        default="not-loaded",
+        alias="COPILOT_SERVICE_SHARED_JWT",
+    )
+    copilot_agent_audience: str = Field(
+        default="app-api-service",
+        alias="COPILOT_AGENT_AUDIENCE",
+    )
+    copilot_backend_audience: str = Field(
+        default="medical-api",
+        alias="COPILOT_BACKEND_AUDIENCE",
+    )
+    copilot_agent_timeout_seconds: float = Field(
+        default=60.0,
+        alias="COPILOT_AGENT_TIMEOUT_SECONDS",
+    )
+    cloud_tasks_region: str | None = Field(default=None, alias="CLOUD_TASKS_REGION")
+    transcription_queue_name: str | None = Field(
+        default=None,
+        alias="TRANSCRIPTION_QUEUE_NAME",
+    )
+    cloud_tasks_invoker_service_account: str | None = Field(
+        default=None,
+        alias="CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT",
+    )
 
     access_cookie_name: str = "medical_access_token"
     refresh_cookie_name: str = "medical_refresh_token"
@@ -134,6 +178,11 @@ class StrictDeploymentSettings(Settings):
             missing.append("GCP_PROJECT_ID")
         if not self.gcs_bucket_name:
             missing.append("GCS_BUCKET_NAME")
+        if (
+            not self.copilot_service_shared_jwt
+            or self.copilot_service_shared_jwt == "not-loaded"
+        ):
+            missing.append("COPILOT_SERVICE_SHARED_JWT")
         if missing:
             joined = ", ".join(missing)
             raise ValueError(f"Missing required FastAPI deployment settings: {joined}")

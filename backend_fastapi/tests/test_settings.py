@@ -27,6 +27,7 @@ def test_settings_selects_class_from_environment(monkeypatch: pytest.MonkeyPatch
             monkeypatch.setenv("FASTAPI_CORS_ALLOWED_ORIGINS", "https://app.example")
             monkeypatch.setenv("GCP_PROJECT_ID", "medical-prod")
             monkeypatch.setenv("GCS_BUCKET_NAME", "medical-audio-prod")
+            monkeypatch.setenv("COPILOT_SERVICE_SHARED_JWT", "copilot-shared-secret")
         get_settings.cache_clear()
 
         assert isinstance(get_settings(), expected_class)
@@ -65,6 +66,7 @@ def test_production_requires_deployment_settings(
         "FASTAPI_CORS_ALLOWED_ORIGINS",
         "GCP_PROJECT_ID",
         "GCS_BUCKET_NAME",
+        "COPILOT_SERVICE_SHARED_JWT",
     ]:
         monkeypatch.delenv(key, raising=False)
 
@@ -80,6 +82,7 @@ def test_production_accepts_explicit_deployment_settings(
     monkeypatch.setenv("FASTAPI_CORS_ALLOWED_ORIGINS", "https://app.example")
     monkeypatch.setenv("GCP_PROJECT_ID", "medical-prod")
     monkeypatch.setenv("GCS_BUCKET_NAME", "medical-audio-prod")
+    monkeypatch.setenv("COPILOT_SERVICE_SHARED_JWT", "copilot-shared-secret")
 
     settings = ProductionSettings()
 

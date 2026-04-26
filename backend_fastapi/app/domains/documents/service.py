@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import Document, Encounter
+from app.db.models import Document, DoctorTemplate, Encounter
 from app.domains.documents.content import (
     build_synced_document_content,
     set_document_content_fields,
@@ -40,6 +40,26 @@ async def get_encounter_for_doctor(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def get_doctor_template_for_doctor(
+    session: AsyncSession,
+    *,
+    template_id: int,
+    doctor_id: int,
+) -> DoctorTemplate | None:
+    result = await session.execute(
+        select(DoctorTemplate)
+        .options(selectinload(DoctorTemplate.base_template))
+        .where(DoctorTemplate.id == template_id, DoctorTemplate.doctor_id == doctor_id)
+    )
+    return result.scalar_one_or_none()
+
+
+def get_effective_template_content(template: DoctorTemplate) -> str | None:
+    if template.uses_base_content and template.base_template:
+        return template.base_template.content
+    return template.content
 
 
 def serialize_document(doc: Document) -> DocumentOut:

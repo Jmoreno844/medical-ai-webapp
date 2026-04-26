@@ -6,6 +6,17 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+    last_name: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
 class UserProfile(BaseModel):
     id: int
     email: str
@@ -21,4 +32,9 @@ class AuthResponse(BaseModel):
 
 class LogoutResponse(BaseModel):
     success: bool = True
+
+
+class MessageResponse(BaseModel):
+    success: bool = True
+    message: str
 

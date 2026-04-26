@@ -91,7 +91,7 @@ export const useEncounter = (encounterId?: number) => {
       logger.debug("Raw payload:", payload);
 
       const response = await axiosInstance.patch(
-        `/api/encounters/${encounterIdToUpdate}`,
+        `/api/v1/encounters/${encounterIdToUpdate}`,
         payload,
         {
           headers: {
@@ -145,7 +145,7 @@ export const useEncounter = (encounterId?: number) => {
       logger.debug(`Deleting encounter ${encounterIdToDelete}`);
 
       const response = await axiosInstance.delete(
-        `/api/encounters/${encounterIdToDelete}`
+        `/api/v1/encounters/${encounterIdToDelete}`
       );
 
       logger.debug("Delete response:", response.data);

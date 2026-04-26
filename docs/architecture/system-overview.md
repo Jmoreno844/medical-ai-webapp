@@ -53,13 +53,13 @@ graph LR
 
 ## 2. Flujo de Transcripción de Audio
 
-El camino completo desde que el médico detiene la grabación hasta que el texto aparece en el editor.
+El camino completo desde que el médico detiene la grabación hasta que el texto aparece en el editor. En el slice migrado, el kickoff y los callbacks de este flujo viven en FastAPI bajo `/api/v1`.
 
 ```mermaid
 sequenceDiagram
     actor Medico
     participant Browser as React (Browser)
-    participant Django as Django API
+    participant Django as API Backend
     participant GCS as Cloud Storage
     participant CF as CF transcription-endpoint
     participant Gemini as Vertex AI · Gemini
@@ -74,8 +74,8 @@ sequenceDiagram
 
     rect rgb(255, 248, 240)
         note over Browser,CF: Paso 2 — Inicio de transcripción
-        Browser->>Django: POST /transcription/start
-        Django->>Django: Genera JWT de servicio (15 min)
+        Browser->>Django: POST /api/v1/transcription/start
+        Django->>Django: Genera JWT callback FastAPI (15 min)
         Django->>Django: Encola Cloud Task
         Django-->>Browser: 200 OK { queued: true }
         Django->>CF: POST { audio_uri, auth_token } via Cloud Tasks
@@ -90,10 +90,10 @@ sequenceDiagram
 
     rect rgb(248, 240, 255)
         note over CF,Browser: Paso 4 — Actualización y notificación
-        CF->>Django: PATCH /documents/by-function/:id { content }
+        CF->>Django: PATCH /api/v1/documents/by-function/:id { content }
         Django->>Django: Guarda en PostgreSQL
         Django-->>Browser: SSE evento "transcription_complete"
-        CF->>Django: POST /transcription/notify-complete
+        CF->>Django: POST /api/v1/transcription/notify-complete
         Django->>Django: Marca encuentro como transcrito
         CF-->>Django: 200 OK
         Django-->>Browser: 200 OK
@@ -104,29 +104,29 @@ sequenceDiagram
 
 ## 3. Flujo de Generación de Documentos
 
-Genera un documento clínico (SOAP, nota de evolución, etc.) combinando la transcripción, el contexto del paciente y una plantilla, con streaming en tiempo real vía SSE.
+Genera un documento clínico (SOAP, nota de evolución, etc.) combinando la transcripción, el contexto del paciente y una plantilla, con streaming en tiempo real vía SSE. En el slice migrado, el kickoff, SSE token y callbacks de generación viven en FastAPI bajo `/api/v1`.
 
 ```mermaid
 sequenceDiagram
     actor Medico
     participant Browser as React (Browser)
-    participant Django as Django API
+    participant Django as API Backend
     participant CF as CF document-workflow
     participant Gemini as Vertex AI · Gemini
 
     rect rgb(240, 248, 255)
         note over Browser,Django: Paso 1 — Apertura de canal SSE
-        Browser->>Django: POST /generate-sse-token/:doc_id
+        Browser->>Django: POST /api/v1/documents/:doc_id/sse-token
         Django-->>Browser: { token } (5 min)
-        Browser->>Django: GET /sse/document/:id/:token
+        Browser->>Django: GET /api/v1/sse/documents/:id/:token
         note right of Browser: Conexión SSE abierta (streaming)
     end
 
     rect rgb(255, 248, 240)
         note over Browser,CF: Paso 2 — Trigger de generación
         Medico->>Browser: Clic en "Generar Documento"
-        Browser->>Django: POST /documents/generate
-        Django->>Django: Valida permisos y genera JWT (30 min)
+        Browser->>Django: POST /api/v1/documents/generate
+        Django->>Django: Valida permisos y genera JWT callback (30 min)
         Django->>CF: POST validate_only=true (síncrono)
         CF-->>Django: 200 OK
         Django-->>Browser: 200 OK { process_id }
@@ -140,7 +140,7 @@ sequenceDiagram
 
         loop Cada chunk de texto
             Gemini-->>CF: chunk
-            CF->>Django: POST /documents/generation-chunk
+            CF->>Django: POST /api/v1/documents/generation-chunk
             Django-->>Browser: SSE "generation_chunk" { chunk }
         end
     end

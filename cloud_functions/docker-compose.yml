@@ -19,6 +19,8 @@ services:
       - FUNCTION_TARGET=transcription_endpoint
       - PORT=8082 # Explicitly set port
       - GOOGLE_APPLICATION_CREDENTIALS=/app/adc.json
+      - BACKEND_API_BASE_URL=http://localhost:8001
+      - BACKEND_API_VERSION=v1
     env_file:
       - ./functions/.env.local
     volumes:
@@ -40,6 +42,8 @@ services:
       - FUNCTION_TARGET=generate_document_workflow
       - PORT=8083 # Different port here
       - GOOGLE_APPLICATION_CREDENTIALS=/app/adc.json
+      - BACKEND_API_BASE_URL=http://localhost:8001
+      - BACKEND_API_VERSION=v1
     env_file:
       - ./functions/.env.local
     volumes:

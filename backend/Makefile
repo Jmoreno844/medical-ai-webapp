@@ -10,9 +10,10 @@ PY := $(UV) run python
 
 .DEFAULT_GOAL := help
 
-.PHONY: help sync sync-frozen sync-dev sync-dev-frozen install run runserver migrate \
-	makemigrations test pytest shell createsuperuser lint format check pre-commit \
-	pre-commit-all clear-db db-up db-down up-db down-db
+.PHONY: help sync sync-frozen sync-dev sync-dev-frozen install run runserver fastapi-run \
+	fastapi-check fastapi-docker-build migrate makemigrations test pytest shell \
+	createsuperuser lint format check pre-commit pre-commit-all clear-db db-up \
+	db-down up-db down-db
 
 help: ## Show available targets
 	@echo "Backend (uv) — run from backend/"
@@ -37,6 +38,15 @@ runserver: ## Django runserver 0.0.0.0:8001
 	$(PY) manage.py runserver 0.0.0.0:8001
 
 run: runserver ## alias: same as runserver
+
+fastapi-run: ## FastAPI migration app on 0.0.0.0:8002
+	cd ../backend_fastapi && $(UV) run uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
+
+fastapi-check: ## FastAPI migration tests
+	cd ../backend_fastapi && $(UV) run pytest -q
+
+fastapi-docker-build: ## Build the parallel FastAPI image from repo root context
+	cd ../backend_fastapi && docker build -t medical-fastapi-migration:local .
 
 migrate: ## apply migrations
 	$(PY) manage.py migrate

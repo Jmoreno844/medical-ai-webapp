@@ -78,7 +78,7 @@ export const generateAudioUploadUrl = async (
     );
 
     const response = await axiosInstance.post(
-      `/api/encounters/${encounterId}/audio/upload-url`,
+      `/api/v1/encounters/${encounterId}/audio/upload-url`,
       { audio_duration_seconds: audioDurationSeconds }
     );
 

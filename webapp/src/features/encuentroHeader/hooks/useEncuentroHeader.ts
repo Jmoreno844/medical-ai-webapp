@@ -255,7 +255,7 @@ export function useEncuentroHeader(
       logger.debug(`Updating encounter date to: ${isoDate}`);
 
       const response = await axiosInstance.patch(
-        `/api/encounters/${encounterIdFromUrl}`,
+        `/api/v1/encounters/${encounterIdFromUrl}`,
         {
           occurred_at: isoDate,
         }

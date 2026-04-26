@@ -124,6 +124,11 @@ El bucket `*-audio` también necesita CORS para subida directa desde el navegado
 | `vpc-egress` | `PRIVATE_RANGES_ONLY` | Solo la base de datos viaja por VPC |
 | `Cloud SQL` | Private IP + IAM DB auth | PostgreSQL no queda expuesto por IP pública |
 
+La migración Django -> FastAPI conserva esta misma restricción en su primera
+fase: no se introduce Redis/Memorystore todavía, por lo que cualquier servicio
+FastAPI que maneje SSE debe desplegarse con una sola instancia y afinidad de
+sesión hasta que exista un broker compartido.
+
 ### Copilot Agent Cloud Run — configuración inicial
 
 | Parámetro | Valor (stg) | Nota |

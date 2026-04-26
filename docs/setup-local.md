@@ -61,7 +61,8 @@ Variables clave:
 - `GCP_PROJECT`
 - `GCP_REGION`
 - `GEMINI_MODEL`
-- `DJANGO_API_BASE_URL=http://localhost:8001/`
+- `BACKEND_API_BASE_URL=http://localhost:8001`
+- `BACKEND_API_VERSION=v1`
 - `LANGSMITH_TRACING=true` si quieres tracing local en LangSmith
 - `LANGSMITH_API_KEY`
 - `LANGSMITH_PROJECT=cloud-functions-local`

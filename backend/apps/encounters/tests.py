@@ -1,118 +1,80 @@
 import pytest
-from datetime import date
-from apps.medico.models import Medico
-from apps.paciente.models import Paciente
-from .models import Encuentro
+from datetime import datetime
+
+from apps.encounters.models import Encounter
+from apps.patients.models import Patient, PatientDoctor
+from apps.users.models import User
 
 
 @pytest.fixture
-def medico(db):
-    return Medico.objects.create(
+def doctor(db):
+    user = User.objects.create(
         email="test@doctor.com",
-        password="testpass123",
-        nombre="Dr. Test",
-        especialidad="General",
+        name="Dr.",
+        last_name="Test",
     )
+    user.set_password("testpass123")
+    user.save(update_fields=["password"])
+    return user
 
 
 @pytest.fixture
-def otro_medico(db):
-    return Medico.objects.create(
+def other_doctor(db):
+    user = User.objects.create(
         email="other@doctor.com",
-        password="testpass123",
-        nombre="Dr. Other",
-        especialidad="General",
+        name="Dr.",
+        last_name="Other",
     )
+    user.set_password("testpass123")
+    user.save(update_fields=["password"])
+    return user
 
 
 @pytest.fixture
 def paciente(db):
-    return Paciente.objects.create(
-        email="patient@test.com", nombre="Test Patient", fecha_nacimiento="1990-01-01"
-    )
+    return Patient.objects.create(name="Test Patient")
 
 
 @pytest.fixture
-def encuentro(db, medico, paciente):
-    return Encuentro.objects.create(
-        id_medico=medico,
-        id_paciente=paciente,
-        nombre_encuentro="Test Encuentro",
-        fecha=date.today(),
+def encounter(db, doctor, paciente):
+    PatientDoctor.objects.create(doctor=doctor, patient=paciente)
+    return Encounter.objects.create(
+        doctor=doctor,
+        patient=paciente,
+        encounter_name="Test Encounter",
+        occurred_at=datetime.now(),
     )
 
 
 @pytest.mark.django_db
-class TestEncuentroAPI:
-    def test_list_encuentros(self, client, medico, encuentro):
-        # Create an encounter for another doctor to ensure it's not returned
-        Encuentro.objects.create(
-            id_medico=otro_medico,
-            id_paciente=paciente,
-            nombre_encuentro="Other Encuentro",
-            fecha=date.today(),
+class TestEncounterAPI:
+    def test_list_encounters(self, client, doctor, other_doctor, paciente, encounter):
+        client.force_login(doctor)
+        Encounter.objects.create(
+            doctor=other_doctor,
+            patient=paciente,
+            encounter_name="Other Encounter",
+            occurred_at=datetime.now(),
         )
 
-        response = client.get(
-            "/api/encuentros", HTTP_AUTHORIZATION=f"Bearer {medico.id}"
-        )
+        response = client.get("/api/encounters")
 
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 1
-        assert data[0]["id"] == encuentro.id
-        assert data[0]["id_medico"] == medico.id
+        assert data[0]["id"] == encounter.id
+        assert data[0]["doctor_id"] == doctor.id
 
-    def test_create_encuentro(self, client, medico, paciente):
-        payload = {
-            "id_medico": medico.id,
-            "id_paciente": paciente.id,
-            "nombre_encuentro": "New Encuentro",
-            "fecha": str(date.today()),
-        }
+    def test_create_empty_encounter(self, client, doctor):
+        client.force_login(doctor)
 
-        response = client.post(
-            "/api/encuentros",
-            payload,
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Bearer {medico.id}",
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["nombre_encuentro"] == "New Encuentro"
-        assert data["id_medico"] == medico.id
-        assert data["id_paciente"] == paciente.id
-
-    def test_create_encuentro_unauthorized(self, client, medico, otro_medico, paciente):
-        payload = {
-            "id_medico": otro_medico.id,  # Trying to create for another doctor
-            "id_paciente": paciente.id,
-            "nombre_encuentro": "Unauthorized Encuentro",
-            "fecha": str(date.today()),
-        }
-
-        response = client.post(
-            "/api/encuentros",
-            payload,
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Bearer {medico.id}",
-        )
-
-        assert response.status_code == 403
-
-    def test_create_empty_encuentro(self, client, medico):
-        response = client.post(
-            "/api/encuentros/new", HTTP_AUTHORIZATION=f"Bearer {medico.id}"
-        )
+        response = client.post("/api/encounters", data={}, content_type="application/json")
 
         assert response.status_code == 200
         data = response.json()
         assert "id" in data
 
-        # Verify the encounter was created with correct defaults
-        encuentro = Encuentro.objects.get(id=data["id"])
-        assert encuentro.id_medico_id == medico.id
-        assert encuentro.id_paciente_id is None
-        assert encuentro.nombre_encuentro == "Encuentro Nuevo"
-        assert encuentro.fecha == date.today()
+        encounter = Encounter.objects.get(id=data["id"])
+        assert encounter.doctor_id == doctor.id
+        assert encounter.patient_id is None
+        assert encounter.encounter_name == "Encuentro Nuevo"

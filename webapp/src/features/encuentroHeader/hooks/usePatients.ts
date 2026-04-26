@@ -38,7 +38,7 @@ export const usePatients = () => {
 
     try {
       const response = await axiosInstance.get(
-        `/api/patients/search?name=${encodeURIComponent(query)}`
+        `/api/v1/patients/search?name=${encodeURIComponent(query)}`
       );
 
       if (!Array.isArray(response.data)) {
@@ -64,7 +64,7 @@ export const usePatients = () => {
     setError(null);
 
     try {
-      const response = await axiosInstance.post("/api/patients", {
+      const response = await axiosInstance.post("/api/v1/patients", {
         name: patientName,
       });
 
@@ -91,7 +91,7 @@ export const usePatients = () => {
     setError(null);
 
     try {
-      await axiosInstance.put(`/api/patients/${patientId}`, {
+      await axiosInstance.put(`/api/v1/patients/${patientId}`, {
         name: patientName,
       });
 

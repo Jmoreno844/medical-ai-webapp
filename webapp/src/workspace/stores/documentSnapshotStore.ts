@@ -89,7 +89,7 @@ export const useDocumentSnapshotStore =
       get().setSnapshotError(documentId, null);
 
       try {
-        const response = await axiosInstance.get(`/api/documents/${documentId}`);
+        const response = await axiosInstance.get(`/api/v1/documents/${documentId}`);
         const contentMarkdown =
           response.data.content_markdown ?? response.data.content ?? "";
         const contentJson =

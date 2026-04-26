@@ -113,6 +113,11 @@ def _preseed_document_reads(workspace_index: dict[str, Any] | None) -> list[dict
         content = doc.get("content_markdown")
         if doc.get("ai_writable") and content:
             content_hash = doc.get("content_hash") or _content_hash(str(content))
+            # Deliberately do NOT pre-seed structure_mode/sections from the initial
+            # workspace payload. Keeping the bootstrap symmetric across documents is
+            # more important than giving richer structure to only a subset, which
+            # would bias the planner toward those docs. Section extraction remains an
+            # explicit backend read concern (read_document / read_document_summary).
             pre_reads.append(
                 {
                     "document_id": str(doc["document_id"]),

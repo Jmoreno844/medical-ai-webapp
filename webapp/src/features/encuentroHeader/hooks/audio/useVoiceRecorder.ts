@@ -13,7 +13,7 @@ import { logger } from "@/lib/logger";
 const checkAudioExists = async (encounterId: number) => {
   try {
     const response = await axiosInstance.get(
-      `/api/encounters/${encounterId}/audio/exists`
+      `/api/v1/encounters/${encounterId}/audio/exists`
     );
 
     // With axiosInstance, the data is already parsed as JSON
@@ -376,7 +376,7 @@ export const useVoiceRecorder = (
           logger.debug(
             `[VOICE_RECORDER] Attempting to delete audio for encounter ${encounterId}`
           );
-          await axiosInstance.delete(`/api/encounters/${encounterId}/audio`);
+          await axiosInstance.delete(`/api/v1/encounters/${encounterId}/audio`);
           logger.debug(
             "[VOICE_RECORDER] Server delete request sent for encounter",
             encounterId

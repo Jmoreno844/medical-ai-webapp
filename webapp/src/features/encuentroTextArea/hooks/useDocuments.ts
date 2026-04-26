@@ -39,7 +39,7 @@ export const useDocuments = (encounterId: number) => {
     try {
       setLoading(true);
       const response = await axiosInstance.get(
-        `/api/documents/encounter/${encounterId}`
+        `/api/v1/documents/encounter/${encounterId}`
       );
 
       const data = response.data;
@@ -143,7 +143,7 @@ export const useDocuments = (encounterId: number) => {
         setIsLoadingContent(true);
         logger.debug(`[DB_FETCH 🔍] Document ${docId}: Fetching from database`);
 
-        const response = await axiosInstance.get(`/api/documents/${docId}`);
+        const response = await axiosInstance.get(`/api/v1/documents/${docId}`);
 
         const documentData = response.data;
         const content = documentData.content || "";
@@ -265,7 +265,7 @@ export const useDocuments = (encounterId: number) => {
         );
 
         // Send the update
-        await axiosInstance.patch(`/api/documents/by-editor/${docId}`, {
+        await axiosInstance.patch(`/api/v1/documents/by-editor/${docId}`, {
           content: finalContent,
         });
 
@@ -312,7 +312,7 @@ export const useDocuments = (encounterId: number) => {
     async (documentType: string, content: string = "") => {
       try {
         setLoading(true);
-        const response = await axiosInstance.post("/api/documents", {
+        const response = await axiosInstance.post("/api/v1/documents", {
           encounter_id: encounterId,
           kind: documentType,
           content,
@@ -359,7 +359,7 @@ export const useDocuments = (encounterId: number) => {
     async (docId: number) => {
       try {
         setLoading(true);
-        await axiosInstance.delete(`/api/documents/${docId}`);
+        await axiosInstance.delete(`/api/v1/documents/${docId}`);
 
         // Remove document from local state
         setDocuments((docs) => docs.filter((doc) => doc.id !== docId));
