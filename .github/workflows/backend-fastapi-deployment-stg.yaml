@@ -111,18 +111,18 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
-      - name: Resolve Cloud Function and Copilot URLs
+      - name: Resolve service URLs
         id: function_urls
         run: |
           set -euo pipefail
-          TRANSCRIPTION_URL="$(gcloud functions describe transcription-endpoint --gen2 --region="${REGION}" --format='value(serviceConfig.uri)')"
           DOCUMENT_URL="$(gcloud functions describe document-workflow --gen2 --region="${REGION}" --format='value(serviceConfig.uri)')"
           DB_IAM_USER="${{ vars.BACKEND_SERVICE_ACCOUNT }}"
           DB_IAM_USER="${DB_IAM_USER%.gserviceaccount.com}"
+          BACKEND_URL="$(gcloud run services describe "${SERVICE_NAME}" --region="${REGION}" --format='value(status.url)')"
           COPILOT_URL="$(gcloud run services describe vexthealth-copilot-agent --region="${REGION}" --format='value(status.url)')"
-          echo "transcription_url=${TRANSCRIPTION_URL}" >> "$GITHUB_OUTPUT"
           echo "document_url=${DOCUMENT_URL}" >> "$GITHUB_OUTPUT"
           echo "db_iam_user=${DB_IAM_USER}" >> "$GITHUB_OUTPUT"
+          echo "backend_url=${BACKEND_URL}" >> "$GITHUB_OUTPUT"
           echo "copilot_url=${COPILOT_URL}" >> "$GITHUB_OUTPUT"
 
       - name: Deploy to Cloud Run
@@ -154,10 +154,10 @@ jobs:
             DB_NAME=${{ env.GCP_PROJECT_ID }}
             DB_USER=${{ steps.function_urls.outputs.db_iam_user }}
             CLOUD_TASKS_REGION=${{ env.REGION }}
-            TRANSCRIPTION_QUEUE_NAME=audio-transcription-queue
+            TRANSCRIPTION_QUEUE_NAME=audio-transcription-queue-stg
             CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT=cloud-tasks-invoker@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+            TRANSCRIPTION_TASK_TARGET_URL=${{ steps.function_urls.outputs.backend_url }}/api/v1/internal/transcription/tasks
             GENERATE_DOCUMENT_CLOUD_FUNCTION_URL=${{ steps.function_urls.outputs.document_url }}
-            TRANSCRIPTION_CLOUD_FUNCTION_URL=${{ steps.function_urls.outputs.transcription_url }}
             COPILOT_AGENT_BASE_URL=${{ steps.function_urls.outputs.copilot_url }}
             FASTAPI_CORS_ALLOWED_ORIGINS=${{ vars.FASTAPI_CORS_ALLOWED_ORIGINS }}
           secrets: |

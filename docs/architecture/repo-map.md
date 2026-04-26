@@ -7,7 +7,7 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 | Carpeta | Rol | Fuente de verdad |
 |--------|-----|------------------|
 | `backend_fastapi/` | API central, modelos SQLAlchemy, auth, JWT, SSE, orquestación y migraciones Alembic | Sí |
-| `cloud_functions/` | Transcripción y generación documental con Gemini | Sí |
+| `cloud_functions/` | Generación documental con Gemini y transcripción legacy | Sí |
 | `webapp/` | SPA del médico | Sí |
 | `infra/` | Infra GCP, IAM, budgets, deploy base | Sí |
 | `landing-page/` | Sitio marketing separado | Sí, pero no es parte del flujo clínico central |
@@ -55,8 +55,8 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 - Transcripción:
   - Kickoff: `backend_fastapi/app/domains/transcription/api.py`
   - Cola: `backend_fastapi/app/domains/transcription/service.py`
-  - Function: `cloud_functions/functions/endpoints/transcription_endpoint.py`
-  - Callbacks al API: `cloud_functions/functions/services/backend_api.py`
+  - Worker interno: `backend_fastapi/app/domains/transcription/api.py`
+  - Gemini async: `backend_fastapi/app/domains/transcription/gemini_async.py`
 - Generación documental:
   - Kickoff, SSE y callbacks: `backend_fastapi/app/domains/documents/api.py`
   - Servicios: `backend_fastapi/app/domains/documents/service.py`
@@ -97,7 +97,8 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
   - signed URLs se generan en backend
   - el navegador sube audio directo al bucket
 - Gemini:
-  - solo vive en Cloud Functions
+  - transcripción vive en FastAPI con Google Gen AI SDK async sobre Vertex AI
+  - generación documental sigue en Cloud Functions
 - Secret Manager / IAM / budgets:
   - viven en `infra/`, no en lógica de producto
 

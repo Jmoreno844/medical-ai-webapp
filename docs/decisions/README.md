@@ -32,3 +32,4 @@ Cada ADR deberia incluir al menos estas secciones:
 - [0005. Aislamiento de cargas de trabajo IA (LangGraph)](0005-aislamiento-cargas-trabajo-ia-langgraph.md)
 - [0006. Diferir explicit context caching para un futuro QA helper clínico](0006-explicit-context-caching-futuro-qa-helper.md)
 - [0007. Anchors por contenido y lectura completa explícita en el writer flow](0007-writer-flow-anchors-y-lectura-completa.md)
+- [0008. Transcripcion segmentada near realtime con GCS, Cloud Tasks y Gemini](0008-transcripcion-segmentada-near-realtime.md)

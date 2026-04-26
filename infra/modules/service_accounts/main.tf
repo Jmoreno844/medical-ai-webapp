@@ -66,6 +66,12 @@ resource "google_project_iam_member" "backend_tasks_enqueue" {
   member  = "serviceAccount:${google_service_account.backend_runner.email}"
 }
 
+resource "google_project_iam_member" "backend_aiplatform" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.backend_runner.email}"
+}
+
 resource "google_project_iam_member" "backend_run_invoker" {
   project = var.project_id
   role    = "roles/run.invoker"

@@ -195,10 +195,11 @@ module "cloud_tasks" {
   project_id = var.project_id
   region     = var.region
 
-  queue_name          = "audio-transcription-queue-stg"
-  max_attempts        = 3
-  min_backoff_seconds = 10
-  max_backoff_seconds = 300
+  queue_name                = "audio-transcription-queue-stg"
+  max_attempts              = 3
+  max_concurrent_dispatches = 3
+  min_backoff_seconds       = 10
+  max_backoff_seconds       = 300
 
   depends_on = [module.project_services]
 }

@@ -1,12 +1,12 @@
 # Cloud Functions
 
-El directorio `cloud_functions/` contiene las funciones serverless que hacen el trabajo pesado con Gemini: transcripción de audio y generación de documentos clínicos.
+El directorio `cloud_functions/` contiene la generación documental serverless con Gemini. La transcripción nueva corre en FastAPI mediante Cloud Tasks y Google Gen AI SDK async; la función de transcripción queda como legacy.
 
 ## Qué vive aquí
 
-- `functions/endpoints/transcription_endpoint.py` — entrypoint HTTP para transcripción.
 - `functions/endpoints/document_workflow.py` — entrypoint HTTP para generación de documentos.
-- `functions/services/transcription/` — procesamiento de audio desde `gs://`.
+- `functions/endpoints/transcription_endpoint.py` — legacy para transcripción.
+- `functions/services/transcription/` — legacy para procesamiento de audio desde `gs://`.
 - `functions/services/document_generation/` — prompt building, streaming y formateo.
 - `functions/services/backend_api.py` — callbacks HTTP hacia el backend versionado (`PATCH` de contenido, chunks de generación, notify complete).
 - `functions/tracing.py` — OpenTelemetry (span por request + propagación en `requests` hacia el backend). Variables: [`../backend/tracing.md`](../backend/tracing.md).
@@ -16,8 +16,8 @@ El directorio `cloud_functions/` contiene las funciones serverless que hacen el 
 
 - Terraform crea el bucket fuente `gs://<project>-cf-source`, las service accounts y los permisos necesarios.
 - El runtime de las funciones **no** lo crea Terraform en `stg`.
-- El workflow [`deploy-cloud-function-stg.yaml`](../../.github/workflows/deploy-cloud-function-stg.yaml) empaqueta el código, sube el zip al bucket fuente y despliega las dos funciones con `gcloud functions deploy`.
-- El mismo workflow aplica los bindings IAM de invocación para `cloud-tasks-invoker` y `backend-runner`.
+- El workflow [`deploy-cloud-function-stg.yaml`](../../.github/workflows/deploy-cloud-function-stg.yaml) empaqueta el código, sube el zip al bucket fuente y despliega `document-workflow` con `gcloud functions deploy`.
+- El mismo workflow aplica el binding IAM de invocación para `backend-runner`.
 
 ## Variables de entorno clave
 
@@ -64,7 +64,7 @@ Si el archivo de ADC no existe aún, ejecuta en el host: `gcloud auth applicatio
 
 ## Contrato con el backend
 
-- El backend encola la transcripción en Cloud Tasks y llama la generación de documentos por HTTP directo.
+- El backend encola la transcripción en Cloud Tasks hacia un endpoint interno de FastAPI y llama la generación de documentos por HTTP directo.
 - Las funciones devuelven resultados al backend usando `Authorization: Bearer <jwt>`.
 - Los chunks de generación se envían de vuelta al backend y luego salen al navegador por SSE.
 - Durante la migración actual, los callbacks clínicos apuntan a FastAPI bajo `/api/v1`.

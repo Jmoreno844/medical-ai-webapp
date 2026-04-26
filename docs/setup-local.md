@@ -33,7 +33,7 @@ Para local, el backend y el contenedor Docker de PostgreSQL usan `5433` por defe
 - `GCS_BUCKET_NAME`
 - `GCP_PROJECT_ID`
 - `GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT`
-- `TRANSCRIPTION_CLOUD_FUNCTION_URL=http://localhost:8082`
+- `TRANSCRIPTION_TASK_TARGET_URL=http://localhost:8001/api/v1/internal/transcription/tasks`
 - `GENERATE_DOCUMENT_CLOUD_FUNCTION_URL=http://localhost:8083`
 
 La ruta recomendada para firmar URLs de GCS en local es ADC + impersonación. Usa `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH` solo como excepción.
@@ -216,7 +216,6 @@ docker compose -f cloud_functions/docker-compose.yml up --build
 
 Puertos locales:
 
-- `8082` — `transcription-endpoint`
 - `8083` — `document-workflow`
 
 ## 6. Smoke test recomendado
@@ -224,7 +223,7 @@ Puertos locales:
 1. Abrir el frontend en `http://localhost:5173`.
 2. Crear o abrir un `Encuentro`.
 3. Verificar que el API responda en `http://localhost:8001/api/v1/health`.
-4. Confirmar que el flujo de transcripción apunte a `http://localhost:8082`.
+4. Confirmar que el flujo de transcripción apunte al worker interno de FastAPI.
 5. Confirmar que la generación documental apunte a `http://localhost:8083`.
 6. Confirmar que `copilot_agent` responda en `http://localhost:8090/healthz`.
 
@@ -260,7 +259,8 @@ Para el slice actual del broker, backend y `copilot_agent` deben compartir el mi
 
 ## 8. Trazas distribuidas opcionales
 
-Para un trace local de `webapp -> FastAPI -> Cloud Functions -> FastAPI` (mismo
+Para un trace local de `webapp -> FastAPI -> Cloud Tasks/worker -> FastAPI` o
+`webapp -> FastAPI -> Cloud Functions -> FastAPI` (mismo
 camino lógico de producción):
 
 ```bash
@@ -280,7 +280,6 @@ Detalle completo en [`docs/backend/tracing.md`](backend/tracing.md).
 - `5173` — frontend Vite
 - `8001` — API backend (FastAPI)
 - `5433` — PostgreSQL local
-- `8082` — Cloud Function de transcripción
 - `8083` — Cloud Function de generación
 - `8090` — copilot agent service
 - `16686` — Jaeger UI

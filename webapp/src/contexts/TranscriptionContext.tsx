@@ -33,6 +33,8 @@ type TranscriptionContextType = {
   duration: number;
   audioBlob: Blob | null;
   audioExists: boolean;
+  recordingSessionId: string | null;
+  pendingAudioSections: number;
   audioExpiresAt: string | null;
   isAudioExpired: boolean;
   isCheckingAudio: boolean;
@@ -388,6 +390,13 @@ export function TranscriptionProvider({
           );
         }
 
+        if (voiceRecorder.recordingSessionId) {
+          return {
+            success: true,
+            message: "Transcripción por secciones en proceso",
+          };
+        }
+
         const response = await axiosInstance.post(
           `/api/v1/transcription/start`,
           {
@@ -425,7 +434,12 @@ export function TranscriptionProvider({
         throw error;
       }
     },
-    [closeEventSource, failTranscription, subscribeToTranscriptionUpdates]
+    [
+      closeEventSource,
+      failTranscription,
+      subscribeToTranscriptionUpdates,
+      voiceRecorder.recordingSessionId,
+    ]
   );
 
   /**
@@ -473,8 +487,11 @@ export function TranscriptionProvider({
   }, [contentContext, transcriptionDocId]);
 
   const startRecording = useCallback(() => {
+    if (transcriptionDocId) {
+      void subscribeToTranscriptionUpdates(transcriptionDocId);
+    }
     voiceRecorder.startRecording();
-  }, [voiceRecorder]);
+  }, [subscribeToTranscriptionUpdates, transcriptionDocId, voiceRecorder]);
 
   const stopRecording = useCallback(() => {
     voiceRecorder.stopRecording();
@@ -503,6 +520,8 @@ export function TranscriptionProvider({
     duration: voiceRecorder.duration,
     audioBlob: voiceRecorder.audioBlob,
     audioExists: voiceRecorder.audioExists,
+    recordingSessionId: voiceRecorder.recordingSessionId,
+    pendingAudioSections: voiceRecorder.pendingAudioSections,
     audioExpiresAt: voiceRecorder.audioExpiresAt,
     isAudioExpired: voiceRecorder.isAudioExpired,
     isCheckingAudio: voiceRecorder.isCheckingAudio,

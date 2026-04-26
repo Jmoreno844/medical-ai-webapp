@@ -3,7 +3,17 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -47,6 +57,9 @@ class Encounter(Base):
     doctor: Mapped[User] = relationship()
     patient: Mapped["Patient | None"] = relationship()
     documents: Mapped[list["Document"]] = relationship(back_populates="encounter")
+    transcription_recording_sessions: Mapped[list["TranscriptionRecordingSession"]] = (
+        relationship(back_populates="encounter")
+    )
 
 
 class Document(Base):
@@ -66,6 +79,77 @@ class Document(Base):
     doctor: Mapped[User] = relationship()
     encounter: Mapped[Encounter] = relationship(back_populates="documents")
     doctor_template: Mapped["DoctorTemplate | None"] = relationship()
+    transcription_recording_sessions: Mapped[list["TranscriptionRecordingSession"]] = (
+        relationship(back_populates="document")
+    )
+
+
+class TranscriptionRecordingSession(Base):
+    __tablename__ = "transcription_recording_session"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    encounter_id: Mapped[int] = mapped_column(ForeignKey("encounters_encounter.id"))
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents_document.id"))
+    doctor_id: Mapped[int] = mapped_column(ForeignKey("users_user.id"))
+    status: Mapped[str] = mapped_column(String(32))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    consolidated_transcript: Mapped[str | None] = mapped_column(Text)
+    error_code: Mapped[str | None] = mapped_column(String(64))
+
+    encounter: Mapped[Encounter] = relationship(
+        back_populates="transcription_recording_sessions"
+    )
+    document: Mapped[Document] = relationship(
+        back_populates="transcription_recording_sessions"
+    )
+    doctor: Mapped[User] = relationship()
+    sections: Mapped[list["TranscriptionAudioSection"]] = relationship(
+        back_populates="recording_session",
+        order_by="TranscriptionAudioSection.section_index",
+    )
+
+
+class TranscriptionAudioSection(Base):
+    __tablename__ = "transcription_audio_section"
+    __table_args__ = (
+        UniqueConstraint(
+            "recording_session_id",
+            "client_section_id",
+            name="uq_transcription_section_client_id",
+        ),
+        UniqueConstraint(
+            "recording_session_id",
+            "section_index",
+            name="uq_transcription_section_index",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    section_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    recording_session_id: Mapped[int] = mapped_column(
+        ForeignKey("transcription_recording_session.id")
+    )
+    client_section_id: Mapped[str] = mapped_column(String(64))
+    section_index: Mapped[int] = mapped_column(Integer)
+    start_time_ms: Mapped[int] = mapped_column(Integer)
+    end_time_ms: Mapped[int] = mapped_column(Integer)
+    overlap_ms: Mapped[int] = mapped_column(Integer)
+    gcs_object_name: Mapped[str] = mapped_column(String(512))
+    content_type: Mapped[str] = mapped_column(String(100))
+    byte_size: Mapped[int | None] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(32))
+    raw_transcript: Mapped[str | None] = mapped_column(Text)
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    retry_count: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    recording_session: Mapped[TranscriptionRecordingSession] = relationship(
+        back_populates="sections"
+    )
 
 
 class Patient(Base):

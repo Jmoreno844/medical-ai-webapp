@@ -44,6 +44,9 @@ erDiagram
     Paciente ||--o{ PacienteMedico : "id_paciente"
     Paciente ||--o{ Encuentro : "id_paciente (nullable)"
     Encuentro ||--o{ Documento : "id_encuentro"
+    Encuentro ||--o{ TranscriptionRecordingSession : "id_encuentro"
+    Documento ||--o{ TranscriptionRecordingSession : "id_documento"
+    TranscriptionRecordingSession ||--o{ TranscriptionAudioSection : "recording_session_id"
     PlantillaBase ||--o{ PlantillaDoctor : "id_plantilla_base (nullable)"
     PlantillaDoctor ||--o{ Documento : "id_plantilla_doctor (nullable)"
     PlantillaDoctor ||--|| UsoPlantilla : "id_plantilla"
@@ -97,6 +100,40 @@ erDiagram
         varchar tipo
         text contenido
         date fecha_creacion
+    }
+
+    TranscriptionRecordingSession {
+        bigint id PK
+        varchar session_id UK
+        bigint encounter_id FK
+        bigint document_id FK
+        bigint doctor_id FK
+        varchar status
+        datetime started_at
+        datetime finished_at
+        datetime finalized_at
+        text consolidated_transcript
+        varchar error_code
+    }
+
+    TranscriptionAudioSection {
+        bigint id PK
+        varchar section_id UK
+        bigint recording_session_id FK
+        varchar client_section_id
+        int section_index
+        int start_time_ms
+        int end_time_ms
+        int overlap_ms
+        varchar gcs_object_name
+        varchar content_type
+        int byte_size
+        varchar status
+        text raw_transcript
+        varchar error_code
+        int retry_count
+        datetime created_at
+        datetime updated_at
     }
 
     PlantillaBase {

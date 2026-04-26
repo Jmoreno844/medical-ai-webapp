@@ -32,7 +32,7 @@ Use **test-only** `JWT_SECRET_KEY`. Do not point test at production databases or
 | `DB_NAME` | Yes |
 | `DB_USER` | Yes; en `stg` es el usuario IAM derivado de `backend-runner` (formato canonical: sin `.gserviceaccount.com`; el backend normaliza el email completo si se le pasa así) |
 | `DB_HOST` / `DB_PORT` | Yes; en `stg` quedan `127.0.0.1:5432` vía Cloud SQL Auth Proxy sidecar |
-| `TRANSCRIPTION_CLOUD_FUNCTION_URL` | Yes |
+| `TRANSCRIPTION_TASK_TARGET_URL` | Yes |
 | `GENERATE_DOCUMENT_CLOUD_FUNCTION_URL` | Yes |
 | `CLOUD_TASKS_REGION` | Yes |
 | `TRANSCRIPTION_QUEUE_NAME` | Yes |
@@ -49,7 +49,7 @@ En `stg`, la conexión a Cloud SQL usa **IAM DB auth + Cloud SQL Auth Proxy**. Y
 | `GCS_BUCKET_NAME` | As needed for storage |
 | `SERVICE_ACCOUNT_JSON` | JSON string for GCS client when not using dev file path |
 | `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH` | Optional; local path if used |
-| `TRANSCRIPTION_CLOUD_FUNCTION_URL` | As needed |
+| `TRANSCRIPTION_CLOUD_FUNCTION_URL` | Legacy fallback only |
 | `GENERATE_DOCUMENT_CLOUD_FUNCTION_URL` | As needed (alias: `GENERATE_DOCUMENT_CLOUD_FUNCTION_BASE_URL`) |
 
 Inject via Cloud Run / Secret Manager; never commit real values.

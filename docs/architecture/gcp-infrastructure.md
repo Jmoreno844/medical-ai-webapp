@@ -16,7 +16,7 @@ IaC: `infra/` en la raíz del repo.
 |---|---|---|
 | Cloud Run service | `vexthealth-backend` | `vexthealth-backend` |
 | Cloud Run copilot | `vexthealth-copilot-agent` | `vexthealth-copilot-agent` |
-| Cloud Function | `<nombre-funcional>` | `transcription-endpoint`, `document-workflow` |
+| Cloud Function | `<nombre-funcional>` | `document-workflow` |
 | Cloud SQL instance | `vexthealth-db-<env>` | `vexthealth-db-stg` |
 | GCS audio | `<project>-audio` | `vext-stg-audio` |
 | GCS frontend | `<project>-frontend-spa` | `vext-stg-frontend-spa` |
@@ -37,6 +37,7 @@ IaC: `infra/` en la raíz del repo.
 | `roles/storage.objectAdmin` sobre `*-audio` | Subir/firmar URLs de audio en GCS |
 | `roles/cloudtrace.agent` | Enviar trazas a Cloud Trace |
 | `roles/cloudtasks.enqueuer` | Encolar tareas de transcripción |
+| `roles/aiplatform.user` | Llamar Gemini/Vertex AI desde el worker interno de transcripción |
 | `roles/run.invoker` | Invocar el copilot agent service por contrato interno |
 | `roles/iam.serviceAccountUser` sobre `cloud-tasks-invoker` | Crear tasks autenticadas con OIDC |
 | `roles/iam.serviceAccountTokenCreator` sobre `cloud-tasks-invoker` | Permitir que Cloud Tasks use la identidad del invoker SA |
@@ -64,7 +65,7 @@ IaC: `infra/` en la raíz del repo.
 
 | Rol | Justificación |
 |---|---|
-| `roles/run.invoker` | Invocar la Cloud Function gen2 de transcripción (el binding se aplica con `gcloud functions add-invoker-policy-binding`) |
+| `roles/run.invoker` | Invocar el endpoint interno de transcripción en Cloud Run vía Cloud Tasks |
 
 ### github-actions-deployer (CI/CD via WIF)
 
@@ -109,7 +110,7 @@ El bucket `*-audio` también necesita CORS para subida directa desde el navegado
 
 | Queue | Max attempts | Min backoff | Max backoff | Target |
 |---|---|---|---|---|
-| `audio-transcription-queue-stg` | 3 | 10s | 300s | `transcription-endpoint` (CF, OIDC con `cloud-tasks-invoker`) |
+| `audio-transcription-queue-stg` | 3 | 10s | 300s | FastAPI internal transcription worker (Cloud Run, OIDC con `cloud-tasks-invoker`) |
 
 ## Cloud Run — configuración clave
 
@@ -139,11 +140,10 @@ sesión hasta que exista un broker compartido.
 
 ## Cloud Functions — IAM auth
 
-Ambas funciones (`transcription-endpoint`, `document-workflow`) están desplegadas con `--no-allow-unauthenticated`.
+La función `document-workflow` está desplegada con `--no-allow-unauthenticated`.
 
 Solo las service accounts autorizadas pueden invocarlas:
 
-- `transcription-endpoint` ← `cloud-tasks-invoker` (vía Cloud Tasks)
 - `document-workflow` ← `backend-runner` (HTTP directo desde Cloud Run)
 
 ## Workload Identity Federation
@@ -190,8 +190,8 @@ El workflow [`.github/workflows/deploy-cloud-function-stg.yaml`](../../.github/w
 
 1. Usa el bucket `gs://{proyecto}-cf-source` creado por Terraform.
 2. Genera un zip del directorio `cloud_functions/functions/` (excluye `__pycache__`, `.venv`, etc.) y lo sube a `cloud-functions.zip`.
-3. Despliega las dos funciones con `gcloud functions deploy` (origen local, igual que antes).
-4. Aplica los bindings IAM de invocación para `cloud-tasks-invoker` y `backend-runner`.
+3. Despliega `document-workflow` con `gcloud functions deploy` (origen local, igual que antes).
+4. Aplica el binding IAM de invocación para `backend-runner`.
 
 Así el artefacto en GCS queda alineado con Terraform, pero el runtime de las funciones en `stg` queda controlado por CI.
 

@@ -92,3 +92,87 @@ export const generateAudioUploadUrl = async (
     return null;
   }
 };
+
+export const createRecordingSession = async (
+  encounterId: number,
+  documentId: number
+): Promise<string | null> => {
+  try {
+    const response = await axiosInstance.post(`/api/v1/transcription/sessions`, {
+      encounter_id: encounterId,
+      document_id: documentId,
+    });
+    return response.data?.session_id ?? null;
+  } catch (error) {
+    logger.error("[VOICE_RECORDER] Failed to create recording session:", error);
+    return null;
+  }
+};
+
+export const generateSectionUploadUrl = async (
+  recordingSessionId: string,
+  clientSectionId: string,
+  sectionIndex: number,
+  contentType: string
+): Promise<{ uploadUrl: string; gcsObjectName: string } | null> => {
+  try {
+    const response = await axiosInstance.post(
+      `/api/v1/transcription/sessions/${recordingSessionId}/sections/upload-url`,
+      {
+        client_section_id: clientSectionId,
+        section_index: sectionIndex,
+        content_type: contentType,
+      }
+    );
+    if (!response.data?.success) return null;
+    return {
+      uploadUrl: response.data.upload_url,
+      gcsObjectName: response.data.gcs_object_name,
+    };
+  } catch (error) {
+    logger.error("[VOICE_RECORDER] Failed to generate section upload URL:", error);
+    return null;
+  }
+};
+
+export const registerAudioSection = async (
+  recordingSessionId: string,
+  payload: {
+    client_section_id: string;
+    section_index: number;
+    start_time_ms: number;
+    end_time_ms: number;
+    overlap_ms: number;
+    gcs_object_name: string;
+    content_type: string;
+    byte_size?: number;
+  }
+): Promise<{ success: boolean; backendSectionId?: string }> => {
+  try {
+    const response = await axiosInstance.post(
+      `/api/v1/transcription/sessions/${recordingSessionId}/sections`,
+      payload
+    );
+    return {
+      success: response.data?.success === true,
+      backendSectionId: response.data?.section?.section_id,
+    };
+  } catch (error) {
+    logger.error("[VOICE_RECORDER] Failed to register audio section:", error);
+    return { success: false };
+  }
+};
+
+export const finishRecordingSession = async (
+  recordingSessionId: string
+): Promise<boolean> => {
+  try {
+    const response = await axiosInstance.post(
+      `/api/v1/transcription/sessions/${recordingSessionId}/finish`
+    );
+    return response.data?.success === true;
+  } catch (error) {
+    logger.error("[VOICE_RECORDER] Failed to finish recording session:", error);
+    return false;
+  }
+};

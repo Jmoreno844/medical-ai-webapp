@@ -8,6 +8,8 @@ export interface UseVoiceRecorderReturn {
   audioBlob: Blob | null;
   transcriptionDocId?: number;
   audioExists: boolean;
+  recordingSessionId: string | null;
+  pendingAudioSections: number;
   audioExpiresAt: string | null;
   isAudioExpired: boolean;
   isDeleting: boolean;

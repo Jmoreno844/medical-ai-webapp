@@ -23,6 +23,7 @@ const VoiceRecorder: React.FC = () => {
     isPaused,
     duration,
     audioExists,
+    pendingAudioSections,
     audioExpiresAt,
     isAudioExpired,
     isCheckingAudio,
@@ -91,6 +92,12 @@ const VoiceRecorder: React.FC = () => {
         </span>
       )}
       <TimerDisplay duration={duration} />
+      {pendingAudioSections > 0 && (
+        <span className="text-sm text-gray-600">
+          {pendingAudioSections} sección{pendingAudioSections === 1 ? "" : "es"} pendiente
+          {pendingAudioSections === 1 ? "" : "s"}
+        </span>
+      )}
       <MicrophoneIcon isRecording={isRecording} isPaused={isPaused} />
 
       {showPauseButton && (

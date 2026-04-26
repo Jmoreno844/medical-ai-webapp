@@ -74,32 +74,6 @@ jobs:
           rm -f "${TMP_ZIP}"
           echo "Uploaded Terraform source archive to gs://${BUCKET}/${OBJECT}"
 
-      - name: Deploy Transcription Function
-        run: |
-          cd cloud_functions/functions
-          gcloud functions deploy transcription-endpoint \
-            --gen2 \
-            --runtime=python312 \
-            --region=${{ env.GCP_REGION }} \
-            --source=. \
-            --entry-point=transcription_endpoint \
-            --trigger-http \
-            --no-allow-unauthenticated \
-            --min-instances=0 \
-            --max-instances=3 \
-            --memory=1024MB \
-            --timeout=300s \
-            --service-account=cloud-functions-runner@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com \
-            --set-env-vars GCP_PROJECT=${{ env.GCP_PROJECT }},GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT }},GCP_REGION=${{ env.GCP_REGION }},GEMINI_MODEL=${{ env.GEMINI_MODEL }},ENVIRONMENT=stg,BACKEND_API_BASE_URL=${{ vars.VITE_API_URL }},BACKEND_API_VERSION=v1
-
-      - name: Bind transcription invokers
-        run: |
-          set -euo pipefail
-          MEMBER="serviceAccount:cloud-tasks-invoker@${GCP_PROJECT}.iam.gserviceaccount.com"
-          gcloud functions add-invoker-policy-binding transcription-endpoint \
-            --region="${GCP_REGION}" \
-            --member="${MEMBER}"
-
       - name: Deploy Document Workflow Function
         run: |
           cd cloud_functions/functions

@@ -33,6 +33,14 @@ def test_app_usable_routes_are_registered() -> None:
         "/api/v1/documents/{document_id}",
         "/api/v1/documents/{document_id}/sse-token",
         "/api/v1/transcription/start",
+        "/api/v1/transcription/sessions",
+        "/api/v1/transcription/sessions/{session_id}",
+        "/api/v1/transcription/sessions/{session_id}/sections/upload-url",
+        "/api/v1/transcription/sessions/{session_id}/sections",
+        "/api/v1/transcription/sessions/{session_id}/finish",
+        "/api/v1/internal/transcription/tasks/sections/{section_id}",
+        "/api/v1/internal/transcription/tasks/sessions/{session_id}/consolidate",
+        "/api/v1/internal/transcription/tasks/legacy-audio",
         "/api/v1/transcription/notify-complete",
         "/api/v1/sse/documents/{document_id}/{token}",
         "/api/v1/patients",
@@ -84,4 +92,3 @@ def test_csrf_endpoint_sets_fastapi_cookie() -> None:
     assert response.status_code == 200
     assert response.json()["csrfToken"]
     assert "_xsrf=" in response.headers["set-cookie"]
-

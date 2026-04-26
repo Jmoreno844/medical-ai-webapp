@@ -15,13 +15,16 @@ def _is_configured_value(value: str | None) -> bool:
 
 
 def is_transcription_queue_configured(settings: Settings) -> bool:
+    target_url = settings.transcription_task_target_url or (
+        settings.transcription_cloud_function_url
+    )
     return all(
         _is_configured_value(value)
         for value in (
             settings.gcp_project_id,
             settings.cloud_tasks_region,
             settings.transcription_queue_name,
-            settings.transcription_cloud_function_url,
+            target_url,
             settings.cloud_tasks_invoker_service_account,
         )
     )
@@ -38,12 +41,13 @@ def enqueue_transcription_task(
     payload: Mapping[str, Any],
     *,
     settings: Settings,
+    target_url: str | None = None,
     task_client: Any | None = None,
 ) -> str:
     if not is_transcription_queue_configured(settings):
         raise TranscriptionTaskConfigurationError(
             "Cloud Tasks transcription is not fully configured; missing project, "
-            "region, queue, function URL, or invoker SA"
+            "region, queue, task target URL, or invoker SA"
         )
 
     try:
@@ -54,7 +58,7 @@ def enqueue_transcription_task(
         ) from exc
 
     client = task_client or tasks_v2.CloudTasksClient()
-    target_url = str(settings.transcription_cloud_function_url).strip()
+    target_url = str(target_url or settings.transcription_cloud_function_url).strip()
     parent = client.queue_path(
         str(settings.gcp_project_id).strip(),
         str(settings.cloud_tasks_region).strip(),

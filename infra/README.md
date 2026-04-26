@@ -44,7 +44,7 @@ infra/
 3. **Secret Manager**: cargar versiones de `django-secret-key` y `jwt-secret-key` (y opcionalmente `service-account-json`).
 4. **GitHub**: variables del environment **`stg`** (o del repo) según `docs/architecture/gcp-infrastructure.md`. Los workflows de deploy usan `environment: stg`. Sin `WIF_PROVIDER` / `GH_DEPLOYER_SA` los workflows no autentican.
 5. **CI**:
-   - Ejecutar primero el workflow de Cloud Functions para que existan `transcription-endpoint` y `document-workflow`.
+   - Ejecutar primero el workflow de Cloud Functions para que exista `document-workflow`.
    - Luego ejecutar backend / frontend, o dejar que corran por `push` / `workflow_dispatch`.
 
 **Autenticación local de Terraform:** con usuario humano basta `gcloud auth application-default login` en muchos casos; si usas la SA `terraform-admin`, exporta `GOOGLE_APPLICATION_CREDENTIALS` a la clave JSON (solo transitoria; revócala tras validar WIF).

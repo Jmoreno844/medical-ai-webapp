@@ -8,6 +8,7 @@ dependencies = [
   "asyncpg>=0.30.0,<1",
   "fastapi>=0.136.1,<0.137",
   "google-auth>=2.38.0,<3",
+  "google-genai>=1.55.0,<2",
   "google-cloud-speech>=2.38.0",
   "google-cloud-storage>=2.19.0,<4",
   "google-cloud-tasks>=2.22.0",

@@ -19,7 +19,6 @@ graph LR
             Copilot["copilot-agent-service\n(LangGraph)"]
         end
         subgraph functions ["Cloud Functions"]
-            CF_Trans["transcription-endpoint"]
             CF_Gen["document-workflow"]
         end
         GCS["Cloud Storage\n(audio clínico)"]
@@ -34,7 +33,6 @@ graph LR
 
     Backend -->|"SQLAlchemy async"| PG
     Backend -->|"signed URL"| GCS
-    Backend -->|"JWT + payload"| CF_Trans
     Backend -->|"JWT + payload"| CF_Gen
     Backend -->|"internal broker contract"| Copilot
     Backend -->|"secrets"| SM
@@ -42,9 +40,8 @@ graph LR
     Copilot -->|"checkpoints + memory"| PG
     Copilot -->|"Gemini / tools orchestration"| Vertex
 
-    CF_Trans -->|"gs:// URI"| GCS
-    CF_Trans -->|"Gemini API"| Vertex
-    CF_Trans -->|"PATCH Bearer JWT"| Backend
+    Backend -->|"Cloud Tasks OIDC\ninternal worker"| Backend
+    Backend -->|"Gemini async / gs:// audio"| Vertex
 
     CF_Gen -->|"Gemini streaming"| Vertex
     CF_Gen -->|"chunks Bearer JWT"| Backend
@@ -62,7 +59,7 @@ sequenceDiagram
     participant Browser as React (Browser)
     participant Backend as API Backend
     participant GCS as Cloud Storage
-    participant CF as CF transcription-endpoint
+    participant Worker as FastAPI internal worker
     participant Gemini as Vertex AI · Gemini
 
     rect rgb(240, 248, 255)
@@ -74,29 +71,24 @@ sequenceDiagram
     end
 
     rect rgb(255, 248, 240)
-        note over Browser,CF: Paso 2 — Inicio de transcripción
+        note over Browser,Worker: Paso 2 — Inicio de transcripción
         Browser->>Backend: POST /api/v1/transcription/start
-        Backend->>Backend: Genera JWT callback FastAPI (15 min)
         Backend->>Backend: Encola Cloud Task
         Backend-->>Browser: 200 OK { queued: true }
-        Backend->>CF: POST { audio_uri, auth_token } via Cloud Tasks
+        Backend->>Worker: POST internal task via Cloud Tasks OIDC
     end
 
     rect rgb(240, 255, 248)
-        note over CF,Gemini: Paso 3 — Procesamiento con IA
-        CF->>GCS: Lee audio (gs:// URI)
-        CF->>Gemini: generate_content(audio + prompt)
-        Gemini-->>CF: Texto transcrito
+        note over Worker,Gemini: Paso 3 — Procesamiento con IA
+        Worker->>Gemini: async generate_content(gs:// audio + prompt)
+        Gemini-->>Worker: Texto transcrito
     end
 
     rect rgb(248, 240, 255)
         note over CF,Browser: Paso 4 — Actualización y notificación
-        CF->>Backend: PATCH /api/v1/documents/by-function/:id { content }
         Backend->>Backend: Guarda en PostgreSQL
         Backend-->>Browser: SSE evento "transcription_complete"
-        CF->>Backend: POST /api/v1/transcription/notify-complete
         Backend->>Backend: Marca encuentro como transcrito
-        CF-->>Backend: 200 OK
         Backend-->>Browser: 200 OK
     end
 ```
@@ -163,7 +155,7 @@ sequenceDiagram
 | **Frontend** `webapp/` | React 18, Vite, TypeScript, Tailwind | SPA del médico. Maneja grabación, UI del editor y conexión SSE. |
 | **API principal** `backend_fastapi/` | FastAPI, SQLAlchemy async, PostgreSQL | API bajo `/api/v1`, orquestación, JWTs, hub SSE, callbacks y migraciones Alembic. |
 | **Copilot Agent** `copilot_agent/` | Python, FastAPI, LangGraph | Runtime del copiloto; broker hacia el API principal. |
-| **CF Transcripción** | Python, Functions Framework | Recibe audio de GCS → llama a Gemini → devuelve texto al API. |
+| **Worker transcripción** | FastAPI internal endpoint + Cloud Tasks | Recibe task autenticada → llama a Gemini async con `gs://` → guarda texto y emite SSE. |
 | **CF Generación** | Python, Functions Framework | Recibe contexto+plantilla → streaming desde Gemini → envía chunks al API. |
 | **Cloud Storage** | GCS | Almacena los audios clínicos. El frontend sube directo vía signed URL. |
 | **Vertex AI · Gemini** | Managed (GCP) | Modelo de IA para transcripción y generación de documentos clínicos. |
@@ -177,8 +169,8 @@ sequenceDiagram
 - **Backend público + DB privada**: Cloud Run sigue público para la SPA, pero PostgreSQL queda aislado por IP privada y acceso vía Cloud SQL Auth Proxy + IAM DB auth.
 - **Agent runtime separado**: LangGraph no vive dentro del backend principal. El backend hace de broker y conserva la autoridad clínica/transaccional.
 - **Auth interna temporal del copiloto**: el API (FastAPI) y `copilot-agent-service` usan un `shared JWT` temporal en `local`/`stg`; ver deuda canónica en [`../debt/copilot-agent-runtime.md`](../debt/copilot-agent-runtime.md).
-- **Audio no se borra al transcribir**: `audio_expires_at` controla el acceso vía API, pero el blob en GCS solo se elimina si el médico lo solicita explícitamente.
-- **Cloud Functions IAM-auth**: las funciones están desplegadas con `--no-allow-unauthenticated`; la seguridad depende de IAM de invocación + JWT de callback. El `JWT_SECRET_KEY` no debe filtrarse.
+- **Audio no se borra al transcribir**: `audio_expires_at` controla el acceso lógico legacy por 24h, pero el blob en GCS se elimina por lifecycle a los 7 días salvo DELETE explícito. SSE no borra audio.
+- **Cloud Functions IAM-auth**: `document-workflow` está desplegada con `--no-allow-unauthenticated`; la seguridad depende de IAM de invocación + JWT de callback. El `JWT_SECRET_KEY` no debe filtrarse.
 
 ---
 
