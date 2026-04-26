@@ -1,8 +1,8 @@
 # FastAPI Backend Migration App
 
-This service is the parallel FastAPI implementation used to migrate the
-existing Django backend incrementally. Django remains the production source of
-truth until every clinical contract has been ported and verified.
+This service is the primary clinical API. It owns auth, encounter/document
+orchestration, callback validation, SSE streaming, signed upload URLs, and the
+Alembic-managed PostgreSQL schema.
 
 Current runtime baseline:
 
@@ -33,18 +33,19 @@ From the repo root, use `--project`:
 ENVIRONMENT=local uv --project backend_fastapi run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
-Use `8001` only when Django is stopped.
+Use `8001` for the local API unless another process already owns it.
 
 ## Current constraints
 
 - Redis is intentionally out of scope for the first migration phase.
-- SSE uses an in-memory hub equivalent to the Django implementation.
+- SSE uses an in-memory hub; Cloud Run stays at one instance until this moves
+  to Redis/Pub/Sub or another shared transport.
 - Cloud Run must stay at `max-instances=1` with session affinity while SSE is
   backed by process memory.
 - New endpoints live under `/api/v1`; legacy `/api/*` compatibility is temporary
   and should not receive new product features.
-- When porting Django modules, preserve useful comments that explain contracts,
-  security assumptions, legacy compatibility or clinical constraints.
+- Preserve comments that explain contracts, security assumptions, compatibility
+  or clinical constraints.
 
 ## App layout
 
@@ -64,8 +65,8 @@ behavior should live in the domain folder that owns it.
 
 FastAPI selects typed settings from `ENVIRONMENT`:
 
-- `local`, `dev`, `development` — local defaults, `../backend/.env`,
-  `backend_fastapi/.env`, then `backend_fastapi/.env.local`.
+- `local`, `dev`, `development` — local defaults, `backend_fastapi/.env`, then
+  `backend_fastapi/.env.local`.
 - `test`, `ci` — test-safe defaults and optional `backend_fastapi/.env.test`.
 - `stg`, `staging` — production-like validation and optional
   `backend_fastapi/.env.stg`.
@@ -92,7 +93,7 @@ Run Alembic before testing login/logout/refresh against a fresh local database.
 
 ## Scripts (`scripts/`)
 
-- `migration_smoke_staging.sh` — optional `USE_DJANGO_MIGRATE=1`, then `alembic upgrade head` (run from repo root).
-- `verify_alembic_schema_parity.sh` — `pg_dump` diff between a Django-migrated reference DB and an Alembic-only DB.
+- `migration_smoke_staging.sh` — `alembic upgrade head` against the configured DB (run from repo root).
+- `verify_alembic_schema_parity.sh` — `pg_dump` diff between a trusted reference DB and an Alembic-only DB.
 - `build_alembic_baseline_sql.py` — regenerate `alembic/baseline/baseline_clinical_v1.sql` (operator flow; see `docs/architecture/backend-fastapi-migration.md`).
 - `realtime_stt_poc.html` — local STT WebSocket smoke page.

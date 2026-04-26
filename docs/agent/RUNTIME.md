@@ -75,7 +75,7 @@ call_model draft_patch_from_plan interrupt_for_review finalize_response
 | `consolidate_tool_state` | Deriva `read_documents`, `retrieved_context`, `selected_document_ids` del batch de resultados. Entonces re-routea.                     |
 | `draft_patch_from_plan`  | Si `set_edit_plan` ya dejó `next_required_action='draft_patch_set'` y las precondiciones están listas, invoca al drafter directamente. |
 | `interrupt_for_review`   | Pausa el grafo. Espera `review_result` externo (`approve` / `reject`). LangGraph interrupt.                                            |
-| `apply_patch`            | Placeholder — el apply real ocurre en el backend broker (FastAPI; Django legacy durante transición), no aquí.                          |
+| `apply_patch`            | Placeholder — el apply real ocurre en el backend broker (FastAPI), no aquí.                          |
 | `finalize_response`      | Construye el `final_response` del run.                                                                                                 |
 
 ### Routing

@@ -35,5 +35,5 @@ Usar siempre `webapp/src/lib/logger.ts`:
 
 ## Relación con otros servicios
 
-- Política de Django: [`../backend/logging.md`](../backend/logging.md).
+- Política del backend: [`../backend/logging.md`](../backend/logging.md).
 - Flujo global del sistema: [`../architecture/system-overview.md`](../architecture/system-overview.md).

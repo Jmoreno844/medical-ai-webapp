@@ -2,8 +2,9 @@
 Build `alembic/baseline/baseline_clinical_v1.sql` from pg_dump and fastapi.
 
 Operator workflow when schema changes:
-1. `manage.py migrate` a fresh database to current Django state.
-2. `pg_dump --schema-only` the FastAPI table subset and `fastapi_revoked_token`.
+1. Prepare a trusted historical/reference PostgreSQL database with the current
+   clinical schema.
+2. `pg_dump --schema-only` the active FastAPI table subset.
 3. Re-run this script, then refresh `0001` docstring and schema parity baselines.
 """
 
@@ -39,11 +40,11 @@ def _pg_env() -> dict[str, str]:
     return {**os.environ, "PGPASSWORD": os.environ.get("PGPASSWORD", "")}
 
 
-def _run_pg_dump_django_baseline() -> str:
+def _run_pg_dump_reference_baseline() -> str:
     host = os.environ.get("PGHOST", "127.0.0.1")
     port = os.environ.get("PGPORT", "5433")
     user = os.environ.get("PGUSER", "juan")
-    ref_db = os.environ.get("ALEMBIC_REF_DJANGO_DB", "alembic_baseline_ref")
+    ref_db = os.environ.get("ALEMBIC_REF_DB", "alembic_baseline_ref")
     env = _pg_env()
     cmd = [
         "pg_dump",
@@ -87,7 +88,7 @@ def _run_pg_dump_django_baseline() -> str:
         check=False,
     )
     if p.returncode != 0:
-        _fail(f"pg_dump django failed: {p.stderr}")
+        _fail(f"pg_dump reference failed: {p.stderr}")
     return p.stdout
 
 
@@ -126,9 +127,9 @@ def _run_pg_dump_fastapi() -> str:
 
 
 def main() -> None:
-    django_sql = _run_pg_dump_django_baseline()
+    reference_sql = _run_pg_dump_reference_baseline()
     fast_sql = _run_pg_dump_fastapi()
-    out = _clean_pg_dump(django_sql) + "\n" + _clean_pg_dump(fast_sql) + "\n"
+    out = _clean_pg_dump(reference_sql) + "\n" + _clean_pg_dump(fast_sql) + "\n"
     BASELINE_OUT.parent.mkdir(parents=True, exist_ok=True)
     BASELINE_OUT.write_text(out, encoding="utf-8")
     size = Path(BASELINE_OUT).stat().st_size

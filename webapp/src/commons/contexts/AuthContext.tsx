@@ -154,15 +154,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     logAuth("info", "Checking authentication status");
     updateCsrfToken();
 
-    // Check whether either the FastAPI JWT cookie or legacy Django session exists.
+    // Check whether the FastAPI JWT cookie exists.
     const hasCookie = document.cookie
       .split(";")
       .some((item) => {
         const cookie = item.trim();
-        return (
-          cookie.startsWith("medical_access_token=") ||
-          cookie.startsWith("sessionid=")
-        );
+        return cookie.startsWith("medical_access_token=");
       });
     logAuth("info", "Auth cookie exists:", hasCookie);
 

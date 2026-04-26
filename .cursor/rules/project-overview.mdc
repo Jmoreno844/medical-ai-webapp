@@ -9,7 +9,7 @@ alwaysApply: true
 
 Este es un sistema fullstack de documentación médica asistida por IA con tres partes:
 
-- `backend/` — API REST principal (Django Ninja + PostgreSQL; dependencias con **uv**)
+- `backend_fastapi/` — API REST principal (FastAPI + PostgreSQL; dependencias con **uv**)
 - `cloud_functions/` — Funciones Google Cloud para generación de documentos con IA y transcripción de audio
 - `webapp/` — Frontend React + TypeScript (Vite)
 
@@ -34,10 +34,10 @@ Este es un sistema fullstack de documentación médica asistida por IA con tres 
 
 ## Comunicación entre servicios
 
-- Django → Cloud Functions: JWT de servicio (`backend/utils/service_jwt.py`)
-- Cloud Functions → Django API: token auth en headers
-- Frontend → Django: sesión Django (`django_auth`) o JWT para SSE
-- SSE hub en Django: `backend/apps/documentos/services/sse_hub.py`
+- FastAPI → Cloud Functions: JWT de servicio desde `backend_fastapi/app/core/security.py`
+- Cloud Functions → FastAPI API: token auth en headers
+- Frontend → FastAPI: cookies JWT + CSRF y token corto para SSE
+- SSE hub en FastAPI: `backend_fastapi/app/domains/documents/sse_hub.py`
 
 ## Documentación técnica de referencia
 
@@ -45,7 +45,7 @@ Antes de proponer cambios en auth, flujos o arquitectura, consultar:
 
 | Documento | Contenido |
 |---|---|
-| `docs/backend/auth-and-jwt.md` | Contratos de todos los JWT (sesión, callbacks, SSE) y sus claims |
+| `docs/backend/auth-and-jwt.md` | Contratos de JWT browser, callbacks, SSE y sus claims |
 | `docs/architecture/system-overview.md` | Mapa de servicios, endpoints, variables de entorno y diagramas de secuencia |
 | `docs/backend/database.md` | Modelo de datos y ERD |
 

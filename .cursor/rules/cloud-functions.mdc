@@ -99,7 +99,7 @@ logger.error(f"Document generation failed for doc_id={doc_id}: {str(e)}", exc_in
 ## Variables de entorno y configuración
 
 - Toda configuración en `config.py` — nunca hardcodear en endpoints ni services
-- API keys, URLs de Django, credenciales de GCP → variables de entorno en Cloud Run
+- API keys, URLs del backend, credenciales de GCP → variables de entorno en Cloud Run
 
 ## Seguridad
 

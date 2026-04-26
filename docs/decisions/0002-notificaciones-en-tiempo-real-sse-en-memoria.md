@@ -29,7 +29,7 @@ Descartado por ahora porque:
 
 ## Decision
 
-Implementar `Server-Sent Events (SSE)` nativos utilizando `asyncio.Queue` y un diccionario en memoria (`_channels`) dentro de Django, corriendo bajo ASGI.
+Implementar `Server-Sent Events (SSE)` nativos utilizando `asyncio.Queue` y un diccionario en memoria (`_channels`) dentro del backend FastAPI, corriendo bajo ASGI.
 
 En despliegue sobre Cloud Run, restringir el servicio a `max-instances=1` y subir la concurrencia a `max-concurrency=250`.
 

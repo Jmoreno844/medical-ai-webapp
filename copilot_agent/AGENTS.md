@@ -18,7 +18,7 @@ Mantener este servicio como runtime dedicado del copiloto clínico:
 - no exponer endpoints públicos al navegador
 - no aplicar cambios clínicos sensibles sin review externo
 - no tocar directamente la DB clínica operativa para writes finales
-- no mover auth de usuarios o lógica de permisos desde Django a este servicio
+- no mover auth de usuarios o lógica de permisos desde FastAPI a este servicio
 
 ## Code Rules
 
@@ -39,7 +39,7 @@ forma de transmitir contexto que no se puede inferir leyendo el código.
 - Workarounds o stubs temporales con una nota de qué los reemplazaría (ej. `apply_patch` vacío)
 - Límites de tamaño o presupuesto con la razón (ej. excerpt:600 en turn context vs 12000 en ToolMessage)
 - Cualquier comportamiento del proveedor LLM que sea sorprendente (ej. Gemini empty response, AFC side loop)
-- Flujo de ownership inter-servicio cuando no está en el nombre del módulo (ej. Django es quien escribe, no el agente)
+- Flujo de ownership inter-servicio cuando no está en el nombre del módulo (ej. FastAPI es quien escribe, no el agente)
 
 **Cuándo NO comentar:**
 

@@ -61,7 +61,7 @@ export default function ChatBody({ controller }: ChatBodyProps) {
         {/* Generating card — shown while set_edit_plan has fired but review is not ready yet.
              Hidden once the review was resolved (accepted/rejected) to prevent the card
              from reappearing while state.status is still "waiting_review" during the
-             brief window between store clear and Django's final status response. */}
+             brief window between store clear and FastAPI's final status response. */}
         {isGeneratingPatch && !reviewPatchSet && !resolvedPatchCard && (
           <PatchGeneratingCard doctorSummary={editPlanDoctorSummary} />
         )}

@@ -1,4 +1,4 @@
-# Primary staging API: FastAPI (Django deploy is manual rollback only).
+# Primary staging API: FastAPI.
 # Required GitHub Environment `stg` var: FASTAPI_CORS_ALLOWED_ORIGINS (comma-separated
 # origins, e.g. the staging SPA URL). Maps to env on Cloud Run.
 name: Backend FastAPI Staging Deployment

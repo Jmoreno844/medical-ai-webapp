@@ -1,37 +1,33 @@
 # Secrets and environments
 
-Use **different values** for local development, CI/test, and production for Django signing, JWT signing, and GCP credentials. That limits blast radius if a `.env` leaks and avoids tokens minted in dev being valid in prod.
+Use **different values** for local development, CI/test, and production for JWT signing and GCP credentials. That limits blast radius if a `.env` leaks and avoids tokens minted in dev being valid in prod.
 
 ## Settings modules (explicit)
 
-| Context | `DJANGO_SETTINGS_MODULE` |
-|---------|---------------------------|
-| Local CLI (`manage.py` default) | `config.settings.develop` |
-| Staging / Cloud Run | `config.settings.stg` |
-| Pytest / CI | `config.settings.test` |
-| Gunicorn / Cloud Run image | `config.settings.production` |
-
-Legacy: `DJANGO_SETTINGS_MODULE=config.settings` still loads **develop** (see `config/settings/__init__.py`) but prefer explicit modules.
+| Context | `ENVIRONMENT` |
+|---------|---------------|
+| Local CLI | `local` |
+| Staging / Cloud Run | `stg` |
+| Pytest / CI | `test` |
+| Production / Cloud Run image | `prod` |
 
 ## Required secrets by environment
 
-### Development (`config.settings.develop`)
+### Development (`ENVIRONMENT=local`)
 
 | Variable | Notes |
 |----------|--------|
-| `DJANGO_SECRET_KEY` | Preferred. Falls back to `SECRET_KEY`, then an insecure default (change for shared machines). |
-| `JWT_SECRET_KEY` | Separate from Django secret; use a dev-only value. |
-| GCS / Cloud Functions | See `develop.py` — bucket path, URLs, optional local SA JSON path. |
+| `JWT_SECRET_KEY` | Use a dev-only value. |
+| GCS / Cloud Functions | Bucket path, URLs, optional local SA JSON path. |
 
 ### Test (`config.settings.test`)
 
-Use **test-only** `DJANGO_SECRET_KEY` and `JWT_SECRET_KEY` (pytest sets `DJANGO_SETTINGS_MODULE` via `pytest.ini`). Do not point test at production databases or buckets.
+Use **test-only** `JWT_SECRET_KEY`. Do not point test at production databases or buckets.
 
-### Staging (`config.settings.stg`)
+### Staging (`ENVIRONMENT=stg`)
 
 | Variable | Required |
 |----------|----------|
-| `DJANGO_SECRET_KEY` or Secret Manager `django-secret-key` | Yes |
 | `JWT_SECRET_KEY` or Secret Manager `jwt-secret-key` | Yes |
 | `DB_NAME` | Yes |
 | `DB_USER` | Yes; en `stg` es el usuario IAM derivado de `backend-runner` (formato canonical: sin `.gserviceaccount.com`; el backend normaliza el email completo si se le pasa así) |
@@ -44,11 +40,10 @@ Use **test-only** `DJANGO_SECRET_KEY` and `JWT_SECRET_KEY` (pytest sets `DJANGO_
 
 En `stg`, la conexión a Cloud SQL usa **IAM DB auth + Cloud SQL Auth Proxy**. Ya no se usan `db-user` ni `db-password` como runtime secrets del backend.
 
-### Production (`config.settings.production`)
+### Production (`ENVIRONMENT=prod`)
 
 | Variable | Required |
 |----------|----------|
-| `DJANGO_SECRET_KEY` | Yes |
 | `JWT_SECRET_KEY` | Yes |
 | `DB_*` | Yes (PostgreSQL) |
 | `GCS_BUCKET_NAME` | As needed for storage |
@@ -70,7 +65,7 @@ See `apps/encounters/services/storage.py` for how the client is built from setti
 
 ## Local ADC (Application Default Credentials)
 
-Use ADC to authenticate to GCP **without** creating service account keys. For this repo's Django signed-URL endpoint, the recommended local setup is ADC plus impersonation of a dedicated signer service account.
+Use ADC to authenticate to GCP **without** creating service account keys. For this repo's signed-URL endpoint, the recommended local setup is ADC plus impersonation of a dedicated signer service account.
 
 ### One-time login
 
@@ -97,7 +92,7 @@ gcloud iam service-accounts add-iam-policy-binding \
   --role='roles/iam.serviceAccountTokenCreator'
 ```
 
-Set these variables in `backend/.env`:
+Set these variables in `backend_fastapi/.env.local`:
 
 ```env
 GCP_PROJECT_ID=vext-stg
@@ -107,7 +102,7 @@ GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT=backend-local-gcs-signer@vext-stg.iam.g
 
 ### How the backend uses local ADC
 
-- With `DJANGO_SETTINGS_MODULE=config.settings.develop`, the backend first checks `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH`.
+- With `ENVIRONMENT=local`, the backend first checks `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH`.
 - If that path is not set, it tries to impersonate `GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT` using your local ADC.
 - If neither is configured, it falls back to plain ADC, but local `blob.generate_signed_url(...)` may fail because plain user ADC does not provide a private signing key.
 - In Cloud Run, ADC comes from the service account attached to the service (e.g. `backend-runner@...`), so you typically **do not** need `SERVICE_ACCOUNT_JSON`.

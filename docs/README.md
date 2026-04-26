@@ -11,10 +11,10 @@ La documentación está organizada para responder dos preguntas:
 |---------|-------------|
 | [Mapa del repositorio](architecture/repo-map.md) | Qué vive en cada carpeta, qué es sensible y dónde editar según el tipo de cambio. |
 | [Guía de inicio local](setup-local.md) | Levantar backend, frontend, base de datos y Cloud Functions en local. |
-| [Arquitectura global](architecture/system-overview.md) | Big picture del sistema: audio, Django, GCS, Gemini, SSE y callbacks. |
+| [Arquitectura global](architecture/system-overview.md) | Big picture del sistema: audio, FastAPI, GCS, Gemini, SSE y callbacks. |
 | [Backend](backend/README.md) | Auth/JWT, DB, entornos, logging, tracing y límites del backend. |
 | [Frontend](frontend/README.md) | Rutas, contextos, features principales y logging del `webapp/`. |
-| [Cloud Functions](cloud-functions/README.md) | Entry points, servicios internos, callbacks a Django y variables clave. |
+| [Cloud Functions](cloud-functions/README.md) | Entry points, servicios internos, callbacks al backend y variables clave. |
 | [Infraestructura GCP](architecture/gcp-infrastructure.md) | IAM, secrets, lifecycle, naming, Terraform, CI y troubleshooting. |
 | [Arquitectura del workspace + copiloto](architecture/ai-agent-workspace.md) | Workspace frontend, boundary del agent runtime y patrón de patches/review. |
 | [Deuda técnica canónica](debt/README.md) | Deudas aceptadas y transversales que futuros chats deben tener presentes. |

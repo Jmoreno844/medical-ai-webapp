@@ -142,7 +142,7 @@ def generate_content_streaming(
         custom_prompt: Optional custom prompt
         id_documento: ID of the document (for notifications)
         id_proceso: ID of the processing job (for notifications)
-        token_auth: Auth token for Django API
+        token_auth: Auth token for backend API
         model_name: Optional model override
         chunk_size: Minimum characters per chunk
         max_delay: Maximum seconds between sending chunks
@@ -311,7 +311,7 @@ def generate_document_from_components(
         transcription_content: Transcription of the doctor-patient conversation
         new_document_id: ID of the document to update
         process_id: ID of the processing job
-        auth_token: Auth token for Django API
+        auth_token: Auth token for backend API
         model_name: Optional model name override
 
     Returns:

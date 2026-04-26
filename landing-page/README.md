@@ -5,7 +5,7 @@ Sitio de marketing separado del producto clínico principal.
 ## Alcance
 
 - No participa en el flujo `Encuentro -> Transcripción -> Documento`.
-- Puede compartir branding con `webapp/`, pero no comparte estado ni contratos de negocio con Django.
+- Puede compartir branding con `webapp/`, pero no comparte estado ni contratos de negocio del backend clínico.
 
 ## Comandos comunes
 

@@ -7,7 +7,6 @@ from app.core.settings.base import (
     COMMON_SETTINGS_CONFIG,
     CorsAllowedOrigins,
     LOCAL_CORS_ALLOWED_ORIGINS,
-    REPO_DIR,
     Settings,
 )
 
@@ -15,7 +14,6 @@ from app.core.settings.base import (
 class LocalSettings(Settings):
     model_config = COMMON_SETTINGS_CONFIG | {
         "env_file": (
-            REPO_DIR / "backend/.env",
             BASE_DIR / ".env",
             BASE_DIR / ".env.local",
         ),

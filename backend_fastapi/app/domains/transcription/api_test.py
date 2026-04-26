@@ -25,7 +25,7 @@ def _is_local_environment(environment: str) -> bool:
 @router.websocket("/dev/transcription/realtime/stt")
 async def realtime_stt_websocket(
     websocket: WebSocket,
-    language_code: str = "es-CO",
+    language_code: str = "es-US",
     sample_rate_hertz: int = 16_000,
     settings: Settings = Depends(get_settings),
 ) -> None:

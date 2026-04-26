@@ -10,23 +10,23 @@ Las consultas médicas en la plataforma generan audios de larga duración (10 a 
 
 ## Decisión
 
-Implementar Google Cloud Tasks como el orquestador y buffer entre el backend (Django) y el servicio de transcripción (Cloud Functions). El backend encola la tarea y libera la conexión del usuario de inmediato con un estado 200 OK (Processing).
+Implementar Google Cloud Tasks como el orquestador y buffer entre el backend (FastAPI) y el servicio de transcripción (Cloud Functions). El backend encola la tarea y libera la conexión del usuario de inmediato con un estado 200 OK (Processing).
 
 ## Justificación Técnica (El "Por Qué")
 
 ### 1. Prevención del "Worker Starvation" (Hambruna de Procesos)
 
-En un servidor web (Django), cada petición activa ocupa un "worker" o hilo de ejecución.
+En un servidor web (FastAPI), cada petición activa ocupa un "worker" o hilo de ejecución.
 
-- **El Problema**: Si 10 médicos guardan una consulta al mismo tiempo y Django hace una llamada síncrona a la IA, esos 10 workers quedan bloqueados por 40 segundos esperando respuesta.
+- **El Problema**: Si 10 médicos guardan una consulta al mismo tiempo y FastAPI hace una llamada síncrona a la IA, esos 10 workers quedan bloqueados por 40 segundos esperando respuesta.
 - **El Riesgo**: Si el servidor tiene un límite de 10-20 workers, la aplicación dejará de responder a cualquier otro usuario (incluso para ver una agenda o hacer login) porque todos los hilos están "secuestrados" esperando a la IA.
-- **La Solución**: Cloud Tasks permite que Django delegue el trabajo y quede libre en milisegundos para atender a otros médicos.
+- **La Solución**: Cloud Tasks permite que FastAPI delegue el trabajo y quede libre en milisegundos para atender a otros médicos.
 
 ### 2. Gestión de Timeouts de Red
 
 Las conexiones HTTP en la nube (especialmente tras balanceadores o en entornos serverless) tienen límites de tiempo estrictos (usualmente 30-60 segundos).
 
-- **El Riesgo**: Si la transcripción se demora un poco más de lo habitual por carga en la API de Google, la conexión entre Django y la Cloud Function se romperá por timeout, dejando la historia clínica en un estado inconsistente (audio subido pero nunca transcrito).
+- **El Riesgo**: Si la transcripción se demora un poco más de lo habitual por carga en la API de Google, la conexión entre FastAPI y la Cloud Function se romperá por timeout, dejando la historia clínica en un estado inconsistente (audio subido pero nunca transcrito).
 - **La Solución**: Cloud Tasks es agnóstico al tiempo de respuesta del destino; si la tarea se toma 2 minutos, la tarea sigue viva hasta que recibe una confirmación de éxito.
 
 ### 3. Resiliencia y Retries Automáticos (Backoff)

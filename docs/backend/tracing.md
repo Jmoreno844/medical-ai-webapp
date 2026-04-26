@@ -1,22 +1,20 @@
 # Distributed tracing (OpenTelemetry)
 
-El stack usa **OpenTelemetry** con propagación **W3C** (`traceparent` / `tracestate`) entre `webapp` → Django → Cloud Functions → Django (callbacks).
+El stack usa **OpenTelemetry** con propagación **W3C** (`traceparent` / `tracestate`) entre `webapp` → FastAPI → Cloud Functions → FastAPI (callbacks).
 
 ## Componentes
 
 | Código | Rol |
 |--------|-----|
-| [backend/config/tracing.py](../../backend/config/tracing.py) | Arranque OTel + export + instrumentación Django y `requests` |
-| [backend/config/wsgi.py](../../backend/config/wsgi.py) / [asgi.py](../../backend/config/asgi.py) | Llama a `configure_tracing()` antes de crear la app |
-| [backend/config/settings/logging_utils.py](../../backend/config/settings/logging_utils.py) | Filtro que añade `trace_id` / `span_id` a cada log |
-| [cloud_functions/functions/tracing.py](../../cloud_functions/functions/tracing.py) | Span servidor por request HTTP + `requests` a Django |
+| `backend_fastapi/app/` | API principal; emite logs y spans del backend |
+| [cloud_functions/functions/tracing.py](../../cloud_functions/functions/tracing.py) | Span servidor por request HTTP + `requests` al backend |
 | [webapp/src/tracing.ts](../../webapp/src/tracing.ts) | OTLP desde el navegador (opcional) + propagación en XHR/`axios` |
 
 ## Variables de entorno (backend y Cloud Functions)
 
 | Variable | Descripción |
 |----------|-------------|
-| `OTEL_SDK_DISABLED` | `1` / `true` — desactiva export e instrumentación pesada (p. ej. tests: se usa en `config.settings.test`, no en `config.settings.stg`). |
+| `OTEL_SDK_DISABLED` | `1` / `true` — desactiva export e instrumentación pesada (p. ej. tests). |
 | `OTEL_TRACES_EXPORTER` | `none` \| `otlp` \| `gcp` (opcional; si no se define, se infiere). |
 | `OTEL_SERVICE_NAME` | Nombre del servicio en el backend de trazas (p. ej. `vexthealth-backend`, `vexthealth-cloud-functions`). |
 | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | URL completa OTLP/HTTP, p. ej. `http://127.0.0.1:4318/v1/traces`. |
@@ -33,7 +31,7 @@ El stack usa **OpenTelemetry** con propagación **W3C** (`traceparent` / `traces
 
 ### Estado actual en `stg`
 
-- `backend` y `cloud functions` sí pueden compartir el mismo `trace_id` en Cloud Trace cuando la petición pasa por HTTP normal (`Django -> Cloud Function -> callback Django`).
+- `backend` y `cloud functions` sí pueden compartir el mismo `trace_id` en Cloud Trace cuando la petición pasa por HTTP normal (`FastAPI -> Cloud Function -> callback FastAPI`).
 - `webapp` todavía **no** participa en el mismo trace en `stg`: el workflow de frontend no configura `VITE_OTEL_EXPORTER_OTLP_TRACES_URL` y no hay un OTEL collector público/intermedio.
 - Hasta montar collector OTLP o un backend OTLP accesible desde navegador, la visibilidad de `stg` es **backend/cloud functions**, no navegador de extremo a extremo.
 
@@ -48,8 +46,8 @@ UI Jaeger: `http://localhost:16686`.
 
 ## Limitaciones conocidas
 
-- **SSE**: `EventSource` no envía cabeceras W3C; se registra `trace_id` en logs al generar token y al conectar el stream en [sse.py](../../backend/apps/documents/api/sse.py), no un span continuo en el navegador.
+- **SSE**: `EventSource` no envía cabeceras W3C; se registra `trace_id` en logs al generar token y al conectar el stream en `backend_fastapi/app/domains/documents/sse_api.py`, no un span continuo en el navegador.
 - **Subida GCS** (`fetch` a signed URL): span cliente local `gcs.signed_url_upload` sin propagación a GCS.
-- **Hilo de generación**: el POST en segundo plano reutiliza el contexto OTel del request que lo disparó ([generation_runner.py](../../backend/apps/documents/services/generation_runner.py)).
+- **Hilo de generación**: el POST en segundo plano reutiliza el contexto OTel del request que lo disparó (`backend_fastapi/app/domains/documents/generation_runner.py`).
 
 El `process_id` de negocio sigue siendo el identificador de correlación del flujo de generación; no sustituye al `trace_id`.

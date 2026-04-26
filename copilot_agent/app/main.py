@@ -46,11 +46,11 @@ async def create_run(
     _token_payload: dict[str, object] = Depends(require_internal_bearer_token),
 ) -> dict[str, object]:
     run_id = str(uuid.uuid4())
-    # Create the run record and emit run_started immediately so Django can return
+    # Create the run record and emit run_started immediately so FastAPI can return
     # run_id to the browser within ~50 ms instead of blocking for 15-30 s.
     # The graph runs as a BackgroundTask: uvicorn's event loop keeps the background
     # coroutine alive until it completes even after the HTTP response is sent.
-    # Django's existing SSE polling (stream_copilot_run) delivers events to the
+    # FastAPI's existing SSE polling (stream_copilot_run) delivers events to the
     # browser as they land in DB — typically within 1 s of each graph step.
     stored_run, events = await asyncio.to_thread(
         runtime.bootstrap_run, request, run_id=run_id

@@ -74,7 +74,6 @@ module "secret_manager" {
   project_id = var.project_id
 
   secret_ids = [
-    "django-secret-key",
     "jwt-secret-key",
     "service-account-json",
     "copilot-service-shared-jwt",
@@ -149,7 +148,7 @@ module "workload_identity" {
   service_account_name = module.service_accounts.github_actions_deployer_name
   allowed_refs         = ["refs/heads/main"]
   allowed_workflow_files = [
-    ".github/workflows/backend-deployment-stg.yaml",
+    ".github/workflows/backend-fastapi-deployment-stg.yaml",
     ".github/workflows/copilot-agent-deployment-stg.yaml",
     ".github/workflows/deploy-cloud-function-stg.yaml",
     ".github/workflows/frontend-deployment-stg.yaml",
@@ -225,26 +224,23 @@ module "cloud_run" {
   session_affinity = true
 
   env_vars = {
-    DJANGO_SETTINGS_MODULE              = "config.settings.stg"
     ENVIRONMENT                         = var.environment
     GCP_PROJECT                         = var.project_id
     GOOGLE_CLOUD_PROJECT                = var.project_id
     GCP_PROJECT_ID                      = var.project_id
     GCS_BUCKET_NAME                     = module.storage_buckets.audio_bucket_name
-    ENABLE_SILK                         = "true"
     DB_HOST                             = "127.0.0.1"
     DB_PORT                             = "5432"
     DB_NAME                             = var.db_name
     DB_USER                             = trimsuffix(module.service_accounts.backend_runner_email, ".gserviceaccount.com")
-    CONN_MAX_AGE                        = "300"
     CLOUD_TASKS_REGION                  = var.region
     TRANSCRIPTION_QUEUE_NAME            = module.cloud_tasks.queue_name
     CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT = module.service_accounts.cloud_tasks_invoker_email
   }
 
   secret_env_vars = var.cloud_run_use_secret_manager ? [
-    { name = "SECRET_KEY", secret_id = "django-secret-key" },
-    { name = "JWT_SECRET", secret_id = "jwt-secret-key" },
+    { name = "JWT_SECRET_KEY", secret_id = "jwt-secret-key" },
+    { name = "COPILOT_SERVICE_SHARED_JWT", secret_id = "copilot-service-shared-jwt" },
   ] : []
 
   vpc_access = {

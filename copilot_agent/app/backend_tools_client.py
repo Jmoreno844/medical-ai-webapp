@@ -14,7 +14,7 @@ class CopilotBackendToolsError(Exception):
 
 
 class CopilotBackendToolsClient:
-    """Bounded tools client used by the agent runtime against Django."""
+    """Bounded tools client used by the agent runtime against FastAPI."""
 
     def __init__(
         self,
@@ -161,7 +161,7 @@ class CopilotBackendToolsClient:
             )
             response.raise_for_status()
         except httpx.HTTPError as error:
-            # Include the response body for HTTP status errors so that Django's
+            # Include the response body for HTTP status errors so that FastAPI's
             # rejection reason (e.g. "El anchor es ambiguo") reaches the LLM and
             # allows it to self-correct (e.g. by adding prefix_text/suffix_text).
             if isinstance(error, httpx.HTTPStatusError):

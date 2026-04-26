@@ -4,7 +4,7 @@ Este directorio guarda los Architecture Decision Records (ADR) del sistema.
 
 ## Proposito
 
-Los ADR documentan decisiones arquitectonicas importantes, su contexto, las alternativas consideradas y sus consecuencias. Aqui deben vivir decisiones que afecten a mas de un servicio, por ejemplo `backend/`, `cloud_functions/`, `webapp/` o el despliegue en Google Cloud.
+Los ADR documentan decisiones arquitectonicas importantes, su contexto, las alternativas consideradas y sus consecuencias. Aqui deben vivir decisiones que afecten a mas de un servicio, por ejemplo `backend_fastapi/`, `cloud_functions/`, `webapp/` o el despliegue en Google Cloud.
 
 ## Convenciones
 

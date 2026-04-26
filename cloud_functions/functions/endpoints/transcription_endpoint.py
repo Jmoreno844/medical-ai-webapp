@@ -57,7 +57,7 @@ def transcription_endpoint(request) -> tuple:
     Expects:
         - document_id: ID of the document to update
         - audio_uri: gs:// URI to the audio file
-        - auth_token: JWT for Django API
+        - auth_token: JWT for backend API
     """
     from tracing import configure_tracing, run_with_request_span
 

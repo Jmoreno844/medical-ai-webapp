@@ -1,26 +1,23 @@
-# Backend Django -> FastAPI Migration Plan
+# FastAPI Backend Cutover
 
-Este plan define una migracion completa del backend central de Django Ninja a
-FastAPI sin romper los contratos clinicos existentes con la SPA, Cloud
-Functions, GCS, PostgreSQL y `copilot_agent`.
+Este documento deja el estado final del cutover del backend central a FastAPI,
+sin depender del antiguo monolito para runtime ni migraciones.
 
 ## Resumen
 
-- Migrar por fases con una API FastAPI en paralelo, manteniendo la compatibilidad
-  de rutas actuales hasta que frontend, Cloud Functions y copilot esten en la
-  nueva superficie.
-- Usar PostgreSQL como fuente de verdad existente; no recrear datos ni reescribir
-  migraciones historicas. El cambio de ORM/migraciones debe ser controlado y
-  verificable.
-- Reemplazar sesion Django por JWTs seguros para navegador y servicios:
+- `backend_fastapi/` es la API principal. Las rutas públicas viven bajo
+  `/api/v1/*`.
+- Alembic crea el schema completo en bases nuevas mediante
+  `alembic/baseline/baseline_clinical_v1.sql` y revisiones posteriores.
+- Usar JWTs seguros para navegador y servicios:
   access token corto, refresh rotativo, cookies `HttpOnly`, `Secure`,
   `SameSite`, CSRF para requests mutantes y JWTs separados por proposito para
   callbacks, SSE y copilot.
-- Adoptar FastAPI async donde haya I/O real: DB async, HTTP interno async,
+- Usar FastAPI async donde haya I/O real: DB async, HTTP interno async,
   SSE, GCS, Cloud Tasks y llamadas a servicios. Evitar marcar como async código
   que siga usando clientes bloqueantes.
-- Introducir versionado explicito bajo `/api/v1`, con aliases temporales para
-  las rutas legacy mientras se migra el frontend.
+- El monolito Django fue retirado del repo; cualquier rollback debe venir de un
+  artefacto/branch histórico, no de `main`.
 
 ## Arquitectura Objetivo
 
@@ -35,9 +32,8 @@ Functions, GCS, PostgreSQL y `copilot_agent`.
 - SQLAlchemy 2.0 async + Alembic sera el stack recomendado para la migracion
   final. La fase intermedia puede leer el schema existente, pero no debe generar
   migraciones destructivas ni renombrar tablas de forma implicita.
-- `admin` de Django no debe bloquear la migracion. Si aun se necesita una UI
-  administrativa, se reemplazara por una herramienta explicita despues de portar
-  los endpoints clinicos.
+- Si se necesita una UI administrativa, se reemplazara por una herramienta
+  explicita en FastAPI o fuera del repo.
 - Redis queda fuera de la primera migración. SSE conserva un hub en memoria
   equivalente al actual; por eso Cloud Run debe mantenerse en `max-instances=1`
   con `session-affinity=true` hasta una fase futura con Redis/Pub/Sub.
@@ -52,18 +48,17 @@ Functions, GCS, PostgreSQL y `copilot_agent`.
   - CSRF se conserva para mutaciones autenticadas por cookie.
 
 - JWTs de servicio:
-  - Mantener secretos/audiencias separados: navegador, callbacks Cloud
-    Functions, SSE, Django/FastAPI -> copilot y copilot -> backend tools.
+- Mantener secretos/audiencias separados: navegador, callbacks Cloud
+    Functions, SSE, FastAPI -> copilot y copilot -> backend tools.
   - Validar siempre `iss`, `aud`, `purpose`, `exp`, `iat` y claims de dominio
     como `document_id`, `process_id`, `user_id`, `run_id` o `thread_id`.
   - No registrar tokens, documentos completos, transcripciones completas ni
     prompts clinicos en logs.
 
 - Versionado y contratos:
-- Congelar los payloads actuales antes de portar endpoints.
-- Preservar comentarios útiles del código Django al portar módulos a FastAPI,
-  especialmente los que documenten contratos, seguridad, compatibilidad legacy o
-  límites clínicos; evitar copiar comentarios que solo narren sintaxis.
+- Mantener payloads clínicos revisables y OpenAPI actualizado.
+- Preservar comentarios útiles que documenten contratos, seguridad,
+  compatibilidad o límites clínicos; evitar comentarios que solo narren sintaxis.
 - Para cambios no compatibles, crear DTOs nuevos en `/api/v1` y adaptar el
   frontend una ruta a la vez.
   - Mantener OpenAPI como artefacto revisable y usarlo para contract tests.
@@ -87,14 +82,13 @@ Functions, GCS, PostgreSQL y `copilot_agent`.
 2. **Scaffold FastAPI**
    - Crear `backend_fastapi/` con FastAPI, Pydantic v2, settings tipados,
      logging JSON, CORS, security headers, tracing OpenTelemetry y healthchecks.
-   - Agregar `Makefile`/Docker targets paralelos sin tocar el deploy de Django.
+   - Agregar Docker targets y workflow de deploy propios.
    - Publicar `/api/v1/health` y OpenAPI versionado.
 
 3. **Modelo de datos y migraciones**
    - Mapear tablas existentes a SQLAlchemy manteniendo nombres reales de tablas,
      columnas, indices y constraints.
-   - Introducir Alembic con baseline del schema actual, sin regenerar historia
-     Django.
+   - Introducir Alembic con baseline del schema actual.
    - Portar primero queries read-only, luego writes transaccionales.
 
 4. **Auth y seguridad**
@@ -119,14 +113,11 @@ Functions, GCS, PostgreSQL y `copilot_agent`.
      copilot a clientes async.
    - Alinear tracing `webapp -> FastAPI -> Cloud Functions -> FastAPI`.
 
-7. **Cutover y retiro de Django**
-   - Ejecutar ambos backends en staging y comparar respuestas para rutas criticas.
-   - Migrar `VITE_API_URL`, Cloud Functions callbacks y copilot tools a FastAPI.
-   - Retirar rutas legacy, dependencias Django, settings Django y migrations
-     Django solo cuando Alembic y tests cubran el schema activo.
-   - **Corte en stg (estado deseado):** el deploy automático a Cloud Run publica
-     `backend_fastapi` (imagen `fastapi-backend`); el workflow de Django pasa
-     a **rollback manual** (`workflow_dispatch`).
+7. **Estado final**
+   - `VITE_API_URL`, Cloud Functions callbacks y copilot tools apuntan a FastAPI.
+   - El deploy automático a Cloud Run publica `backend_fastapi` (imagen
+     `fastapi-backend`).
+   - Django no vive en `main`.
 
 ### Propiedad del schema post-cutover (stg+)
 
@@ -136,25 +127,19 @@ Functions, GCS, PostgreSQL y `copilot_agent`.
   de dominio, copilot, `fastapi_revoked_token`). `backend_fastapi/scripts/migration_smoke_staging.sh`
   hace eso por defecto. Regenerar el SQL en entornos controlados con
   `backend_fastapi/scripts/build_alembic_baseline_sql.py`.
-- Opcional: `USE_DJANGO_MIGRATE=1` con el mismo script para ejecutar antes
-  `manage.py migrate` (rollback, comparación, no es el camino de bootstrap en
-  verde). Verificación de paridad: `backend_fastapi/scripts/verify_alembic_schema_parity.sh`.
+- Verificación de paridad: `backend_fastapi/scripts/verify_alembic_schema_parity.sh`
+  contra una base histórica de referencia y una base creada solo con Alembic.
 - Las **nuevas** migraciones de tablas compartidas van en **Alembic**; los
-  `makemigrations` de Django quedan para rama/rollback o hasta el retiro del
-  monolito.
+  cambios de schema ya no usan migraciones Django.
 
-### Puerta de verificación para retirar Django (repo)
+### Puerta de verificación usada para retirar Django (repo)
 
 - Esquema: prueba con PostgreSQL vacío: `uv --project backend_fastapi run alembic upgrade head`.
-- Paridad: `backend_fastapi/scripts/verify_alembic_schema_parity.sh` (referencia Django + candidato
-  Alembic; la referencia debe incluir `fastapi_revoked_token` si se obtuvo solo
-  vía `migrate` sin Alembic previo).
-- Tests: `make -C backend check` mientras el monolito viva; `uv --project backend_fastapi run ruff check .`, `uv run pytest`; `npm --prefix webapp run build` (lint puede tener deuda previa). Cloud Functions: `python -m pytest cloud_functions/functions/tests`. Smoke
+- Paridad: `backend_fastapi/scripts/verify_alembic_schema_parity.sh` (referencia
+  histórica + candidato Alembic).
+- Tests: `uv --project backend_fastapi run ruff check .`, `uv --project backend_fastapi run pytest -q`; `npm --prefix webapp run build`. Cloud Functions: `python -m pytest cloud_functions/functions/tests`. Smoke
   staging: login, encuentro, URL firmada, transcripción, SSE documentos, copilot
-  (según `docs/debt/django-backend-removal.md`).
-
-- **Django admin y Silk** (profiling) no forman parte del flujo de la SPA; son
-  deuda operativa: [`docs/debt/fastapi-admin-ops.md`](../debt/fastapi-admin-ops.md).
+  si el entorno está disponible.
 
 ## Plan de Pruebas
 
@@ -181,6 +166,4 @@ Functions, GCS, PostgreSQL y `copilot_agent`.
 - Default para la primera fase SSE: hub en memoria y Cloud Run con una instancia.
 - Redis/Pub/Sub queda como migración futura cuando se necesiten múltiples réplicas.
 - Default recomendado para migracion: strangler pattern por dominio, no big bang.
-- El sistema no debe aceptar una migracion como completa hasta que Django deje de
-  ser requerido para auth, migraciones, admin operativo, callbacks, SSE y copilot
-  tools.
+- El sistema no debe aceptar un cambio de schema sin Alembic, pruebas y docs.

@@ -202,8 +202,8 @@ async def delete_document_for_doctor(
     if not document:
         return False
 
-    # Django cascades these ORM relationships before deleting Document. SQLAlchemy
-    # writes directly against the shared schema, so it must clear Copilot rows first.
+    # Copilot rows reference the target document, so clear them before deleting
+    # the canonical document row.
     await session.execute(
         delete(CopilotPatch).where(
             CopilotPatch.target_document_id == document_id,

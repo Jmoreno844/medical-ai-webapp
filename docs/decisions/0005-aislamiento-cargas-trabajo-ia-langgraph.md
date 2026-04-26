@@ -8,13 +8,13 @@ Aceptado
 
 Con la introducción del copiloto clínico read-only y su evolución futura hacia `patch -> review -> apply`, necesitamos desplegar un ecosistema de agentes separado del backend transaccional. Este flujo utiliza LangGraph, streaming brokered, tools internas read-only y persistencia de memoria (`PostgresSaver`).
 
-La API principal de la plataforma está desarrollada en Django (Cloud Run), diseñada para servir tráfico web (REST/SSE) con latencia baja y alta concurrencia. Surgió la interrogante de si la lógica de LangGraph debería integrarse dentro del monolito actual de Django o separarse en su propio servicio.
+La API principal de la plataforma estaba en Django cuando se aceptó este ADR; hoy vive en FastAPI (Cloud Run), diseñada para servir tráfico web (REST/SSE) con latencia baja y alta concurrencia. Surgió la interrogante de si la lógica de LangGraph debería integrarse dentro del API principal o separarse en su propio servicio.
 
 ## Decisión
 
 Hemos decidido **aislar completamente el workflow de los agentes (LangGraph) en un servicio independiente desplegado como Cloud Run**, bajo el boundary `copilot-agent-service`.
 
-El backend de Django seguirá siendo el broker seguro:
+El backend principal sigue siendo el broker seguro:
 
 - autentica al usuario
 - valida permisos
@@ -26,7 +26,7 @@ El backend de Django seguirá siendo el broker seguro:
 ## Justificación Técnica
 
 1. **Perfiles de Recursos Incompatibles:**
-   - **Backend (Django):** Optimizado para conexiones concurrentes, E/S intensiva (I/O bound) y SSE. Requiere poca RAM y CPU por request.
+   - **Backend (FastAPI):** Optimizado para conexiones concurrentes, E/S intensiva (I/O bound) y SSE. Requiere poca RAM y CPU por request.
    - **Agentes (LangGraph):** Requieren procesamiento intensivo (CPU bound), mantienen estado extenso en memoria y pueden tardar entre 15 a 60 segundos por ejecución. Mezclarlos causaría que los agentes monopolicen los recursos, degradando el rendimiento general de la API (provocando latencia en tareas simples como la carga de paicentes o pérdida de conexiones SSE).
 
 2. **Inflación del Contenedor y Cold Starts:**

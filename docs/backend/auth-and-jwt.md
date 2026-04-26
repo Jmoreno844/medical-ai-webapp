@@ -1,17 +1,5 @@
 # Contratos de autenticación y JWT
 
-## Sesión Django (`django_auth`)
-
-- Usada por el navegador: cookie de sesión + CSRF en requests mutantes.
-- Endpoints de negocio: encuentros, documentos (CRUD editor), pacientes, plantillas, etc.
-
-## JWT de usuario (`POST /api/auth/jwt-token`)
-
-- Audiencia: clientes que envían `Authorization: Bearer` al API (no es el mismo flujo que los callbacks de Cloud Functions en `documentos/api/callbacks.py`).
-- Claims típicos: `user_id`, `exp`, `iat`, `iss`, `aud`, `jti`, `role`.
-- Firma: `utils.jwt_settings.get_jwt_signing_key()` (misma clave que `JWT_SECRET_KEY` cuando está definida).
-- Revocación: `jti` en caché / blacklist (`apps/users/api.py`).
-
 ## FastAPI browser JWTs (`/api/v1/auth/*`)
 
 - FastAPI uses HttpOnly browser cookies for `browser_access` and
@@ -23,28 +11,23 @@
   `401`, the frontend attempts one `POST /api/v1/auth/refresh` and retries the
   original request before treating the session as logged out.
 - Browser tokens also include a password-state fingerprint claim derived from
-  the current Django password hash. If the password changes, existing FastAPI
+  the current password hash. If the password changes, existing FastAPI
   access and refresh tokens become invalid without waiting for normal expiry.
 - Settings are environment-variable driven through `backend_fastapi/app/core/config.py`;
-  `backend_fastapi/.env` may override values loaded from `backend/.env`.
+  `backend_fastapi/.env.local` may override local values.
 
-## JWT de callbacks Cloud Functions (`utils.auth.JWTAuth` / FastAPI callbacks)
+## JWT de callbacks Cloud Functions (FastAPI callbacks)
 
 Verificado en:
 
-- Django legacy:
-  - `PATCH /api/documento_by_function/{id}`
-  - `POST /api/documents/generation-chunk`
-  - `POST /api/notify/transcription-complete`
-- FastAPI migration:
-  - `PATCH /api/v1/documents/by-function/{id}`
-  - `POST /api/v1/documents/generation-chunk`
-  - `POST /api/v1/transcription/notify-complete`
+- `PATCH /api/v1/documents/by-function/{id}`
+- `POST /api/v1/documents/generation-chunk`
+- `POST /api/v1/transcription/notify-complete`
 
 Firma: misma clave vía `get_jwt_signing_key()`.
 
-En el flujo FastAPI los tokens de callback se emiten desde `backend_fastapi`
-con `iss=medical-web-app-fastapi`, `aud=medical-api-callbacks` y `purpose`
+Los tokens de callback se emiten desde `backend_fastapi` con
+`iss=medical-web-app-fastapi`, `aud=medical-api-callbacks` y `purpose`
 obligatorio. Los callbacks validan además los claims de recurso antes de tocar
 datos clínicos: `document_id` para transcripción y `document_id + process_id`
 para generación. El token SSE sigue siendo separado (`aud=medical-api-sse`,
@@ -58,17 +41,16 @@ Payload mínimo:
 - `document_id` (int): documento a actualizar
 - `exp` (datetime)
 - `purpose`: `"transcription"`
-- `iss`, `aud` en FastAPI
+- `iss`, `aud`
 
-Emitido por: `apps/generative_ai/api.py` usando `utils.service_jwt` en Django
-legacy, o `backend_fastapi/app/core/service_jwt.py` en el flujo migrado.
+Emitido por: `backend_fastapi/app/core/service_jwt.py`.
 
 ### Generación de documento
 
 Payload mínimo:
 
 - `user_id`, `document_id`, `process_id`, `exp`, `purpose`: `"document_generation"`
-- `iss`, `aud` en FastAPI
+- `iss`, `aud`
 
 ### SSE
 
@@ -79,11 +61,10 @@ Payload mínimo:
 ## JWT interno del broker del copiloto
 
 - Usado por: `backend_fastapi/app/domains/copilot/` cuando FastAPI llama a `copilot-agent-service`.
-- Legado temporal: `backend/apps/copilot/` mantiene el mismo contrato mientras no se retiren las rutas Django.
 - Se firma con: `COPILOT_SERVICE_SHARED_JWT` y no con `JWT_SECRET_KEY`.
 - Claims mínimos:
   - `iss`: `app-api-service`
-  - `sub`: `fastapi-copilot-broker` en FastAPI (`django-copilot-broker` en el broker legacy)
+  - `sub`: `fastapi-copilot-broker`
   - `aud`: `app-api-service`
   - `purpose`: `"copilot_internal_broker"`
   - `exp`
@@ -92,8 +73,7 @@ Payload mínimo:
 ## JWT interno de tools del copiloto
 
 - Usado por: `copilot_agent/` cuando el runtime llama a los endpoints internos read-only de FastAPI.
-- FastAPI expone compatibilidad en `/api/internal/copilot/tools/*` para preservar el cliente actual de `copilot_agent`; las mismas rutas también existen bajo `/api/v1/internal/...` durante la migración.
-- Legado temporal: Django conserva endpoints equivalentes hasta completar el apagado del broker legacy.
+- FastAPI expone `/api/internal/copilot/tools/*`; las mismas rutas también existen bajo `/api/v1/internal/...`.
 - Se firma con: `COPILOT_SERVICE_SHARED_JWT`.
 - Claims mínimos:
   - `iss`: `copilot-agent-service`
@@ -109,9 +89,8 @@ Payload mínimo:
 | Variable | Uso |
 |----------|-----|
 | `JWT_SECRET_KEY` | Firma de todos los JWT anteriores cuando está definida y no es el placeholder `not-loaded` |
-| `DJANGO_SECRET_KEY` | Fallback de firma si `JWT_SECRET_KEY` no aplica |
 | `COPILOT_AGENT_BASE_URL` | Base URL del `copilot-agent-service` que consume el broker FastAPI |
-| `COPILOT_SERVICE_SHARED_JWT` | Secreto compartido temporal entre FastAPI, Django legacy y `copilot_agent` |
+| `COPILOT_SERVICE_SHARED_JWT` | Secreto compartido temporal entre FastAPI y `copilot_agent` |
 | `COPILOT_AGENT_AUDIENCE` | Audiencia esperada por el agent runtime |
 | `COPILOT_BACKEND_AUDIENCE` | Audiencia esperada por FastAPI para las tools internas llamadas desde `copilot_agent` |
 | `COPILOT_AGENT_TIMEOUT_SECONDS` | Timeout HTTP del cliente interno del copiloto. En local y broker síncrono conviene `60` para no cortar runs de edición mientras Vertex termina el draft. |

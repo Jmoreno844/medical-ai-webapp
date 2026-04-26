@@ -39,7 +39,7 @@ DATABASES = {
 }
 ```
 
-La idea no es copiar esta configuracion literal sin validar el driver y el pool real usado por Django en produccion. El recordatorio importante es que el riesgo principal puede estar en el numero de conexiones concurrentes a Cloud SQL.
+La idea no es copiar esta configuracion literal sin validar el driver y el pool real usado por FastAPI en produccion. El recordatorio importante es que el riesgo principal puede estar en el numero de conexiones concurrentes a Cloud SQL.
 
 ### Cloud Run timeout
 

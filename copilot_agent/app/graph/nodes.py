@@ -807,7 +807,7 @@ def wait_for_human_review(state: CopilotState) -> dict[str, Any]:
 
 
 def apply_patch_review(state: CopilotState) -> dict[str, Any]:
-    # Intentional stub. Django owns the actual clinical write and audit trail.
+    # Intentional stub. FastAPI owns the actual clinical write and audit trail.
     # This node exists to keep the graph edge explicit and auditable in traces.
     # If the copilot ever gets direct write authority, this is the right place.
     del state

@@ -4,10 +4,8 @@ Este documento describe la arquitectura global de la plataforma, sus componentes
 
 ## 1. Arquitectura de Alto Nivel
 
-El sistema es una plataforma fullstack con un **API FastAPI** en `backend_fastapi/`
-(desplegado en stg como servicio principal), funciones serverless en GCP, un runtime
-del copiloto y una SPA en React. El monolito **Django** en `backend/` permanece en
-el repositorio para rollback y migraciones ORM históricas hasta su retiro completo.
+El sistema es una plataforma fullstack con un **API FastAPI** en `backend_fastapi/`,
+funciones serverless en GCP, un runtime del copiloto y una SPA en React.
 
 ```mermaid
 graph LR
@@ -163,8 +161,7 @@ sequenceDiagram
 | Componente | Stack | Responsabilidad |
 |------------|-------|-----------------|
 | **Frontend** `webapp/` | React 18, Vite, TypeScript, Tailwind | SPA del médico. Maneja grabación, UI del editor y conexión SSE. |
-| **API principal** `backend_fastapi/` | FastAPI, SQLAlchemy async, PostgreSQL | API bajo `/api/v1`, orquestación, JWTs, hub SSE, callbacks. |
-| **Monolito legacy** `backend/` | Django Ninja | Rollback, admin, migraciones ORM de comparación; esquemas en verde van con Alembic en `backend_fastapi/`. Stg+ API: FastAPI. |
+| **API principal** `backend_fastapi/` | FastAPI, SQLAlchemy async, PostgreSQL | API bajo `/api/v1`, orquestación, JWTs, hub SSE, callbacks y migraciones Alembic. |
 | **Copilot Agent** `copilot_agent/` | Python, FastAPI, LangGraph | Runtime del copiloto; broker hacia el API principal. |
 | **CF Transcripción** | Python, Functions Framework | Recibe audio de GCS → llama a Gemini → devuelve texto al API. |
 | **CF Generación** | Python, Functions Framework | Recibe contexto+plantilla → streaming desde Gemini → envía chunks al API. |
@@ -176,7 +173,7 @@ sequenceDiagram
 
 ## 5. Puntos de Atención Arquitectónica
 
-- **Hub SSE en memoria**: el hub en `backend_fastapi` (y el legacy en Django) usa memoria de proceso. Con múltiples réplicas en Cloud Run, un evento en la instancia A no llega a clientes en la B. Resolver con Redis o Pub/Sub en el futuro.
+- **Hub SSE en memoria**: el hub en `backend_fastapi` usa memoria de proceso. Con múltiples réplicas en Cloud Run, un evento en la instancia A no llega a clientes en la B. Resolver con Redis o Pub/Sub en el futuro.
 - **Backend público + DB privada**: Cloud Run sigue público para la SPA, pero PostgreSQL queda aislado por IP privada y acceso vía Cloud SQL Auth Proxy + IAM DB auth.
 - **Agent runtime separado**: LangGraph no vive dentro del backend principal. El backend hace de broker y conserva la autoridad clínica/transaccional.
 - **Auth interna temporal del copiloto**: el API (FastAPI) y `copilot-agent-service` usan un `shared JWT` temporal en `local`/`stg`; ver deuda canónica en [`../debt/copilot-agent-runtime.md`](../debt/copilot-agent-runtime.md).

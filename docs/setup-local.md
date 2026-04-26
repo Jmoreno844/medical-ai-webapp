@@ -15,12 +15,11 @@ Esta guía busca dejar un entorno local repetible para volver al proyecto rápid
 ### Backend
 
 ```bash
-cp backend/.env.example backend/.env
+cp backend_fastapi/.env.stg.example backend_fastapi/.env.local
 ```
 
 Variables clave:
 
-- `DJANGO_SECRET_KEY`
 - `JWT_SECRET_KEY`
 - `COPILOT_AGENT_BASE_URL=http://localhost:8090`
 - `COPILOT_SERVICE_SHARED_JWT`
@@ -106,14 +105,19 @@ Si quieres separar planner y drafter por proveedor/modelo, puedes usar overrides
 - `COPILOT_PATCH_MODEL`
 - `COPILOT_GOOGLE_LOCATION` o los overrides `COPILOT_PLANNER_GOOGLE_LOCATION` / `COPILOT_PATCH_GOOGLE_LOCATION` para modelos Gemini preview.
 
-Para local, el valor recomendado es reutilizar la misma base `medical_web_app` que levanta `make -C backend db-up`. No necesitas crear una DB adicional solo para el agent runtime.
+Para local, el valor recomendado es reutilizar la misma base `medical_web_app` que usa `backend_fastapi`. No necesitas crear una DB adicional solo para el agent runtime.
 
 La integración LangSmith del `copilot_agent` y de `cloud_functions` queda limitada a `local` y registra solo metadata sanitizada del request/run. No envía transcripciones completas, documentos generados ni tokens a LangSmith.
 
 ## 2. Base de datos
 
 ```bash
-make -C backend db-up
+docker run --name medical-web-app-db \
+  -e POSTGRES_DB=medical_web_app \
+  -e POSTGRES_USER=juan \
+  -e POSTGRES_PASSWORD=12345 \
+  -p 5433:5433 \
+  -d postgres:15 -c 'port=5433'
 ```
 
 ## 3. API principal (FastAPI) y migraciones
@@ -121,7 +125,7 @@ make -C backend db-up
 `backend_fastapi/` es el proyecto `uv` del API por defecto. En una base **nueva**,
 el esquema clínico se crea con **Alembic solamente** (`0001` aplica
 `alembic/baseline/baseline_clinical_v1.sql`, equivalente a las tablas
-históricas creadas por `manage.py migrate` + columnas/índices relevantes, más
+históricas del producto + columnas/índices relevantes, más
 `fastapi_revoked_token`).
 
 En una base **nueva** (vacía) el mínimo es:
@@ -136,15 +140,9 @@ O desde la raíz:
 bash backend_fastapi/scripts/migration_smoke_staging.sh
 ```
 
-Para comparar o recuperar un flujo con **Django** (solo rollback / auditoría),
-`USE_DJANGO_MIGRATE=1 bash backend_fastapi/scripts/migration_smoke_staging.sh` ejecuta antes
-`manage.py migrate` y luego Alembic (típicamente inútil en una base ya poblada
-por Alembic; ver `docs/architecture/backend-fastapi-migration.md`).
-
-Verificación de paridad (opcional, requiere dos bases: una migrada con Django
-y otra con Alembic, mismas versiones de PostgreSQL): `bash backend_fastapi/scripts/verify_alembic_schema_parity.sh` (ver comentario en el script sobre
-`ALEMBIC_REF_DJANGO_DB` e incluir `fastapi_revoked_token` en la de referencia si
-solo corrió `migrate` sin Alembic previo).
+Verificación de paridad (opcional, requiere una base histórica de referencia y
+otra creada solo con Alembic, mismas versiones de PostgreSQL):
+`bash backend_fastapi/scripts/verify_alembic_schema_parity.sh`.
 
 ### 3.1. FastAPI en el host (recomendado para desarrollo)
 
@@ -157,11 +155,9 @@ ENVIRONMENT=local uv run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reloa
 
 Health: `http://localhost:8001/api/v1/health`
 
-También puedes usar el puerto `8002` si en `8001` sigue levantado otro proceso:
+También puedes usar otro puerto si en `8001` sigue levantado otro proceso.
 
-`make -C backend fastapi-run` (apunta a `8002`).
-
-`backend_fastapi` carga en orden `backend/.env`, `backend_fastapi/.env` y
+`backend_fastapi` carga en orden `backend_fastapi/.env` y
 `backend_fastapi/.env.local`. El archivo `backend_fastapi/.env` contiene
 placeholders locales; usa `backend_fastapi/.env.stg.example` y
 `backend_fastapi/.env.prod.example` como referencia para variables de despliegue,
@@ -173,15 +169,15 @@ FastAPI incluye un WebSocket experimental, solo local, para probar Google
 Speech-to-Text v2 sin pasar por GCS:
 
 ```text
-ws://localhost:8001/api/v1/dev/transcription/realtime/stt?language_code=es-CO&sample_rate_hertz=16000
+ws://localhost:8001/api/v1/dev/transcription/realtime/stt?language_code=es-US&sample_rate_hertz=16000
 ```
 
 Requisitos:
 
 - `gcloud auth application-default login`
-- `GCP_PROJECT_ID` en `backend/.env` o `backend_fastapi/.env.local`
+- `GCP_PROJECT_ID` en `backend_fastapi/.env.local`
 - Speech-to-Text API habilitada en el proyecto
-- opcional: `GCP_STT_LOCATION=global`, `GCP_STT_MODEL=chirp_3`
+- opcional: `GCP_STT_LOCATION=us`, `GCP_STT_MODEL=chirp_3`
 
 El endpoint espera chunks binarios `LINEAR16` PCM mono a 16 kHz y devuelve
 eventos JSON `partial` / `final`. Para una prueba manual rápida, abre
@@ -191,42 +187,19 @@ corriendo en `8001`. La implementación vive separada del flujo clínico en
 `backend_fastapi/app/domains/transcription/test_realtime_stt.py`. No uses audio
 real de pacientes ni PHI en este POC.
 
-### 3.3. FastAPI con Docker (perfil `fastapi`)
+### 3.3. FastAPI con Docker
 
-Con Postgres ya definido en `backend/.env`:
-
-```bash
-make -C backend fastapi-compose-up
-# o: (cd backend && docker compose --profile fastapi up -d --build web_fastapi db)
-```
-
-No arranques a la vez `web` (Django) y `web_fastapi` mapeando el **mismo**
-`BACKEND_PORT` (p. ej. 8001). En la primera subida, el `docker-entrypoint` ejecuta `alembic upgrade head` sobre
-la base vacía: no hace falta `manage.py migrate` en esa ruta. El contenedor
-`web` (Django) y `web_fastapi` comparten el mismo `POSTGRES_DB` solo si quieres
-migrar/auditar con Django; no mezcles ambos en el mismo puerto de API
-(Django vs FastAPI).
-
-## 4. Backend Django (solo rollback / referencia)
-
-Mientras exista el monolito, puedes levantar Django con:
+Con Postgres ya definido en `backend_fastapi/.env.local`:
 
 ```bash
-make -C backend sync-dev
-make -C backend migrate
-make -C backend runserver
+docker build -t medical-fastapi:local backend_fastapi
+docker run --rm --env-file backend_fastapi/.env.local -p 8001:8080 medical-fastapi:local
 ```
 
-Django: `http://localhost:8001` — **no** lo uses al mismo tiempo que FastAPI
-en el mismo host/puerto.
+En la primera subida, el `docker-entrypoint` ejecuta `alembic upgrade head`
+sobre la base vacía.
 
-Opcional:
-
-```bash
-make -C backend createsuperuser
-```
-
-## 5. Frontend
+## 4. Frontend
 
 ```bash
 npm --prefix webapp install
@@ -235,7 +208,7 @@ npm --prefix webapp run dev
 
 Frontend: `http://localhost:5173`
 
-## 6. Cloud Functions locales
+## 5. Cloud Functions locales
 
 ```bash
 docker compose -f cloud_functions/docker-compose.yml up --build
@@ -246,26 +219,21 @@ Puertos locales:
 - `8082` — `transcription-endpoint`
 - `8083` — `document-workflow`
 
-## 7. Smoke test recomendado
+## 6. Smoke test recomendado
 
 1. Abrir el frontend en `http://localhost:5173`.
 2. Crear o abrir un `Encuentro`.
-3. Verificar que el API (FastAPI) responda en `http://localhost:8001/api/v1/health` (Django seguía en `/api/health/` solo si usas el stack legacy).
+3. Verificar que el API responda en `http://localhost:8001/api/v1/health`.
 4. Confirmar que el flujo de transcripción apunte a `http://localhost:8082`.
 5. Confirmar que la generación documental apunte a `http://localhost:8083`.
 6. Confirmar que `copilot_agent` responda en `http://localhost:8090/healthz`.
 
-## 8. Checks rápidos
+## 7. Checks rápidos
 
 Backend:
 
 ```bash
-make -C backend check
-```
-
-Backend FastAPI:
-
-```bash
+uv --project backend_fastapi run ruff check .
 uv --project backend_fastapi run pytest -q backend_fastapi/tests
 ```
 
@@ -288,12 +256,12 @@ Copilot agent:
 docker compose -f copilot_agent/docker-compose.yml up --build
 ```
 
-Para el slice actual del broker, backend y `copilot_agent` deben compartir el mismo valor de `COPILOT_SERVICE_SHARED_JWT`. El runtime también usa `COPILOT_BACKEND_AUDIENCE` para firmar las tools internas read-only hacia el **backend** (FastAPI por defecto; Django solo en rollback). En local, el path más simple es apuntar `COPILOT_AGENT_DATABASE_URL` y `COPILOT_LONG_TERM_DATABASE_URL` a `medical_web_app`. La migración futura a OIDC/ID token está documentada en [`docs/debt/copilot-agent-runtime.md`](debt/copilot-agent-runtime.md).
+Para el slice actual del broker, backend y `copilot_agent` deben compartir el mismo valor de `COPILOT_SERVICE_SHARED_JWT`. El runtime también usa `COPILOT_BACKEND_AUDIENCE` para firmar las tools internas read-only hacia el **backend**. En local, el path más simple es apuntar `COPILOT_AGENT_DATABASE_URL` y `COPILOT_LONG_TERM_DATABASE_URL` a `medical_web_app`. La migración futura a OIDC/ID token está documentada en [`docs/debt/copilot-agent-runtime.md`](debt/copilot-agent-runtime.md).
 
-## 9. Trazas distribuidas opcionales
+## 8. Trazas distribuidas opcionales
 
 Para un trace local de `webapp -> FastAPI -> Cloud Functions -> FastAPI` (mismo
-camino lógico si aún usas el stack legacy con Django en rollback):
+camino lógico de producción):
 
 ```bash
 docker compose -f docker-compose.tracing.yml up -d
@@ -310,7 +278,7 @@ Detalle completo en [`docs/backend/tracing.md`](backend/tracing.md).
 ## Puertos locales
 
 - `5173` — frontend Vite
-- `8001` — API backend (FastAPI por defecto; Django solo en rollback local)
+- `8001` — API backend (FastAPI)
 - `5433` — PostgreSQL local
 - `8082` — Cloud Function de transcripción
 - `8083` — Cloud Function de generación

@@ -38,7 +38,7 @@ db_tier          = "db-custom-1-3840"  # 1 vCPU, 3.75 GB RAM
 db_name          = "vexthealthdb"
 
 cloud_run_service_name    = "vexthealth-backend"
-cloud_run_image           = "us-east1-docker.pkg.dev/<PROD_PROJECT_ID>/vexthealth-containers/django-backend:latest"
+cloud_run_image           = "us-east1-docker.pkg.dev/<PROD_PROJECT_ID>/vexthealth-containers/fastapi-backend:latest"
 cloud_run_max_instances   = 1       # Mantener en 1 por SSE en memoria (ver ADR-0002)
 cloud_run_max_concurrency = 250
 

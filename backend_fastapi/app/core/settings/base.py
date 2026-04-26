@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 
     gcp_project_id: str | None = Field(default=None, alias="GCP_PROJECT_ID")
     gcs_bucket_name: str | None = Field(default=None, alias="GCS_BUCKET_NAME")
-    gcp_stt_location: str = Field(default="global", alias="GCP_STT_LOCATION")
+    gcp_stt_location: str = Field(default="us", alias="GCP_STT_LOCATION")
     gcp_stt_model: str = Field(default="chirp_3", alias="GCP_STT_MODEL")
     gcp_storage_impersonated_service_account: str | None = Field(
         default=None,

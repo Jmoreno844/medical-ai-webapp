@@ -4,13 +4,13 @@ Producto fullstack para documentación médica asistida por IA. El flujo princip
 
 1. El médico crea un `Encuentro` y graba audio.
 2. El frontend sube el audio directo a GCS con signed URL.
-3. Django dispara la transcripción y la generación documental.
-4. Cloud Functions llama a Gemini y devuelve resultados a Django.
+3. FastAPI dispara la transcripción y la generación documental.
+4. Cloud Functions llama a Gemini y devuelve resultados a FastAPI.
 5. El frontend recibe transcripción y generación por SSE.
 
 ## Mapa del repo
 
-- `backend/` — API Django Ninja, modelos, auth, SSE y orquestación.
+- `backend_fastapi/` — API FastAPI, modelos SQLAlchemy, auth, SSE, orquestación y migraciones Alembic.
 - `cloud_functions/` — transcripción y generación documental en GCP Functions.
 - `copilot_agent/` — runtime dedicado del copiloto clínico basado en LangGraph.
 - `webapp/` — SPA React/Vite usada por el médico.
@@ -30,11 +30,11 @@ Producto fullstack para documentación médica asistida por IA. El flujo princip
 
 Backend:
 ```bash
-make -C backend sync-dev
-make -C backend db-up
-make -C backend migrate
-make -C backend runserver
-make -C backend test
+cd backend_fastapi
+uv sync --group dev
+uv run alembic upgrade head
+ENVIRONMENT=local uv run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+uv run pytest -q
 ```
 
 Frontend:
@@ -61,7 +61,7 @@ docker compose -f copilot_agent/docker-compose.yml up --build
 
 - Usa [`AGENTS.md`](AGENTS.md) como contrato principal para agentes.
 - La guía más útil para retomar contexto rápido es [`docs/architecture/repo-map.md`](docs/architecture/repo-map.md).
-- `webapp/dist/`, `webapp/node_modules/`, `landing-page/.next/`, `landing-page/node_modules/`, `backend/.venv/`, `backend/logs/` e `infra/**/.terraform/` son artefactos locales, no fuente de verdad.
+- `webapp/dist/`, `webapp/node_modules/`, `landing-page/.next/`, `landing-page/node_modules/`, `backend_fastapi/.venv/` e `infra/**/.terraform/` son artefactos locales, no fuente de verdad.
 - No existe billing de producto dentro de la app hoy; el único “billing” del repo está en budgets/monitoring de Terraform.
 - El runtime del copiloto debe vivir fuera del backend principal; usa `copilot_agent/` como base de ese servicio.
 

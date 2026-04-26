@@ -1,4 +1,4 @@
-"""Bootstrap the full clinical schema (Django-matched) plus FastAPI token table.
+"""Bootstrap the full clinical schema plus FastAPI token table.
 
 Revision ID: 0001
 Revises:

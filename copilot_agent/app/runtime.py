@@ -111,7 +111,7 @@ class CopilotRuntime:
     # (bootstrap_run writes the initial run record + run_started event) and
     # runs the graph as a FastAPI BackgroundTask via run_graph_async().
     #
-    # Django's existing SSE polling endpoint (stream_copilot_run) already
+    # FastAPI's existing SSE polling endpoint (stream_copilot_run) already
     # delivers events from the DB to the browser; it now gets live data
     # instead of a single burst at the end.
     #
@@ -214,7 +214,7 @@ class CopilotRuntime:
         """Create the initial run record (status='running') and persist run_started.
 
         Called synchronously before the graph starts so the HTTP endpoint can
-        return run_id to Django in ~50 ms.  The graph itself runs separately
+        return run_id to FastAPI in ~50 ms.  The graph itself runs separately
         in run_graph_async via FastAPI BackgroundTasks.
         """
         initial_run = StoredRun(
@@ -983,7 +983,7 @@ class CopilotRuntime:
             return None
 
         # Legacy runs may still only populate patch_preview. Normalize that path
-        # into a one-patch PatchSet so Django/frontend keep a single review model.
+        # into a one-patch PatchSet so FastAPI/frontend keep a single review model.
         patch_set_id = str(uuid.uuid4())
         return {
             "patch_set_id": patch_set_id,

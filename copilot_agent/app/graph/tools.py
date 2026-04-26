@@ -1055,7 +1055,7 @@ def _build_patch_set_preview_payload(
         )
 
     # Adjuntar los campos del clinical_plan al patch_set_preview para que el backend
-    # Django los persista en CopilotPatchSet y el frontend los pueda mostrar en la
+    # FastAPI los persista en CopilotPatchSet y el frontend los pueda mostrar en la
     # tarjeta de revisión (ej. badge de alcance clínico).
     clinical_plan = dict(scope_plan or {})
     base_hash = (

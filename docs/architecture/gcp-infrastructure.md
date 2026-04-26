@@ -86,10 +86,9 @@ echo -n "VALOR" | gcloud secrets versions add SECRET_ID --data-file=-
 
 | Secret ID | Usado por | Descripción |
 |---|---|---|
-| `django-secret-key` | Cloud Run | Django `SECRET_KEY` |
 | `jwt-secret-key` | Cloud Run | Firmado de JWTs (SSE, service) |
 | `service-account-json` | Cloud Run | Opcional; solo si se fuerza una SA key en lugar de ADC |
-| `copilot-service-shared-jwt` | Copilot Agent | JWT compartido para broker interno Django -> agent runtime |
+| `copilot-service-shared-jwt` | Backend + Copilot Agent | JWT compartido para broker interno FastAPI -> agent runtime |
 
 ### Rotación de secrets
 
@@ -124,9 +123,8 @@ El bucket `*-audio` también necesita CORS para subida directa desde el navegado
 | `vpc-egress` | `PRIVATE_RANGES_ONLY` | Solo la base de datos viaja por VPC |
 | `Cloud SQL` | Private IP + IAM DB auth | PostgreSQL no queda expuesto por IP pública |
 
-La migración Django -> FastAPI conserva esta misma restricción en su primera
-fase: no se introduce Redis/Memorystore todavía, por lo que cualquier servicio
-FastAPI que maneje SSE debe desplegarse con una sola instancia y afinidad de
+La API FastAPI conserva esta restricción: no se introduce Redis/Memorystore
+todavía, por lo que cualquier servicio que maneje SSE debe desplegarse con una sola instancia y afinidad de
 sesión hasta que exista un broker compartido.
 
 ### Copilot Agent Cloud Run — configuración inicial
@@ -224,7 +222,7 @@ Así el artefacto en GCS queda alineado con Terraform, pero el runtime de las fu
 | Cloud Functions falla con `missing permission on the build service account` | Dar `roles/storage.objectViewer` al service account de build (`PROJECT_NUMBER-compute@developer.gserviceaccount.com`) sobre el bucket interno `gcf-v2-sources-*`; el módulo `service_accounts` ya contempla este binding para nuevos applies. |
 | Cloud Functions falla porque la build SA no puede escribir logs | Dar `roles/logging.logWriter` a `PROJECT_NUMBER-compute@developer.gserviceaccount.com`; el módulo `service_accounts` ya contempla este binding para nuevos applies. |
 | Cloud Functions falla con `artifactregistry.repositories.downloadArtifacts denied` | Dar `roles/artifactregistry.reader` y `roles/artifactregistry.writer` al service account de build `PROJECT_NUMBER-compute@developer.gserviceaccount.com`; el módulo `service_accounts` ya contempla estos bindings para nuevos applies. |
-| Cloud Run falla con `Image ... not found` | Usar una imagen bootstrap publica en `cloud_run_image` para el primer `apply`, o publicar primero `django-backend:latest` en Artifact Registry. |
+| Cloud Run falla con `Image ... not found` | Usar una imagen bootstrap publica en `cloud_run_image` para el primer `apply`, o publicar primero `fastapi-backend:latest` en Artifact Registry. |
 | Cloud Run falla porque `Secret ... versions/latest was not found` | En bootstrap, usar `cloud_run_use_secret_manager = false`; después de cargar versiones en Secret Manager, volver a `true` para que el backend lea secretos reales. |
 | Cloud Run falla al aplicar IAM con `allUsers ... do not belong to a permitted customer` | La organizacion bloquea acceso publico; poner `cloud_run_allow_unauthenticated = false` y exponer el servicio luego mediante una estrategia compatible con tu tenant. |
 | Bucket frontend falla con `allUsers ... do not belong to a permitted customer` | La organizacion bloquea buckets publicos; poner `frontend_public_read_enabled = false` y definir luego hosting/CDN alternativo si necesitas SPA publica. |

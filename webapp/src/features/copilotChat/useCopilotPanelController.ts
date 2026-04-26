@@ -933,7 +933,7 @@ export function useCopilotPanelController(
       // Force-save any dirty editor drafts before building the workspace index.
       // This guarantees the DB reflects exactly what the doctor sees right now,
       // so the agent's pre-seeded content_markdown and any base_hash used by
-      // the patcher matches the canonical document version in Django.
+      // the patcher matches the canonical document version in FastAPI.
       const draftState = useDocumentDraftStore.getState();
       const dirtyDocIds = Object.entries(draftState.draftsByDocumentId)
         .filter(([, draft]) => draft?.isDirty)

@@ -7,8 +7,8 @@
 
 **Esquema en verde (sin datos):** se crea con `alembic upgrade head` en
 `backend_fastapi/`; la revisión `0001` aplica
-`alembic/baseline/baseline_clinical_v1.sql` (mismo conjunto de tablas que
-historial Django + `fastapi_revoked_token`, sin admin, sesiones, Silk, ni
+`alembic/baseline/baseline_clinical_v1.sql` (mismo conjunto de tablas clínicas
+históricas + `fastapi_revoked_token`, sin admin, sesiones, Silk, ni
 `django_migrations`). Nuevas migraciones compartidas van en Alembic. Ver
 [`../architecture/backend-fastapi-migration.md`](../architecture/backend-fastapi-migration.md).
 
@@ -17,7 +17,7 @@ historial Django + `fastapi_revoked_token`, sin admin, sesiones, Silk, ni
 En entornos Cloud (`stg`, `production`), el backend ya **no utiliza contraseñas** (`DB_PASSWORD` fue removido de los secretos por seguridad). En su lugar, utilizamos autenticación IAM integrada nativa de GCP:
 
 1. El backend inicializa su conexión local a `127.0.0.1` en el puerto `5432` provisto por el sidecar **Cloud SQL Auth Proxy**.
-2. Django usa el SA del contenedor (`backend-runner@...`) intercambiando temporalmente OAuth tokens por la sesión.
+2. FastAPI usa el SA del contenedor (`backend-runner@...`) intercambiando temporalmente OAuth tokens por la sesión.
 3. El usuario de base de datos en `config/settings/stg.py` asume el nombre truncado de la cuenta de servicio (`DB_USER=backend-runner@<proyecto>.iam`).
 
 > **Importante (PostgreSQL 15+):**
@@ -131,7 +131,7 @@ erDiagram
 
 ## Tablas — descripción detallada
 
-### `users_user` (`apps/users/models.py`)
+### `users_user` (`backend_fastapi/app/db/models.py`)
 
 Modelo personalizado que extiende `AbstractBaseUser` + `PermissionsMixin`.
 
@@ -139,19 +139,19 @@ Modelo personalizado que extiende `AbstractBaseUser` + `PermissionsMixin`.
 | ------------- | ------------ | ---------------------------------------------------- | ---------------------- |
 | `id`          | bigint       | PK, auto                                             | —                      |
 | `email`       | varchar(254) | unique, not null                                     | Identificador de login |
-| `password`    | varchar(128) | not null                                             | Hash Django            |
+| `password`    | varchar(128) | not null                                             | Hash de password       |
 | `name`        | varchar(50)  | not null                                             | Nombre del médico      |
 | `lastName`    | varchar(50)  | not null                                             | Apellido               |
 | `role`        | varchar(20)  | choices: `medico`, `administrador`; default `medico` | Rol del usuario        |
 | `is_active`   | bool         | default True                                         | Soft-delete            |
 | `is_staff`    | bool         | default False                                        | Acceso admin           |
 | `date_joined` | datetime     | default `now()`                                      | —                      |
-| `last_login`  | datetime     | nullable                                             | Gestionado por Django  |
+| `last_login`  | datetime     | nullable                                             | Último login           |
 
 Relaciones M2M:
 
 - `Paciente` a través de `PacienteMedico`
-- Grupos y permisos Django (`auth_group`, `auth_permission`) — heredados.
+- Grupos y permisos (`auth_group`, `auth_permission`) — tablas heredadas por compatibilidad de schema.
 
 Índices:
 
@@ -159,7 +159,7 @@ Relaciones M2M:
 
 ---
 
-### `pacientes_paciente` (`apps/pacientes/models.py`)
+### `pacientes_paciente` (`backend_fastapi/app/db/models.py`)
 
 | Campo        | Tipo         | Restricciones | Descripción                  |
 | ------------ | ------------ | ------------- | ---------------------------- |
@@ -170,7 +170,7 @@ Relaciones M2M:
 
 ---
 
-### `pacientes_pacientemedico` (`apps/pacientes/models.py`)
+### `pacientes_pacientemedico` (`backend_fastapi/app/db/models.py`)
 
 Tabla de relación N:M entre `User` (médico) y `Paciente`.
 
@@ -192,7 +192,7 @@ Restricciones:
 
 ---
 
-### `encuentro_encuentro` (`apps/encuentro/models.py`)
+### `encuentro_encuentro` (`backend_fastapi/app/db/models.py`)
 
 Registro central de una consulta médica. Contiene metadatos del audio grabado.
 
@@ -228,7 +228,7 @@ Orden por defecto: `-created_at`.
 
 ---
 
-### `documentos_documento` (`apps/documentos/models.py`)
+### `documentos_documento` (`backend_fastapi/app/db/models.py`)
 
 Contenedor de texto clínico asociado a un encuentro. Un encuentro puede tener
 múltiples documentos de distinto tipo.
@@ -244,8 +244,8 @@ múltiples documentos de distinto tipo.
 | `content_json`           | jsonb       | nullable                                                  | Canónico del editor Tiptap |
 | `fecha_creacion`         | date        | auto_now_add                                              | —                          |
 
-Al crear un nuevo `Encuentro`, Django crea automáticamente dos documentos vacíos:
-uno de tipo `contexto` y otro de tipo `transcripcion` (`encuentro/api.py` → `create_empty_encuentro`).
+Al crear un nuevo `Encuentro`, FastAPI crea automáticamente dos documentos vacíos:
+uno de tipo `contexto` y otro de tipo `transcripcion`.
 
 ### Nota de compatibilidad 2026-04
 
@@ -258,7 +258,7 @@ uno de tipo `contexto` y otro de tipo `transcripcion` (`encuentro/api.py` → `c
 - El backend ahora sincroniza ambos campos en todos los write paths soportados:
   - si entra `content_json`, regenera `content_markdown`
   - si entra solo markdown/texto, regenera `content_json`
-- La sincronización vive en `apps/documents/services/rich_document_content.py`; no se debe duplicar esta lógica en endpoints o servicios aislados.
+- La sincronización vive en `backend_fastapi/app/domains/documents/content.py`; no se debe duplicar esta lógica en endpoints o servicios aislados.
 - `content` sigue existiendo como alias legacy de compat a `content_markdown`, pero ya no debe usarse como un segundo campo persistente.
 - La estructura de secciones todavía no se persiste en una tabla propia. El backend la extrae de forma determinista al leer el documento para el copilot usando headings reales del markdown.
 
@@ -271,7 +271,7 @@ La regla general es simple:
 - los read paths normales devuelven ambos campos ya sincronizados
 - el runtime del copilot hoy consume markdown como contrato operativo seguro, aunque el backend siga persistiendo ambos campos
 
-La sincronización central vive en `apps/documents/services/rich_document_content.py`:
+La sincronización central vive en `backend_fastapi/app/domains/documents/content.py`:
 
 - `build_synced_document_content(...)`
 - `set_document_content_fields(...)`
@@ -280,18 +280,18 @@ La sincronización central vive en `apps/documents/services/rich_document_conten
 
 #### Cuándo ocurre cada dirección de conversión
 
-| Flujo                                                                                     | Entrada preferida                                             | Conversión que hace Django                                                                                       | Resultado persistido / expuesto                                                                                   |
+| Flujo                                                                                     | Entrada preferida                                             | Conversión que hace FastAPI                                                                                      | Resultado persistido / expuesto                                                                                   |
 | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | Editor crea o actualiza documento (`POST /documents`, `PATCH /documents/by-editor/{id}`)  | `content_json` si viene presente; si no, markdown             | `content_json -> content_markdown` cuando hay JSON. Si no hay JSON, `content_markdown -> content_json`           | Se guardan `content_markdown + content_json`; las respuestas del API devuelven ambos                              |
 | Callback o función actualiza documento (`PATCH /documents/by-function/{id}`)              | markdown si viene `content_markdown` o `content`; si no, JSON | Normalmente `content_markdown -> content_json`; si el caller manda solo JSON, `content_json -> content_markdown` | Se guardan ambos campos sincronizados                                                                             |
 | Streaming/generation chunk final (`POST /documents/generation-chunk`, `is_complete=true`) | markdown chunk final                                          | `content_markdown -> content_json`                                                                               | Se guardan ambos campos sincronizados antes de notificar SSE                                                      |
-| Patch apply clínico aceptado (`apps/copilot/services/patch_sets.py`)                      | markdown canónico actual del documento                        | Aplica patches sobre markdown y luego `content_markdown -> content_json`                                         | El documento queda persistido con ambos campos actualizados; además otros patch sets viejos pueden quedar `stale` |
+| Patch apply clínico aceptado (`backend_fastapi/app/domains/copilot/patch_sets.py`)        | markdown canónico actual del documento                        | Aplica patches sobre markdown y luego `content_markdown -> content_json`                                         | El documento queda persistido con ambos campos actualizados; además otros patch sets viejos pueden quedar `stale` |
 | Lectura normal de documento desde backend                                                 | ninguno; solo serializa estado actual                         | no convierte si ya está persistido sincronizado                                                                  | Se exponen `content`, `content_markdown` y `content_json`                                                         |
 | Bootstrap del runtime copilot (`workspace_index`)                                         | `content_markdown` opcional enviado por frontend              | no hay conversión dentro del runtime; solo pre-seed de lectura full                                              | El runtime usa markdown. `content_json` puede viajar por compat/UX futura, pero hoy no se usa para patching       |
 
 #### Consecuencias operativas
 
-- El frontend no necesita adivinar qué representación es canónica por endpoint; debe mandar la representación natural del flujo y dejar que Django sincronice la otra.
+- El frontend no necesita adivinar qué representación es canónica por endpoint; debe mandar la representación natural del flujo y dejar que FastAPI sincronice la otra.
 - El editor rico debe seguir prefiriendo `content_json` como payload semántico principal.
 - Los write paths automáticos, callbacks y patch apply siguen siendo markdown-first porque el contrato clínico de patching y anchors todavía opera sobre texto/markdown.
 - El copilot runtime puede recibir `content_json` en `workspace_index`, pero hoy solo confía en `content_markdown` para lecturas pre-seedeadas, `base_hash` y drafting.
@@ -301,7 +301,7 @@ Sin índices adicionales definidos en `Meta` (aparte del PK y las FKs implícita
 
 ---
 
-### `plantillas_plantillabase` (`apps/plantillas/models.py`)
+### `plantillas_plantillabase` (`backend_fastapi/app/db/models.py`)
 
 Plantillas del sistema, disponibles para todos los médicos como punto de partida.
 
@@ -319,7 +319,7 @@ Plantillas del sistema, disponibles para todos los médicos como punto de partid
 
 ---
 
-### `plantillas_plantilladoctor` (`apps/plantillas/models.py`)
+### `plantillas_plantilladoctor` (`backend_fastapi/app/db/models.py`)
 
 Plantillas personalizadas por médico. Puede heredar el contenido de `PlantillaBase`
 (`contenido_base=True`) o tener su propio texto (`contenido_base=False`).
@@ -347,7 +347,7 @@ Método de modelo:
 
 ---
 
-### `plantillas_usoplantilla` (`apps/plantillas/models.py`)
+### `plantillas_usoplantilla` (`backend_fastapi/app/db/models.py`)
 
 Estadísticas de uso por plantilla y médico.
 
@@ -370,7 +370,7 @@ Restricciones:
 
 ---
 
-### `copilot_copilotrun`, `copilot_copilotpatchset`, `copilot_copilotpatch` (`apps/copilot/models.py`)
+### `copilot_copilotrun`, `copilot_copilotpatchset`, `copilot_copilotpatch` (`backend_fastapi/app/db/models.py`)
 
 Persisten el broker del runtime del copiloto, el review humano y el apply seguro de escritura clínica.
 
@@ -421,7 +421,7 @@ Unidad de review del writer flow. En v1 apunta a **un solo documento target por 
 
 #### `copilot_copilotpatch`
 
-Unidad granular de cambio. Cada fila representa un cambio anclado que Django puede aceptar, rechazar, marcar como conflictivo o aplicar.
+Unidad granular de cambio. Cada fila representa un cambio anclado que FastAPI puede aceptar, rechazar, marcar como conflictivo o aplicar.
 
 | Campo                             | Tipo         | Restricciones                                                       | Descripción                                                                         |
 | --------------------------------- | ------------ | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -436,7 +436,7 @@ Unidad granular de cambio. Cada fila representa un cambio anclado que Django pue
 | `anchor`                          | json         | default `{}`                                                        | Anchor textual del cambio                                                           |
 | `expected_hash`                   | varchar(128) | nullable                                                            | Hash esperado del span/ancla                                                        |
 | `old_text`, `new_text`            | text         | nullable                                                            | Texto previo y propuesto                                                            |
-| `resolved_start`, `resolved_end`  | int          | nullable                                                            | Rango resuelto por Django sobre el contenido base                                   |
+| `resolved_start`, `resolved_end`  | int          | nullable                                                            | Rango resuelto por FastAPI sobre el contenido base                                  |
 | `confidence`                      | float        | nullable                                                            | Confianza del runtime cuando exista                                                 |
 | `conflict_reason`                 | text         | nullable                                                            | Motivo de conflicto interno o stale                                                 |
 | `before_preview`, `after_preview` | text         | nullable                                                            | Preview corto del cambio                                                            |
@@ -453,7 +453,7 @@ Unidad granular de cambio. Cada fila representa un cambio anclado que Django pue
 
 Notas de operación:
 
-- Django, no el frontend, resuelve anchors a `resolved_start/resolved_end`.
+- FastAPI, no el frontend, resuelve anchors a `resolved_start/resolved_end`.
 - Si el `base_hash` ya no coincide al aplicar, el `CopilotPatchSet` pasa a `stale`.
 - El endpoint legacy `/api/copilot/runs/{run_id}/review` sigue existiendo solo para patch sets de un cambio mientras migra la UI.
 
@@ -463,7 +463,7 @@ Notas de operación:
 
 | Convención                                  | Ejemplo                                            |
 | ------------------------------------------- | -------------------------------------------------- |
-| Tablas: `{app}_{model}` (Django default)    | `encuentro_encuentro`, `pacientes_paciente`        |
+| Tablas: nombres históricos `{app}_{model}`  | `encuentro_encuentro`, `pacientes_paciente`        |
 | FKs con `_id` como sufijo                   | `id_medico_id`, `id_paciente_id`                   |
 | Timestamps: `created_at` / `fecha_creacion` | `Encuentro.created_at`, `Documento.fecha_creacion` |
 | Booleanos de estado: verbo pasado           | `has_been_transcribed`, `paciente_conectado`       |
@@ -474,7 +474,7 @@ Notas de operación:
 
 `CONN_MAX_AGE` está configurado en `stg` con valor por defecto `300` segundos
 (sobrescribible por variable de entorno). En `develop.py` y `production.py` no se fija,
-por lo que Django usa su comportamiento por defecto para esos entornos.
+por lo que los entornos actuales dependen de la configuración explícita de FastAPI.
 
 En Cloud Run, ajustar `CONN_MAX_AGE` debe hacerse junto con el límite de conexiones de
 Cloud SQL y la arquitectura descrita en `docs/architecture/system-overview.md`.

@@ -53,7 +53,7 @@ def generate_document_workflow(request) -> tuple:
         - context_document: { id, content }
         - transcription_document: { id, content }
         - template: { id, content }
-        - auth_token: Bearer JWT for Django callbacks
+        - auth_token: Bearer JWT for backend callbacks
         - validate_only: bool
     """
     from tracing import configure_tracing, run_with_request_span

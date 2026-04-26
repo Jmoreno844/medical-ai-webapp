@@ -6,38 +6,36 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 
 | Carpeta | Rol | Fuente de verdad |
 |--------|-----|------------------|
-| `backend/` | API central, modelos, auth, JWT, SSE y orquestación | Sí |
-| `backend_fastapi/` | API FastAPI primaria en stg (cutover); Django en `backend/` queda para rollback local/CI | Sí |
+| `backend_fastapi/` | API central, modelos SQLAlchemy, auth, JWT, SSE, orquestación y migraciones Alembic | Sí |
 | `cloud_functions/` | Transcripción y generación documental con Gemini | Sí |
 | `webapp/` | SPA del médico | Sí |
 | `infra/` | Infra GCP, IAM, budgets, deploy base | Sí |
 | `landing-page/` | Sitio marketing separado | Sí, pero no es parte del flujo clínico central |
 | `docs/` | Contratos operativos y arquitectura | Sí |
-| `webapp/dist/`, `webapp/node_modules/`, `landing-page/.next/`, `landing-page/node_modules/`, `backend/.venv/`, `infra/**/.terraform/` | Artefactos locales o build output | No |
+| `webapp/dist/`, `webapp/node_modules/`, `landing-page/.next/`, `landing-page/node_modules/`, `backend_fastapi/.venv/`, `infra/**/.terraform/` | Artefactos locales o build output | No |
 
 ## Límites de negocio
 
-- `backend/apps/encounters/`
+- `backend_fastapi/app/domains/encounters/`
   - Dueño del ciclo de vida del encuentro y metadatos del audio.
   - También concentra la lógica de GCS signed URLs en `services/storage.py`.
-- `backend/apps/documents/`
+- `backend_fastapi/app/domains/documents/`
   - Dueño del CRUD documental, SSE, callbacks desde Cloud Functions y kickoff de generación.
   - Es la zona más sensible para streaming y coordinación backend <-> frontend <-> functions.
-- `backend/apps/generative_ai/`
+- `backend_fastapi/app/domains/transcription/`
   - Solo inicia transcripción y decide si usar Cloud Tasks o llamada HTTP directa.
   - No es el dueño del stream SSE ni del almacenamiento final del documento.
-- `backend/apps/templates/`
+- `backend_fastapi/app/domains/templates/`
   - Dueño de plantillas base y plantillas del médico.
-- `backend/apps/patients/`
+- `backend_fastapi/app/domains/patients/`
   - Dueño del modelo de paciente y relación médico-paciente.
-- `backend/apps/users/`
-  - Dueño de sesión Django y JWT de usuario.
 - `backend_fastapi/`
   - Servicio ASGI con proyecto `uv` propio (`pyproject.toml` y `uv.lock`).
   - Organiza endpoints, schemas y servicios por dominio en `app/domains/*`;
     `app/api/v1/router.py` compone los routers bajo `/api/v1`.
-  - Alembic aplica el schema clínico completo en bases nuevas (`alembic/baseline/baseline_clinical_v1.sql` vía `0001`); Django solo aplica en ramas/rollback. Ver `docs/architecture/backend-fastapi-migration.md`.
-  - SSE en memoria en la primera fase; mismas limitaciones de Cloud Run `max-instances=1` que el hub legacy.
+  - `app/domains/auth/` es dueño de login/JWT/CSRF de usuario.
+  - Alembic aplica el schema clínico completo en bases nuevas (`alembic/baseline/baseline_clinical_v1.sql` vía `0001`). Ver `docs/architecture/backend-fastapi-migration.md`.
+  - SSE en memoria en la primera fase; limita Cloud Run a `max-instances=1`.
 - `cloud_functions/functions/endpoints/`
   - Adaptadores HTTP; validan request y delegan.
 - `cloud_functions/functions/services/`
@@ -50,19 +48,18 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 ## Si quieres cambiar X
 
 - Nuevo endpoint de backend:
-  - `backend/config/urls.py`
-  - app correspondiente en `backend/apps/*/api.py`
-  - `schemas.py`
+  - router de dominio en `backend_fastapi/app/domains/*/`
+  - schema de dominio en `backend_fastapi/app/domains/*/schemas.py`
+  - composición en `backend_fastapi/app/api/v1/router.py`
   - tests
 - Transcripción:
-  - Django kickoff: `backend/apps/generative_ai/api.py`
-  - Cola: `backend/apps/generative_ai/services/transcription_tasks.py`
+  - Kickoff: `backend_fastapi/app/domains/transcription/api.py`
+  - Cola: `backend_fastapi/app/domains/transcription/service.py`
   - Function: `cloud_functions/functions/endpoints/transcription_endpoint.py`
   - Callbacks al API: `cloud_functions/functions/services/backend_api.py`
 - Generación documental:
-  - Django kickoff: `backend/apps/documents/api/generation.py`
-  - Background runner: `backend/apps/documents/services/generation_runner.py`
-  - SSE y callbacks: `backend/apps/documents/api/sse.py`, `backend/apps/documents/api/callbacks.py`
+  - Kickoff, SSE y callbacks: `backend_fastapi/app/domains/documents/api.py`
+  - Servicios: `backend_fastapi/app/domains/documents/service.py`
   - Function: `cloud_functions/functions/endpoints/document_workflow.py`
 - Estado del encuentro en frontend:
   - `webapp/src/contexts/AppProviders.tsx`
@@ -77,14 +74,14 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 
 ### Auth y seguridad
 
-- Navegador -> API (FastAPI) usa cookies JWT + CSRF; el monolito Django (rollback) usaba sesión.
+- Navegador -> API usa cookies JWT + CSRF.
 - Cloud Functions -> API usan Bearer JWT de callback de vida corta.
 - SSE usa un token distinto y de vida corta.
 - Si cambias claims, expiración o propósito de un token, actualiza API, Cloud Functions y docs en el mismo cambio.
 
 ### Data models y migraciones
 
-- Los modelos viven en `backend/apps/*/models.py`.
+- Los modelos viven en `backend_fastapi/app/db/models.py`.
 - Las migraciones son parte del contrato del sistema; no las regeneres “por si acaso”.
 - Si renombras un campo, actualiza también schemas, frontend, docs y cualquier payload de Cloud Functions.
 

@@ -57,7 +57,7 @@ Se descartó porque el backend ya soporta inserciones y borrados anclados. Mante
 ### Positivas
 
 - El runtime puede resolver mejor pedidos como "agrega al final", "inserta antes de..." o "borra esta frase".
-- La surface del agente queda más alineada con el contrato real de apply en Django.
+- La surface del agente queda más alineada con el contrato real de apply en FastAPI.
 - El sistema depende menos de offsets frágiles y más de anchors textuales reubicables.
 
 ### Negativas / Retos

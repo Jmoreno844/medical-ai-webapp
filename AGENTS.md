@@ -24,7 +24,7 @@ Priorities, in order:
 
 ## Repo Map
 
-- `backend/` — Django Ninja API, PostgreSQL models, auth, SSE, orchestration
+- `backend_fastapi/` — FastAPI API, SQLAlchemy models, auth, SSE, orchestration, Alembic migrations
 - `cloud_functions/` — transcribe audio and generate clinical documents with Gemini
 - `webapp/` — React + TypeScript SPA for doctors
 - `infra/` — Terraform for GCP resources, IAM, budgets, deploy foundations
@@ -39,25 +39,24 @@ Do not treat these as source of truth unless the task is specifically about gene
 - `webapp/node_modules/`
 - `landing-page/.next/`
 - `landing-page/node_modules/`
-- `backend/.venv/`
-- `backend/logs/`
+- `backend_fastapi/.venv/`
 - `infra/**/.terraform/`
 
 ## Architecture Rules
 
-- Browser -> Django uses session auth + CSRF.
-- Django -> Cloud Functions uses short-lived service JWTs.
-- Cloud Functions -> Django callbacks use Bearer JWTs validated in Django.
-- SSE uses a separate short-lived token and an in-memory hub in `backend/apps/documents/services/sse_hub.py`.
-- Audio uploads go browser -> GCS directly through signed URLs; Django stores metadata and triggers background work.
+- Browser -> FastAPI uses JWT cookies + CSRF.
+- FastAPI -> Cloud Functions uses short-lived service JWTs.
+- Cloud Functions -> FastAPI callbacks use Bearer JWTs validated in FastAPI.
+- SSE uses a separate short-lived token and an in-memory hub in `backend_fastapi/app/domains/documents/sse_hub.py`.
+- Audio uploads go browser -> GCS directly through signed URLs; FastAPI stores metadata and triggers background work.
 
 ## Business Boundaries
 
-- `backend/apps/encounters/` owns encounter lifecycle and audio metadata.
-- `backend/apps/documents/` owns document CRUD, generation kickoff, callbacks, and SSE.
-- `backend/apps/generative_ai/` owns transcription dispatch and Cloud Tasks integration.
-- `backend/apps/templates/` owns base templates and doctor templates.
-- `backend/apps/users/` owns login/session/JWT for user-facing auth.
+- `backend_fastapi/app/domains/encounters/` owns encounter lifecycle and audio metadata.
+- `backend_fastapi/app/domains/documents/` owns document CRUD, generation kickoff, callbacks, and SSE.
+- `backend_fastapi/app/domains/transcription/` owns transcription dispatch and Cloud Tasks integration.
+- `backend_fastapi/app/domains/templates/` owns base templates and doctor templates.
+- `backend_fastapi/app/domains/auth/` owns login/JWT for user-facing auth.
 - `cloud_functions/functions/` owns Gemini-facing logic only; it should not grow direct database responsibilities.
 - `copilot_agent/` owns the LangGraph runtime for the future clinical copilot and must stay outside the backend monolith.
 - In the frontend, `webapp/src/workspace/` is the state layer for encounter-document workspace concerns such as tabs, active document, snapshot, draft, derived state, AI session state, and patch-review preparation.
@@ -68,12 +67,12 @@ Do not treat these as source of truth unless the task is specifically about gene
 
 ### Auth / Security
 
-- Keep Django session auth and service JWT auth separate.
+- Keep browser JWT auth and service JWT auth separate.
 - Keep backend user auth separate from copilot service-to-service auth.
-- Keep Django -> copilot broker auth separate from `copilot_agent -> Django` tools auth, even if both are temporarily backed by `COPILOT_SERVICE_SHARED_JWT`.
-- The current copilot slice supports `patch proposal + review + safe apply`, but the agent still must not write directly to canonical clinical documents; Django owns apply and any future audit trail.
+- Keep FastAPI -> copilot broker auth separate from `copilot_agent -> FastAPI` tools auth, even if both are temporarily backed by `COPILOT_SERVICE_SHARED_JWT`.
+- The current copilot slice supports `patch proposal + review + safe apply`, but the agent still must not write directly to canonical clinical documents; FastAPI owns apply and any future audit trail.
 - Temporary cross-service copilot auth debt lives in `docs/debt/copilot-agent-runtime.md`; do not duplicate that explanation in every file.
-- If you change JWT claims, token purpose, token TTL, or callback endpoints, update Django, Cloud Functions, and docs together.
+- If you change JWT claims, token purpose, token TTL, or callback endpoints, update FastAPI, Cloud Functions, and docs together.
 - Never log full transcripts, generated documents, raw secrets, or tokens.
 
 ### Data Models / Migrations
@@ -85,8 +84,8 @@ Do not treat these as source of truth unless the task is specifically about gene
 ### Background Jobs / Streaming
 
 - Transcription may run through Cloud Tasks depending on environment/config.
-- Document generation currently starts in Django and streams back through callbacks + SSE.
-- The future copilot runtime must remain a separate Cloud Run service brokered by Django, not a hidden module inside the backend process.
+- Document generation starts in FastAPI and streams back through callbacks + SSE.
+- The future copilot runtime must remain a separate Cloud Run service brokered by FastAPI, not a hidden module inside the backend process.
 - If you touch the copilot broker/runtime boundary, update the nearest doc and keep `docs/debt/copilot-agent-runtime.md` aligned with any accepted temporary compromise.
 - SSE is not multi-instance safe today; treat that as a known constraint, not an accidental bug.
 
@@ -183,7 +182,7 @@ Do not treat these as source of truth unless the task is specifically about gene
 
 ## Verification
 
-- Backend: `make -C backend check`
+- Backend: `uv --project backend_fastapi run ruff check . && ENVIRONMENT=test uv --project backend_fastapi run pytest -q`
 - Frontend: `npm --prefix webapp run lint && npm --prefix webapp run build`
 - Cloud Functions: `python -m pytest cloud_functions/functions/tests`
 

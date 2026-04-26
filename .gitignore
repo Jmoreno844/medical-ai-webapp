@@ -1,10 +1,5 @@
-backend/.venv
-backend/db.sqlite3
-backend/logs/
-backend/.pytest_cache/
-backend/.ruff_cache/
-django_ninja_project/.venv
 /claw-code-parity/
+/backend/
 .env
 .env.local
 .env.test
@@ -12,7 +7,6 @@ django_ninja_project/.venv
 .pycache
 __pycache__
 *.pyc
-django_ninja_project/commands.sh
 
 **/credentials/**/*.json
 /credentials/*.json
@@ -36,5 +30,8 @@ webapp/dist/
 landing-page/node_modules/
 landing-page/.next/
 landing-page/out/
+backend_fastapi/.venv/
+backend_fastapi/.pytest_cache/
+backend_fastapi/.ruff_cache/
 copilot_agent/copilot_runtime.db
 copilot_agent/test_*.py

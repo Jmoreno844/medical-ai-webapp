@@ -18,8 +18,8 @@ MAX_STREAMING_CHUNK_BYTES = 24_000
 @dataclass(frozen=True)
 class RealtimeSpeechConfig:
     project_id: str
-    location: str = "global"
-    language_codes: tuple[str, ...] = ("es-CO",)
+    location: str = "us"
+    language_codes: tuple[str, ...] = ("es-US",)
     model: str = "chirp_3"
     sample_rate_hertz: int = 16_000
 

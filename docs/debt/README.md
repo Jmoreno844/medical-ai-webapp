@@ -23,8 +23,3 @@ Regla de duplicación:
 - en `AGENTS.md`, docs de arquitectura o módulos sensibles deja solo una nota breve con link
 - evita copiar el mismo texto completo en varios lados
 
-| Documento | Tema |
-|-----------|------|
-| [fastapi-admin-ops.md](fastapi-admin-ops.md) | Admin Django / Silk: no son parte de la SPA; reemplazos y límites del baseline Alembic. |
-| [django-backend-removal.md](django-backend-removal.md) | Criterio de aceptación y limpieza al retirar el monolito `backend/`. |
-
