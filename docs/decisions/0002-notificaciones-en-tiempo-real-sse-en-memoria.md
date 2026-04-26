@@ -1,6 +1,6 @@
 # 0002. Notificaciones en tiempo real (SSE en memoria)
 
-- Estatus: `Proposed`
+- Estatus: `Accepted`
 - Fecha: `2026-03-31`
 
 ## Contexto
@@ -32,6 +32,10 @@ Descartado por ahora porque:
 Implementar `Server-Sent Events (SSE)` nativos utilizando `asyncio.Queue` y un diccionario en memoria (`_channels`) dentro del backend FastAPI, corriendo bajo ASGI.
 
 En despliegue sobre Cloud Run, restringir el servicio a `max-instances=1` y subir la concurrencia a `max-concurrency=250`.
+
+Este modelo ya cubre tanto la generacion documental como las notificaciones de
+transcripcion por secciones (`transcription_update` y `transcription_complete`).
+No se introdujo Redis ni otro broker compartido en la primera version.
 
 ## Justificacion
 
@@ -69,6 +73,8 @@ Esta arquitectura se debe abandonar y refactorizar cuando ocurra alguna de estas
 
 - la base de usuarios activos supere aproximadamente los 200 medicos conectados simultaneamente
 - la carga de CPU o RAM requiera escalar a `max-instances=2` o mas para evitar latencia en peticiones HTTP normales
+- la transcripcion por secciones requiera que eventos emitidos por workers en
+  instancias distintas lleguen de forma confiable al navegador conectado
 
 ## Recordatorio operativo
 

@@ -20,6 +20,8 @@ const GenerateDocumentationButton: React.FC = () => {
     // freshlyCompleted, // Removed
     // resetFreshlyCompleted, // Removed
     isRecording,
+    pendingAudioSections,
+    transcriptionStatus,
   } = useTranscriptionContext();
 
   const { openGenerationModal, isGenerating } = useGenerationContext(); // Added isGenerating
@@ -46,10 +48,13 @@ const GenerateDocumentationButton: React.FC = () => {
       return "Generación en curso…";
     }
     if (isRecording) {
-      return "No puede generar mientras graba";
+      return "Pause la grabación para consolidar la transcripción automática";
     }
     if (!hasBeenTranscribed) {
-      return "Debe transcribir el audio primero";
+      if (pendingAudioSections > 0 || transcriptionStatus === "pending") {
+        return "Espere a que termine la consolidación automática de la transcripción";
+      }
+      return "Grabe o continúe el audio para producir una transcripción";
     }
     // Optional: Could add a check here using checkTranscriptionContent if needed,
     // but often just relying on hasBeenTranscribed is sufficient for enabling the button.

@@ -48,9 +48,17 @@ def test_local_and_test_settings_have_safe_defaults(
     assert local_settings.debug is True
     assert local_settings.cookie_secure is False
     assert "http://localhost:5173" in local_settings.cors_allowed_origins
+    assert local_settings.transcription_gemini_model == "gemini-2.5-flash"
+    assert local_settings.vertex_ai_location == "global"
     assert test_settings.debug is False
     assert test_settings.cookie_secure is False
     assert test_settings.token_signing_key == "test-secret-at-least-32-bytes-long"
+
+
+def test_vertex_ai_location_is_independent_from_cloud_tasks_region() -> None:
+    settings = Settings(CLOUD_TASKS_REGION="us-east1")
+
+    assert settings.vertex_ai_location == "global"
 
 
 def test_production_requires_deployment_settings(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import difflib
 import logging
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -39,6 +40,15 @@ SECTION_STATUS_TRANSCRIBING = "transcribing"
 SECTION_STATUS_TRANSCRIBED = "transcribed"
 SECTION_STATUS_FAILED_RETRYABLE = "failed_retryable"
 SECTION_STATUS_FAILED_FINAL = "failed_final"
+
+REMOVABLE_INLINE_TAGS = {
+    "tos",
+    "ruido",
+    "silencio",
+    "carraspeo",
+    "respiracion",
+    "respiración",
+}
 
 
 def serialize_section(section: TranscriptionAudioSection) -> AudioSectionResponse:
@@ -271,6 +281,27 @@ def _merge_with_light_dedup(previous: str, next_text: str) -> str:
     return f"{previous}\n\n{next_text}"
 
 
+def _normalize_transcript_for_document(transcript: str | None) -> str:
+    if not transcript:
+        return ""
+
+    def replace_tag(match: re.Match[str]) -> str:
+        tag = match.group(1).strip().lower()
+        if tag in REMOVABLE_INLINE_TAGS:
+            return " "
+        return match.group(0)
+
+    normalized = re.sub(r"\[\s*([^\[\]]+?)\s*\]", replace_tag, transcript)
+    normalized = re.sub(r"\s+", " ", normalized)
+    normalized = re.sub(r"\s+([,.;:!?])", r"\1", normalized)
+    normalized = normalized.strip()
+
+    if re.fullmatch(r"(?:\[[^\[\]]+\]\s*)+", normalized):
+        return ""
+
+    return normalized
+
+
 async def process_section_transcription(
     db_session: AsyncSession,
     *,
@@ -282,7 +313,10 @@ async def process_section_transcription(
         .options(
             selectinload(TranscriptionAudioSection.recording_session).selectinload(
                 TranscriptionRecordingSession.sections
-            )
+            ),
+            selectinload(TranscriptionAudioSection.recording_session).selectinload(
+                TranscriptionRecordingSession.document
+            ),
         )
         .where(TranscriptionAudioSection.section_id == section_id)
     )
@@ -325,13 +359,24 @@ async def process_section_transcription(
     await db_session.commit()
 
     ordered_transcripts = [
-        item.raw_transcript
+        _normalize_transcript_for_document(item.raw_transcript)
         for item in sorted(recording_session.sections, key=lambda item: item.section_index)
-        if item.raw_transcript
     ]
     streaming_content = ""
     for item in ordered_transcripts:
+        if not item:
+            continue
         streaming_content = _merge_with_light_dedup(streaming_content, item)
+
+    # Persist the merged partial transcript so refresh/HMR can recover the last
+    # realtime text even before the final consolidation finishes.
+    set_document_content_fields(
+        recording_session.document,
+        content_markdown=streaming_content,
+        preferred_source="markdown",
+    )
+    await db_session.commit()
+
     await publish_document_event(
         recording_session.document_id,
         "transcription_update",
@@ -387,7 +432,9 @@ async def consolidate_recording_session(
     recording_session.status = SESSION_STATUS_CONSOLIDATING
     await db_session.commit()
 
-    ordered_transcripts = [section.raw_transcript or "" for section in sections]
+    ordered_transcripts = [
+        _normalize_transcript_for_document(section.raw_transcript) for section in sections
+    ]
     try:
         consolidated = await consolidate_transcripts(
             ordered_transcripts=ordered_transcripts,

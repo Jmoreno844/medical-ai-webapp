@@ -16,23 +16,23 @@ Documento de referencia rápida del `webapp` (React 18 + Vite + TypeScript). Los
 
 ## Estado global (providers + stores)
 
-| Contexto | Ruta | Rol |
-|----------|------|-----|
-| Auth | `src/commons/contexts/AuthContext.tsx` | Sesión, usuario, login/logout. |
-| Documentos | `src/contexts/DocumentContext.tsx` | Compat wrapper temporal para CRUD y bridge hacia `WorkspaceStore`. |
-| Contenido editor | `src/contexts/ContentContext.tsx` | Compat bridge del editor sobre snapshot + draft. |
-| Encuentro | `src/contexts/EncuentroContext.tsx` | Datos del encuentro, paciente y fechas. |
-| Transcripción | `src/contexts/TranscriptionContext.tsx` | Audio, kickoff, SSE y flags del encounter. |
-| Generación | `src/contexts/GenerationContext.tsx` | Plantillas, kickoff y SSE de generación. |
+| Contexto         | Ruta                                    | Rol                                                                |
+| ---------------- | --------------------------------------- | ------------------------------------------------------------------ |
+| Auth             | `src/commons/contexts/AuthContext.tsx`  | Sesión, usuario, login/logout.                                     |
+| Documentos       | `src/contexts/DocumentContext.tsx`      | Compat wrapper temporal para CRUD y bridge hacia `WorkspaceStore`. |
+| Contenido editor | `src/contexts/ContentContext.tsx`       | Compat bridge del editor sobre snapshot + draft.                   |
+| Encuentro        | `src/contexts/EncuentroContext.tsx`     | Datos del encuentro, paciente y fechas.                            |
+| Transcripción    | `src/contexts/TranscriptionContext.tsx` | Audio, kickoff, SSE y flags del encounter.                         |
+| Generación       | `src/contexts/GenerationContext.tsx`    | Plantillas, kickoff y SSE de generación.                           |
 
-| Store | Ruta | Rol |
-|-------|------|-----|
-| Workspace | `src/workspace/stores/workspaceStore.ts` | Tabs, documento activo, orden y visibilidad AI. |
-| Snapshot | `src/workspace/stores/documentSnapshotStore.ts` | Contenido canónico conocido y versión frontend por documento. |
-| Draft | `src/workspace/stores/documentDraftStore.ts` | Draft local editable e `isDirty`. |
-| Derived | `src/workspace/stores/documentDerivedStore.ts` | Streaming, modo del editor y estado transitorio de generación/transcripción. |
-| Patch | `src/workspace/stores/patchStore.ts` | Preview/review de patches en preparación. |
-| AI session | `src/workspace/stores/aiSessionStore.ts` | Working set y metadata de lectura futura del copiloto. |
+| Store      | Ruta                                            | Rol                                                                          |
+| ---------- | ----------------------------------------------- | ---------------------------------------------------------------------------- |
+| Workspace  | `src/workspace/stores/workspaceStore.ts`        | Tabs, documento activo, orden y visibilidad AI.                              |
+| Snapshot   | `src/workspace/stores/documentSnapshotStore.ts` | Contenido canónico conocido y versión frontend por documento.                |
+| Draft      | `src/workspace/stores/documentDraftStore.ts`    | Draft local editable e `isDirty`.                                            |
+| Derived    | `src/workspace/stores/documentDerivedStore.ts`  | Streaming, modo del editor y estado transitorio de generación/transcripción. |
+| Patch      | `src/workspace/stores/patchStore.ts`            | Preview/review de patches en preparación.                                    |
+| AI session | `src/workspace/stores/aiSessionStore.ts`        | Working set y metadata de lectura futura del copiloto.                       |
 
 `src/contexts/AppProviders.tsx` compone los providers en la página de detalle de encuentro.
 Para esa pantalla, `contexts/` es el owner de SSE y kickoff de procesos; el
@@ -45,11 +45,11 @@ renderizar.
 
 El contenido documental en frontend no vive solo en Lexical. Se reparte en tres capas explícitas:
 
-| Capa | Store / owner | Rol |
-| ---- | ------------- | --- |
-| `snapshot` | `src/workspace/stores/documentSnapshotStore.ts` | Último contenido canónico conocido por el frontend para ese documento. |
-| `draft` | `src/workspace/stores/documentDraftStore.ts` | Contenido editable local, mutable por el médico y por callbacks del editor. |
-| `derived` | `src/workspace/stores/documentDerivedStore.ts` | Contenido transitorio no canónico: streaming, preview, patch review. |
+| Capa       | Store / owner                                   | Rol                                                                         |
+| ---------- | ----------------------------------------------- | --------------------------------------------------------------------------- |
+| `snapshot` | `src/workspace/stores/documentSnapshotStore.ts` | Último contenido canónico conocido por el frontend para ese documento.      |
+| `draft`    | `src/workspace/stores/documentDraftStore.ts`    | Contenido editable local, mutable por el médico y por callbacks del editor. |
+| `derived`  | `src/workspace/stores/documentDerivedStore.ts`  | Contenido transitorio no canónico: streaming, preview, patch review.        |
 
 `ContentContext` es solo el bridge de compatibilidad del editor sobre `snapshot + draft`; no es el owner definitivo del estado.
 
@@ -65,14 +65,14 @@ Eso evita que `Lexical` se convierta en la fuente de verdad implícita.
 
 ### Qué significan las variables clave
 
-| Variable | Dónde vive | Semántica actual |
-| -------- | ---------- | ---------------- |
-| `localUnsavedContent` | `DocumentDraftState` | Último markdown local que el editor emitió para ese documento. |
-| `isDirty` | `DocumentDraftState` | Hay draft local pendiente o recién re-emitido por Lexical. No significa necesariamente que el contenido difiera materialmente del snapshot. |
-| `userEditedSinceLastCopilotTurn` | `DocumentDraftState` | El médico tocó el documento desde el último turno del copiloto. Sobrevive al autosave; se limpia solo después de enviar un mensaje al copiloto. |
-| `contentMarkdown` | `DocumentSnapshot` / `WorkspaceDocument` | Markdown canónico conocido en frontend. `WorkspaceDocument.contentMarkdown` es el valor cargado con el documento; `DocumentSnapshot.contentMarkdown` pasa a ser la capa canónica una vez leído/guardado. |
-| `version` | `DocumentSnapshot` / `WorkspaceDocument` | Baseline de frontend usado por `WorkspaceIndex`. No debe asumirse como versión autoritativa de persistencia del backend salvo que el contrato lo haga explícito. |
-| `savedAt` | `DocumentSnapshot` | Timestamp local del último refresh/save que actualizó el snapshot. |
+| Variable                         | Dónde vive                               | Semántica actual                                                                                                                                                                                         |
+| -------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `localUnsavedContent`            | `DocumentDraftState`                     | Último markdown local que el editor emitió para ese documento.                                                                                                                                           |
+| `isDirty`                        | `DocumentDraftState`                     | Hay draft local pendiente o recién re-emitido por Lexical. No significa necesariamente que el contenido difiera materialmente del snapshot.                                                              |
+| `userEditedSinceLastCopilotTurn` | `DocumentDraftState`                     | El médico tocó el documento desde el último turno del copiloto. Sobrevive al autosave; se limpia solo después de enviar un mensaje al copiloto.                                                          |
+| `contentMarkdown`                | `DocumentSnapshot` / `WorkspaceDocument` | Markdown canónico conocido en frontend. `WorkspaceDocument.contentMarkdown` es el valor cargado con el documento; `DocumentSnapshot.contentMarkdown` pasa a ser la capa canónica una vez leído/guardado. |
+| `version`                        | `DocumentSnapshot` / `WorkspaceDocument` | Baseline de frontend usado por `WorkspaceIndex`. No debe asumirse como versión autoritativa de persistencia del backend salvo que el contrato lo haga explícito.                                         |
+| `savedAt`                        | `DocumentSnapshot`                       | Timestamp local del último refresh/save que actualizó el snapshot.                                                                                                                                       |
 
 ### Autosave y comparación de contenido
 
@@ -86,14 +86,14 @@ El editor usa `AutoSavePlugin` para serializar Lexical a markdown y publicar cam
 
 - normaliza `\r\n`, `\r`, múltiples saltos de línea, espacios/tabs repetidos y `trim()`
 - si `normalize(snapshot.contentMarkdown) === normalize(content)`:
-	- no hace `PATCH /api/documents/...`
-	- resetea el draft desde el snapshot
-	- marca `isDirty=false`
+  - no hace `PATCH /api/documents/...`
+  - resetea el draft desde el snapshot
+  - marca `isDirty=false`
 - si el contenido sí cambió:
-	- hace save HTTP
-	- actualiza `snapshot`
-	- resetea el draft desde el snapshot nuevo
-	- marca `isDirty=false`
+  - hace save HTTP
+  - actualiza `snapshot`
+  - resetea el draft desde el snapshot nuevo
+  - marca `isDirty=false`
 
 No existe hoy un hash frontend para decidir el skip del autosave; la decisión es content-based.
 
@@ -132,14 +132,25 @@ Si `preSeedExcluded=true` en los logs del chat debug, el agente no recibió el m
 
 ## Features principales
 
-| Área | Carpeta |
-|------|---------|
-| Inicio | `src/features/home/` |
-| Login / registro | `src/features/login/`, `src/features/registro/` |
-| Cabecera encuentro (audio, paciente) | `src/features/encuentroHeader/` |
-| Editor y pestañas de documentos | `src/features/encuentroTextArea/` |
-| Plantillas | `src/features/plantillas/` |
-| Páginas estáticas | `src/pages/` |
+| Área                                 | Carpeta                                         |
+| ------------------------------------ | ----------------------------------------------- |
+| Inicio                               | `src/features/home/`                            |
+| Login / registro                     | `src/features/login/`, `src/features/registro/` |
+| Cabecera encuentro (audio, paciente) | `src/features/encuentroHeader/`                 |
+| Editor y pestañas de documentos      | `src/features/encuentroTextArea/`               |
+| Plantillas                           | `src/features/plantillas/`                      |
+| Páginas estáticas                    | `src/pages/`                                    |
+
+### Cabecera de audio y transcripción
+
+`VoiceRecorder` consume `TranscriptionContext` directamente. En transcripción
+por secciones, grabar ya crea una sesión y abre SSE; la cabecera ya no muestra
+un botón separado de `Transcribir`. La cabecera expone un botón principal de
+sesión `Grabar / Detener transcripción / Reanudar` y un control secundario de
+`Pausar / Reanudar` solo mientras la sesión sigue abierta. `Detener
+transcripción` cierra la sesión activa para que el backend consolide la
+transcripción near realtime; `Reanudar` abre una nueva sesión sobre el mismo
+encuentro.
 
 ## Observabilidad
 

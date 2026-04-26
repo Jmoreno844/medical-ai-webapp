@@ -3,19 +3,27 @@
  * and production builds stay quiet (see also vite esbuild.drop).
  *
  * Override in dev: VITE_LOG_LEVEL=silent disables all client logs.
+ * Sensitive payload logs are allowed by default in dev/test/staging-like modes
+ * and can be disabled with VITE_ENABLE_SENSITIVE_LOGS=false. They are never
+ * allowed in production.
  */
 
 const env = import.meta.env;
 const isDevOrTest = Boolean(env.DEV || env.MODE === "test");
+const isStagingLike =
+  typeof env.MODE === "string" && env.MODE.toLowerCase().includes("staging");
+const nonProductionLogging = Boolean(isDevOrTest || isStagingLike);
 const silent =
   typeof env.VITE_LOG_LEVEL === "string" &&
   env.VITE_LOG_LEVEL.toLowerCase() === "silent";
+const sensitiveLoggingEnabled =
+  nonProductionLogging && env.VITE_ENABLE_SENSITIVE_LOGS !== "false";
 
-const enabled = isDevOrTest && !silent;
+const enabled = nonProductionLogging && !silent;
 
 function emit(
   method: "debug" | "info" | "warn" | "error",
-  args: unknown[]
+  args: unknown[],
 ): void {
   if (!enabled || args.length === 0) return;
   const fn = console[method];
@@ -29,6 +37,10 @@ export const logger = {
   info: (...args: unknown[]) => emit("info", args),
   warn: (...args: unknown[]) => emit("warn", args),
   error: (...args: unknown[]) => emit("error", args),
+  sensitiveDebug: (...args: unknown[]) => {
+    if (!sensitiveLoggingEnabled) return;
+    emit("debug", args);
+  },
 };
 
 /**

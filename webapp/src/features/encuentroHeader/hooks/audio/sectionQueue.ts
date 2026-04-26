@@ -1,5 +1,6 @@
 export type LocalSectionStatus =
   | "recorded"
+  | "discarded_no_voice"
   | "upload_url_pending"
   | "uploading"
   | "uploaded"
@@ -21,6 +22,8 @@ export type LocalAudioSection = {
   content_type: string;
   status: LocalSectionStatus;
   retry_count: number;
+  speech_frame_count?: number;
+  discard_reason?: string;
   gcs_object_name?: string;
   backend_section_id?: string;
   created_at: string;
@@ -58,7 +61,7 @@ function openDb(): Promise<IDBDatabase> {
 
 async function withStore<T>(
   mode: IDBTransactionMode,
-  fn: (store: IDBObjectStore) => IDBRequest<T> | void
+  fn: (store: IDBObjectStore) => IDBRequest<T> | void,
 ): Promise<T | undefined> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
@@ -84,7 +87,7 @@ export async function saveLocalSection(section: LocalAudioSection) {
 
 export async function updateLocalSection(
   localSectionId: string,
-  updates: Partial<LocalAudioSection>
+  updates: Partial<LocalAudioSection>,
 ) {
   const current = await getLocalSection(localSectionId);
   if (!current) return;
@@ -96,15 +99,15 @@ export async function updateLocalSection(
 }
 
 export async function getLocalSection(
-  localSectionId: string
+  localSectionId: string,
 ): Promise<LocalAudioSection | undefined> {
   return withStore<LocalAudioSection>("readonly", (store) =>
-    store.get(localSectionId)
+    store.get(localSectionId),
   );
 }
 
 export async function listPendingSections(
-  encounterId?: number
+  encounterId?: number,
 ): Promise<LocalAudioSection[]> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
@@ -113,9 +116,13 @@ export async function listPendingSections(
     const request = store.getAll();
     request.onsuccess = () => {
       const sections = (request.result as LocalAudioSection[])
-        .filter((section) => section.status !== "registered")
+        .filter(
+          (section) =>
+            section.status !== "registered" &&
+            section.status !== "discarded_no_voice",
+        )
         .filter((section) =>
-          encounterId ? section.encounter_id === encounterId : true
+          encounterId ? section.encounter_id === encounterId : true,
         )
         .sort((a, b) => a.section_index - b.section_index);
       resolve(sections);
@@ -139,6 +146,8 @@ export async function deleteLocalSectionBlob(localSectionId: string) {
     content_type: current.content_type,
     status: current.status,
     retry_count: current.retry_count,
+    speech_frame_count: current.speech_frame_count,
+    discard_reason: current.discard_reason,
     gcs_object_name: current.gcs_object_name,
     backend_section_id: current.backend_section_id,
     created_at: current.created_at,

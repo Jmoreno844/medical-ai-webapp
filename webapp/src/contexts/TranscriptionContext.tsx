@@ -48,7 +48,7 @@ type TranscriptionContextType = {
   deleteRecording: () => void;
   transcribeAudio: (
     id_documento_transcripcion: number,
-    id_encuentro: number
+    id_encuentro: number,
   ) => Promise<unknown>;
   setHasBeenTranscribed: (value: boolean) => void;
   onTranscriptionComplete: () => void;
@@ -73,7 +73,7 @@ export function TranscriptionProvider({
   const { encuentro, updateEncuentro } = useEncuentroContext();
 
   const [transcriptionDocId, setTranscriptionDocId] = useState<number | null>(
-    initialTranscriptionDocId
+    initialTranscriptionDocId,
   );
   const [transcriptionCompleteTimestamp, setTranscriptionCompleteTimestamp] =
     useState<number | null>(null);
@@ -83,25 +83,25 @@ export function TranscriptionProvider({
   const eventSourceRef = useRef<EventSource | null>(null);
   const previousEncounterIdRef = useRef<number | null>(null);
   const activeTranscriptionDocumentId = useDocumentDerivedStore(
-    (state) => state.activeTranscriptionDocumentId
+    (state) => state.activeTranscriptionDocumentId,
   );
   const derivedByDocumentId = useDocumentDerivedStore(
-    (state) => state.derivedByDocumentId
+    (state) => state.derivedByDocumentId,
   );
   const startTranscriptionStream = useDocumentDerivedStore(
-    (state) => state.startTranscription
+    (state) => state.startTranscription,
   );
   const updateTranscriptionContent = useDocumentDerivedStore(
-    (state) => state.updateTranscriptionContent
+    (state) => state.updateTranscriptionContent,
   );
   const completeTranscription = useDocumentDerivedStore(
-    (state) => state.completeTranscription
+    (state) => state.completeTranscription,
   );
   const failTranscription = useDocumentDerivedStore(
-    (state) => state.failTranscription
+    (state) => state.failTranscription,
   );
   const clearDocumentDerivedState = useDocumentDerivedStore(
-    (state) => state.clearDocumentDerivedState
+    (state) => state.clearDocumentDerivedState,
   );
 
   const transcriptionDerivedState = useMemo(() => {
@@ -119,7 +119,8 @@ export function TranscriptionProvider({
   const transcriptionStatus =
     transcriptionDerivedState?.transcriptionStatus ?? "idle";
   const isTranscribing = Boolean(transcriptionDerivedState?.inProgress);
-  const effectiveErrorMessage = transcriptionDerivedState?.error ?? errorMessage;
+  const effectiveErrorMessage =
+    transcriptionDerivedState?.error ?? errorMessage;
 
   // Transcription owns the streaming lifecycle for encounter detail so feature
   // components only consume shared state instead of creating parallel SSE flows.
@@ -132,7 +133,7 @@ export function TranscriptionProvider({
 
   const voiceRecorder = useVoiceRecorder(
     encounterId,
-    transcriptionDocId ?? undefined
+    transcriptionDocId ?? undefined,
   );
 
   const loggedSetHasBeenTranscribed = useCallback(
@@ -140,11 +141,11 @@ export function TranscriptionProvider({
       logger.debug(
         "[TRANSCRIPTION][SET] Setting hasBeenTranscribed from %s to %s",
         hasBeenTranscribed,
-        value
+        value,
       );
       setHasBeenTranscribed(value);
     },
-    [hasBeenTranscribed]
+    [hasBeenTranscribed],
   );
 
   const handleTranscriptionComplete = useCallback(() => {
@@ -155,8 +156,8 @@ export function TranscriptionProvider({
       updateEncuentro({ has_been_transcribed: true }).catch((error) =>
         logger.error(
           "[TRANSCRIPTION] Error updating has_been_transcribed:",
-          error
-        )
+          error,
+        ),
       );
 
       if (!transcriptionDocId) {
@@ -170,11 +171,11 @@ export function TranscriptionProvider({
       try {
         const refreshedContent = await contentContext.fetchDocumentContent(
           transcriptionDocId,
-          true
+          true,
         );
         completeTranscription(
           String(transcriptionDocId),
-          refreshedContent ?? undefined
+          refreshedContent ?? undefined,
         );
         contentContext.triggerEditorRefresh();
       } catch (error) {
@@ -184,7 +185,12 @@ export function TranscriptionProvider({
     };
 
     void complete();
-  }, [completeTranscription, contentContext, transcriptionDocId, updateEncuentro]);
+  }, [
+    completeTranscription,
+    contentContext,
+    transcriptionDocId,
+    updateEncuentro,
+  ]);
 
   const resetTranscriptionState = useCallback(() => {
     setErrorMessage(null);
@@ -193,7 +199,11 @@ export function TranscriptionProvider({
     } else if (activeTranscriptionDocumentId) {
       clearDocumentDerivedState(activeTranscriptionDocumentId);
     }
-  }, [activeTranscriptionDocumentId, clearDocumentDerivedState, transcriptionDocId]);
+  }, [
+    activeTranscriptionDocumentId,
+    clearDocumentDerivedState,
+    transcriptionDocId,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -208,7 +218,7 @@ export function TranscriptionProvider({
         logger.debug(
           "[TRANSCRIPTION][ENCUENTRO] Syncing hasBeenTranscribed from %s to %s",
           hasBeenTranscribed,
-          nextValue
+          nextValue,
         );
         setHasBeenTranscribed(nextValue);
       }
@@ -222,7 +232,7 @@ export function TranscriptionProvider({
       !voiceRecorder.isCheckingAudio
     ) {
       logger.debug(
-        "[TRANSCRIPTION][RECORDER] Promoting recorder transcription state into shared context"
+        "[TRANSCRIPTION][RECORDER] Promoting recorder transcription state into shared context",
       );
       setHasBeenTranscribed(true);
     }
@@ -250,7 +260,7 @@ export function TranscriptionProvider({
 
     logger.debug(
       "[TRANSCRIPTION][RESET] Encounter changed to %s; resetting transcription-owned state.",
-      encounterId
+      encounterId,
     );
 
     closeEventSource();
@@ -270,12 +280,12 @@ export function TranscriptionProvider({
     async (documentId: number): Promise<string | null> => {
       logger.debug(
         "[TRANSCRIPTION] Requesting SSE token for document %s",
-        documentId
+        documentId,
       );
 
       try {
         const response = await axiosInstance.post(
-          `/api/v1/documents/${documentId}/sse-token`
+          `/api/v1/documents/${documentId}/sse-token`,
         );
 
         if (response.data.success && response.data.token) {
@@ -284,7 +294,7 @@ export function TranscriptionProvider({
 
         logger.error(
           "[TRANSCRIPTION] Failed to get SSE token: %s",
-          response.data.error
+          response.data.error,
         );
         return null;
       } catch (error) {
@@ -292,7 +302,7 @@ export function TranscriptionProvider({
         return null;
       }
     },
-    []
+    [],
   );
 
   const subscribeToTranscriptionUpdates = useCallback(
@@ -309,7 +319,9 @@ export function TranscriptionProvider({
           return false;
         }
 
-        const apiBaseUrl = API_URL.endsWith("/") ? API_URL.slice(0, -1) : API_URL;
+        const apiBaseUrl = API_URL.endsWith("/")
+          ? API_URL.slice(0, -1)
+          : API_URL;
         const sseUrl = `${apiBaseUrl}/api/v1/sse/documents/${documentId}/${token}`;
         const eventSource = new EventSource(sseUrl);
         eventSourceRef.current = eventSource;
@@ -318,13 +330,31 @@ export function TranscriptionProvider({
         eventSource.onopen = () => {
           logger.debug(
             "[TRANSCRIPTION] SSE connection established for document %s",
-            documentId
+            documentId,
           );
         };
 
         eventSource.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
+
+            logger.debug("[TRANSCRIPTION] SSE event received", {
+              documentId,
+              event: data?.event,
+              hasContent: typeof data?.content === "string",
+              contentLength:
+                typeof data?.content === "string" ? data.content.length : 0,
+            });
+
+            if (
+              data?.event === "transcription_update" &&
+              typeof data?.content === "string"
+            ) {
+              logger.sensitiveDebug("[TRANSCRIPTION] SSE content", {
+                documentId,
+                content: data.content,
+              });
+            }
 
             if (data.event === "transcription_complete") {
               handleTranscriptionComplete();
@@ -334,6 +364,17 @@ export function TranscriptionProvider({
 
             if (data.event === "transcription_update" && data.content) {
               updateTranscriptionContent(String(documentId), data.content);
+              return;
+            }
+
+            if (data.event === "transcription_update") {
+              logger.warn(
+                "[TRANSCRIPTION] SSE update arrived without usable content",
+                {
+                  documentId,
+                  contentType: typeof data?.content,
+                },
+              );
             }
           } catch (error) {
             logger.error("[TRANSCRIPTION] Error parsing SSE message:", error);
@@ -342,7 +383,8 @@ export function TranscriptionProvider({
 
         eventSource.onerror = (error) => {
           logger.error("[TRANSCRIPTION] SSE connection error:", error);
-          const message = "Error en la conexión de actualizaciones en tiempo real";
+          const message =
+            "Error en la conexión de actualizaciones en tiempo real";
           setErrorMessage(message);
           failTranscription(String(documentId), message);
           closeEventSource();
@@ -365,14 +407,14 @@ export function TranscriptionProvider({
       handleTranscriptionComplete,
       startTranscriptionStream,
       updateTranscriptionContent,
-    ]
+    ],
   );
 
   const transcribeAudio = useCallback(
     async (id_documento_transcripcion: number, id_encuentro: number) => {
       if (!id_documento_transcripcion || !id_encuentro) {
         setErrorMessage(
-          "Falta el ID del documento de transcripción o del encuentro"
+          "Falta el ID del documento de transcripción o del encuentro",
         );
         return;
       }
@@ -382,11 +424,11 @@ export function TranscriptionProvider({
 
       try {
         const subscribed = await subscribeToTranscriptionUpdates(
-          id_documento_transcripcion
+          id_documento_transcripcion,
         );
         if (!subscribed) {
           throw new Error(
-            "No se pudieron preparar las actualizaciones en tiempo real"
+            "No se pudieron preparar las actualizaciones en tiempo real",
           );
         }
 
@@ -403,13 +445,13 @@ export function TranscriptionProvider({
             document_id: id_documento_transcripcion,
             encounter_id: id_encuentro,
           },
-          { timeout: 60000 }
+          { timeout: 60000 },
         );
 
         logger.debug("Transcription initiated:", response.data);
         if (response.data?.success === false) {
           const message = getTranscriptionErrorMessage(
-            response.data?.error || response.data?.message
+            response.data?.error || response.data?.message,
           );
           setErrorMessage(message);
           failTranscription(String(id_documento_transcripcion), message);
@@ -426,7 +468,7 @@ export function TranscriptionProvider({
         const message = getTranscriptionErrorMessage(
           apiError.response?.data?.error ||
             apiError.response?.data?.message ||
-            apiError.message
+            apiError.message,
         );
         setErrorMessage(message);
         failTranscription(String(id_documento_transcripcion), message);
@@ -439,7 +481,7 @@ export function TranscriptionProvider({
       failTranscription,
       subscribeToTranscriptionUpdates,
       voiceRecorder.recordingSessionId,
-    ]
+    ],
   );
 
   /**
@@ -459,7 +501,7 @@ export function TranscriptionProvider({
     try {
       const content = await contentContext.fetchDocumentContent(
         transcriptionDocId,
-        true
+        true,
       );
       return !!content && content.trim().length > 0;
     } catch (error) {
@@ -468,7 +510,7 @@ export function TranscriptionProvider({
 
     try {
       const response = await axiosInstance.get(
-        `/api/v1/documents/${transcriptionDocId}`
+        `/api/v1/documents/${transcriptionDocId}`,
       );
       const content = response.data?.content || "";
 
@@ -498,14 +540,19 @@ export function TranscriptionProvider({
     updateEncuentro({ has_been_transcribed: false }).catch((error) =>
       logger.error(
         "[TRANSCRIPTION] Error updating has_been_transcribed:",
-        error
-      )
+        error,
+      ),
     );
     setHasBeenTranscribed(false);
     if (transcriptionDocId) {
       clearDocumentDerivedState(String(transcriptionDocId));
     }
-  }, [clearDocumentDerivedState, transcriptionDocId, updateEncuentro, voiceRecorder]);
+  }, [
+    clearDocumentDerivedState,
+    transcriptionDocId,
+    updateEncuentro,
+    voiceRecorder,
+  ]);
 
   const deleteRecording = useCallback(async () => {
     await voiceRecorder.deleteRecording();
@@ -551,7 +598,7 @@ export function useTranscriptionContext() {
   const context = useContext(TranscriptionContext);
   if (context === undefined) {
     throw new Error(
-      "useTranscriptionContext must be used within a TranscriptionProvider"
+      "useTranscriptionContext must be used within a TranscriptionProvider",
     );
   }
   return context;

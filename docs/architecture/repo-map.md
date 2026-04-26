@@ -4,15 +4,15 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 
 ## Qué vive dónde
 
-| Carpeta | Rol | Fuente de verdad |
-|--------|-----|------------------|
-| `backend_fastapi/` | API central, modelos SQLAlchemy, auth, JWT, SSE, orquestación y migraciones Alembic | Sí |
-| `cloud_functions/` | Generación documental con Gemini y transcripción legacy | Sí |
-| `webapp/` | SPA del médico | Sí |
-| `infra/` | Infra GCP, IAM, budgets, deploy base | Sí |
-| `landing-page/` | Sitio marketing separado | Sí, pero no es parte del flujo clínico central |
-| `docs/` | Contratos operativos y arquitectura | Sí |
-| `webapp/dist/`, `webapp/node_modules/`, `landing-page/.next/`, `landing-page/node_modules/`, `backend_fastapi/.venv/`, `infra/**/.terraform/` | Artefactos locales o build output | No |
+| Carpeta                                                                                                                                       | Rol                                                                                 | Fuente de verdad                               |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `backend_fastapi/`                                                                                                                            | API central, modelos SQLAlchemy, auth, JWT, SSE, orquestación y migraciones Alembic | Sí                                             |
+| `cloud_functions/`                                                                                                                            | Generación documental con Gemini y transcripción legacy                             | Sí                                             |
+| `webapp/`                                                                                                                                     | SPA del médico                                                                      | Sí                                             |
+| `infra/`                                                                                                                                      | Infra GCP, IAM, budgets, deploy base                                                | Sí                                             |
+| `landing-page/`                                                                                                                               | Sitio marketing separado                                                            | Sí, pero no es parte del flujo clínico central |
+| `docs/`                                                                                                                                       | Contratos operativos y arquitectura                                                 | Sí                                             |
+| `webapp/dist/`, `webapp/node_modules/`, `landing-page/.next/`, `landing-page/node_modules/`, `backend_fastapi/.venv/`, `infra/**/.terraform/` | Artefactos locales o build output                                                   | No                                             |
 
 ## Límites de negocio
 
@@ -23,8 +23,10 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
   - Dueño del CRUD documental, SSE, callbacks desde Cloud Functions y kickoff de generación.
   - Es la zona más sensible para streaming y coordinación backend <-> frontend <-> functions.
 - `backend_fastapi/app/domains/transcription/`
-  - Solo inicia transcripción y decide si usar Cloud Tasks o llamada HTTP directa.
-  - No es el dueño del stream SSE ni del almacenamiento final del documento.
+  - Dueño de la transcripción legacy y de la transcripción por secciones:
+    sesiones, signed URLs por sección, registro idempotente, dispatch a Cloud
+    Tasks/BackgroundTasks, worker interno, status y consolidación final.
+  - Publica eventos por el hub SSE de documentos, pero no es dueño del hub.
 - `backend_fastapi/app/domains/templates/`
   - Dueño de plantillas base y plantillas del médico.
 - `backend_fastapi/app/domains/patients/`
@@ -54,6 +56,7 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
   - tests
 - Transcripción:
   - Kickoff: `backend_fastapi/app/domains/transcription/api.py`
+  - Sesiones/secciones: `backend_fastapi/app/domains/transcription/api.py`
   - Cola: `backend_fastapi/app/domains/transcription/service.py`
   - Worker interno: `backend_fastapi/app/domains/transcription/api.py`
   - Gemini async: `backend_fastapi/app/domains/transcription/gemini_async.py`
@@ -88,6 +91,8 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 ### Background jobs
 
 - En `stg/prod`, la transcripción debe salir por Cloud Tasks cuando la configuración esté presente.
+- En local, la transcripción por secciones puede usar `BackgroundTasks` como
+  fallback para evitar depender del emulador de Cloud Tasks.
 - La generación documental puede usar un hilo en el proceso API (mismo patrón de orquestación que el monolito legacy).
 - SSE depende de un hub en memoria; por decisión actual se mantiene sin Redis en la primera migración FastAPI y limita Cloud Run a una instancia.
 
@@ -97,7 +102,8 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
   - signed URLs se generan en backend
   - el navegador sube audio directo al bucket
 - Gemini:
-  - transcripción vive en FastAPI con Google Gen AI SDK async sobre Vertex AI
+  - transcripción vive en FastAPI con Google Gen AI SDK async sobre Vertex AI;
+    la version near realtime ordena y consolida secciones por `section_index`
   - generación documental sigue en Cloud Functions
 - Secret Manager / IAM / budgets:
   - viven en `infra/`, no en lógica de producto

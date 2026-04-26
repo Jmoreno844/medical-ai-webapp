@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import TimerDisplay from "./TimerDisplay";
 import MicrophoneIcon from "./MicrophoneIcon";
-import StartStopButton from "./StartStopButton";
 import PauseResumeButton from "./PauseResumeButton";
 import DeleteButton from "./DeleteButton";
 import SettingsIcon from "./SettingsIcon";
-import TranscribeButton from "./TranscribeButton";
 import { useTranscriptionContext } from "../../../contexts/TranscriptionContext";
 
 /**
@@ -24,6 +22,7 @@ const VoiceRecorder: React.FC = () => {
     duration,
     audioExists,
     pendingAudioSections,
+    transcriptionStatus,
     audioExpiresAt,
     isAudioExpired,
     isCheckingAudio,
@@ -34,25 +33,14 @@ const VoiceRecorder: React.FC = () => {
     deleteRecording,
   } = useTranscriptionContext();
 
-  // UI state management - Simplified
-  const [showPauseButton, setShowPauseButton] = useState(false);
-  const [showStartStopButton, setShowStartStopButton] = useState(true);
-
   /**
-   * Update UI based on recording state
+   * Handle the single primary audio action.
+   *
+   * The primary button controls the recording session lifecycle. Stopping the
+   * session finalizes the current near realtime transcription window, and the
+   * idle state becomes "Reanudar" for the next session on the same encounter.
    */
-  useEffect(() => {
-    // Show pause button only during active recording
-    setShowPauseButton(isRecording && !isPaused);
-
-    // Expired audio should not trap the user without a recording action.
-    setShowStartStopButton(isRecording || !audioExists || isAudioExpired);
-  }, [isRecording, isPaused, audioExists, isAudioExpired, isCheckingAudio]);
-
-  /**
-   * Handle recording start/stop
-   */
-  const handleStartStop = () => {
+  const handlePrimaryAudioAction = () => {
     if (isRecording) {
       stopRecording();
     } else {
@@ -71,6 +59,25 @@ const VoiceRecorder: React.FC = () => {
     ? `Audio expirado el ${new Date(audioExpiresAt).toLocaleString()}`
     : "Audio expirado";
 
+  const hasTranscriptionActivity =
+    isRecording ||
+    pendingAudioSections > 0 ||
+    transcriptionStatus === "pending";
+
+  const primaryAudioLabel = isRecording
+    ? "Detener transcripción"
+    : audioExists || pendingAudioSections > 0 || isAudioExpired
+      ? isAudioExpired
+        ? "Grabar de nuevo"
+        : "Reanudar"
+      : "Grabar";
+
+  const primaryAudioButtonClasses = `px-4 py-2 rounded-md text-white font-medium transition-colors ${
+    isRecording
+      ? "bg-red-500 hover:bg-red-600"
+      : "bg-purple-500 hover:bg-purple-600"
+  }`;
+
   // Show loading state while checking audio existence
   if (isCheckingAudio) {
     return (
@@ -85,22 +92,24 @@ const VoiceRecorder: React.FC = () => {
 
   return (
     <div className="flex items-center space-x-4">
-      <TranscribeButton />
       {isAudioExpired && (
         <span className="rounded-md bg-amber-100 px-2 py-1 text-sm font-medium text-amber-800">
           {expiredMessage}
         </span>
       )}
       <TimerDisplay duration={duration} />
-      {pendingAudioSections > 0 && (
+      {hasTranscriptionActivity && (
         <span className="text-sm text-gray-600">
-          {pendingAudioSections} sección{pendingAudioSections === 1 ? "" : "es"} pendiente
-          {pendingAudioSections === 1 ? "" : "s"}
+          {isRecording
+            ? "Transcripción automática en curso"
+            : pendingAudioSections > 0
+              ? `${pendingAudioSections} sección${pendingAudioSections === 1 ? "" : "es"} pendiente${pendingAudioSections === 1 ? "" : "s"}`
+              : "Consolidando transcripción…"}
         </span>
       )}
       <MicrophoneIcon isRecording={isRecording} isPaused={isPaused} />
 
-      {showPauseButton && (
+      {isRecording && (
         <PauseResumeButton
           isRecording={isRecording}
           isPaused={isPaused}
@@ -108,13 +117,13 @@ const VoiceRecorder: React.FC = () => {
         />
       )}
 
-      {showStartStopButton && (
-        <StartStopButton
-          isRecording={isRecording}
-          onClick={handleStartStop}
-          idleLabel={isAudioExpired ? "Grabar de nuevo" : undefined}
-        />
-      )}
+      <button
+        onClick={handlePrimaryAudioAction}
+        className={primaryAudioButtonClasses}
+        aria-label={primaryAudioLabel}
+      >
+        {primaryAudioLabel}
+      </button>
 
       {audioExists && !isCheckingAudio && (
         <DeleteButton

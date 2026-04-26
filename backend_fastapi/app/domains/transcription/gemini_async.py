@@ -50,7 +50,7 @@ async def transcribe_gcs_audio(
     client = _get_genai_client(settings.gcp_project_id, _vertex_location(settings))
     audio_part = types.Part.from_uri(file_uri=gcs_uri, mime_type=content_type)
     response = await client.aio.models.generate_content(
-        model=settings.gemini_model,
+        model=settings.transcription_gemini_model,
         contents=[audio_part, SECTION_TRANSCRIPTION_PROMPT],
         config=types.GenerateContentConfig(
             temperature=0.0,
@@ -82,7 +82,7 @@ async def consolidate_transcripts(
         if text.strip()
     )
     response = await client.aio.models.generate_content(
-        model=settings.gemini_model,
+        model=settings.transcription_gemini_model,
         contents=[CONSOLIDATION_PROMPT, numbered_segments],
         config=types.GenerateContentConfig(
             temperature=0.0,

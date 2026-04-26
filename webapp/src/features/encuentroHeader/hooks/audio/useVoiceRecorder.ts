@@ -16,16 +16,29 @@ import {
   saveLocalSection,
   updateLocalSection,
 } from "./sectionQueue";
+import {
+  AUDIO_SEGMENTATION_CONFIG,
+  VAD_ANALYSER_FFT_SIZE,
+  detectVoiceActivity,
+  shouldFlushOnNaturalPause,
+  shouldForceSectionCut,
+  shouldUploadSectionForTranscription,
+} from "./vad";
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { logger } from "@/lib/logger";
 
-const SECTION_DURATION_MS = 15000;
-const SECTION_OVERLAP_MS = 2000;
-const MEDIA_RECORDER_TIMESLICE_MS = 100;
+type RecorderSection = {
+  id: string;
+  recorder: MediaRecorder;
+  chunks: Blob[];
+  startedAtMs: number;
+  overlapMs: number;
+  hasDetectedSpeech: boolean;
+  speechFrameCount: number;
+};
 
-type TimedChunk = {
-  blob: Blob;
-  offsetMs: number;
+type BrowserAudioContextCtor = typeof AudioContext & {
+  new (): AudioContext;
 };
 /**
  * Checks if audio exists for an encounter
@@ -36,7 +49,7 @@ type TimedChunk = {
 const checkAudioExists = async (encounterId: number) => {
   try {
     const response = await axiosInstance.get(
-      `/api/v1/encounters/${encounterId}/audio/exists`
+      `/api/v1/encounters/${encounterId}/audio/exists`,
     );
 
     // With axiosInstance, the data is already parsed as JSON
@@ -73,7 +86,7 @@ const checkAudioExists = async (encounterId: number) => {
  */
 export const useVoiceRecorder = (
   encounterId: number, // Add encounterId parameter
-  transcriptionDocId?: number
+  transcriptionDocId?: number,
 ): UseVoiceRecorderReturn => {
   // State for recording status
   const [isRecording, setIsRecording] = useState(false);
@@ -86,20 +99,35 @@ export const useVoiceRecorder = (
   const [isCheckingAudio, setIsCheckingAudio] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [hasBeenTranscribed, setHasBeenTranscribed] = useState(false);
-  const [recordingSessionId, setRecordingSessionId] = useState<string | null>(null);
+  const [recordingSessionId, setRecordingSessionId] = useState<string | null>(
+    null,
+  );
   const [pendingAudioSections, setPendingAudioSections] = useState(0);
 
   // Refs for managing media recorder and timer
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const overlapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const timedChunksRef = useRef<TimedChunk[]>([]);
   const recordingStartedAtRef = useRef<number>(0);
   const nextSectionIndexRef = useRef(0);
-  const lastSectionEndMsRef = useRef(0);
-  const lastEmittedSectionEndMsRef = useRef(0);
   const recordingSessionIdRef = useRef<string | null>(null);
+  const isRecordingRef = useRef(false);
+  const isPausedRef = useRef(false);
+  const audioMimeTypeRef = useRef("audio/webm");
+  const sectionFlushRef = useRef<Promise<void> | null>(null);
+  const activeSectionRef = useRef<RecorderSection | null>(null);
+  const retiringSectionRef = useRef<RecorderSection | null>(null);
+  const forcedSplitInFlightRef = useRef(false);
+  const lastSpeechAtMsRef = useRef(0);
+  const segmentationModeRef = useRef<"vad" | "timer">("timer");
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const vadBufferRef = useRef<Float32Array | null>(null);
+  const vadIntervalRef = useRef<number | null>(null);
 
   // Store the transcription document ID
   const transcriptionDocIdRef = useRef<number | undefined>(transcriptionDocId);
@@ -113,7 +141,7 @@ export const useVoiceRecorder = (
   useEffect(() => {
     // --- State Reset ---
     logger.debug(
-      `[VOICE_RECORDER] Effect running for encounterId: ${encounterId}. Resetting state.`
+      `[VOICE_RECORDER] Effect running for encounterId: ${encounterId}. Resetting state.`,
     );
     setIsRecording(false);
     setIsPaused(false);
@@ -124,17 +152,24 @@ export const useVoiceRecorder = (
     setIsAudioExpired(false);
     setHasBeenTranscribed(false);
     chunksRef.current = [];
-    timedChunksRef.current = [];
     nextSectionIndexRef.current = 0;
-    lastSectionEndMsRef.current = 0;
-    lastEmittedSectionEndMsRef.current = 0;
     recordingSessionIdRef.current = null;
+    isRecordingRef.current = false;
+    isPausedRef.current = false;
+    activeSectionRef.current = null;
+    retiringSectionRef.current = null;
+    forcedSplitInFlightRef.current = false;
     setRecordingSessionId(null);
     setPendingAudioSections(0);
     if (timerRef.current) clearInterval(timerRef.current);
     if (sectionTimerRef.current) clearTimeout(sectionTimerRef.current);
+    if (overlapTimerRef.current) clearTimeout(overlapTimerRef.current);
+    if (vadIntervalRef.current !== null)
+      window.clearInterval(vadIntervalRef.current);
     timerRef.current = null;
     sectionTimerRef.current = null;
+    overlapTimerRef.current = null;
+    vadIntervalRef.current = null;
 
     // Stop any active recorder
     if (mediaRecorderRef.current?.state !== "inactive") {
@@ -144,13 +179,24 @@ export const useVoiceRecorder = (
         logger.warn("Error stopping previous recorder:", e);
       }
     }
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
     mediaRecorderRef.current = null;
+    mediaStreamRef.current = null;
+    sourceNodeRef.current?.disconnect();
+    analyserRef.current?.disconnect();
+    sourceNodeRef.current = null;
+    analyserRef.current = null;
+    vadBufferRef.current = null;
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      void audioContextRef.current.close();
+    }
+    audioContextRef.current = null;
 
     const checkExistingAudio = async () => {
       if (encounterId > 0) {
         setIsCheckingAudio(true);
         logger.debug(
-          `[VOICE_RECORDER] Checking audio for encounter ${encounterId}`
+          `[VOICE_RECORDER] Checking audio for encounter ${encounterId}`,
         );
         try {
           const {
@@ -163,7 +209,13 @@ export const useVoiceRecorder = (
 
           logger.debug(
             `[VOICE_RECORDER] Audio check result for ${encounterId}:`,
-            { exists, existingDuration, has_been_transcribed, expires_at, is_expired }
+            {
+              exists,
+              existingDuration,
+              has_been_transcribed,
+              expires_at,
+              is_expired,
+            },
           );
 
           setAudioExists(exists);
@@ -174,7 +226,7 @@ export const useVoiceRecorder = (
         } catch (error) {
           logger.error(
             `[VOICE_RECORDER] Error checking audio for ${encounterId}:`,
-            error
+            error,
           );
           setAudioExists(false);
           setDuration(0);
@@ -184,12 +236,12 @@ export const useVoiceRecorder = (
         } finally {
           setIsCheckingAudio(false);
           logger.debug(
-            `[VOICE_RECORDER] Finished checking audio for ${encounterId}`
+            `[VOICE_RECORDER] Finished checking audio for ${encounterId}`,
           );
         }
       } else {
         logger.debug(
-          `[VOICE_RECORDER] Invalid encounterId (${encounterId}), skipping check.`
+          `[VOICE_RECORDER] Invalid encounterId (${encounterId}), skipping check.`,
         );
         setAudioExists(false);
         setDuration(0);
@@ -204,7 +256,7 @@ export const useVoiceRecorder = (
 
     return () => {
       logger.debug(
-        `[VOICE_RECORDER] Cleanup effect for encounter ${encounterId}`
+        `[VOICE_RECORDER] Cleanup effect for encounter ${encounterId}`,
       );
       if (timerRef.current) clearInterval(timerRef.current);
       if (sectionTimerRef.current) clearTimeout(sectionTimerRef.current);
@@ -253,7 +305,7 @@ export const useVoiceRecorder = (
               section.recording_session_id,
               section.local_section_id,
               section.section_index,
-              section.content_type
+              section.content_type,
             );
 
         if (!uploadInfo) {
@@ -272,7 +324,7 @@ export const useVoiceRecorder = (
           const uploadSuccess = await uploadAudioToCloud(
             section.blob,
             uploadInfo.uploadUrl,
-            section.content_type
+            section.content_type,
           );
           if (!uploadSuccess) {
             await updateLocalSection(section.local_section_id, {
@@ -303,7 +355,7 @@ export const useVoiceRecorder = (
             gcs_object_name: gcsObjectName,
             content_type: section.content_type,
             byte_size: section.blob.size,
-          }
+          },
         );
 
         if (!registerResult.success) {
@@ -319,7 +371,10 @@ export const useVoiceRecorder = (
         });
         await deleteLocalSectionBlob(section.local_section_id);
       } catch (error) {
-        logger.error("[VOICE_RECORDER] Error processing pending section:", error);
+        logger.error(
+          "[VOICE_RECORDER] Error processing pending section:",
+          error,
+        );
         await updateLocalSection(section.local_section_id, {
           status: "failed_retryable",
         });
@@ -339,39 +394,162 @@ export const useVoiceRecorder = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [encounterId]);
 
-  const saveSectionFromChunks = async (endTimeMs: number, isFinal = false) => {
+  const clearSectionBoundaryTimers = () => {
+    if (sectionTimerRef.current) {
+      clearTimeout(sectionTimerRef.current);
+      sectionTimerRef.current = null;
+    }
+    if (overlapTimerRef.current) {
+      clearTimeout(overlapTimerRef.current);
+      overlapTimerRef.current = null;
+    }
+  };
+
+  const teardownVadMonitoring = async () => {
+    clearSectionBoundaryTimers();
+    if (vadIntervalRef.current !== null) {
+      window.clearInterval(vadIntervalRef.current);
+      vadIntervalRef.current = null;
+    }
+    sourceNodeRef.current?.disconnect();
+    analyserRef.current?.disconnect();
+    sourceNodeRef.current = null;
+    analyserRef.current = null;
+    vadBufferRef.current = null;
+    const audioContext = audioContextRef.current;
+    audioContextRef.current = null;
+    if (audioContext && audioContext.state !== "closed") {
+      await audioContext.close();
+    }
+  };
+
+  const queueSectionWork = (work: () => Promise<void>) => {
+    const previous =
+      sectionFlushRef.current?.catch((error) => {
+        logger.error("[VOICE_RECORDER] Section flush chain error:", error);
+      }) ?? Promise.resolve();
+
+    const next = previous.then(work);
+    sectionFlushRef.current = next;
+    return next.finally(() => {
+      if (sectionFlushRef.current === next) {
+        sectionFlushRef.current = null;
+      }
+    });
+  };
+
+  const createSectionRecorder = (
+    stream: MediaStream,
+    mimeType: string,
+    overlapMs: number,
+  ): RecorderSection => {
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType,
+      audioBitsPerSecond: 24000,
+    });
+
+    const section: RecorderSection = {
+      id: crypto.randomUUID(),
+      recorder: mediaRecorder,
+      chunks: [],
+      startedAtMs: Date.now() - recordingStartedAtRef.current,
+      overlapMs,
+      hasDetectedSpeech: false,
+      speechFrameCount: 0,
+    };
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        section.chunks.push(event.data);
+      }
+    };
+
+    mediaRecorder.onerror = (event) => {
+      logger.error("[VOICE_RECORDER] Section recorder error:", event);
+    };
+
+    mediaRecorder.start();
+    return section;
+  };
+
+  const startActiveSectionRecorder = (
+    stream: MediaStream,
+    overlapMs: number,
+  ) => {
+    const nextSection = createSectionRecorder(
+      stream,
+      audioMimeTypeRef.current,
+      overlapMs,
+    );
+    activeSectionRef.current = nextSection;
+    mediaRecorderRef.current = nextSection.recorder;
+    lastSpeechAtMsRef.current = nextSection.startedAtMs;
+  };
+
+  const stopSectionRecorder = async (
+    section: RecorderSection,
+  ): Promise<{ blob: Blob | null; endTimeMs: number }> => {
+    const mediaRecorder = section.recorder;
+    const endTimeMs = Date.now() - recordingStartedAtRef.current;
+
+    if (mediaRecorder.state === "inactive") {
+      const blob =
+        section.chunks.length > 0
+          ? new Blob(section.chunks, {
+              type: mediaRecorder.mimeType || audioMimeTypeRef.current,
+            })
+          : null;
+      return { blob, endTimeMs };
+    }
+
+    return new Promise((resolve) => {
+      const mimeType = mediaRecorder.mimeType || audioMimeTypeRef.current;
+      mediaRecorder.onstop = () => {
+        const blob =
+          section.chunks.length > 0
+            ? new Blob(section.chunks, { type: mimeType })
+            : null;
+        section.chunks = [];
+        resolve({ blob, endTimeMs });
+      };
+      try {
+        mediaRecorder.requestData();
+        mediaRecorder.stop();
+      } catch (error) {
+        logger.error(
+          "[VOICE_RECORDER] Failed to stop section recorder:",
+          error,
+        );
+        resolve({ blob: null, endTimeMs });
+      }
+    });
+  };
+
+  const saveSectionBlob = async (
+    blob: Blob,
+    startTimeMs: number,
+    endTimeMs: number,
+    overlapMs: number,
+    hasDetectedSpeech: boolean,
+    speechFrameCount: number,
+  ) => {
     const activeSessionId = recordingSessionIdRef.current;
     const documentId = transcriptionDocIdRef.current;
-    if (!activeSessionId || !documentId || timedChunksRef.current.length === 0) {
+    if (!activeSessionId || !documentId || blob.size === 0) {
       return;
     }
 
     const sectionIndex = nextSectionIndexRef.current;
-    const overlapMs = sectionIndex === 0 ? 0 : SECTION_OVERLAP_MS;
-    const startTimeMs =
-      sectionIndex === 0
-        ? 0
-        : Math.max(
-            lastEmittedSectionEndMsRef.current - SECTION_OVERLAP_MS,
-            endTimeMs - SECTION_DURATION_MS
-          );
-    if (!isFinal && endTimeMs - lastSectionEndMsRef.current < SECTION_DURATION_MS) {
-      return;
-    }
-    if (isFinal && endTimeMs - lastEmittedSectionEndMsRef.current < 1000) {
-      return;
-    }
+    const sectionDurationMs = endTimeMs - startTimeMs;
 
-    const sectionChunks = timedChunksRef.current.filter(
-      (chunk) => chunk.offsetMs >= startTimeMs && chunk.offsetMs <= endTimeMs
-    );
-    if (sectionChunks.length === 0) {
-      return;
-    }
-
-    const contentType = mediaRecorderRef.current?.mimeType || "audio/webm";
+    const contentType = blob.type || audioMimeTypeRef.current;
     const localSectionId = crypto.randomUUID();
     const now = new Date().toISOString();
+    const shouldUpload = shouldUploadSectionForTranscription({
+      hasDetectedSpeech,
+      speechFrameCount,
+      sectionDurationMs,
+    });
     const localSection: LocalAudioSection = {
       local_section_id: localSectionId,
       recording_session_id: activeSessionId,
@@ -381,35 +559,255 @@ export const useVoiceRecorder = (
       start_time_ms: startTimeMs,
       end_time_ms: endTimeMs,
       overlap_ms: overlapMs,
-      blob: new Blob(
-        sectionChunks.map((chunk) => chunk.blob),
-        { type: contentType }
-      ),
+      blob: shouldUpload ? blob : undefined,
       content_type: contentType,
-      status: "recorded",
+      status: shouldUpload ? "recorded" : "discarded_no_voice",
       retry_count: 0,
+      speech_frame_count: speechFrameCount,
+      discard_reason: shouldUpload
+        ? undefined
+        : hasDetectedSpeech
+          ? "insufficient_voice_frames"
+          : "no_voice_detected",
       created_at: now,
       updated_at: now,
     };
 
     await saveLocalSection(localSection);
+    if (!shouldUpload) {
+      logger.debug("[VOICE_RECORDER] Discarded section without enough voice", {
+        sectionIndex,
+        sectionDurationMs,
+        speechFrameCount,
+        discardReason: localSection.discard_reason,
+      });
+      nextSectionIndexRef.current += 1;
+      return;
+    }
+
+    chunksRef.current.push(blob);
+    setAudioBlob(new Blob(chunksRef.current, { type: contentType }));
     nextSectionIndexRef.current += 1;
-    lastEmittedSectionEndMsRef.current = endTimeMs;
-    lastSectionEndMsRef.current = isFinal
-      ? endTimeMs
-      : Math.max(0, endTimeMs - SECTION_OVERLAP_MS);
-    timedChunksRef.current = timedChunksRef.current.filter(
-      (chunk) => chunk.offsetMs >= lastSectionEndMsRef.current - SECTION_OVERLAP_MS
-    );
     await processPendingSections();
   };
 
-  const scheduleNextSectionFlush = () => {
-    if (sectionTimerRef.current) clearTimeout(sectionTimerRef.current);
+  const finalizeSection = (section: RecorderSection | null) => {
+    if (!section) {
+      return Promise.resolve();
+    }
+
+    return queueSectionWork(async () => {
+      const { blob, endTimeMs } = await stopSectionRecorder(section);
+      if (blob) {
+        await saveSectionBlob(
+          blob,
+          section.startedAtMs,
+          endTimeMs,
+          section.overlapMs,
+          section.hasDetectedSpeech,
+          section.speechFrameCount,
+        );
+      }
+    });
+  };
+
+  const armSectionBoundaryControl = () => {
+    if (!isRecordingRef.current || isPausedRef.current) {
+      return;
+    }
+
+    if (sectionTimerRef.current) {
+      clearTimeout(sectionTimerRef.current);
+    }
+
+    const timeoutMs =
+      segmentationModeRef.current === "vad"
+        ? AUDIO_SEGMENTATION_CONFIG.maxSectionMs
+        : AUDIO_SEGMENTATION_CONFIG.fallbackSectionMs;
+
     sectionTimerRef.current = setTimeout(() => {
-      const elapsedMs = Date.now() - recordingStartedAtRef.current;
-      void saveSectionFromChunks(elapsedMs).finally(scheduleNextSectionFlush);
-    }, nextSectionIndexRef.current === 0 ? SECTION_DURATION_MS : SECTION_DURATION_MS - SECTION_OVERLAP_MS);
+      if (!isRecordingRef.current || isPausedRef.current) {
+        return;
+      }
+
+      if (segmentationModeRef.current === "vad") {
+        const currentSection = activeSectionRef.current;
+        if (!currentSection) {
+          return;
+        }
+        const sectionDurationMs =
+          Date.now() -
+          recordingStartedAtRef.current -
+          currentSection.startedAtMs;
+        if (shouldForceSectionCut(sectionDurationMs)) {
+          void splitCurrentSectionWithOverlap();
+        } else {
+          armSectionBoundaryControl();
+        }
+        return;
+      }
+
+      void flushCurrentSection().finally(() => {
+        if (isRecordingRef.current && !isPausedRef.current) {
+          armSectionBoundaryControl();
+        }
+      });
+    }, timeoutMs);
+  };
+
+  const flushCurrentSection = (isFinal = false) => {
+    const currentSection = activeSectionRef.current;
+    if (!currentSection) {
+      return Promise.resolve();
+    }
+
+    activeSectionRef.current = null;
+    mediaRecorderRef.current = null;
+    clearSectionBoundaryTimers();
+
+    return finalizeSection(currentSection).then(() => {
+      const stream = mediaStreamRef.current;
+      if (
+        !isFinal &&
+        stream?.active &&
+        isRecordingRef.current &&
+        !isPausedRef.current
+      ) {
+        startActiveSectionRecorder(stream, 0);
+        armSectionBoundaryControl();
+      }
+    });
+  };
+
+  const finalizeRetiringSection = () => {
+    const retiringSection = retiringSectionRef.current;
+    if (!retiringSection) {
+      forcedSplitInFlightRef.current = false;
+      return Promise.resolve();
+    }
+
+    retiringSectionRef.current = null;
+    return finalizeSection(retiringSection).finally(() => {
+      forcedSplitInFlightRef.current = false;
+    });
+  };
+
+  const splitCurrentSectionWithOverlap = () => {
+    const stream = mediaStreamRef.current;
+    const currentSection = activeSectionRef.current;
+
+    if (
+      !stream?.active ||
+      !currentSection ||
+      forcedSplitInFlightRef.current ||
+      isPausedRef.current
+    ) {
+      return Promise.resolve();
+    }
+
+    forcedSplitInFlightRef.current = true;
+    clearSectionBoundaryTimers();
+    retiringSectionRef.current = currentSection;
+    startActiveSectionRecorder(
+      stream,
+      AUDIO_SEGMENTATION_CONFIG.forcedOverlapMs,
+    );
+    armSectionBoundaryControl();
+
+    overlapTimerRef.current = setTimeout(() => {
+      overlapTimerRef.current = null;
+      void finalizeRetiringSection();
+    }, AUDIO_SEGMENTATION_CONFIG.forcedOverlapMs);
+
+    return Promise.resolve();
+  };
+
+  const evaluateVoiceActivity = () => {
+    const analyser = analyserRef.current;
+    const buffer = vadBufferRef.current;
+    const currentSection = activeSectionRef.current;
+
+    if (
+      !analyser ||
+      !buffer ||
+      !currentSection ||
+      !isRecordingRef.current ||
+      isPausedRef.current
+    ) {
+      return;
+    }
+
+    analyser.getFloatTimeDomainData(buffer);
+    const sample = detectVoiceActivity(buffer);
+    const nowMs = Date.now() - recordingStartedAtRef.current;
+
+    if (sample.isSpeech) {
+      lastSpeechAtMsRef.current = nowMs;
+      currentSection.hasDetectedSpeech = true;
+      currentSection.speechFrameCount += 1;
+      if (retiringSectionRef.current) {
+        retiringSectionRef.current.hasDetectedSpeech = true;
+        retiringSectionRef.current.speechFrameCount += 1;
+      }
+      return;
+    }
+
+    if (forcedSplitInFlightRef.current) {
+      return;
+    }
+
+    if (
+      shouldFlushOnNaturalPause({
+        nowMs,
+        sectionStartedAtMs: currentSection.startedAtMs,
+        lastSpeechAtMs: lastSpeechAtMsRef.current,
+        hasDetectedSpeech: currentSection.hasDetectedSpeech,
+      })
+    ) {
+      void flushCurrentSection();
+    }
+  };
+
+  const enableVadSegmentation = async (stream: MediaStream) => {
+    const AudioContextCtor = (window.AudioContext ??
+      (
+        window as Window & {
+          webkitAudioContext?: BrowserAudioContextCtor;
+        }
+      ).webkitAudioContext) as BrowserAudioContextCtor | undefined;
+
+    if (!AudioContextCtor) {
+      segmentationModeRef.current = "timer";
+      return;
+    }
+
+    try {
+      const audioContext = new AudioContextCtor();
+      const sourceNode = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = VAD_ANALYSER_FFT_SIZE;
+      analyser.smoothingTimeConstant = 0.15;
+      sourceNode.connect(analyser);
+
+      audioContextRef.current = audioContext;
+      sourceNodeRef.current = sourceNode;
+      analyserRef.current = analyser;
+      vadBufferRef.current = new Float32Array(analyser.fftSize);
+      segmentationModeRef.current = "vad";
+      await audioContext.resume();
+
+      vadIntervalRef.current = window.setInterval(
+        evaluateVoiceActivity,
+        AUDIO_SEGMENTATION_CONFIG.vadPollIntervalMs,
+      );
+    } catch (error) {
+      logger.warn(
+        "[VOICE_RECORDER] Falling back to timer segmentation because VAD setup failed:",
+        error,
+      );
+      segmentationModeRef.current = "timer";
+      await teardownVadMonitoring();
+    }
   };
 
   /**
@@ -421,7 +819,7 @@ export const useVoiceRecorder = (
       if (transcriptionDocIdRef.current) {
         nextRecordingSessionId = await createRecordingSession(
           encounterId,
-          transcriptionDocIdRef.current
+          transcriptionDocIdRef.current,
         );
         if (!nextRecordingSessionId) {
           logger.error("[VOICE_RECORDER] Could not create recording session");
@@ -442,52 +840,23 @@ export const useVoiceRecorder = (
       };
 
       // 2. Get audio stream with optimized constraints
-      const stream = await navigator.mediaDevices.getUserMedia(
-        audioConstraints
-      );
+      const stream =
+        await navigator.mediaDevices.getUserMedia(audioConstraints);
 
       // 3. Find best supported audio format
       const supportedType = getBestSupportedAudioType();
 
       // 4. Create MediaRecorder with optimized settings
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: supportedType,
-        audioBitsPerSecond: 24000, // Lower bitrate for smaller files
-      });
-
-      mediaRecorderRef.current = mediaRecorder;
+      mediaStreamRef.current = stream;
+      audioMimeTypeRef.current = supportedType;
       chunksRef.current = [];
-      timedChunksRef.current = [];
       recordingStartedAtRef.current = Date.now();
       nextSectionIndexRef.current = 0;
-      lastSectionEndMsRef.current = 0;
-      lastEmittedSectionEndMsRef.current = 0;
-
-      mediaRecorder.ondataavailable = (e) => {
-        const elapsedMs = Date.now() - recordingStartedAtRef.current;
-        chunksRef.current.push(e.data);
-        if (e.data.size > 0) {
-          timedChunksRef.current.push({ blob: e.data, offsetMs: elapsedMs });
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(chunksRef.current, {
-          type: mediaRecorderRef.current?.mimeType || "audio/webm",
-        });
-
-        // Log file size information
-        const fileSizeKB = audioBlob.size / 1024;
-        logger.debug(
-          `[VOICE_RECORDER] Recording complete: ${fileSizeKB.toFixed(
-            2
-          )} KB, ${duration} seconds`
-        );
-
-        setAudioBlob(audioBlob);
-        setAudioExists(true);
-        stream.getTracks().forEach((track) => track.stop());
-      };
+      activeSectionRef.current = null;
+      retiringSectionRef.current = null;
+      forcedSplitInFlightRef.current = false;
+      segmentationModeRef.current = "timer";
+      await teardownVadMonitoring();
 
       // Reset duration if we're starting a new recording
       if (audioExists) {
@@ -496,13 +865,16 @@ export const useVoiceRecorder = (
         setIsAudioExpired(false);
       }
 
-      mediaRecorder.start(MEDIA_RECORDER_TIMESLICE_MS);
+      startActiveSectionRecorder(stream, 0);
+      await enableVadSegmentation(stream);
+      isRecordingRef.current = true;
+      isPausedRef.current = false;
       setIsRecording(true);
       setIsPaused(false);
       timerRef.current = setInterval(() => {
         setDuration((prev) => prev + 1);
       }, 1000);
-      scheduleNextSectionFlush();
+      armSectionBoundaryControl();
     } catch (error) {
       logger.error("Error starting recording:", error);
       setIsRecording(false);
@@ -524,19 +896,21 @@ export const useVoiceRecorder = (
         timerRef.current = setInterval(() => {
           setDuration((prev) => prev + 1);
         }, 1000);
-        scheduleNextSectionFlush();
+        armSectionBoundaryControl();
+        isPausedRef.current = false;
         setIsPaused(false);
       } else {
         // Pause recording
+        clearSectionBoundaryTimers();
+        if (forcedSplitInFlightRef.current) {
+          void finalizeRetiringSection();
+        }
         mediaRecorderRef.current.pause();
         if (timerRef.current) {
           clearInterval(timerRef.current);
           timerRef.current = null;
         }
-        if (sectionTimerRef.current) {
-          clearTimeout(sectionTimerRef.current);
-          sectionTimerRef.current = null;
-        }
+        isPausedRef.current = true;
         setIsPaused(true);
       }
     } catch (error) {
@@ -562,33 +936,35 @@ export const useVoiceRecorder = (
 
       // Now stop the recording
       try {
-        mediaRecorderRef.current.stop();
-        if (sectionTimerRef.current) {
-          clearTimeout(sectionTimerRef.current);
-          sectionTimerRef.current = null;
+        isRecordingRef.current = false;
+        isPausedRef.current = false;
+        clearSectionBoundaryTimers();
+        await teardownVadMonitoring();
+
+        if (forcedSplitInFlightRef.current) {
+          await finalizeRetiringSection();
         }
 
-        // Give time for the onstop handler to execute and set the audioBlob
-        setTimeout(async () => {
-          const elapsedMs = Date.now() - recordingStartedAtRef.current;
-          await saveSectionFromChunks(elapsedMs, true);
+        void flushCurrentSection(true).then(async () => {
           if (recordingSessionIdRef.current) {
             await finishRecordingSession(recordingSessionIdRef.current);
           }
 
-          // Generate upload URL if we have a transcription document ID
+          // The sectioned transcription flow already uploaded each section to GCS.
+          // The legacy full-audio upload is only used when there is no active
+          // recording session backing the near realtime path.
           if (transcriptionDocIdRef.current && !recordingSessionIdRef.current) {
             try {
               if (!encounterId || encounterId <= 0) {
                 logger.error(
                   "[VOICE_RECORDER] Invalid encounterId in stopRecording:",
-                  encounterId
+                  encounterId,
                 );
                 return;
               }
               const uploadUrl = await generateAudioUploadUrl(
                 encounterId,
-                duration
+                duration,
               );
 
               if (!uploadUrl) {
@@ -600,7 +976,7 @@ export const useVoiceRecorder = (
               const currentAudioBlob =
                 chunksRef.current.length > 0
                   ? new Blob(chunksRef.current, {
-                      type: mediaRecorderRef.current?.mimeType || "audio/webm",
+                      type: audioMimeTypeRef.current,
                     })
                   : null;
 
@@ -609,12 +985,12 @@ export const useVoiceRecorder = (
                 const uploadSuccess = await uploadAudioToCloud(
                   currentAudioBlob,
                   uploadUrl,
-                  mediaRecorderRef.current?.mimeType || "audio/webm"
+                  audioMimeTypeRef.current,
                 );
 
                 if (!uploadSuccess) {
                   logger.error(
-                    "[VOICE_RECORDER] Failed to upload audio recording"
+                    "[VOICE_RECORDER] Failed to upload audio recording",
                   );
                 } else {
                   setIsAudioExpired(false);
@@ -622,21 +998,38 @@ export const useVoiceRecorder = (
                 }
               } else {
                 logger.error(
-                  "[VOICE_RECORDER] No audio data available to upload"
+                  "[VOICE_RECORDER] No audio data available to upload",
                 );
               }
             } catch (error) {
               logger.error(
                 "[VOICE_RECORDER] Error during upload process:",
-                error
+                error,
               );
             }
+          } else if (recordingSessionIdRef.current) {
+            logger.debug(
+              "[VOICE_RECORDER] Sectioned transcription session finished; skipping legacy full-audio upload because sections were already uploaded to GCS",
+            );
           } else {
             logger.debug(
-              "[VOICE_RECORDER] No transcription document ID provided, skipping upload"
+              "[VOICE_RECORDER] No transcription document ID available for legacy full-audio upload; skipping encounter audio upload",
             );
           }
-        }, 300); // Small delay to ensure onstop has executed
+          const finalAudioBlob = new Blob(chunksRef.current, {
+            type: audioMimeTypeRef.current,
+          });
+          const fileSizeKB = finalAudioBlob.size / 1024;
+          logger.debug(
+            `[VOICE_RECORDER] Recording complete: ${fileSizeKB.toFixed(
+              2,
+            )} KB, ${duration} seconds`,
+          );
+          setAudioExists(true);
+          mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+          mediaStreamRef.current = null;
+          mediaRecorderRef.current = null;
+        });
       } catch (error) {
         logger.error("Error stopping recording:", error);
       }
@@ -675,23 +1068,23 @@ export const useVoiceRecorder = (
       try {
         if (encounterId && encounterId > 0) {
           logger.debug(
-            `[VOICE_RECORDER] Attempting to delete audio for encounter ${encounterId}`
+            `[VOICE_RECORDER] Attempting to delete audio for encounter ${encounterId}`,
           );
           await axiosInstance.delete(`/api/v1/encounters/${encounterId}/audio`);
           logger.debug(
             "[VOICE_RECORDER] Server delete request sent for encounter",
-            encounterId
+            encounterId,
           );
         } else {
           logger.warn(
             "[VOICE_RECORDER] Invalid encounterId in deleteRecording:",
-            encounterId
+            encounterId,
           );
         }
       } catch (error) {
         logger.error(
           "[VOICE_RECORDER] Error deleting audio from server:",
-          error
+          error,
         );
       }
     }
@@ -706,15 +1099,20 @@ export const useVoiceRecorder = (
     setIsAudioExpired(false);
     setHasBeenTranscribed(false);
     chunksRef.current = [];
+    isRecordingRef.current = false;
+    isPausedRef.current = false;
+    activeSectionRef.current = null;
+    retiringSectionRef.current = null;
+    forcedSplitInFlightRef.current = false;
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+    mediaRecorderRef.current = null;
+    await teardownVadMonitoring();
 
     // Clear timer
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
-    }
-    if (sectionTimerRef.current) {
-      clearTimeout(sectionTimerRef.current);
-      sectionTimerRef.current = null;
     }
 
     setIsDeleting(false); // Reset deleting state
@@ -728,9 +1126,21 @@ export const useVoiceRecorder = (
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
-      if (sectionTimerRef.current) clearTimeout(sectionTimerRef.current);
+      clearSectionBoundaryTimers();
+      if (vadIntervalRef.current !== null) {
+        window.clearInterval(vadIntervalRef.current);
+      }
       if (mediaRecorderRef.current?.state !== "inactive") {
         mediaRecorderRef.current?.stop();
+      }
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      sourceNodeRef.current?.disconnect();
+      analyserRef.current?.disconnect();
+      if (
+        audioContextRef.current &&
+        audioContextRef.current.state !== "closed"
+      ) {
+        void audioContextRef.current.close();
       }
     };
   }, []);

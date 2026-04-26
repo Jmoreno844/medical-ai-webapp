@@ -28,6 +28,8 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
     audioExists,
     isAudioExpired,
     hasBeenTranscribed,
+    recordingSessionId,
+    pendingAudioSections,
     isTranscribing,
     transcriptionStatus,
     errorMessage,
@@ -42,8 +44,18 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
     }
   }, [resetKey, audioExists, audioBlob, resetTranscriptionState]);
 
-  // Determine if we have audio to transcribe
-  const hasAudioToTranscribe = audioBlob || audioExists;
+  const hasRealtimeSession = Boolean(
+    recordingSessionId || pendingAudioSections > 0,
+  );
+  const shouldContinueRealtimeTranscription =
+    hasRealtimeSession &&
+    !hasBeenTranscribed &&
+    transcriptionStatus !== "success";
+
+  // Determine if we have audio to transcribe or a realtime session to follow.
+  const hasAudioToTranscribe = Boolean(
+    audioBlob || audioExists || hasRealtimeSession,
+  );
   const isDisabled =
     !transcriptionDocId ||
     isRecording ||
@@ -54,16 +66,18 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
   const disabledTooltip = isAudioExpired
     ? "El audio expiró. Grabe uno nuevo o elimine el audio vencido."
     : !hasAudioToTranscribe
-    ? "Grabe audio primero"
-    : isTranscribing
-    ? "Transcripción en progreso"
-    : "Transcribir audio a texto";
+      ? "Grabe audio primero"
+      : isTranscribing
+        ? "Transcripción en progreso"
+        : shouldContinueRealtimeTranscription
+          ? "Continuar seguimiento de la transcripción en curso"
+          : "Transcribir audio a texto";
 
   const handleTranscribe = async () => {
     logger.debug("[TRANSCRIBE_BUTTON] Transcribe button clicked");
     if (isDisabled) {
       logger.debug(
-        "[TRANSCRIBE_BUTTON] Button is disabled. Aborting transcription"
+        "[TRANSCRIBE_BUTTON] Button is disabled. Aborting transcription",
       );
       return;
     }
@@ -74,7 +88,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
       }
 
       logger.debug(
-        `[TRANSCRIBE_BUTTON] Initiating transcription for document ${transcriptionDocId} and encounter ${encounterId}`
+        `[TRANSCRIBE_BUTTON] Initiating transcription for document ${transcriptionDocId} and encounter ${encounterId}`,
       );
 
       // Call the transcribeAudio function from the context
@@ -91,17 +105,25 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
       isDisabled
         ? "bg-gray-200 text-gray-400 cursor-not-allowed"
         : transcriptionStatus === "success"
-        ? "bg-teal-500 text-white hover:bg-teal-600"
-        : transcriptionStatus === "error"
-        ? "bg-red-500 text-white hover:bg-red-600"
-        : "bg-purple-500 text-white hover:bg-purple-600"
+          ? "bg-teal-500 text-white hover:bg-teal-600"
+          : transcriptionStatus === "error"
+            ? "bg-red-500 text-white hover:bg-red-600"
+            : "bg-purple-500 text-white hover:bg-purple-600"
     }
     transition-colors duration-200
   `;
 
+  const defaultButtonLabel = shouldContinueRealtimeTranscription
+    ? "Continuar transcripción"
+    : "Transcribir";
+
+  const defaultAriaLabel = shouldContinueRealtimeTranscription
+    ? "Continuar transcripción en curso"
+    : "Transcribir audio a texto";
+
   // Button content based on state
   const renderButtonContent = () => {
-    if (isTranscribing) {
+    if (isTranscribing || (isRecording && hasRealtimeSession)) {
       return (
         <>
           <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -184,7 +206,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
             clipRule="evenodd"
           ></path>
         </svg>
-        <span className="text-base font-medium">Transcribir</span>
+        <span className="text-base font-medium">{defaultButtonLabel}</span>
       </>
     );
   };
@@ -198,7 +220,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
           onClick={handleTranscribe}
           disabled={isDisabled}
           className={buttonClasses}
-          aria-label="Transcribir audio a texto"
+          aria-label={defaultAriaLabel}
         >
           {renderButtonContent()}
         </button>

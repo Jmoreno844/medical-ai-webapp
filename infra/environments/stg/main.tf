@@ -237,6 +237,8 @@ module "cloud_run" {
     CLOUD_TASKS_REGION                  = var.region
     TRANSCRIPTION_QUEUE_NAME            = module.cloud_tasks.queue_name
     CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT = module.service_accounts.cloud_tasks_invoker_email
+    GEMINI_MODEL                        = var.gemini_model
+    VERTEX_AI_LOCATION                  = "global"
   }
 
   secret_env_vars = var.cloud_run_use_secret_manager ? [

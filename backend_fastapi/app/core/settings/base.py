@@ -73,8 +73,11 @@ class Settings(BaseSettings):
         default=None,
         alias="TRANSCRIPTION_TASK_TARGET_URL",
     )
-    gemini_model: str = Field(default="gemini-2.0-flash", alias="GEMINI_MODEL")
-    vertex_ai_location: str | None = Field(default=None, alias="VERTEX_AI_LOCATION")
+    transcription_gemini_model: str = Field(
+        default="gemini-2.5-flash",
+        alias="TRANSCRIPTION_GEMINI_MODEL",
+    )
+    vertex_ai_location: str | None = Field(default="global", alias="VERTEX_AI_LOCATION")
     generate_document_cloud_function_url: str | None = Field(
         default=None,
         validation_alias=AliasChoices(
