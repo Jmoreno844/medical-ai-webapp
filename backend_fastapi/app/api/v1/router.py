@@ -12,6 +12,7 @@ from app.domains.patients import api as patients_api
 from app.domains.system import csrf_api, health_api
 from app.domains.templates import api as templates_api
 from app.domains.transcription import api as transcription_api
+from app.domains.transcription import api_test as transcription_api_test
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(health_api.router, tags=["health"])
@@ -22,6 +23,7 @@ api_v1_router.include_router(documents_api.router, tags=["documents"])
 api_v1_router.include_router(document_generation_api.router, tags=["documents"])
 api_v1_router.include_router(document_callbacks_api.router, tags=["documents"])
 api_v1_router.include_router(transcription_api.router, tags=["transcription"])
+api_v1_router.include_router(transcription_api_test.router, tags=["transcription-test"])
 api_v1_router.include_router(patients_api.router, tags=["patients"])
 api_v1_router.include_router(templates_api.router, tags=["templates"])
 api_v1_router.include_router(sse_api.router, tags=["sse"])

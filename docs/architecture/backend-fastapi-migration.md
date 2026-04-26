@@ -124,6 +124,37 @@ Functions, GCS, PostgreSQL y `copilot_agent`.
    - Migrar `VITE_API_URL`, Cloud Functions callbacks y copilot tools a FastAPI.
    - Retirar rutas legacy, dependencias Django, settings Django y migrations
      Django solo cuando Alembic y tests cubran el schema activo.
+   - **Corte en stg (estado deseado):** el deploy automático a Cloud Run publica
+     `backend_fastapi` (imagen `fastapi-backend`); el workflow de Django pasa
+     a **rollback manual** (`workflow_dispatch`).
+
+### Propiedad del schema post-cutover (stg+)
+
+- Bases de datos **nuevas (vacías)**: solo `alembic upgrade head` en
+  `backend_fastapi/`; la revisión `0001` aplica el DDL congelado en
+  `alembic/baseline/baseline_clinical_v1.sql` (auth/contenttypes, tablas
+  de dominio, copilot, `fastapi_revoked_token`). `backend_fastapi/scripts/migration_smoke_staging.sh`
+  hace eso por defecto. Regenerar el SQL en entornos controlados con
+  `backend_fastapi/scripts/build_alembic_baseline_sql.py`.
+- Opcional: `USE_DJANGO_MIGRATE=1` con el mismo script para ejecutar antes
+  `manage.py migrate` (rollback, comparación, no es el camino de bootstrap en
+  verde). Verificación de paridad: `backend_fastapi/scripts/verify_alembic_schema_parity.sh`.
+- Las **nuevas** migraciones de tablas compartidas van en **Alembic**; los
+  `makemigrations` de Django quedan para rama/rollback o hasta el retiro del
+  monolito.
+
+### Puerta de verificación para retirar Django (repo)
+
+- Esquema: prueba con PostgreSQL vacío: `uv --project backend_fastapi run alembic upgrade head`.
+- Paridad: `backend_fastapi/scripts/verify_alembic_schema_parity.sh` (referencia Django + candidato
+  Alembic; la referencia debe incluir `fastapi_revoked_token` si se obtuvo solo
+  vía `migrate` sin Alembic previo).
+- Tests: `make -C backend check` mientras el monolito viva; `uv --project backend_fastapi run ruff check .`, `uv run pytest`; `npm --prefix webapp run build` (lint puede tener deuda previa). Cloud Functions: `python -m pytest cloud_functions/functions/tests`. Smoke
+  staging: login, encuentro, URL firmada, transcripción, SSE documentos, copilot
+  (según `docs/debt/django-backend-removal.md`).
+
+- **Django admin y Silk** (profiling) no forman parte del flujo de la SPA; son
+  deuda operativa: [`docs/debt/fastapi-admin-ops.md`](../debt/fastapi-admin-ops.md).
 
 ## Plan de Pruebas
 

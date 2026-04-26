@@ -49,4 +49,6 @@ class AudioExistsResponse(BaseModel):
     exists: bool
     duration: int = 0
     has_been_transcribed: bool
+    expires_at: datetime | None = None
+    is_expired: bool = False
 

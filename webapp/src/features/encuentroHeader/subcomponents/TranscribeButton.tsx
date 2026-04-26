@@ -26,6 +26,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
     audioBlob,
     isRecording,
     audioExists,
+    isAudioExpired,
     hasBeenTranscribed,
     isTranscribing,
     transcriptionStatus,
@@ -47,7 +48,16 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
     !transcriptionDocId ||
     isRecording ||
     isTranscribing ||
+    isAudioExpired ||
     !hasAudioToTranscribe;
+
+  const disabledTooltip = isAudioExpired
+    ? "El audio expiró. Grabe uno nuevo o elimine el audio vencido."
+    : !hasAudioToTranscribe
+    ? "Grabe audio primero"
+    : isTranscribing
+    ? "Transcripción en progreso"
+    : "Transcribir audio a texto";
 
   const handleTranscribe = async () => {
     logger.debug("[TRANSCRIBE_BUTTON] Transcribe button clicked");
@@ -96,6 +106,26 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
         <>
           <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
           <span>Transcribiendo…</span>
+        </>
+      );
+    }
+
+    if (isAudioExpired) {
+      return (
+        <>
+          <svg
+            className="w-4 h-4 mr-1"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              fillRule="evenodd"
+              d="M8.257 3.099c.765-1.36 2.72-1.36 3.486 0l6.516 11.585c.75 1.334-.213 2.983-1.742 2.983H3.483c-1.529 0-2.492-1.649-1.742-2.983L8.257 3.099zM11 14a1 1 0 10-2 0 1 1 0 002 0zm-1-2a1 1 0 01-1-1V8a1 1 0 112 0v3a1 1 0 01-1 1z"
+              clipRule="evenodd"
+            ></path>
+          </svg>
+          <span>Audio expirado</span>
         </>
       );
     }
@@ -162,11 +192,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
   return (
     <div>
       <Tooltip
-        content={
-          isDisabled
-            ? "Grabe audio primero"
-            : errorMessage || "Transcribir audio a texto"
-        }
+        content={isDisabled ? disabledTooltip : errorMessage || disabledTooltip}
       >
         <button
           onClick={handleTranscribe}

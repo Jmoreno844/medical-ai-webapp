@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Realtime STT POC</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 2rem;
+        max-width: 820px;
+      }
+
+      button,
+      input {
+        font: inherit;
+        margin-right: 0.5rem;
+      }
+
+      pre {
+        background: #111827;
+        color: #e5e7eb;
+        min-height: 16rem;
+        padding: 1rem;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Realtime STT POC</h1>
+    <p>
+      Local-only test page. Do not use real patient audio or PHI.
+    </p>
+
+    <label>
+      WebSocket URL
+      <input
+        id="wsUrl"
+        size="80"
+        value="ws://localhost:8001/api/v1/dev/transcription/realtime/stt?language_code=es-CO&sample_rate_hertz=16000"
+      />
+    </label>
+    <p>
+      <button id="start">Start microphone</button>
+      <button id="stop" disabled>Stop</button>
+    </p>
+    <pre id="log"></pre>
+
+    <script>
+      const TARGET_SAMPLE_RATE = 16000;
+      const logElement = document.querySelector("#log");
+      const startButton = document.querySelector("#start");
+      const stopButton = document.querySelector("#stop");
+      const wsUrlInput = document.querySelector("#wsUrl");
+
+      let audioContext;
+      let processor;
+      let source;
+      let stream;
+      let socket;
+
+      function log(message) {
+        logElement.textContent += `${message}\n`;
+        logElement.scrollTop = logElement.scrollHeight;
+      }
+
+      function downsampleBuffer(buffer, inputSampleRate, outputSampleRate) {
+        if (outputSampleRate === inputSampleRate) {
+          return buffer;
+        }
+
+        const sampleRateRatio = inputSampleRate / outputSampleRate;
+        const newLength = Math.round(buffer.length / sampleRateRatio);
+        const result = new Float32Array(newLength);
+        let offsetResult = 0;
+        let offsetBuffer = 0;
+
+        while (offsetResult < result.length) {
+          const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+          let accum = 0;
+          let count = 0;
+
+          for (
+            let i = offsetBuffer;
+            i < nextOffsetBuffer && i < buffer.length;
+            i += 1
+          ) {
+            accum += buffer[i];
+            count += 1;
+          }
+
+          result[offsetResult] = accum / count;
+          offsetResult += 1;
+          offsetBuffer = nextOffsetBuffer;
+        }
+
+        return result;
+      }
+
+      function encodeLinear16(samples) {
+        const buffer = new ArrayBuffer(samples.length * 2);
+        const view = new DataView(buffer);
+
+        for (let i = 0; i < samples.length; i += 1) {
+          const sample = Math.max(-1, Math.min(1, samples[i]));
+          view.setInt16(i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+        }
+
+        return buffer;
+      }
+
+      async function start() {
+        socket = new WebSocket(wsUrlInput.value);
+        socket.binaryType = "arraybuffer";
+
+        socket.onopen = async () => {
+          log("WebSocket connected");
+
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              channelCount: 1,
+              echoCancellation: true,
+              noiseSuppression: true,
+            },
+          });
+          audioContext = new AudioContext();
+          source = audioContext.createMediaStreamSource(stream);
+          processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+          processor.onaudioprocess = (event) => {
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+              return;
+            }
+
+            const input = event.inputBuffer.getChannelData(0);
+            const resampled = downsampleBuffer(
+              input,
+              audioContext.sampleRate,
+              TARGET_SAMPLE_RATE,
+            );
+            socket.send(encodeLinear16(resampled));
+
+            const output = event.outputBuffer.getChannelData(0);
+            output.fill(0);
+          };
+
+          source.connect(processor);
+          processor.connect(audioContext.destination);
+          startButton.disabled = true;
+          stopButton.disabled = false;
+          log(`Microphone streaming from ${audioContext.sampleRate} Hz`);
+        };
+
+        socket.onmessage = (event) => {
+          const message = JSON.parse(event.data);
+          if (message.type === "partial" || message.type === "final") {
+            log(
+              `[${message.type} ${message.elapsed_ms}ms] ${message.transcript}`,
+            );
+            return;
+          }
+          log(JSON.stringify(message));
+        };
+
+        socket.onerror = () => log("WebSocket error");
+        socket.onclose = () => log("WebSocket closed");
+      }
+
+      async function stop() {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: "stop" }));
+          socket.close();
+        }
+        if (processor) {
+          processor.disconnect();
+        }
+        if (source) {
+          source.disconnect();
+        }
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+        }
+        if (audioContext) {
+          await audioContext.close();
+        }
+
+        startButton.disabled = false;
+        stopButton.disabled = true;
+      }
+
+      startButton.addEventListener("click", start);
+      stopButton.addEventListener("click", stop);
+    </script>
+  </body>
+</html>

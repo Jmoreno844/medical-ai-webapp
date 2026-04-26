@@ -23,6 +23,8 @@ const VoiceRecorder: React.FC = () => {
     isPaused,
     duration,
     audioExists,
+    audioExpiresAt,
+    isAudioExpired,
     isCheckingAudio,
     isDeleting,
     startRecording,
@@ -42,9 +44,9 @@ const VoiceRecorder: React.FC = () => {
     // Show pause button only during active recording
     setShowPauseButton(isRecording && !isPaused);
 
-    // Show start/stop button if recording OR if not recording and no audio exists yet
-    setShowStartStopButton(isRecording || !audioExists);
-  }, [isRecording, isPaused, audioExists, isCheckingAudio]);
+    // Expired audio should not trap the user without a recording action.
+    setShowStartStopButton(isRecording || !audioExists || isAudioExpired);
+  }, [isRecording, isPaused, audioExists, isAudioExpired, isCheckingAudio]);
 
   /**
    * Handle recording start/stop
@@ -64,6 +66,10 @@ const VoiceRecorder: React.FC = () => {
     deleteRecording();
   };
 
+  const expiredMessage = audioExpiresAt
+    ? `Audio expirado el ${new Date(audioExpiresAt).toLocaleString()}`
+    : "Audio expirado";
+
   // Show loading state while checking audio existence
   if (isCheckingAudio) {
     return (
@@ -79,6 +85,11 @@ const VoiceRecorder: React.FC = () => {
   return (
     <div className="flex items-center space-x-4">
       <TranscribeButton />
+      {isAudioExpired && (
+        <span className="rounded-md bg-amber-100 px-2 py-1 text-sm font-medium text-amber-800">
+          {expiredMessage}
+        </span>
+      )}
       <TimerDisplay duration={duration} />
       <MicrophoneIcon isRecording={isRecording} isPaused={isPaused} />
 
@@ -91,11 +102,19 @@ const VoiceRecorder: React.FC = () => {
       )}
 
       {showStartStopButton && (
-        <StartStopButton isRecording={isRecording} onClick={handleStartStop} />
+        <StartStopButton
+          isRecording={isRecording}
+          onClick={handleStartStop}
+          idleLabel={isAudioExpired ? "Grabar de nuevo" : undefined}
+        />
       )}
 
       {audioExists && !isCheckingAudio && (
-        <DeleteButton onClick={handleDelete} isDeleting={isDeleting} />
+        <DeleteButton
+          onClick={handleDelete}
+          isDeleting={isDeleting}
+          label={isAudioExpired ? "Eliminar audio vencido" : undefined}
+        />
       )}
 
       <SettingsIcon />

@@ -8,8 +8,10 @@ export interface UseVoiceRecorderReturn {
   audioBlob: Blob | null;
   transcriptionDocId?: number;
   audioExists: boolean;
+  audioExpiresAt: string | null;
+  isAudioExpired: boolean;
   isDeleting: boolean;
-  hasBeenTranscribed: boolean; // Add this
+  hasBeenTranscribed: boolean;
   isCheckingAudio: boolean;
   startRecording: () => Promise<void>;
   stopRecording: () => void;

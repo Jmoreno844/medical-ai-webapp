@@ -3,6 +3,7 @@ import React from "react";
 interface DeleteButtonProps {
   onClick: () => void;
   isDeleting?: boolean;
+  label?: string;
 }
 
 /**
@@ -11,6 +12,7 @@ interface DeleteButtonProps {
 const DeleteButton: React.FC<DeleteButtonProps> = ({
   onClick,
   isDeleting = false,
+  label = "Eliminar",
 }) => (
   <button
     onClick={onClick}
@@ -46,7 +48,7 @@ const DeleteButton: React.FC<DeleteButtonProps> = ({
         Eliminando…
       </div>
     ) : (
-      "Eliminar"
+      label
     )}
   </button>
 );

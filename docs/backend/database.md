@@ -5,6 +5,13 @@
 > Para una vista global del sistema ver [`../architecture/system-overview.md`](../architecture/system-overview.md).
 > Para tokens y seguridad entre servicios ver [`auth-and-jwt.md`](auth-and-jwt.md).
 
+**Esquema en verde (sin datos):** se crea con `alembic upgrade head` en
+`backend_fastapi/`; la revisión `0001` aplica
+`alembic/baseline/baseline_clinical_v1.sql` (mismo conjunto de tablas que
+historial Django + `fastapi_revoked_token`, sin admin, sesiones, Silk, ni
+`django_migrations`). Nuevas migraciones compartidas van en Alembic. Ver
+[`../architecture/backend-fastapi-migration.md`](../architecture/backend-fastapi-migration.md).
+
 ## Autenticación IAM (Cloud SQL)
 
 En entornos Cloud (`stg`, `production`), el backend ya **no utiliza contraseñas** (`DB_PASSWORD` fue removido de los secretos por seguridad). En su lugar, utilizamos autenticación IAM integrada nativa de GCP:

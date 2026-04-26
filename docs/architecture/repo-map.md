@@ -7,7 +7,7 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 | Carpeta | Rol | Fuente de verdad |
 |--------|-----|------------------|
 | `backend/` | API central, modelos, auth, JWT, SSE y orquestación | Sí |
-| `backend_fastapi/` | Nueva API FastAPI en migración paralela; no reemplaza a Django hasta completar contratos | Sí |
+| `backend_fastapi/` | API FastAPI primaria en stg (cutover); Django en `backend/` queda para rollback local/CI | Sí |
 | `cloud_functions/` | Transcripción y generación documental con Gemini | Sí |
 | `webapp/` | SPA del médico | Sí |
 | `infra/` | Infra GCP, IAM, budgets, deploy base | Sí |
@@ -33,17 +33,15 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 - `backend/apps/users/`
   - Dueño de sesión Django y JWT de usuario.
 - `backend_fastapi/`
-  - Implementación paralela de la migración Django -> FastAPI.
-  - Tiene su propio proyecto `uv` (`pyproject.toml` y `uv.lock`) separado del
-    entorno Django.
+  - Servicio ASGI con proyecto `uv` propio (`pyproject.toml` y `uv.lock`).
   - Organiza endpoints, schemas y servicios por dominio en `app/domains/*`;
-    `app/api/v1/router.py` solo compone routers.
-  - Expone rutas nuevas bajo `/api/v1` y conserva SSE en memoria durante la primera fase.
-  - No debe introducir nuevas responsabilidades clínicas que aún no estén cubiertas por tests de contrato contra Django.
+    `app/api/v1/router.py` compone los routers bajo `/api/v1`.
+  - Alembic aplica el schema clínico completo en bases nuevas (`alembic/baseline/baseline_clinical_v1.sql` vía `0001`); Django solo aplica en ramas/rollback. Ver `docs/architecture/backend-fastapi-migration.md`.
+  - SSE en memoria en la primera fase; mismas limitaciones de Cloud Run `max-instances=1` que el hub legacy.
 - `cloud_functions/functions/endpoints/`
   - Adaptadores HTTP; validan request y delegan.
 - `cloud_functions/functions/services/`
-  - Lógica de negocio serverless y callbacks a Django.
+  - Lógica de negocio serverless y callbacks al API (`BACKEND_API_BASE_URL` / `services/backend_api.py`).
 - `webapp/src/contexts/`
   - Fuente de verdad oficial del estado del detalle de encuentro y de sus side effects compartidos.
 - `webapp/src/features/`
@@ -60,7 +58,7 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
   - Django kickoff: `backend/apps/generative_ai/api.py`
   - Cola: `backend/apps/generative_ai/services/transcription_tasks.py`
   - Function: `cloud_functions/functions/endpoints/transcription_endpoint.py`
-  - Callback a Django: `cloud_functions/functions/services/django_api.py`
+  - Callbacks al API: `cloud_functions/functions/services/backend_api.py`
 - Generación documental:
   - Django kickoff: `backend/apps/documents/api/generation.py`
   - Background runner: `backend/apps/documents/services/generation_runner.py`
@@ -79,10 +77,10 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 
 ### Auth y seguridad
 
-- Navegador -> Django usa sesión + CSRF.
-- Cloud Functions -> Django usa Bearer JWT de vida corta.
+- Navegador -> API (FastAPI) usa cookies JWT + CSRF; el monolito Django (rollback) usaba sesión.
+- Cloud Functions -> API usan Bearer JWT de callback de vida corta.
 - SSE usa un token distinto y de vida corta.
-- Si cambias claims, expiración o propósito de un token, actualiza Django, Cloud Functions y docs en el mismo cambio.
+- Si cambias claims, expiración o propósito de un token, actualiza API, Cloud Functions y docs en el mismo cambio.
 
 ### Data models y migraciones
 
@@ -93,7 +91,7 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 ### Background jobs
 
 - En `stg/prod`, la transcripción debe salir por Cloud Tasks cuando la configuración esté presente.
-- La generación documental hoy usa un thread en Django para disparar la Cloud Function.
+- La generación documental puede usar un hilo en el proceso API (mismo patrón de orquestación que el monolito legacy).
 - SSE depende de un hub en memoria; por decisión actual se mantiene sin Redis en la primera migración FastAPI y limita Cloud Run a una instancia.
 
 ### Integraciones externas

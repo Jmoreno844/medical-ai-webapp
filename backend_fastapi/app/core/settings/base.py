@@ -42,6 +42,8 @@ class Settings(BaseSettings):
 
     gcp_project_id: str | None = Field(default=None, alias="GCP_PROJECT_ID")
     gcs_bucket_name: str | None = Field(default=None, alias="GCS_BUCKET_NAME")
+    gcp_stt_location: str = Field(default="global", alias="GCP_STT_LOCATION")
+    gcp_stt_model: str = Field(default="chirp_3", alias="GCP_STT_MODEL")
     gcp_storage_impersonated_service_account: str | None = Field(
         default=None,
         alias="GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT",
@@ -169,9 +171,9 @@ class StrictDeploymentSettings(Settings):
         if not self.jwt_secret_key or self.jwt_secret_key == "not-loaded":
             missing.append("JWT_SECRET_KEY")
         if not self.database_url and not (
-            self.db_name and self.db_user and self.db_password and self.db_host
+            self.db_name and self.db_user and self.db_host
         ):
-            missing.append("DATABASE_URL or DB_NAME/DB_USER/DB_PASSWORD/DB_HOST")
+            missing.append("DATABASE_URL or DB_NAME/DB_USER/DB_HOST")
         if not self.cors_allowed_origins:
             missing.append("FASTAPI_CORS_ALLOWED_ORIGINS")
         if not self.gcp_project_id:

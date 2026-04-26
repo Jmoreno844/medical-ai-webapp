@@ -124,6 +124,6 @@ import axiosInstance from "../../../commons/utils/axiosInstance";
 
 ## SSE (Server-Sent Events)
 
-1. Obtener token corto via `POST /generate-sse-token/{id}`
-2. Conectar con `new EventSource(url?token=...)` 
+1. Obtener token corto via `POST /api/v1/documents/{document_id}/sse-token` (FastAPI; no usar rutas legacy `/api/generate-sse-token/...` del monolito).
+2. Conectar al stream con `new EventSource` apuntando a `GET /api/v1/sse/documents/{document_id}/{token}` (no query `?token=` a menos que un endpoint lo documente explícitamente).
 3. Siempre cerrar la conexión en el cleanup del `useEffect` con `eventSource.close()`

@@ -45,6 +45,8 @@ DOCUMENT_TITLES = {
 
 
 def _document_ai_writable(document_kind: str) -> bool:
+    # Internal encounter listings must mirror the copilot write contract:
+    # transcriptions are read-only, while clinician-facing editable docs stay writable.
     return document_kind != "transcription"
 
 
@@ -194,15 +196,53 @@ def _find_anchor_span(
             )
         start = narrowed[0]
         return start, start + len(exact_text)
+    # prefix_text-only path: the LLM knows where a section STARTS (e.g. a markdown
+    # header like "## 10. Plan de manejo") but cannot know where it ends without
+    # reading it first. We treat prefix_text as a section-start anchor and return
+    # from that position to the next markdown header (#/##) or end of document.
+    # Without this path the backend silently fell back to returning the first 400
+    # chars of the document, which is wrong and confusing.
     if prefix_text:
-        index = content.find(prefix_text)
-        if index == -1:
+        matches: list[int] = []
+        cursor = 0
+        normalized_prefix = " ".join(prefix_text.split())
+        while True:
+            # Search with whitespace normalization to tolerate minor spacing diffs.
+            index = content.find(prefix_text, cursor)
+            if index == -1:
+                # Also try a normalized single-space variant in case the document
+                # uses a different whitespace sequence (e.g. Windows line endings).
+                normalized_content = " ".join(content.split())
+                norm_index = normalized_content.find(normalized_prefix)
+                if norm_index != -1 and not matches:
+                    # Best-effort: map the normalized index back to raw content by
+                    # using the same phrase on the raw content with find().
+                    raw_index = content.find(prefix_text.strip())
+                    if raw_index != -1:
+                        matches.append(raw_index)
+                break
+            matches.append(index)
+            cursor = index + 1
+
+        if not matches:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "No se encontro el prefix_text solicitado en el documento")
-        next_header_index = min(
-            [candidate for candidate in (content.find("\n##", index + len(prefix_text)), content.find("\n#", index + len(prefix_text))) if candidate != -1]
-            or [len(content)]
-        )
-        return index, next_header_index
+        if len(matches) > 1:
+            raise HTTPException(status.HTTP_409_CONFLICT, "El prefix_text es ambiguo: aparece mas de una vez en el documento")
+
+        start = matches[0]
+        # Find the end of this section: advance to the next markdown header or EOF.
+        # We look for "\n#" patterns that indicate a new section at the same or higher
+        # level, starting just after the anchor header line itself.
+        next_header_index = -1
+        search_cursor = start + len(prefix_text)
+        for pattern in ("\n##", "\n#"):
+            candidate = content.find(pattern, search_cursor)
+            if candidate != -1:
+                if next_header_index == -1 or candidate < next_header_index:
+                    next_header_index = candidate
+
+        end = next_header_index if next_header_index != -1 else len(content)
+        return start, end
     excerpt = _build_excerpt(content, max_length=400)
     return 0, len(excerpt)
 

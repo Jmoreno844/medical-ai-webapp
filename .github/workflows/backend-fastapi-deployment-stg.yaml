@@ -1,16 +1,25 @@
-# Manual rollback only: deploys the legacy Django (django-backend) image to
-# vexthealth-backend. The primary stg API is FastAPI; see
-# backend-fastapi-deployment-stg.yaml for push-to-main deploys.
-name: Backend Staging Deployment (Django Rollback)
+# Primary staging API: FastAPI (Django deploy is manual rollback only).
+# Required GitHub Environment `stg` var: FASTAPI_CORS_ALLOWED_ORIGINS (comma-separated
+# origins, e.g. the staging SPA URL). Maps to env on Cloud Run.
+name: Backend FastAPI Staging Deployment
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend_fastapi/**"
+      - ".github/workflows/backend-fastapi-deployment-stg.yaml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "backend_fastapi/**"
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
-# Variables de GCP viven en el GitHub Environment "stg" (no en repo-level vars).
 
 permissions:
   contents: read
@@ -18,16 +27,16 @@ permissions:
 
 jobs:
   build-and-push:
-    name: Build and Push Docker Image
+    name: Build and Push FastAPI Image
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
     environment: stg
     env:
-      DJANGO_SETTINGS_MODULE: config.settings.stg
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       SERVICE_NAME: vexthealth-backend
       REGION: us-east1
       REPOSITORY: vexthealth-containers
-      IMAGE_NAME: django-backend
+      IMAGE_NAME: fastapi-backend
 
     steps:
       - name: Checkout code
@@ -60,7 +69,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: ./backend_fastapi
           push: true
           tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: |
@@ -78,16 +87,17 @@ jobs:
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
 
   deploy:
-    name: Deploy to Cloud Run
+    name: Deploy FastAPI to Cloud Run
     needs: build-and-push
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     environment: stg
     env:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       SERVICE_NAME: vexthealth-backend
       REGION: us-east1
       REPOSITORY: vexthealth-containers
-      IMAGE_NAME: django-backend
+      IMAGE_NAME: fastapi-backend
 
     steps:
       - name: Authenticate to Google Cloud
@@ -101,7 +111,7 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
-      - name: Resolve Cloud Function URLs
+      - name: Resolve Cloud Function and Copilot URLs
         id: function_urls
         run: |
           set -euo pipefail
@@ -109,9 +119,11 @@ jobs:
           DOCUMENT_URL="$(gcloud functions describe document-workflow --gen2 --region="${REGION}" --format='value(serviceConfig.uri)')"
           DB_IAM_USER="${{ vars.BACKEND_SERVICE_ACCOUNT }}"
           DB_IAM_USER="${DB_IAM_USER%.gserviceaccount.com}"
+          COPILOT_URL="$(gcloud run services describe vexthealth-copilot-agent --region="${REGION}" --format='value(status.url)')"
           echo "transcription_url=${TRANSCRIPTION_URL}" >> "$GITHUB_OUTPUT"
           echo "document_url=${DOCUMENT_URL}" >> "$GITHUB_OUTPUT"
           echo "db_iam_user=${DB_IAM_USER}" >> "$GITHUB_OUTPUT"
+          echo "copilot_url=${COPILOT_URL}" >> "$GITHUB_OUTPUT"
 
       - name: Deploy to Cloud Run
         id: deploy
@@ -131,23 +143,26 @@ jobs:
             --max-instances=1
             --concurrency=250
           env_vars: |
-            DJANGO_SETTINGS_MODULE=config.settings.stg
+            ENVIRONMENT=stg
             GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }}
             GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }}
             GCP_PROJECT=${{ env.GCP_PROJECT_ID }}
             GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT_ID }}
-            ENVIRONMENT=stg
-            ENABLE_SILK=true
+            FASTAPI_COOKIE_SECURE=true
             DB_HOST=127.0.0.1
             DB_PORT=5432
             DB_NAME=${{ env.GCP_PROJECT_ID }}
             DB_USER=${{ steps.function_urls.outputs.db_iam_user }}
-            CONN_MAX_AGE=300
             CLOUD_TASKS_REGION=${{ env.REGION }}
             TRANSCRIPTION_QUEUE_NAME=audio-transcription-queue
             CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT=cloud-tasks-invoker@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
             GENERATE_DOCUMENT_CLOUD_FUNCTION_URL=${{ steps.function_urls.outputs.document_url }}
             TRANSCRIPTION_CLOUD_FUNCTION_URL=${{ steps.function_urls.outputs.transcription_url }}
+            COPILOT_AGENT_BASE_URL=${{ steps.function_urls.outputs.copilot_url }}
+            FASTAPI_CORS_ALLOWED_ORIGINS=${{ vars.FASTAPI_CORS_ALLOWED_ORIGINS }}
+          secrets: |
+            JWT_SECRET_KEY=jwt-secret-key:latest
+            COPILOT_SERVICE_SHARED_JWT=copilot-service-shared-jwt:latest
           project_id: ${{ env.GCP_PROJECT_ID }}
 
       - name: Show Output

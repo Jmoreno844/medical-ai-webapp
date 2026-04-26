@@ -16,6 +16,14 @@ import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+const getTranscriptionErrorMessage = (error?: string | null) => {
+  if (error === "Audio file has expired") {
+    return "El audio expiró. Grabe uno nuevo o elimine el audio vencido.";
+  }
+
+  return error || "Error al transcribir el audio";
+};
+
 type TranscriptionContextType = {
   transcriptionDocId: number | null;
   transcriptionCompleteTimestamp: number | null;
@@ -25,6 +33,8 @@ type TranscriptionContextType = {
   duration: number;
   audioBlob: Blob | null;
   audioExists: boolean;
+  audioExpiresAt: string | null;
+  isAudioExpired: boolean;
   isCheckingAudio: boolean;
   isDeleting: boolean;
   isTranscribing: boolean;
@@ -388,17 +398,27 @@ export function TranscriptionProvider({
         );
 
         logger.debug("Transcription initiated:", response.data);
+        if (response.data?.success === false) {
+          const message = getTranscriptionErrorMessage(
+            response.data?.error || response.data?.message
+          );
+          setErrorMessage(message);
+          failTranscription(String(id_documento_transcripcion), message);
+          closeEventSource();
+          throw new Error(message);
+        }
         return response.data;
       } catch (error: unknown) {
         logger.error("Transcription error:", error);
         const apiError = error as {
-          response?: { data?: { message?: string } };
+          response?: { data?: { error?: string; message?: string } };
           message?: string;
         };
-        const message =
-          apiError.response?.data?.message ||
-          apiError.message ||
-          "Error al transcribir el audio";
+        const message = getTranscriptionErrorMessage(
+          apiError.response?.data?.error ||
+            apiError.response?.data?.message ||
+            apiError.message
+        );
         setErrorMessage(message);
         failTranscription(String(id_documento_transcripcion), message);
         closeEventSource();
@@ -483,6 +503,8 @@ export function TranscriptionProvider({
     duration: voiceRecorder.duration,
     audioBlob: voiceRecorder.audioBlob,
     audioExists: voiceRecorder.audioExists,
+    audioExpiresAt: voiceRecorder.audioExpiresAt,
+    isAudioExpired: voiceRecorder.isAudioExpired,
     isCheckingAudio: voiceRecorder.isCheckingAudio,
     isDeleting: voiceRecorder.isDeleting,
     isTranscribing,

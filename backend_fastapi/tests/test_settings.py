@@ -90,6 +90,29 @@ def test_production_accepts_explicit_deployment_settings(
     assert settings.cors_allowed_origins == ["https://app.example"]
 
 
+def test_production_accepts_cloud_sql_iam_user_without_db_password(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for key in (
+        "DATABASE_URL",
+        "DB_PASSWORD",
+        "DB_PORT",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("JWT_SECRET_KEY", "prod-secret-at-least-32-bytes-long")
+    monkeypatch.setenv("DB_NAME", "appdb")
+    monkeypatch.setenv("DB_USER", "backend-runner@p.iam.gserviceaccount.com")
+    monkeypatch.setenv("DB_HOST", "127.0.0.1")
+    monkeypatch.setenv("FASTAPI_CORS_ALLOWED_ORIGINS", "https://app.example")
+    monkeypatch.setenv("GCP_PROJECT_ID", "medical-prod")
+    monkeypatch.setenv("GCS_BUCKET_NAME", "medical-audio-prod")
+    monkeypatch.setenv("COPILOT_SERVICE_SHARED_JWT", "copilot-shared-secret")
+
+    settings = ProductionSettings()
+    assert "postgresql+asyncpg://backend-runner" in settings.async_database_url
+    assert settings.async_database_url.endswith("@127.0.0.1:5432/appdb")
+
+
 def test_database_url_takes_precedence_over_parts() -> None:
     settings = Settings(
         DATABASE_URL="postgresql://url_user:url_pass@url-host:5432/url_db",

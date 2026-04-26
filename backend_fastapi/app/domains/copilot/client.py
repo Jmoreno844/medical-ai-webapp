@@ -15,6 +15,12 @@ settings = get_settings()
 
 
 class CopilotServiceError(Exception):
+    """Raised when the copilot agent service returns an error or is unreachable.
+
+    ``status_code`` is set when the agent returned an HTTP error response (e.g.
+    409 Conflict). It is None for network-level failures.
+    """
+
     def __init__(self, message: str, status_code: int | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
@@ -23,6 +29,9 @@ class CopilotServiceError(Exception):
 class CopilotAgentClient:
     def __init__(self) -> None:
         self.base_url = settings.copilot_agent_base_url.rstrip("/")
+        # Edit runs can spend most of their wall time in Vertex drafting. Keep a
+        # safety floor here so FastAPI does not return a false 502 while the agent
+        # is still finishing a valid reviewable proposal.
         self.timeout = max(60.0, float(settings.copilot_agent_timeout_seconds))
 
     def create_run(self, payload: dict[str, Any]) -> dict[str, Any]:

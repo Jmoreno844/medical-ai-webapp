@@ -408,6 +408,11 @@ async def get_copilot_run(
     remote_run = await _call_agent(CopilotAgentClient().get_run, run_id)
     _validate_remote_patch_set_preview(remote_run)
     _sync_run_from_remote(run, remote_run)
+    # With the async agent path the run was created with status="running" and no
+    # patch set. When the background graph finishes and review_required arrives
+    # via SSE, the frontend calls syncRunStatus -> getCopilotRun. This is the
+    # first time FastAPI sees the completed patch_set_preview, so we must persist
+    # it here so the subsequent listCopilotPatchSets call finds it in the DB.
     await _persist_patch_set_preview(
         session,
         run=run,
@@ -587,6 +592,11 @@ async def _finalize_patch_set_review(
     try:
         remote_run = await asyncio.to_thread(CopilotAgentClient().resume_run, run.run_id, resume_payload)
     except CopilotServiceError as error:
+        # 409 means the agent already completed this run (race condition: the
+        # agent finished processing the review decision via SSE before our
+        # resume HTTP call landed). apply_accepted_patch_set already persisted
+        # the content, so we can build a synthetic completed response and avoid
+        # surfacing a misleading 502 to the doctor.
         if error.status_code == 409 and accepted_exists:
             remote_run = {
                 "status": "completed",

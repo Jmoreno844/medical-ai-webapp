@@ -8,7 +8,7 @@ import logging
 from langsmith_tracing import trace_operation
 
 from services.document_generation.generator import generate_document_from_components
-from services.django_api import send_generation_chunk
+from services.backend_api import send_generation_chunk
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

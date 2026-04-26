@@ -24,6 +24,8 @@ export interface StartStopButtonProps {
   isRecording: boolean;
   /** Function to toggle recording state */
   onClick: () => void;
+  /** Label shown when the recorder is idle */
+  idleLabel?: string;
 }
 
 /**

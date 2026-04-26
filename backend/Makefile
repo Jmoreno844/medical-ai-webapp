@@ -11,7 +11,7 @@ PY := $(UV) run python
 .DEFAULT_GOAL := help
 
 .PHONY: help sync sync-frozen sync-dev sync-dev-frozen install run runserver fastapi-run \
-	fastapi-check fastapi-docker-build migrate makemigrations test pytest shell \
+	fastapi-check fastapi-docker-build fastapi-compose-up migrate makemigrations test pytest shell \
 	createsuperuser lint format check pre-commit pre-commit-all clear-db db-up \
 	db-down up-db down-db
 
@@ -47,6 +47,9 @@ fastapi-check: ## FastAPI migration tests
 
 fastapi-docker-build: ## Build the parallel FastAPI image from repo root context
 	cd ../backend_fastapi && docker build -t medical-fastapi-migration:local .
+
+fastapi-compose-up: ## docker compose: db + web_fastapi (profile fastapi; migrate Django once on fresh DB first)
+	docker compose --profile fastapi up -d --build web_fastapi db
 
 migrate: ## apply migrations
 	$(PY) manage.py migrate

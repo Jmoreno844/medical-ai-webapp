@@ -80,11 +80,11 @@ Reglas obligatorias:
 - No añadas explicaciones, notas ni encabezados.
 """
 
-# Define backend API connection defaults (will be overridden by environment variables)
-DJANGO_API_DEFAULTS = {
-    "base_url": "http://localhost:8000",
+# Backend API defaults for documentation; runtime uses env (see `services/backend_api.py`).
+BACKEND_API_DEFAULTS = {
+    "base_url": "http://localhost:8001",
     "api_version": "v1",
-    "timeout": 30,  # Default timeout in seconds
+    "timeout": 30,
 }
 
 # Gemini API Configuration

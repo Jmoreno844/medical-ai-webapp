@@ -80,5 +80,19 @@ FastAPI selects typed settings from `ENVIRONMENT`:
 `DATABASE_URL` takes precedence over `DB_NAME` / `DB_USER` / `DB_PASSWORD` /
 `DB_HOST` / `DB_PORT` when both forms are present.
 
+Environment templates live next to this README:
+
+- `backend_fastapi/.env` — local-only placeholder overrides.
+- `backend_fastapi/.env.stg.example` — staging template.
+- `backend_fastapi/.env.prod.example` — production template for Cloud Run/Secret
+  Manager values.
+
 Browser JWT revocation is stored in PostgreSQL table `fastapi_revoked_token`.
 Run Alembic before testing login/logout/refresh against a fresh local database.
+
+## Scripts (`scripts/`)
+
+- `migration_smoke_staging.sh` — optional `USE_DJANGO_MIGRATE=1`, then `alembic upgrade head` (run from repo root).
+- `verify_alembic_schema_parity.sh` — `pg_dump` diff between a Django-migrated reference DB and an Alembic-only DB.
+- `build_alembic_baseline_sql.py` — regenerate `alembic/baseline/baseline_clinical_v1.sql` (operator flow; see `docs/architecture/backend-fastapi-migration.md`).
+- `realtime_stt_poc.html` — local STT WebSocket smoke page.

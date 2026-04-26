@@ -17,10 +17,11 @@ Este directorio contiene la lógica serverless que habla con Gemini.
 
 - Los endpoints validan y orquestan.
 - La lógica reusable vive en `services/`.
-- Los callbacks HTTP al backend viven en `services/django_api.py` (nombre legacy).
+- Los callbacks HTTP al backend viven en `services/backend_api.py`.
 - El cliente de callbacks construye URLs versionadas como `/api/{BACKEND_API_VERSION}`.
-  Por defecto usa `BACKEND_API_VERSION=v1` y `BACKEND_API_BASE_URL`; `DJANGO_API_BASE_URL`
-  sigue aceptado como fallback temporal durante la migración.
+  Usa `BACKEND_API_VERSION=v1` y `BACKEND_API_BASE_URL` (host o raíz sin versión; el
+  cliente añade `/api/v1`). Local por defecto: `http://localhost:8001` si no defines
+  `BACKEND_API_BASE_URL`.
 - No agregues acceso directo a base de datos aquí.
 
 ## Contrato crítico

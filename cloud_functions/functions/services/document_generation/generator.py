@@ -12,7 +12,7 @@ from models.gemini_client import (
     generate_content,
     generate_content_streaming as gemini_generate_content_streaming,
 )
-from services.django_api import send_generation_chunk
+from services.backend_api import send_generation_chunk
 from services.document_generation.formatter import get_prompt_for_type
 
 # Initialize logger

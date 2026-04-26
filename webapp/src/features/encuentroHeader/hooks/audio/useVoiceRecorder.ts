@@ -24,10 +24,19 @@ const checkAudioExists = async (encounterId: number) => {
       duration: typeof data === "object" && data.duration ? data.duration : 0,
       has_been_transcribed:
         typeof data === "object" && data.has_been_transcribed === true,
+      expires_at:
+        typeof data === "object" && data.expires_at ? data.expires_at : null,
+      is_expired: typeof data === "object" && data.is_expired === true,
     };
   } catch (error) {
     logger.error("[VOICE_RECORDER] Error checking audio existence:", error);
-    return { exists: false, duration: 0, has_been_transcribed: false };
+    return {
+      exists: false,
+      duration: 0,
+      has_been_transcribed: false,
+      expires_at: null,
+      is_expired: false,
+    };
   }
 };
 /**
@@ -49,9 +58,11 @@ export const useVoiceRecorder = (
   const [duration, setDuration] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioExists, setAudioExists] = useState(false);
+  const [audioExpiresAt, setAudioExpiresAt] = useState<string | null>(null);
+  const [isAudioExpired, setIsAudioExpired] = useState(false);
   const [isCheckingAudio, setIsCheckingAudio] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [hasBeenTranscribed, setHasBeenTranscribed] = useState(false); // Add this line
+  const [hasBeenTranscribed, setHasBeenTranscribed] = useState(false);
 
   // Refs for managing media recorder and timer
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -77,6 +88,8 @@ export const useVoiceRecorder = (
     setDuration(0);
     setAudioBlob(null);
     setAudioExists(false);
+    setAudioExpiresAt(null);
+    setIsAudioExpired(false);
     setHasBeenTranscribed(false);
     chunksRef.current = [];
     if (timerRef.current) clearInterval(timerRef.current);
@@ -103,15 +116,19 @@ export const useVoiceRecorder = (
             exists,
             duration: existingDuration,
             has_been_transcribed,
+            expires_at,
+            is_expired,
           } = await checkAudioExists(encounterId);
 
           logger.debug(
             `[VOICE_RECORDER] Audio check result for ${encounterId}:`,
-            { exists, existingDuration, has_been_transcribed }
+            { exists, existingDuration, has_been_transcribed, expires_at, is_expired }
           );
 
           setAudioExists(exists);
           setDuration(exists ? existingDuration : 0);
+          setAudioExpiresAt(exists ? expires_at : null);
+          setIsAudioExpired(exists ? is_expired : false);
           setHasBeenTranscribed(exists ? has_been_transcribed : false);
         } catch (error) {
           logger.error(
@@ -120,6 +137,8 @@ export const useVoiceRecorder = (
           );
           setAudioExists(false);
           setDuration(0);
+          setAudioExpiresAt(null);
+          setIsAudioExpired(false);
           setHasBeenTranscribed(false);
         } finally {
           setIsCheckingAudio(false);
@@ -133,6 +152,8 @@ export const useVoiceRecorder = (
         );
         setAudioExists(false);
         setDuration(0);
+        setAudioExpiresAt(null);
+        setIsAudioExpired(false);
         setHasBeenTranscribed(false);
         setIsCheckingAudio(false);
       }
@@ -148,7 +169,7 @@ export const useVoiceRecorder = (
       if (mediaRecorderRef.current?.state !== "inactive") {
         try {
           mediaRecorderRef.current?.stop();
-        } catch (e) {
+        } catch {
           /* ignore */
         }
       }
@@ -212,6 +233,8 @@ export const useVoiceRecorder = (
       // Reset duration if we're starting a new recording
       if (audioExists) {
         setDuration(0);
+        setAudioExpiresAt(null);
+        setIsAudioExpired(false);
       }
 
       mediaRecorder.start(100); // Collect chunks every 100ms for smoother pausing
@@ -318,6 +341,9 @@ export const useVoiceRecorder = (
                   logger.error(
                     "[VOICE_RECORDER] Failed to upload audio recording"
                   );
+                } else {
+                  setIsAudioExpired(false);
+                  setAudioExpiresAt(null);
                 }
               } else {
                 logger.error(
@@ -401,7 +427,9 @@ export const useVoiceRecorder = (
     setIsRecording(false);
     setIsPaused(false);
     setAudioExists(false);
-    setHasBeenTranscribed(false); // Reset this too
+    setAudioExpiresAt(null);
+    setIsAudioExpired(false);
+    setHasBeenTranscribed(false);
     chunksRef.current = [];
 
     // Clear timer
@@ -434,9 +462,11 @@ export const useVoiceRecorder = (
     audioBlob,
     transcriptionDocId: transcriptionDocIdRef.current,
     audioExists,
+    audioExpiresAt,
+    isAudioExpired,
     isCheckingAudio,
     isDeleting,
-    hasBeenTranscribed, // Add this
+    hasBeenTranscribed,
     startRecording,
     stopRecording,
     pauseResumeRecording,

@@ -1,9 +1,5 @@
 """
-Service for interacting with the transactional backend API.
-
-The module name is legacy. During the FastAPI migration these callbacks target
-the versioned FastAPI `/api/{version}` contract. DJANGO_API_BASE_URL remains a
-temporary fallback while platform environment variables are migrated.
+HTTP client for Cloud Function callbacks to the main backend (FastAPI `/api/v1`).
 """
 
 import json
@@ -17,8 +13,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-
-DEFAULT_BACKEND_API_BASE_URL = "http://localhost:8000"
+DEFAULT_BACKEND_API_BASE_URL = "http://localhost:8001"
 DEFAULT_BACKEND_API_VERSION = "v1"
 
 
@@ -44,13 +39,6 @@ def build_backend_request_headers(
     return headers
 
 
-def build_django_request_headers(
-    token_auth: Optional[str] = None, json_body: bool = True
-) -> Dict[str, str]:
-    """Legacy alias kept for callers that still import the Django-named helper."""
-    return build_backend_request_headers(token_auth, json_body)
-
-
 def _backend_api_version() -> str:
     version = os.environ.get("BACKEND_API_VERSION", DEFAULT_BACKEND_API_VERSION).strip()
     if not version:
@@ -69,13 +57,11 @@ def _normalize_backend_base_url(api_base_url: str) -> str:
 
 
 def get_backend_api_base_url() -> str:
-    """Get the versioned backend API base URL used by Cloud Function callbacks."""
-    api_base_url = os.environ.get("BACKEND_API_BASE_URL") or os.environ.get(
-        "DJANGO_API_BASE_URL"
-    )
+    """Versioned base URL e.g. https://host/api/v1 (used by callback paths)."""
+    api_base_url = (os.environ.get("BACKEND_API_BASE_URL") or "").strip()
     if not api_base_url:
         logger.warning(
-            "BACKEND_API_BASE_URL/DJANGO_API_BASE_URL not set, using default: %s",
+            "BACKEND_API_BASE_URL not set, using default: %s",
             DEFAULT_BACKEND_API_BASE_URL,
         )
         api_base_url = DEFAULT_BACKEND_API_BASE_URL
@@ -84,8 +70,8 @@ def get_backend_api_base_url() -> str:
     return f"{root_url}/api/{_backend_api_version()}"
 
 
-def get_api_base_url():
-    """Legacy alias for the FastAPI v1 backend base URL."""
+def get_api_base_url() -> str:
+    """Alias for :func:`get_backend_api_base_url` (keeps test and call sites short)."""
     return get_backend_api_base_url()
 
 

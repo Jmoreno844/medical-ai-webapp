@@ -11,6 +11,7 @@ def test_app_usable_routes_are_registered() -> None:
     }
 
     expected_paths = {
+        "/api/v1/health",
         "/api/v1/csrf",
         "/api/v1/auth/login",
         "/api/v1/auth/register",

@@ -16,7 +16,7 @@ cloud_functions/functions/
     document_workflow.py
     transcription_endpoint.py
   services/            ← servicios reutilizables
-    django_api.py      ← llamadas de vuelta a Django API
+    backend_api.py     ← callbacks HTTP al backend (FastAPI /api/v1)
     document_generation/
     transcription/
 ```
@@ -71,11 +71,11 @@ if missing:
     )
 ```
 
-## Comunicación con Django
+## Comunicación con el backend
 
-- Usar funciones de `services/django_api.py` — nunca hacer HTTP calls directos desde endpoints
+- Usar funciones de `services/backend_api.py` — nunca hacer HTTP calls directos desde endpoints
 - Auth: `token_auth` recibido en el payload, pasarlo a las funciones de servicio
-- No hardcodear URLs — usar `config.py`
+- No hardcodear URLs — usar `config.py` y `BACKEND_API_BASE_URL` / `BACKEND_API_VERSION`
 
 ## Logging
 

@@ -3,11 +3,11 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import Document, DoctorTemplate, Encounter
+from app.db.models import CopilotPatch, CopilotPatchSet, Document, DoctorTemplate, Encounter
 from app.domains.documents.content import (
     build_synced_document_content,
     set_document_content_fields,
@@ -186,6 +186,39 @@ async def update_document_content(
     )
     await session.flush()
     return document
+
+
+async def delete_document_for_doctor(
+    session: AsyncSession,
+    *,
+    document_id: int,
+    doctor_id: int,
+) -> bool:
+    document = await get_document_for_doctor(
+        session,
+        document_id=document_id,
+        doctor_id=doctor_id,
+    )
+    if not document:
+        return False
+
+    # Django cascades these ORM relationships before deleting Document. SQLAlchemy
+    # writes directly against the shared schema, so it must clear Copilot rows first.
+    await session.execute(
+        delete(CopilotPatch).where(
+            CopilotPatch.target_document_id == document_id,
+            CopilotPatch.doctor_id == doctor_id,
+        )
+    )
+    await session.execute(
+        delete(CopilotPatchSet).where(
+            CopilotPatchSet.target_document_id == document_id,
+            CopilotPatchSet.doctor_id == doctor_id,
+        )
+    )
+    await session.delete(document)
+    await session.flush()
+    return True
 
 
 def new_empty_document(*, encounter_id: int, doctor_id: int, kind: str) -> Document:

@@ -230,10 +230,18 @@ async def check_audio_exists(
         encounter_id=encounter_id,
         doctor_id=user.id,
     )
+    has_audio = bool(encounter.audio_file_name and encounter.audio_file_name.strip())
+    is_expired = False
+    if has_audio and encounter.audio_expires_at:
+        now = datetime.now(encounter.audio_expires_at.tzinfo)
+        is_expired = encounter.audio_expires_at <= now
+
     return AudioExistsResponse(
-        exists=bool(encounter.audio_file_name and encounter.audio_file_name.strip()),
+        exists=has_audio,
         duration=encounter.audio_duration_seconds or 0,
         has_been_transcribed=encounter.has_been_transcribed,
+        expires_at=encounter.audio_expires_at if has_audio else None,
+        is_expired=is_expired,
     )
 
 

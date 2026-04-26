@@ -8,6 +8,7 @@ from app.db.session import get_db_session
 from app.domains.auth.service import get_current_user
 from app.domains.documents.service import (
     create_document,
+    delete_document_for_doctor,
     get_document_for_doctor,
     list_documents_for_encounter,
     serialize_document,
@@ -100,14 +101,13 @@ async def delete_document(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> SuccessResponse:
-    document = await get_document_for_doctor(
+    deleted = await delete_document_for_doctor(
         session,
         document_id=document_id,
         doctor_id=user.id,
     )
-    if not document:
+    if not deleted:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Documento no encontrado")
-    await session.delete(document)
     await session.commit()
     return SuccessResponse(
         success=True,

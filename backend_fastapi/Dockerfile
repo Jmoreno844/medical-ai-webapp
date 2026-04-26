@@ -41,6 +41,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 COPY --chown=appuser:appuser . ./
 
+RUN chmod +x /app/backend_fastapi/docker-entrypoint.sh
+
 USER appuser
 
 EXPOSE 8080
@@ -48,4 +50,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=60s --timeout=30s --start-period=30s --retries=2 \
     CMD curl -f http://localhost:8080/api/v1/health || exit 1
 
+ENTRYPOINT ["/app/backend_fastapi/docker-entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]

@@ -4,7 +4,10 @@ Este documento describe la arquitectura global de la plataforma, sus componentes
 
 ## 1. Arquitectura de Alto Nivel
 
-El sistema es una plataforma fullstack que combina un backend Django, funciones serverless en GCP, un runtime dedicado del copiloto y una SPA en React. La pieza central sigue siendo el backend Django, que coordina la comunicación entre los demás servicios.
+El sistema es una plataforma fullstack con un **API FastAPI** en `backend_fastapi/`
+(desplegado en stg como servicio principal), funciones serverless en GCP, un runtime
+del copiloto y una SPA en React. El monolito **Django** en `backend/` permanece en
+el repositorio para rollback y migraciones ORM históricas hasta su retiro completo.
 
 ```mermaid
 graph LR
@@ -14,7 +17,7 @@ graph LR
 
     subgraph gcp ["Google Cloud Platform"]
         subgraph backend_run ["Cloud Run"]
-            Django["Django Ninja API"]
+            Backend["FastAPI API"]
             Copilot["copilot-agent-service\n(LangGraph)"]
         end
         subgraph functions ["Cloud Functions"]
@@ -27,26 +30,26 @@ graph LR
         SM["Secret Manager"]
     end
 
-    Browser -->|"REST + sesión"| Django
+    Browser -->|"REST + cookies JWT"| Backend
     Browser -->|"PUT audio directo"| GCS
-    Browser -->|"SSE stream"| Django
+    Browser -->|"SSE stream"| Backend
 
-    Django -->|"ORM"| PG
-    Django -->|"signed URL"| GCS
-    Django -->|"JWT + payload"| CF_Trans
-    Django -->|"JWT + payload"| CF_Gen
-    Django -->|"internal broker contract"| Copilot
-    Django -->|"secrets"| SM
+    Backend -->|"SQLAlchemy async"| PG
+    Backend -->|"signed URL"| GCS
+    Backend -->|"JWT + payload"| CF_Trans
+    Backend -->|"JWT + payload"| CF_Gen
+    Backend -->|"internal broker contract"| Copilot
+    Backend -->|"secrets"| SM
 
     Copilot -->|"checkpoints + memory"| PG
     Copilot -->|"Gemini / tools orchestration"| Vertex
 
     CF_Trans -->|"gs:// URI"| GCS
     CF_Trans -->|"Gemini API"| Vertex
-    CF_Trans -->|"PATCH Bearer JWT"| Django
+    CF_Trans -->|"PATCH Bearer JWT"| Backend
 
     CF_Gen -->|"Gemini streaming"| Vertex
-    CF_Gen -->|"chunks Bearer JWT"| Django
+    CF_Gen -->|"chunks Bearer JWT"| Backend
 ```
 
 ---
@@ -59,7 +62,7 @@ El camino completo desde que el médico detiene la grabación hasta que el texto
 sequenceDiagram
     actor Medico
     participant Browser as React (Browser)
-    participant Django as API Backend
+    participant Backend as API Backend
     participant GCS as Cloud Storage
     participant CF as CF transcription-endpoint
     participant Gemini as Vertex AI · Gemini
@@ -67,18 +70,18 @@ sequenceDiagram
     rect rgb(240, 248, 255)
         note over Browser,GCS: Paso 1 — Subida de audio
         Medico->>Browser: Detiene grabación
-        Browser->>Django: POST /encounters/:id/audio/upload-url
-        Django-->>Browser: { upload_url, filename }
+        Browser->>Backend: POST /encounters/:id/audio/upload-url
+        Backend-->>Browser: { upload_url, filename }
         Browser->>GCS: PUT audio (directo, signed URL)
     end
 
     rect rgb(255, 248, 240)
         note over Browser,CF: Paso 2 — Inicio de transcripción
-        Browser->>Django: POST /api/v1/transcription/start
-        Django->>Django: Genera JWT callback FastAPI (15 min)
-        Django->>Django: Encola Cloud Task
-        Django-->>Browser: 200 OK { queued: true }
-        Django->>CF: POST { audio_uri, auth_token } via Cloud Tasks
+        Browser->>Backend: POST /api/v1/transcription/start
+        Backend->>Backend: Genera JWT callback FastAPI (15 min)
+        Backend->>Backend: Encola Cloud Task
+        Backend-->>Browser: 200 OK { queued: true }
+        Backend->>CF: POST { audio_uri, auth_token } via Cloud Tasks
     end
 
     rect rgb(240, 255, 248)
@@ -90,13 +93,13 @@ sequenceDiagram
 
     rect rgb(248, 240, 255)
         note over CF,Browser: Paso 4 — Actualización y notificación
-        CF->>Django: PATCH /api/v1/documents/by-function/:id { content }
-        Django->>Django: Guarda en PostgreSQL
-        Django-->>Browser: SSE evento "transcription_complete"
-        CF->>Django: POST /api/v1/transcription/notify-complete
-        Django->>Django: Marca encuentro como transcrito
-        CF-->>Django: 200 OK
-        Django-->>Browser: 200 OK
+        CF->>Backend: PATCH /api/v1/documents/by-function/:id { content }
+        Backend->>Backend: Guarda en PostgreSQL
+        Backend-->>Browser: SSE evento "transcription_complete"
+        CF->>Backend: POST /api/v1/transcription/notify-complete
+        Backend->>Backend: Marca encuentro como transcrito
+        CF-->>Backend: 200 OK
+        Backend-->>Browser: 200 OK
     end
 ```
 
@@ -110,46 +113,46 @@ Genera un documento clínico (SOAP, nota de evolución, etc.) combinando la tran
 sequenceDiagram
     actor Medico
     participant Browser as React (Browser)
-    participant Django as API Backend
+    participant Backend as API Backend
     participant CF as CF document-workflow
     participant Gemini as Vertex AI · Gemini
 
     rect rgb(240, 248, 255)
-        note over Browser,Django: Paso 1 — Apertura de canal SSE
-        Browser->>Django: POST /api/v1/documents/:doc_id/sse-token
-        Django-->>Browser: { token } (5 min)
-        Browser->>Django: GET /api/v1/sse/documents/:id/:token
+        note over Browser,Backend: Paso 1 — Apertura de canal SSE
+        Browser->>Backend: POST /api/v1/documents/:doc_id/sse-token
+        Backend-->>Browser: { token } (5 min)
+        Browser->>Backend: GET /api/v1/sse/documents/:id/:token
         note right of Browser: Conexión SSE abierta (streaming)
     end
 
     rect rgb(255, 248, 240)
         note over Browser,CF: Paso 2 — Trigger de generación
         Medico->>Browser: Clic en "Generar Documento"
-        Browser->>Django: POST /api/v1/documents/generate
-        Django->>Django: Valida permisos y genera JWT callback (30 min)
-        Django->>CF: POST validate_only=true (síncrono)
-        CF-->>Django: 200 OK
-        Django-->>Browser: 200 OK { process_id }
-        note right of Django: Lanza hilo background →
+        Browser->>Backend: POST /api/v1/documents/generate
+        Backend->>Backend: Valida permisos y genera JWT callback (30 min)
+        Backend->>CF: POST validate_only=true (síncrono)
+        CF-->>Backend: 200 OK
+        Backend-->>Browser: 200 OK { process_id }
+        note right of Backend: Lanza hilo background →
     end
 
     rect rgb(240, 255, 248)
-        note over Django,Gemini: Paso 3 — Generación con streaming
-        Django->>CF: POST payload completo (background)
+        note over Backend,Gemini: Paso 3 — Generación con streaming
+        Backend->>CF: POST payload completo (background)
         CF->>Gemini: generate_content(prompt, stream=True)
 
         loop Cada chunk de texto
             Gemini-->>CF: chunk
-            CF->>Django: POST /api/v1/documents/generation-chunk
-            Django-->>Browser: SSE "generation_chunk" { chunk }
+            CF->>Backend: POST /api/v1/documents/generation-chunk
+            Backend-->>Browser: SSE "generation_chunk" { chunk }
         end
     end
 
     rect rgb(248, 240, 255)
-        note over Django,Browser: Paso 4 — Finalización
-        CF->>Django: POST generation-chunk { is_complete: true }
-        Django->>Django: Guarda documento completo en BD
-        Django-->>Browser: SSE "generation_complete"
+        note over Backend,Browser: Paso 4 — Finalización
+        CF->>Backend: POST generation-chunk { is_complete: true }
+        Backend->>Backend: Guarda documento completo en BD
+        Backend-->>Browser: SSE "generation_complete"
     end
 ```
 
@@ -160,10 +163,11 @@ sequenceDiagram
 | Componente | Stack | Responsabilidad |
 |------------|-------|-----------------|
 | **Frontend** `webapp/` | React 18, Vite, TypeScript, Tailwind | SPA del médico. Maneja grabación, UI del editor y conexión SSE. |
-| **Backend** `backend/` | Django Ninja, PostgreSQL | API REST central. Orquesta flujos, emite JWTs, mantiene hub SSE. |
-| **Copilot Agent** `copilot_agent/` | Python, FastAPI, LangGraph | Runtime dedicado del copiloto, threads/runs/checkpoints y flujo read-only brokered por Django. |
-| **CF Transcripción** | Python, Functions Framework | Recibe audio de GCS → llama a Gemini → devuelve texto a Django. |
-| **CF Generación** | Python, Functions Framework | Recibe contexto+plantilla → streaming desde Gemini → envía chunks a Django. |
+| **API principal** `backend_fastapi/` | FastAPI, SQLAlchemy async, PostgreSQL | API bajo `/api/v1`, orquestación, JWTs, hub SSE, callbacks. |
+| **Monolito legacy** `backend/` | Django Ninja | Rollback, admin, migraciones ORM de comparación; esquemas en verde van con Alembic en `backend_fastapi/`. Stg+ API: FastAPI. |
+| **Copilot Agent** `copilot_agent/` | Python, FastAPI, LangGraph | Runtime del copiloto; broker hacia el API principal. |
+| **CF Transcripción** | Python, Functions Framework | Recibe audio de GCS → llama a Gemini → devuelve texto al API. |
+| **CF Generación** | Python, Functions Framework | Recibe contexto+plantilla → streaming desde Gemini → envía chunks al API. |
 | **Cloud Storage** | GCS | Almacena los audios clínicos. El frontend sube directo vía signed URL. |
 | **Vertex AI · Gemini** | Managed (GCP) | Modelo de IA para transcripción y generación de documentos clínicos. |
 | **PostgreSQL** | Cloud SQL | Base de datos principal: encuentros, documentos, pacientes, plantillas. |
@@ -172,10 +176,10 @@ sequenceDiagram
 
 ## 5. Puntos de Atención Arquitectónica
 
-- **Hub SSE en memoria**: `apps/documents/services/sse_hub.py` usa estructuras en memoria. Con múltiples réplicas en Cloud Run, un evento emitido en la instancia A no llega a clientes SSE en la instancia B. Resolver con Redis o Pub/Sub en el futuro.
+- **Hub SSE en memoria**: el hub en `backend_fastapi` (y el legacy en Django) usa memoria de proceso. Con múltiples réplicas en Cloud Run, un evento en la instancia A no llega a clientes en la B. Resolver con Redis o Pub/Sub en el futuro.
 - **Backend público + DB privada**: Cloud Run sigue público para la SPA, pero PostgreSQL queda aislado por IP privada y acceso vía Cloud SQL Auth Proxy + IAM DB auth.
 - **Agent runtime separado**: LangGraph no vive dentro del backend principal. El backend hace de broker y conserva la autoridad clínica/transaccional.
-- **Auth interna temporal del copiloto**: Django y `copilot-agent-service` usan un `shared JWT` temporal en `local`/`stg`; ver deuda canónica en [`../debt/copilot-agent-runtime.md`](../debt/copilot-agent-runtime.md).
+- **Auth interna temporal del copiloto**: el API (FastAPI) y `copilot-agent-service` usan un `shared JWT` temporal en `local`/`stg`; ver deuda canónica en [`../debt/copilot-agent-runtime.md`](../debt/copilot-agent-runtime.md).
 - **Audio no se borra al transcribir**: `audio_expires_at` controla el acceso vía API, pero el blob en GCS solo se elimina si el médico lo solicita explícitamente.
 - **Cloud Functions IAM-auth**: las funciones están desplegadas con `--no-allow-unauthenticated`; la seguridad depende de IAM de invocación + JWT de callback. El `JWT_SECRET_KEY` no debe filtrarse.
 
@@ -183,4 +187,4 @@ sequenceDiagram
 
 ## 6. Observabilidad y trazas
 
-OpenTelemetry enlaza las peticiones **navegador (XHR/axios) → Django → Cloud Functions → callbacks Django** cuando el export está configurado (OTLP/Jaeger en local, Cloud Trace en GCP con `GOOGLE_CLOUD_PROJECT`). Los logs del backend incluyen `trace_id` / `span_id` para correlación. Detalle y variables: [`../backend/tracing.md`](../backend/tracing.md). Limitaciones: SSE (`EventSource` sin cabeceras W3C) y subida directa a GCS con signed URL no continúan el mismo trace de extremo a extremo.
+OpenTelemetry enlaza las peticiones **navegador (XHR/axios) → API (FastAPI) → Cloud Functions → callbacks al API** cuando el export está configurado (OTLP/Jaeger en local, Cloud Trace en GCP con `GOOGLE_CLOUD_PROJECT`). Los logs del backend incluyen `trace_id` / `span_id` para correlación. Detalle y variables: [`../backend/tracing.md`](../backend/tracing.md). Limitaciones: SSE (`EventSource` sin cabeceras W3C) y subida directa a GCS con signed URL no continúan el mismo trace de extremo a extremo.

@@ -19,6 +19,7 @@ PATCH_TYPE_INSERT_BEFORE = "insert_before"
 PATCH_TYPE_INSERT_AFTER = "insert_after"
 PATCH_TYPE_INSERT_AFTER_LEGACY = "insert_after_span"
 PATCH_TYPE_DELETE_SPAN = "delete_span"
+_ANCHOR_WINDOW_MULTIPLIER = 3
 
 
 class CopilotPatchSetError(Exception):
@@ -49,18 +50,25 @@ def _now() -> datetime:
 
 
 def _normalize_ws(text: str) -> str:
+    """Collapse all whitespace runs into a single space and strip edges."""
     return " ".join(text.split())
 
 
 def _prefix_matches(content: str, index: int, prefix_text: str) -> bool:
-    window_size = max(len(prefix_text) * 3, 30)
+    """Check if *prefix_text* plausibly ends the text just before *index*.
+
+    The LLM may drop leading bullet markers, newlines, or extra spaces, so we
+    take a wider window and compare after whitespace normalisation.
+    """
+    window_size = max(len(prefix_text) * _ANCHOR_WINDOW_MULTIPLIER, 30)
     return _normalize_ws(content[max(0, index - window_size) : index]).endswith(
         _normalize_ws(prefix_text)
     )
 
 
 def _suffix_matches(content: str, after_index: int, suffix_text: str) -> bool:
-    window_size = max(len(suffix_text) * 3, 30)
+    """Check if *suffix_text* plausibly starts the text right after the match."""
+    window_size = max(len(suffix_text) * _ANCHOR_WINDOW_MULTIPLIER, 30)
     return _normalize_ws(content[after_index : after_index + window_size]).startswith(
         _normalize_ws(suffix_text)
     )
@@ -165,9 +173,32 @@ def _require_text(value: Any, *, field_name: str, operation_type: str) -> str:
     return value
 
 
+def _replacement_repeats_anchor_context(
+    *,
+    replacement_text: str,
+    anchor: dict[str, Any],
+) -> str | None:
+    normalized_replacement = _normalize_ws(replacement_text)
+    prefix_text = anchor.get("prefixText")
+    suffix_text = anchor.get("suffixText")
+
+    if isinstance(prefix_text, str):
+        normalized_prefix = _normalize_ws(prefix_text)
+        if normalized_prefix and normalized_replacement.startswith(normalized_prefix):
+            return "replacement_repeats_prefix"
+
+    if isinstance(suffix_text, str):
+        normalized_suffix = _normalize_ws(suffix_text)
+        if normalized_suffix and normalized_replacement.endswith(normalized_suffix):
+            return "replacement_repeats_suffix"
+
+    return None
+
+
 def _resolve_patch_against_document(*, preview: dict[str, Any], document_content: str) -> dict[str, Any]:
     patch = _normalize_patch_preview(preview)
     patch_type = patch["patch_type"]
+    anchor = patch["anchor"]
     if patch["operation_type"] == PATCH_TYPE_REWRITE_DOCUMENT:
         new_text = _require_text(
             patch.get("replacement_text"),
@@ -201,6 +232,12 @@ def _resolve_patch_against_document(*, preview: dict[str, Any], document_content
             field_name="replacement_text",
             operation_type=patch_type,
         )
+        repeated_context = _replacement_repeats_anchor_context(
+            replacement_text=new_text,
+            anchor=anchor,
+        )
+        if repeated_context:
+            raise CopilotPatchSetConflictError(repeated_context)
         if new_text == old_text:
             raise CopilotPatchSetConflictError("patch_without_change")
     else:
@@ -382,6 +419,8 @@ async def persist_patch_set_preview(
     patch_set.target_selection_reason = patch_set_preview.get("target_selection_reason")
     patch_set.document_preview_after = patch_set_preview.get("document_preview_after")
     patch_set.status = patch_set_status
+    # Campos del plan clínico. Pueden ser None para ediciones simples que no
+    # llamaron set_edit_plan. El frontend los usa para badges de alcance clínico.
     patch_set.edit_scope = patch_set_preview.get("edit_scope")
     patch_set.clinical_impact_level = patch_set_preview.get("clinical_impact_level")
     patch_set.affected_sections = list(patch_set_preview.get("affected_sections") or [])
@@ -447,6 +486,8 @@ async def persist_patch_set_preview(
         patch.source_context_document_ids = patch_set.source_context_document_ids
         patch.target_document_title = patch_set.target_document_title
         patch.target_selection_reason = patch_set.target_selection_reason
+        # Sección semántica derivada del clinical_plan del copiloto.
+        # None para patches de ediciones simples sin set_edit_plan.
         patch.section = resolved.get("section")
         patch.status = resolved["status"]
         patch.review_comment = None

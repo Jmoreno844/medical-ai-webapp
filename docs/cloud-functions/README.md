@@ -8,7 +8,7 @@ El directorio `cloud_functions/` contiene las funciones serverless que hacen el 
 - `functions/endpoints/document_workflow.py` — entrypoint HTTP para generación de documentos.
 - `functions/services/transcription/` — procesamiento de audio desde `gs://`.
 - `functions/services/document_generation/` — prompt building, streaming y formateo.
-- `functions/services/django_api.py` — cliente legacy de callbacks hacia el backend versionado (`PATCH` de contenido, chunks de generación, notify complete).
+- `functions/services/backend_api.py` — callbacks HTTP hacia el backend versionado (`PATCH` de contenido, chunks de generación, notify complete).
 - `functions/tracing.py` — OpenTelemetry (span por request + propagación en `requests` hacia el backend). Variables: [`../backend/tracing.md`](../backend/tracing.md).
 - `functions/langsmith_tracing.py` — LangSmith local-first para request/model spans con metadata sanitizada.
 
@@ -25,7 +25,6 @@ El directorio `cloud_functions/` contiene las funciones serverless que hacen el 
 | -------------------------------- | ------------------------------------------------------------------- |
 | `BACKEND_API_BASE_URL`           | URL base del backend para callbacks versionados.                     |
 | `BACKEND_API_VERSION`            | Versión del API backend para callbacks; default local: `v1`.         |
-| `DJANGO_API_BASE_URL`            | Fallback temporal legacy si `BACKEND_API_BASE_URL` no está definido. |
 | `GCP_PROJECT`                    | Proyecto usado para inicializar Vertex AI.                          |
 | `GCP_REGION`                     | Región de Vertex AI.                                                |
 | `GEMINI_MODEL`                   | Modelo de Gemini a usar.                                            |

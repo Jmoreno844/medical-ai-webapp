@@ -7,7 +7,7 @@ import json
 
 from langsmith_tracing import trace_operation
 from services.transcription.audio_processor import transcribe_audio
-from services.django_api import update_document_content
+from services.backend_api import update_document_content
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

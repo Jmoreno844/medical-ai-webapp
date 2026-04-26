@@ -7,6 +7,7 @@ import { StartStopButtonProps } from "../utils/EncuentroHeaderInterface";
 const StartStopButton: React.FC<StartStopButtonProps> = ({
     isRecording,
     onClick,
+    idleLabel = "Iniciar grabación",
 }) => (
     <button
         onClick={onClick}
@@ -16,7 +17,7 @@ const StartStopButton: React.FC<StartStopButtonProps> = ({
                 : "bg-purple-500 hover:bg-purple-600"
         }`}
     >
-        {isRecording ? "Detener" : "Iniciar"} grabación
+        {isRecording ? "Detener grabación" : idleLabel}
     </button>
 );
 
