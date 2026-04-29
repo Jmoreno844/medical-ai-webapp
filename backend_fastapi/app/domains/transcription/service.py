@@ -20,15 +20,9 @@ from app.db.models import (
 )
 from app.domains.documents.content import set_document_content_fields
 from app.domains.documents.sse_hub import publish_document_event
-from app.domains.transcription.gemini_async import (
-    consolidate_transcripts,
-    transcribe_gcs_audio,
-)
 from app.domains.transcription.schemas import AudioSectionResponse
-from app.integrations.transcription_tasks import (
-    enqueue_transcription_task,
-    should_use_cloud_tasks,
-)
+from app.domains.transcription.schemas import SectionWorkItemResponse
+from app.integrations.transcription_tasks import enqueue_transcription_task
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +35,13 @@ SESSION_STATUS_NEEDS_REVIEW = "needs_review"
 SECTION_STATUS_REGISTERED = "registered"
 SECTION_STATUS_TRANSCRIBING = "transcribing"
 SECTION_STATUS_TRANSCRIBED = "transcribed"
+SECTION_STATUS_DISCARDED_NO_SPEECH = "discarded_no_speech"
 SECTION_STATUS_FAILED_RETRYABLE = "failed_retryable"
 SECTION_STATUS_FAILED_FINAL = "failed_final"
+SECTION_COMPLETE_STATUSES = {
+    SECTION_STATUS_TRANSCRIBED,
+    SECTION_STATUS_DISCARDED_NO_SPEECH,
+}
 
 REMOVABLE_INLINE_TAGS = {
     "tos",
@@ -261,40 +260,6 @@ def enqueue_section_task(section: TranscriptionAudioSection, settings: Settings)
     )
 
 
-def enqueue_session_consolidation_task(
-    recording_session: TranscriptionRecordingSession,
-    settings: Settings,
-) -> str:
-    target_url = (
-        f"{_task_base_url(settings)}/sessions/"
-        f"{recording_session.session_id}/consolidate"
-    )
-    return enqueue_transcription_task(
-        {"session_id": recording_session.session_id},
-        settings=settings,
-        target_url=target_url,
-    )
-
-
-def enqueue_legacy_audio_task(
-    *,
-    document_id: int,
-    encounter_id: int,
-    doctor_id: int,
-    settings: Settings,
-) -> str:
-    target_url = f"{_task_base_url(settings)}/legacy-audio"
-    return enqueue_transcription_task(
-        {
-            "document_id": document_id,
-            "encounter_id": encounter_id,
-            "doctor_id": doctor_id,
-        },
-        settings=settings,
-        target_url=target_url,
-    )
-
-
 def _merge_with_light_dedup(previous: str, next_text: str) -> str:
     previous = previous.rstrip()
     next_text = next_text.strip()
@@ -356,15 +321,52 @@ def _merge_session_with_existing_document(
 def is_recording_session_ready_for_consolidation(
     recording_session: TranscriptionRecordingSession,
 ) -> bool:
-    return bool(recording_session.finished_at) and all(
-        item.status == SECTION_STATUS_TRANSCRIBED for item in recording_session.sections
+    return (
+        bool(recording_session.finished_at)
+        and bool(recording_session.sections)
+        and all(
+            item.status in SECTION_COMPLETE_STATUSES
+            for item in recording_session.sections
+        )
     )
 
 
-async def process_section_transcription(
+async def get_section_work_item(
     db_session: AsyncSession,
     *,
     section_id: str,
+    settings: Settings,
+) -> SectionWorkItemResponse | None:
+    result = await db_session.execute(
+        select(TranscriptionAudioSection)
+        .options(selectinload(TranscriptionAudioSection.recording_session))
+        .where(TranscriptionAudioSection.section_id == section_id)
+    )
+    section = result.scalar_one_or_none()
+    if not section:
+        return None
+    if not settings.gcs_bucket_name:
+        raise ValueError("GCS_BUCKET_NAME is required for transcription worker")
+    recording_session = section.recording_session
+    return SectionWorkItemResponse(
+        section_id=section.section_id,
+        session_id=recording_session.session_id,
+        encounter_id=recording_session.encounter_id,
+        document_id=recording_session.document_id,
+        section_index=section.section_index,
+        gcs_object_name=section.gcs_object_name,
+        gcs_uri=f"gs://{settings.gcs_bucket_name}/{section.gcs_object_name}",
+        content_type=section.content_type,
+    )
+
+
+async def apply_section_worker_result(
+    db_session: AsyncSession,
+    *,
+    section_id: str,
+    status: str,
+    transcript: str | None,
+    error_code: str | None,
     settings: Settings,
 ) -> TranscriptionAudioSection | None:
     result = await db_session.execute(
@@ -382,38 +384,29 @@ async def process_section_transcription(
     section = result.scalar_one_or_none()
     if not section:
         return None
-    if section.status == SECTION_STATUS_TRANSCRIBED:
+    if section.status in SECTION_COMPLETE_STATUSES:
         return section
 
-    section.status = SECTION_STATUS_TRANSCRIBING
-    section.retry_count += 1
     section.updated_at = datetime.now(timezone.utc)
-    await db_session.commit()
-
-    try:
-        transcript = await transcribe_gcs_audio(
-            gcs_uri=f"gs://{settings.gcs_bucket_name}/{section.gcs_object_name}",
-            content_type=section.content_type,
-            settings=settings,
-        )
-    except ValueError as exc:
+    if status == SECTION_STATUS_DISCARDED_NO_SPEECH:
+        section.raw_transcript = ""
+        section.status = SECTION_STATUS_DISCARDED_NO_SPEECH
+        section.error_code = error_code or "no_speech_detected"
+    elif status == SECTION_STATUS_TRANSCRIBED:
+        section.raw_transcript = _normalize_transcript_for_document(transcript)
+        section.status = SECTION_STATUS_TRANSCRIBED
+        section.error_code = error_code
+    elif status == SECTION_STATUS_FAILED_FINAL:
         section.status = SECTION_STATUS_FAILED_FINAL
-        section.error_code = str(exc)
-        section.updated_at = datetime.now(timezone.utc)
+        section.error_code = error_code or "worker_failed_final"
         await db_session.commit()
         return section
-    except Exception:
-        logger.exception("Retryable transcription error for section %s", section_id)
+    else:
         section.status = SECTION_STATUS_FAILED_RETRYABLE
-        section.error_code = "transcription_error"
-        section.updated_at = datetime.now(timezone.utc)
+        section.error_code = error_code or "worker_failed_retryable"
         await db_session.commit()
-        raise
+        return section
 
-    section.raw_transcript = transcript
-    section.status = SECTION_STATUS_TRANSCRIBED
-    section.error_code = None
-    section.updated_at = datetime.now(timezone.utc)
     recording_session = section.recording_session
     await db_session.commit()
 
@@ -450,17 +443,13 @@ async def process_section_transcription(
     )
     if is_recording_session_ready_for_consolidation(recording_session):
         try:
-            if should_use_cloud_tasks(settings):
-                enqueue_session_consolidation_task(recording_session, settings)
-            else:
-                await consolidate_recording_session(
-                    db_session,
-                    session_id=recording_session.session_id,
-                    settings=settings,
-                )
+            await consolidate_recording_session(
+                db_session,
+                session_id=recording_session.session_id,
+            )
         except Exception:
             logger.exception(
-                "Failed to enqueue consolidation after section %s",
+                "Failed to finalize recording session after section %s",
                 section.section_id,
             )
     return section
@@ -470,7 +459,6 @@ async def consolidate_recording_session(
     db_session: AsyncSession,
     *,
     session_id: str,
-    settings: Settings,
 ) -> TranscriptionRecordingSession | None:
     result = await db_session.execute(
         select(TranscriptionRecordingSession)
@@ -494,7 +482,7 @@ async def consolidate_recording_session(
         await db_session.commit()
         return recording_session
 
-    if any(section.status != SECTION_STATUS_TRANSCRIBED for section in sections):
+    if any(section.status not in SECTION_COMPLETE_STATUSES for section in sections):
         recording_session.status = SESSION_STATUS_FINISHING
         recording_session.error_code = "sections_pending"
         await db_session.commit()
@@ -503,27 +491,28 @@ async def consolidate_recording_session(
     recording_session.status = SESSION_STATUS_CONSOLIDATING
     await db_session.commit()
 
-    ordered_transcripts = [
-        _normalize_transcript_for_document(section.raw_transcript) for section in sections
-    ]
-    try:
-        consolidated = await consolidate_transcripts(
-            ordered_transcripts=ordered_transcripts,
-            settings=settings,
+    session_transcript = ""
+    for section in sections:
+        if section.status != SECTION_STATUS_TRANSCRIBED:
+            continue
+        normalized = _normalize_transcript_for_document(section.raw_transcript)
+        if not normalized:
+            continue
+        session_transcript = _merge_with_light_dedup(
+            session_transcript,
+            normalized,
         )
-    except Exception:
-        logger.exception("Consolidation failed for session %s", session_id)
-        recording_session.status = SESSION_STATUS_NEEDS_REVIEW
-        recording_session.error_code = "consolidation_error"
-        await db_session.commit()
-        raise
 
-    consolidated = _merge_session_with_existing_document(recording_session, consolidated)
-    set_document_content_fields(
-        recording_session.document,
-        content_markdown=consolidated,
-        preferred_source="markdown",
+    consolidated = _merge_session_with_existing_document(
+        recording_session,
+        session_transcript,
     )
+    if consolidated.strip():
+        set_document_content_fields(
+            recording_session.document,
+            content_markdown=consolidated,
+            preferred_source="markdown",
+        )
     recording_session.consolidated_transcript = consolidated
     recording_session.status = SESSION_STATUS_CONSOLIDATED
     recording_session.finalized_at = datetime.now(timezone.utc)
@@ -532,42 +521,3 @@ async def consolidate_recording_session(
     await db_session.commit()
     await publish_document_event(recording_session.document_id, "transcription_complete")
     return recording_session
-
-
-async def process_legacy_audio_transcription(
-    db_session: AsyncSession,
-    *,
-    document_id: int,
-    encounter_id: int,
-    doctor_id: int,
-    settings: Settings,
-) -> bool:
-    result = await db_session.execute(
-        select(Document)
-        .options(selectinload(Document.encounter))
-        .where(
-            Document.id == document_id,
-            Document.doctor_id == doctor_id,
-            Document.encounter_id == encounter_id,
-        )
-    )
-    document = result.scalar_one_or_none()
-    if not document or not document.encounter.audio_file_name:
-        return False
-    if document.encounter.has_been_transcribed and document.content_markdown.strip():
-        return True
-
-    transcript = await transcribe_gcs_audio(
-        gcs_uri=f"gs://{settings.gcs_bucket_name}/{document.encounter.audio_file_name}",
-        content_type="audio/webm",
-        settings=settings,
-    )
-    set_document_content_fields(
-        document,
-        content_markdown=transcript,
-        preferred_source="markdown",
-    )
-    document.encounter.has_been_transcribed = True
-    await db_session.commit()
-    await publish_document_event(document.id, "transcription_complete")
-    return True
