@@ -4,10 +4,10 @@ locals {
 }
 
 resource "google_monitoring_alert_policy" "backend_cloud_run_5xx" {
-  project       = var.project_id
-  display_name  = "stg Cloud Run backend 5xx"
-  combiner      = "OR"
-  enabled       = true
+  project               = var.project_id
+  display_name          = "stg Cloud Run backend 5xx"
+  combiner              = "OR"
+  enabled               = true
   notification_channels = []
 
   documentation {
@@ -43,11 +43,11 @@ resource "google_monitoring_alert_policy" "backend_cloud_run_5xx" {
 }
 
 resource "google_monitoring_alert_policy" "cloud_function_5xx" {
-  for_each      = toset(var.cloud_function_service_names)
-  project       = var.project_id
-  display_name  = "stg Cloud Function ${each.value} 5xx"
-  combiner      = "OR"
-  enabled       = true
+  for_each              = toset(var.cloud_function_service_names)
+  project               = var.project_id
+  display_name          = "stg Cloud Function ${each.value} 5xx"
+  combiner              = "OR"
+  enabled               = true
   notification_channels = []
 
   documentation {
@@ -82,11 +82,127 @@ resource "google_monitoring_alert_policy" "cloud_function_5xx" {
   }
 }
 
+resource "google_monitoring_alert_policy" "transcription_worker_cloud_run_5xx" {
+  count                 = var.transcription_worker_service_name == "" ? 0 : 1
+  project               = var.project_id
+  display_name          = "stg Cloud Run transcription worker 5xx"
+  combiner              = "OR"
+  enabled               = true
+  notification_channels = []
+
+  documentation {
+    content   = "Triggers when the staging transcription worker returns HTTP 5xx responses."
+    mime_type = "text/markdown"
+  }
+
+  conditions {
+    display_name = "Transcription worker Cloud Run 5xx responses"
+
+    condition_threshold {
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+      duration        = "300s"
+      filter          = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.transcription_worker_service_name}\" AND metric.type=\"run.googleapis.com/request_count\" AND metric.labels.response_code_class=\"5xx\""
+
+      aggregations {
+        alignment_period     = "300s"
+        per_series_aligner   = "ALIGN_DELTA"
+        cross_series_reducer = "REDUCE_SUM"
+        group_by_fields      = ["resource.labels.service_name"]
+      }
+
+      trigger {
+        count = 1
+      }
+    }
+  }
+
+  alert_strategy {
+    auto_close = "1800s"
+  }
+}
+
+resource "google_logging_metric" "transcription_worker_vad_no_speech" {
+  count   = var.transcription_worker_service_name == "" ? 0 : 1
+  project = var.project_id
+  name    = "transcription_worker_vad_no_speech"
+  filter  = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.transcription_worker_service_name}\" AND textPayload:\"vad_no_speech\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+  }
+}
+
+resource "google_logging_metric" "transcription_worker_vad_fail_open" {
+  count   = var.transcription_worker_service_name == "" ? 0 : 1
+  project = var.project_id
+  name    = "transcription_worker_vad_fail_open"
+  filter  = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.transcription_worker_service_name}\" AND textPayload:\"vad_fail_open\""
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+  }
+}
+
+resource "google_monitoring_alert_policy" "document_generation_worker_cloud_run_5xx" {
+  count                 = var.document_generation_worker_service_name == "" ? 0 : 1
+  project               = var.project_id
+  display_name          = "stg Cloud Run document generation worker 5xx"
+  combiner              = "OR"
+  enabled               = true
+  notification_channels = []
+
+  documentation {
+    content   = "Triggers when the staging document generation worker returns HTTP 5xx responses."
+    mime_type = "text/markdown"
+  }
+
+  conditions {
+    display_name = "Document generation worker Cloud Run 5xx responses"
+
+    condition_threshold {
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+      duration        = "300s"
+      filter          = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.document_generation_worker_service_name}\" AND metric.type=\"run.googleapis.com/request_count\" AND metric.labels.response_code_class=\"5xx\""
+
+      aggregations {
+        alignment_period     = "300s"
+        per_series_aligner   = "ALIGN_DELTA"
+        cross_series_reducer = "REDUCE_SUM"
+        group_by_fields      = ["resource.labels.service_name"]
+      }
+
+      trigger {
+        count = 1
+      }
+    }
+  }
+
+  alert_strategy {
+    auto_close = "1800s"
+  }
+}
+
+resource "google_logging_metric" "document_generation_worker_errors" {
+  count   = var.document_generation_worker_service_name == "" ? 0 : 1
+  project = var.project_id
+  name    = "document_generation_worker_errors"
+  filter  = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.document_generation_worker_service_name}\" AND (textPayload:\"document_generation_retryable_error\" OR textPayload:\"document_generation_stream_error\" OR textPayload:\"document_generation_callback_error\")"
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+  }
+}
+
 resource "google_monitoring_alert_policy" "cloud_sql_cpu" {
-  project       = var.project_id
-  display_name  = "stg Cloud SQL CPU high"
-  combiner      = "OR"
-  enabled       = true
+  project               = var.project_id
+  display_name          = "stg Cloud SQL CPU high"
+  combiner              = "OR"
+  enabled               = true
   notification_channels = []
 
   documentation {

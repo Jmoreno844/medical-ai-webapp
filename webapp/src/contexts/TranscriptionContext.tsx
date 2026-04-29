@@ -77,10 +77,11 @@ export function TranscriptionProvider({
   );
   const [transcriptionCompleteTimestamp, setTranscriptionCompleteTimestamp] =
     useState<number | null>(null);
-  const [hasBeenTranscribed, setHasBeenTranscribed] = useState(false);
+  const [localHasBeenTranscribed, setLocalHasBeenTranscribed] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
+  const subscribedTranscriptionDocIdRef = useRef<number | null>(null);
   const previousEncounterIdRef = useRef<number | null>(null);
   const activeTranscriptionDocumentId = useDocumentDerivedStore(
     (state) => state.activeTranscriptionDocumentId,
@@ -121,6 +122,10 @@ export function TranscriptionProvider({
   const isTranscribing = Boolean(transcriptionDerivedState?.inProgress);
   const effectiveErrorMessage =
     transcriptionDerivedState?.error ?? errorMessage;
+  const hasBeenTranscribed =
+    Boolean(encuentro?.has_been_transcribed) ||
+    localHasBeenTranscribed ||
+    transcriptionStatus === "success";
 
   // Transcription owns the streaming lifecycle for encounter detail so feature
   // components only consume shared state instead of creating parallel SSE flows.
@@ -129,6 +134,7 @@ export function TranscriptionProvider({
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
+    subscribedTranscriptionDocIdRef.current = null;
   }, []);
 
   const voiceRecorder = useVoiceRecorder(
@@ -143,7 +149,7 @@ export function TranscriptionProvider({
         hasBeenTranscribed,
         value,
       );
-      setHasBeenTranscribed(value);
+      setLocalHasBeenTranscribed(value);
     },
     [hasBeenTranscribed],
   );
@@ -151,7 +157,7 @@ export function TranscriptionProvider({
   const handleTranscriptionComplete = useCallback(() => {
     const complete = async () => {
       setTranscriptionCompleteTimestamp(Date.now());
-      setHasBeenTranscribed(true);
+      setLocalHasBeenTranscribed(true);
 
       updateEncuentro({ has_been_transcribed: true }).catch((error) =>
         logger.error(
@@ -212,37 +218,6 @@ export function TranscriptionProvider({
   }, [closeEventSource]);
 
   useEffect(() => {
-    if (encuentro && encuentro.has_been_transcribed !== undefined) {
-      const nextValue = !!encuentro.has_been_transcribed;
-      if (nextValue !== hasBeenTranscribed) {
-        logger.debug(
-          "[TRANSCRIPTION][ENCUENTRO] Syncing hasBeenTranscribed from %s to %s",
-          hasBeenTranscribed,
-          nextValue,
-        );
-        setHasBeenTranscribed(nextValue);
-      }
-    }
-  }, [encuentro, hasBeenTranscribed]);
-
-  useEffect(() => {
-    if (
-      voiceRecorder.hasBeenTranscribed &&
-      !hasBeenTranscribed &&
-      !voiceRecorder.isCheckingAudio
-    ) {
-      logger.debug(
-        "[TRANSCRIPTION][RECORDER] Promoting recorder transcription state into shared context",
-      );
-      setHasBeenTranscribed(true);
-    }
-  }, [
-    voiceRecorder.hasBeenTranscribed,
-    hasBeenTranscribed,
-    voiceRecorder.isCheckingAudio,
-  ]);
-
-  useEffect(() => {
     const previousEncounterId = previousEncounterIdRef.current;
     previousEncounterIdRef.current = encounterId;
 
@@ -266,7 +241,7 @@ export function TranscriptionProvider({
     closeEventSource();
     resetTranscriptionState();
     setTranscriptionCompleteTimestamp(null);
-    setHasBeenTranscribed(false);
+    setLocalHasBeenTranscribed(false);
     setTranscriptionDocId(initialTranscriptionDocId);
   }, [
     closeEventSource,
@@ -323,9 +298,19 @@ export function TranscriptionProvider({
           ? API_URL.slice(0, -1)
           : API_URL;
         const sseUrl = `${apiBaseUrl}/api/v1/sse/documents/${documentId}/${token}`;
+        let initialStreamingContent =
+          contentContext.documentContentCache.get(documentId) ??
+          (transcriptionDocId === documentId
+            ? contentContext.documentContent
+            : undefined);
+        if (initialStreamingContent === undefined) {
+          initialStreamingContent =
+            (await contentContext.fetchDocumentContent(documentId)) ?? undefined;
+        }
         const eventSource = new EventSource(sseUrl);
         eventSourceRef.current = eventSource;
-        startTranscriptionStream(String(documentId));
+        subscribedTranscriptionDocIdRef.current = documentId;
+        startTranscriptionStream(String(documentId), initialStreamingContent);
 
         eventSource.onopen = () => {
           logger.debug(
@@ -402,10 +387,12 @@ export function TranscriptionProvider({
     },
     [
       closeEventSource,
+      contentContext,
       failTranscription,
       getSSEToken,
       handleTranscriptionComplete,
       startTranscriptionStream,
+      transcriptionDocId,
       updateTranscriptionContent,
     ],
   );
@@ -484,6 +471,37 @@ export function TranscriptionProvider({
     ],
   );
 
+  useEffect(() => {
+    if (!transcriptionDocId || hasBeenTranscribed) {
+      return;
+    }
+
+    const hasBackgroundTranscriptionWork =
+      voiceRecorder.pendingAudioSections > 0 ||
+      Boolean(voiceRecorder.recordingSessionId) ||
+      transcriptionStatus === "pending";
+
+    if (!hasBackgroundTranscriptionWork) {
+      return;
+    }
+
+    if (
+      eventSourceRef.current &&
+      subscribedTranscriptionDocIdRef.current === transcriptionDocId
+    ) {
+      return;
+    }
+
+    void subscribeToTranscriptionUpdates(transcriptionDocId);
+  }, [
+    hasBeenTranscribed,
+    subscribeToTranscriptionUpdates,
+    transcriptionDocId,
+    transcriptionStatus,
+    voiceRecorder.pendingAudioSections,
+    voiceRecorder.recordingSessionId,
+  ]);
+
   /**
    * Generation depends on this lookup to avoid using stale empty transcription
    * state, so the fallback stays here with the transcription owner.
@@ -543,12 +561,13 @@ export function TranscriptionProvider({
         error,
       ),
     );
-    setHasBeenTranscribed(false);
-    if (transcriptionDocId) {
+    setLocalHasBeenTranscribed(false);
+    if (transcriptionDocId && !hasBeenTranscribed) {
       clearDocumentDerivedState(String(transcriptionDocId));
     }
   }, [
     clearDocumentDerivedState,
+    hasBeenTranscribed,
     transcriptionDocId,
     updateEncuentro,
     voiceRecorder,

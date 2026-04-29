@@ -6,8 +6,8 @@ Aceptada temporalmente.
 
 ## Alcance
 
-`backend_fastapi/`, `cloud_functions/`, `infra/modules/monitoring`, Cloud Run,
-Cloud Functions, Cloud Tasks y Cloud SQL.
+`backend_fastapi/`, `transcription_worker/`, `document_generation_worker/`, `cloud_functions/`,
+`infra/modules/monitoring`, Cloud Run, Cloud Functions, Cloud Tasks y Cloud SQL.
 
 ## Situacion actual
 
@@ -15,17 +15,20 @@ El repo ya tiene piezas utiles de observabilidad, pero no un baseline operativo
 completo para launch:
 
 - logs con `trace_id` / `span_id` en backend
-- OpenTelemetry entre FastAPI y Cloud Functions cuando el export esta activo
+- OpenTelemetry entre FastAPI, workers y Cloud Functions legacy cuando el export
+  esta activo
 - alertas Terraform para `Cloud Run 5xx`, `Cloud Function 5xx` y `Cloud SQL CPU`
 - budget mensual en GCP
 
 Eso ayuda a depurar fallos visibles, pero todavia deja huecos importantes para
 operacion diaria. Hoy faltan, como minimo, metricas, alertas y dashboards para:
 
-- latencia p95/p99 del backend y de la Cloud Function de generacion
+- latencia p95/p99 del backend y workers de IA
 - memoria y CPU de Cloud Run
 - saturacion o backlog de Cloud Tasks
 - errores por dominio (`transcription_error`, `generation_error`)
+- decisiones VAD (`vad_no_speech`, `vad_fail_open`) y latencias del
+  `transcription_worker`
 - caidas o desconexiones anormales de SSE
 - conexiones, saturacion y almacenamiento de Cloud SQL
 - canales reales de notificacion y runbooks de respuesta
@@ -56,7 +59,7 @@ operacion diaria. Hoy faltan, como minimo, metricas, alertas y dashboards para:
 ### Alertas
 
 - Cloud Run backend: `5xx`, latencia p95, memoria alta, instancias saturadas.
-- Cloud Function de generacion: `5xx`, duracion alta, ejecuciones fallidas.
+- Document generation worker: `5xx`, duracion alta, ejecuciones fallidas.
 - Cloud Tasks: cola en crecimiento, antiguedad de tarea alta, reintentos altos.
 - Cloud SQL: CPU alta, conexiones altas, almacenamiento bajo.
 
@@ -64,14 +67,14 @@ operacion diaria. Hoy faltan, como minimo, metricas, alertas y dashboards para:
 
 - Vista "backend clinico" con requests, latencia, memoria, CPU y errores.
 - Vista "IA" con transcripciones iniciadas/completadas/fallidas, generaciones
-  iniciadas/completadas/fallidas y duracion por flujo.
+  iniciadas/completadas/fallidas, decisiones VAD saneadas y duracion por flujo.
 - Vista "datos" con CPU/conexiones de Cloud SQL y backlog de Cloud Tasks.
 
 ### Metricas y logs de dominio
 
 - Contadores saneados por evento: `transcription_update`,
   `transcription_complete`, `generation_chunk`, `generation_complete`,
-  `generation_error`.
+  `generation_error`, `vad_no_speech`, `vad_fail_open`.
 - Logs estructurados por `document_id`, `encounter_id`, `process_id` y
   `trace_id`, sin contenido clinico completo.
 - Log-based metrics para errores de transcripcion y generacion si no se
@@ -88,6 +91,7 @@ operacion diaria. Hoy faltan, como minimo, metricas, alertas y dashboards para:
 
 - Infraestructura/operacion GCP: `infra/`
 - Señales de dominio y logging sano: `backend_fastapi/` y `cloud_functions/`
+  legacy, más `transcription_worker/` y `document_generation_worker/`.
 
 ## Trigger para pagarla
 
@@ -97,7 +101,7 @@ condiciones:
 - launch a medicos reales sin Copilot
 - mas de 10 doctores concurrentes usando transcripcion o generacion
 - incidentes donde el equipo no pueda distinguir rapido si el problema esta en
-  backend, Cloud Function, Cloud Tasks o Cloud SQL
+  backend, workers, Cloud Tasks o Cloud SQL
 - decision de subir carga, concurrencia o replicas
 
 ## Referencias

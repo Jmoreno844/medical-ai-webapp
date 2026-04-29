@@ -1,6 +1,7 @@
 # Cloud Functions Module
 
-Este directorio contiene la lógica serverless que habla con Gemini.
+Este directorio contiene la transcripción legacy serverless que habla con Gemini.
+La generación documental vive en `../../document_generation_worker/`.
 
 ## Responsabilidades
 
@@ -8,10 +9,6 @@ Este directorio contiene la lógica serverless que habla con Gemini.
   - valida requests de transcripción
   - invoca servicios de audio/transcripción
   - devuelve contenido al backend transaccional
-- `endpoints/document_workflow.py`
-  - valida requests de generación documental
-  - soporta `validate_only`
-  - transmite chunks al backend transaccional
 
 ## Regla de diseño
 
@@ -32,4 +29,4 @@ Si cambias un payload aquí, confirma el endpoint espejo versionado en `backend_
 
 - OpenTelemetry sigue cubriendo spans HTTP y callbacks locales.
 - LangSmith ahora puede activarse solo en `ENVIRONMENT=local` con `LANGSMITH_API_KEY` + `LANGSMITH_PROJECT=cloud-functions-local`.
-- Los traces de LangSmith se limitan a metadata sanitizada: IDs, flags, tamaños y modelo. No envían transcripciones completas, documentos generados ni tokens.
+- Los traces de LangSmith se limitan a metadata sanitizada: IDs, flags, tamaños y modelo. No envían transcripciones completas ni tokens.

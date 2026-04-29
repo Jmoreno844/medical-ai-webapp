@@ -7,7 +7,9 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 | Carpeta                                                                                                                                       | Rol                                                                                 | Fuente de verdad                               |
 | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------- |
 | `backend_fastapi/`                                                                                                                            | API central, modelos SQLAlchemy, auth, JWT, SSE, orquestación y migraciones Alembic | Sí                                             |
-| `cloud_functions/`                                                                                                                            | Generación documental con Gemini y transcripción legacy                             | Sí                                             |
+| `transcription_worker/`                                                                                                                       | Worker Cloud Run para VAD Silero + Gemini de transcripción por secciones            | Sí                                             |
+| `document_generation_worker/`                                                                                                                 | Worker Cloud Run para generación documental con Gemini streaming                    | Sí                                             |
+| `cloud_functions/`                                                                                                                            | Transcripción legacy                                                                | Sí                                             |
 | `webapp/`                                                                                                                                     | SPA del médico                                                                      | Sí                                             |
 | `infra/`                                                                                                                                      | Infra GCP, IAM, budgets, deploy base                                                | Sí                                             |
 | `landing-page/`                                                                                                                               | Sitio marketing separado                                                            | Sí, pero no es parte del flujo clínico central |
@@ -20,13 +22,24 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
   - Dueño del ciclo de vida del encuentro y metadatos del audio.
   - También concentra la lógica de GCS signed URLs en `services/storage.py`.
 - `backend_fastapi/app/domains/documents/`
-  - Dueño del CRUD documental, SSE, callbacks desde Cloud Functions y kickoff de generación.
-  - Es la zona más sensible para streaming y coordinación backend <-> frontend <-> functions.
+  - Dueño del CRUD documental, SSE, callbacks, work-items internos y kickoff de generación.
+  - Es la zona más sensible para streaming y coordinación backend <-> frontend <-> workers.
 - `backend_fastapi/app/domains/transcription/`
   - Dueño de la transcripción legacy y de la transcripción por secciones:
     sesiones, signed URLs por sección, registro idempotente, dispatch a Cloud
-    Tasks/BackgroundTasks, worker interno, status y consolidación final.
+    Tasks, callbacks desde `transcription_worker`, status y finalización.
   - Publica eventos por el hub SSE de documentos, pero no es dueño del hub.
+- `transcription_worker/`
+  - Servicio Cloud Run privado para trabajo computacional de transcripción:
+    descarga audio desde GCS, ejecuta VAD Silero ONNX, llama Gemini y devuelve
+    resultados saneados a FastAPI.
+  - No escribe directamente en PostgreSQL ni publica SSE; FastAPI conserva la
+    autoridad clínica y transaccional.
+- `document_generation_worker/`
+  - Servicio Cloud Run privado para generación documental:
+    recibe Cloud Tasks con IDs, pide el work-item clínico a FastAPI, llama
+    Gemini streaming y devuelve chunks saneados al callback existente.
+  - No escribe directamente en PostgreSQL ni publica SSE.
 - `backend_fastapi/app/domains/templates/`
   - Dueño de plantillas base y plantillas del médico.
 - `backend_fastapi/app/domains/patients/`
@@ -58,12 +71,12 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
   - Kickoff: `backend_fastapi/app/domains/transcription/api.py`
   - Sesiones/secciones: `backend_fastapi/app/domains/transcription/api.py`
   - Cola: `backend_fastapi/app/domains/transcription/service.py`
-  - Worker interno: `backend_fastapi/app/domains/transcription/api.py`
-  - Gemini async: `backend_fastapi/app/domains/transcription/gemini_async.py`
+  - Worker: `transcription_worker/app/`
+  - Gemini async: `transcription_worker/app/gemini.py`
 - Generación documental:
-  - Kickoff, SSE y callbacks: `backend_fastapi/app/domains/documents/api.py`
+  - Kickoff, SSE, callbacks y work-items: `backend_fastapi/app/domains/documents/`
   - Servicios: `backend_fastapi/app/domains/documents/service.py`
-  - Function: `cloud_functions/functions/endpoints/document_workflow.py`
+  - Worker: `document_generation_worker/app/`
 - Estado del encuentro en frontend:
   - `webapp/src/contexts/AppProviders.tsx`
   - `webapp/src/contexts/*.tsx`
@@ -90,10 +103,14 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 
 ### Background jobs
 
-- En `stg/prod`, la transcripción debe salir por Cloud Tasks cuando la configuración esté presente.
-- En local, la transcripción por secciones puede usar `BackgroundTasks` como
-  fallback para evitar depender del emulador de Cloud Tasks.
-- La generación documental puede usar un hilo en el proceso API (mismo patrón de orquestación que el monolito legacy).
+- En `stg/prod`, la transcripción debe salir por Cloud Tasks hacia
+  `transcription_worker`.
+- En local, la transcripción por secciones puede llamar
+  `TRANSCRIPTION_WORKER_BASE_URL=http://localhost:8091` como fallback sin
+  emulador de Cloud Tasks.
+- En local, la generación documental puede llamar
+  `DOCUMENT_GENERATION_WORKER_BASE_URL=http://localhost:8092` como fallback sin
+  emulador de Cloud Tasks.
 - SSE depende de un hub en memoria; por decisión actual se mantiene sin Redis en la primera migración FastAPI y limita Cloud Run a una instancia.
 
 ### Integraciones externas
@@ -104,7 +121,7 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 - Gemini:
   - transcripción vive en FastAPI con Google Gen AI SDK async sobre Vertex AI;
     la version near realtime ordena y consolida secciones por `section_index`
-  - generación documental sigue en Cloud Functions
+  - generación documental vive en `document_generation_worker`
 - Secret Manager / IAM / budgets:
   - viven en `infra/`, no en lógica de producto
 

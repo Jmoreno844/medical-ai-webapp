@@ -8,6 +8,18 @@ variable "cloud_run_service_name" {
   type        = string
 }
 
+variable "transcription_worker_service_name" {
+  description = "Transcription worker Cloud Run service name"
+  type        = string
+  default     = ""
+}
+
+variable "document_generation_worker_service_name" {
+  description = "Document generation worker Cloud Run service name"
+  type        = string
+  default     = ""
+}
+
 variable "cloud_function_service_names" {
   description = "Gen2 Cloud Function backing service names to monitor"
   type        = list(string)

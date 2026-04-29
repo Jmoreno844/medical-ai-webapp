@@ -4,7 +4,7 @@ import asyncio
 import logging
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -13,8 +13,9 @@ from app.core.service_jwt import issue_generation_callback_token
 from app.db.models import User
 from app.db.session import get_db_session
 from app.domains.auth.service import get_current_user
-from app.domains.documents.generation_runner import start_document_generation_task
 from app.domains.documents.schemas import (
+    DocumentGenerationTaskPayload,
+    DocumentGenerationWorkItemResponse,
     DocumentGenerationWorkflowRequest,
     DocumentGenerationWorkflowResponse,
 )
@@ -24,18 +25,42 @@ from app.domains.documents.service import (
     get_effective_template_content,
 )
 from app.domains.documents.sse_hub import get_processing_id, publish_document_event
-from app.integrations.http_json import JsonHttpError, post_json
+from app.domains.documents.worker_auth import verify_document_generation_worker_request
+from app.integrations.document_generation_tasks import (
+    DocumentGenerationTaskConfigurationError,
+    enqueue_document_generation_task,
+    should_use_document_generation_cloud_tasks,
+)
+from app.integrations.http_json import post_json
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def _post_document_worker_task_background(
+    path: str,
+    payload: dict,
+    settings: Settings,
+) -> None:
+    if not settings.document_generation_worker_base_url:
+        return
+    url = f"{settings.document_generation_worker_base_url.rstrip('/')}{path}"
+    try:
+        await asyncio.to_thread(post_json, url, payload, timeout=5)
+    except Exception:
+        logger.exception(
+            "Local document generation worker dispatch failed process_id=%s",
+            payload.get("process_id"),
+        )
 
 
 @router.post(
     "/documents/generate",
     response_model=DocumentGenerationWorkflowResponse,
 )
-async def generate_document_workflow(
+async def generate_document_endpoint(
     payload: DocumentGenerationWorkflowRequest,
+    background_tasks: BackgroundTasks,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
@@ -80,10 +105,21 @@ async def generate_document_workflow(
             status.HTTP_400_BAD_REQUEST,
             "La plantilla seleccionada está vacía. Se requiere contenido para generar el documento.",
         )
-    if not settings.generate_document_cloud_function_url:
+    if (
+        should_use_document_generation_cloud_tasks(settings)
+        and not settings.document_generation_task_target_url
+    ):
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "GENERATE_DOCUMENT_CLOUD_FUNCTION_URL setting is not configured",
+            "DOCUMENT_GENERATION_TASK_TARGET_URL setting is not configured",
+        )
+    if (
+        not should_use_document_generation_cloud_tasks(settings)
+        and not settings.document_generation_worker_base_url
+    ):
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "DOCUMENT_GENERATION_WORKER_BASE_URL setting is not configured",
         )
 
     doc_new.doctor_template_id = doctor_template.id
@@ -100,66 +136,53 @@ async def generate_document_workflow(
         },
         settings=settings,
     )
-    callback_token = issue_generation_callback_token(
-        user_id=user.id,
-        document_id=doc_new.id,
+    task_payload = DocumentGenerationTaskPayload(
         process_id=process_id,
-        settings=settings,
+        doctor_id=user.id,
+        new_document_id=doc_new.id,
+        context_document_id=doc_context.id,
+        transcription_document_id=doc_transcription.id,
+        doctor_template_id=doctor_template.id,
     )
+    task_payload_dict = task_payload.model_dump()
 
-    request_body = {
-        "new_document_id": doc_new.id,
-        "process_id": process_id,
-        "context_document": {
-            "id": doc_context.id,
-            "content": doc_context.content_markdown,
-        },
-        "transcription_document": {
-            "id": doc_transcription.id,
-            "content": doc_transcription.content_markdown,
-        },
-        "template": {
-            "id": doctor_template.id,
-            "content": template_content,
-        },
-        "auth_token": callback_token,
-        "validate_only": True,
-    }
+    await session.commit()
 
     try:
-        validation_data = await asyncio.to_thread(
-            post_json,
-            settings.generate_document_cloud_function_url,
-            request_body,
-            timeout=10,
+        if should_use_document_generation_cloud_tasks(settings):
+            enqueue_document_generation_task(task_payload_dict, settings=settings)
+        else:
+            background_tasks.add_task(
+                _post_document_worker_task_background,
+                (
+                    f"{settings.api_v1_prefix}/internal/document-generation/tasks/"
+                    f"{process_id}"
+                ),
+                task_payload_dict,
+                settings,
+            )
+    except DocumentGenerationTaskConfigurationError as exc:
+        logger.error("Document generation task misconfigured: %s", exc)
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to enqueue document generation task")
+        await publish_document_event(
+            doc_new.id,
+            "generation_error",
+            {
+                "process_id": process_id,
+                "error": "Error al encolar generación de documento",
+            },
         )
-    except JsonHttpError as exc:
-        logger.error("Error during generation validation request: %s", exc)
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
-            f"Error de conexión con el servicio: {exc}",
+            "Error al encolar generación de documento",
         ) from exc
-
-    if not validation_data.get("success", False):
-        error_msg = validation_data.get("error", "Error desconocido en la validación")
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            f"Error en los parámetros: {error_msg}",
-        )
 
     await publish_document_event(
         doc_new.id,
         "generation_chunk",
         {"process_id": process_id, "chunk": "Iniciando generación de documento..."},
-    )
-
-    request_body["validate_only"] = False
-    await session.commit()
-    await start_document_generation_task(
-        url=settings.generate_document_cloud_function_url,
-        request_body=request_body,
-        document_id=doc_new.id,
-        process_id=process_id,
     )
 
     return DocumentGenerationWorkflowResponse(
@@ -168,4 +191,72 @@ async def generate_document_workflow(
         sse_token=sse_token,
         new_document_id=doc_new.id,
         message="Generación de documento iniciada correctamente",
+    )
+
+
+@router.post(
+    "/internal/document-generation/work-items/{process_id}",
+    response_model=DocumentGenerationWorkItemResponse,
+)
+async def get_document_generation_work_item(
+    process_id: str,
+    payload: DocumentGenerationTaskPayload,
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> DocumentGenerationWorkItemResponse:
+    verify_document_generation_worker_request(request, settings)
+    if payload.process_id != process_id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid processing ID")
+
+    doc_context = await get_document_for_doctor(
+        session,
+        document_id=payload.context_document_id,
+        doctor_id=payload.doctor_id,
+    )
+    doc_transcription = await get_document_for_doctor(
+        session,
+        document_id=payload.transcription_document_id,
+        doctor_id=payload.doctor_id,
+    )
+    doc_new = await get_document_for_doctor(
+        session,
+        document_id=payload.new_document_id,
+        doctor_id=payload.doctor_id,
+    )
+    if not doc_context or not doc_transcription or not doc_new:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Documento no encontrado")
+
+    doctor_template = await get_doctor_template_for_doctor(
+        session,
+        template_id=payload.doctor_template_id,
+        doctor_id=payload.doctor_id,
+    )
+    if not doctor_template:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Plantilla no encontrada")
+
+    template_content = get_effective_template_content(doctor_template)
+    transcription_content = doc_transcription.content_markdown
+    if not transcription_content.strip() or not template_content.strip():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Work item inválido")
+
+    context_content = doc_context.content_markdown.strip() or "No se agregó contexto."
+    callback_token = issue_generation_callback_token(
+        user_id=payload.doctor_id,
+        document_id=doc_new.id,
+        process_id=process_id,
+        settings=settings,
+    )
+    return DocumentGenerationWorkItemResponse(
+        process_id=process_id,
+        doctor_id=payload.doctor_id,
+        new_document_id=doc_new.id,
+        context_document_id=doc_context.id,
+        transcription_document_id=doc_transcription.id,
+        doctor_template_id=doctor_template.id,
+        encounter_id=doc_new.encounter_id,
+        context_content=context_content,
+        transcription_content=transcription_content,
+        template_content=template_content,
+        callback_token=callback_token,
     )

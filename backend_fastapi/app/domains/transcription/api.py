@@ -40,6 +40,7 @@ from app.domains.transcription.service import (
     process_legacy_audio_transcription,
     process_section_transcription,
     register_audio_section,
+    is_recording_session_ready_for_consolidation,
     serialize_section,
 )
 from app.integrations.http_json import JsonHttpError, post_json
@@ -358,11 +359,12 @@ async def finish_transcription_recording_session(
                 error=str(exc),
             )
     else:
-        background_tasks.add_task(
-            _consolidate_session_background,
-            recording_session.session_id,
-            settings,
-        )
+        if is_recording_session_ready_for_consolidation(recording_session):
+            background_tasks.add_task(
+                _consolidate_session_background,
+                recording_session.session_id,
+                settings,
+            )
 
     return RecordingSessionFinishResponse(success=True, status=recording_session.status)
 

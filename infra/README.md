@@ -15,7 +15,7 @@ infra/
     artifact_registry/  Repositorio Docker
     cloud_sql/          PostgreSQL
     storage_buckets/    Audio + frontend SPA
-    cloud_run/          Cloud Run services (backend + copilot agent)
+    cloud_run/          Cloud Run services (backend + copilot agent + transcription worker)
     cloud_tasks/        Cola de transcripción
     workload_identity/  WIF para GitHub Actions
     monitoring/         Alertas básicas + budget
@@ -36,7 +36,7 @@ infra/
 1. **Bootstrap** (`bootstrap/README.md`): bucket de estado + SA `terraform-admin` + IAM.
 2. **Terraform** (como tu usuario o con clave temporal de `terraform-admin`):
    - `cd environments/stg && terraform init && terraform plan`.
-   - En `stg`, Terraform crea la VPC privada, Cloud SQL con IP privada + IAM DB auth, el bucket fuente para Cloud Functions y las alertas básicas.
+   - En `stg`, Terraform crea la VPC privada, Cloud SQL con IP privada + IAM DB auth, workers Cloud Run, colas Cloud Tasks, el bucket fuente para Cloud Functions legacy y las alertas básicas.
    - En `stg`, `cloud_run_image` arranca con una imagen publica de bootstrap para permitir el primer `apply`; el workflow de backend la reemplaza luego por la imagen real.
    - En `stg`, `cloud_run_use_secret_manager = false` evita que el primer `apply` falle mientras los secrets existen pero todavía no tienen versiones; vuelve a `true` cuando cargues esas versiones.
    - En `stg`, `cloud_run_allow_unauthenticated = false` evita fallos si la organizacion bloquea `allUsers`; luego defines otra estrategia de acceso publico si la necesitas.
@@ -44,7 +44,7 @@ infra/
 3. **Secret Manager**: cargar versiones de `django-secret-key` y `jwt-secret-key` (y opcionalmente `service-account-json`).
 4. **GitHub**: variables del environment **`stg`** (o del repo) según `docs/architecture/gcp-infrastructure.md`. Los workflows de deploy usan `environment: stg`. Sin `WIF_PROVIDER` / `GH_DEPLOYER_SA` los workflows no autentican.
 5. **CI**:
-   - Ejecutar primero el workflow de Cloud Functions para que exista `document-workflow`.
+   - Ejecutar primero los workflows de `transcription_worker` y `document_generation_worker` para que existan las URLs privadas.
    - Luego ejecutar backend / frontend, o dejar que corran por `push` / `workflow_dispatch`.
 
 **Autenticación local de Terraform:** con usuario humano basta `gcloud auth application-default login` en muchos casos; si usas la SA `terraform-admin`, exporta `GOOGLE_APPLICATION_CREDENTIALS` a la clave JSON (solo transitoria; revócala tras validar WIF).
@@ -122,6 +122,7 @@ Después del primer apply exitoso, copiar los outputs de Terraform a las variabl
 - `GH_DEPLOYER_SA` (output `github_actions_deployer_email`)
 - `BACKEND_SERVICE_ACCOUNT` (output `backend_service_account`)
 - `COPILOT_AGENT_SERVICE_ACCOUNT` (output `copilot_agent_service_account`)
+- `TRANSCRIPTION_WORKER_SERVICE_ACCOUNT` (output `transcription_worker_service_account`)
 - `COPILOT_AGENT_DB_NAME` (valor de `terraform.tfvars`)
 - `GCS_BUCKET_NAME` (output `audio_bucket`)
 - `FRONTEND_BUCKET_NAME` (output `frontend_bucket`)
@@ -135,8 +136,10 @@ Luego se puede eliminar el secret `GCP_SA_KEY` de GitHub.
 
 ## Terraform y GitHub Actions (matiz)
 
-- **Cloud Run**: el módulo fija una imagen inicial y la topología base del servicio (VPC egress + sidecar del Cloud SQL Auth Proxy). El workflow de backend sustituye la imagen y actualiza env vars del backend.
-- **Cloud Functions**: en `stg`, Terraform **no** crea las funciones. Terraform solo crea el bucket fuente y las cuentas/roles necesarios; el workflow **sube el zip** y hace **`gcloud functions deploy`**.
+- **Cloud Run**: el módulo fija una imagen inicial y la topología base de backend,
+  copilot, transcription worker y document generation worker. Los workflows sustituyen las imágenes y
+  actualizan env vars por servicio.
+- **Cloud Functions**: en `stg`, Terraform **no** crea las funciones legacy. Terraform solo crea el bucket fuente y las cuentas/roles necesarios; el workflow **sube el zip** y despliega `transcription-endpoint`.
 
 ## Documentación relacionada
 

@@ -95,4 +95,6 @@ Payload mínimo:
 | `COPILOT_BACKEND_AUDIENCE` | Audiencia esperada por FastAPI para las tools internas llamadas desde `copilot_agent` |
 | `COPILOT_AGENT_TIMEOUT_SECONDS` | Timeout HTTP del cliente interno del copiloto. En local y broker síncrono conviene `60` para no cortar runs de edición mientras Vertex termina el draft. |
 | `TRANSCRIPTION_TASK_TARGET_URL` | URL base del worker interno de transcripción en FastAPI |
-| `GENERATE_DOCUMENT_CLOUD_FUNCTION_URL` | URL base de la función de generación (también se acepta `GENERATE_DOCUMENT_CLOUD_FUNCTION_BASE_URL` en develop) |
+| `DOCUMENT_GENERATION_TASK_TARGET_URL` | URL base del worker privado de generación documental |
+| `DOCUMENT_GENERATION_QUEUE_NAME` | Cola Cloud Tasks separada para generación documental |
+| `DOCUMENT_GENERATION_WORKER_SERVICE_ACCOUNT` | Service account esperada en llamadas internas worker -> FastAPI |

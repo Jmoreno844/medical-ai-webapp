@@ -4,11 +4,21 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
-from app.db.models import Document, Encounter, Patient, User
+from app.db.models import (
+    CopilotPatch,
+    CopilotPatchSet,
+    CopilotRun,
+    Document,
+    Encounter,
+    Patient,
+    TranscriptionAudioSection,
+    TranscriptionRecordingSession,
+    User,
+)
 from app.db.session import get_db_session
 from app.domains.auth.service import get_current_user
 from app.domains.documents.service import new_empty_document
@@ -56,6 +66,90 @@ async def _get_encounter_or_404(
     if not encounter:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Encuentro no encontrado")
     return encounter
+
+
+async def _get_sectioned_audio_summary(
+    session: AsyncSession,
+    *,
+    encounter_id: int,
+    doctor_id: int,
+) -> tuple[bool, int]:
+    result = await session.execute(
+        select(
+            func.count(TranscriptionAudioSection.id),
+            func.max(TranscriptionAudioSection.end_time_ms),
+        )
+        .select_from(TranscriptionRecordingSession)
+        .join(
+            TranscriptionAudioSection,
+            TranscriptionAudioSection.recording_session_id
+            == TranscriptionRecordingSession.id,
+        )
+        .where(
+            TranscriptionRecordingSession.encounter_id == encounter_id,
+            TranscriptionRecordingSession.doctor_id == doctor_id,
+        )
+    )
+    section_count, max_end_time_ms = result.one()
+    if not section_count:
+        return False, 0
+
+    duration_seconds = int(((max_end_time_ms or 0) + 999) // 1000)
+    return True, duration_seconds
+
+
+def _recording_session_ids_for_encounter(*, encounter_id: int, doctor_id: int):
+    return select(TranscriptionRecordingSession.id).where(
+        TranscriptionRecordingSession.encounter_id == encounter_id,
+        TranscriptionRecordingSession.doctor_id == doctor_id,
+    )
+
+
+async def _delete_encounter_dependents(
+    session: AsyncSession,
+    *,
+    encounter_id: int,
+    doctor_id: int,
+) -> None:
+    recording_session_ids = _recording_session_ids_for_encounter(
+        encounter_id=encounter_id,
+        doctor_id=doctor_id,
+    )
+    await session.execute(
+        delete(TranscriptionAudioSection).where(
+            TranscriptionAudioSection.recording_session_id.in_(recording_session_ids)
+        )
+    )
+    await session.execute(
+        delete(TranscriptionRecordingSession).where(
+            TranscriptionRecordingSession.encounter_id == encounter_id,
+            TranscriptionRecordingSession.doctor_id == doctor_id,
+        )
+    )
+    await session.execute(
+        delete(CopilotPatch).where(
+            CopilotPatch.encounter_id == encounter_id,
+            CopilotPatch.doctor_id == doctor_id,
+        )
+    )
+    await session.execute(
+        delete(CopilotPatchSet).where(
+            CopilotPatchSet.encounter_id == encounter_id,
+            CopilotPatchSet.doctor_id == doctor_id,
+        )
+    )
+    await session.execute(
+        delete(CopilotRun).where(
+            CopilotRun.encounter_id == encounter_id,
+            CopilotRun.doctor_id == doctor_id,
+        )
+    )
+    await session.execute(
+        delete(Document).where(
+            Document.encounter_id == encounter_id,
+            Document.doctor_id == doctor_id,
+        )
+    )
 
 
 @router.get("/encounters", response_model=list[EncounterListItem])
@@ -171,7 +265,11 @@ async def delete_encounter(
         encounter_id=encounter_id,
         doctor_id=user.id,
     )
-    await session.execute(delete(Document).where(Document.encounter_id == encounter.id))
+    await _delete_encounter_dependents(
+        session,
+        encounter_id=encounter.id,
+        doctor_id=user.id,
+    )
     await session.delete(encounter)
     await session.commit()
     return SuccessResponse(success=True)
@@ -230,17 +328,25 @@ async def check_audio_exists(
         encounter_id=encounter_id,
         doctor_id=user.id,
     )
-    has_audio = bool(encounter.audio_file_name and encounter.audio_file_name.strip())
+    has_uploaded_audio_file = bool(
+        encounter.audio_file_name and encounter.audio_file_name.strip()
+    )
+    has_sectioned_audio, sectioned_duration = await _get_sectioned_audio_summary(
+        session,
+        encounter_id=encounter.id,
+        doctor_id=user.id,
+    )
+    has_audio = has_uploaded_audio_file or has_sectioned_audio
     is_expired = False
-    if has_audio and encounter.audio_expires_at:
+    if has_uploaded_audio_file and encounter.audio_expires_at:
         now = datetime.now(encounter.audio_expires_at.tzinfo)
         is_expired = encounter.audio_expires_at <= now
 
     return AudioExistsResponse(
         exists=has_audio,
-        duration=encounter.audio_duration_seconds or 0,
+        duration=encounter.audio_duration_seconds or sectioned_duration,
         has_been_transcribed=encounter.has_been_transcribed,
-        expires_at=encounter.audio_expires_at if has_audio else None,
+        expires_at=encounter.audio_expires_at if has_uploaded_audio_file else None,
         is_expired=is_expired,
     )
 
@@ -264,10 +370,47 @@ async def delete_audio(
         if blob.exists():
             blob.delete()
 
+    section_result = await session.execute(
+        select(TranscriptionAudioSection.gcs_object_name)
+        .select_from(TranscriptionRecordingSession)
+        .join(
+            TranscriptionAudioSection,
+            TranscriptionAudioSection.recording_session_id
+            == TranscriptionRecordingSession.id,
+        )
+        .where(
+            TranscriptionRecordingSession.encounter_id == encounter.id,
+            TranscriptionRecordingSession.doctor_id == user.id,
+        )
+    )
+    section_object_names = list(section_result.scalars().all())
+    if section_object_names and settings.gcs_bucket_name:
+        storage_client = get_storage_client(settings)
+        bucket = storage_client.bucket(settings.gcs_bucket_name)
+        for object_name in section_object_names:
+            blob = bucket.blob(object_name)
+            if blob.exists():
+                blob.delete()
+
     encounter.audio_file_name = None
     encounter.audio_uploaded_at = None
     encounter.audio_expires_at = None
     encounter.audio_duration_seconds = None
+    await session.execute(
+        delete(TranscriptionAudioSection).where(
+            TranscriptionAudioSection.recording_session_id.in_(
+                select(TranscriptionRecordingSession.id).where(
+                    TranscriptionRecordingSession.encounter_id == encounter.id,
+                    TranscriptionRecordingSession.doctor_id == user.id,
+                )
+            )
+        )
+    )
+    await session.execute(
+        delete(TranscriptionRecordingSession).where(
+            TranscriptionRecordingSession.encounter_id == encounter.id,
+            TranscriptionRecordingSession.doctor_id == user.id,
+        )
+    )
     await session.commit()
     return SuccessResponse(success=True)
-

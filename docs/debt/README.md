@@ -27,4 +27,3 @@ Deudas actuales:
 
 - [`observability-baseline.md`](observability-baseline.md) — baseline minimo de alertas, dashboards y runbooks antes de launch.
 - [`copilot-agent-runtime.md`](copilot-agent-runtime.md) — deuda temporal del runtime y auth interna del copiloto.
-

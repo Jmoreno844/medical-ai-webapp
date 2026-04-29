@@ -5,7 +5,7 @@ Este documento describe la arquitectura global de la plataforma, sus componentes
 ## 1. Arquitectura de Alto Nivel
 
 El sistema es una plataforma fullstack con un **API FastAPI** en `backend_fastapi/`,
-funciones serverless en GCP, un runtime del copiloto y una SPA en React.
+workers Cloud Run privados, un runtime del copiloto y una SPA en React.
 
 ```mermaid
 graph LR
@@ -16,10 +16,9 @@ graph LR
     subgraph gcp ["Google Cloud Platform"]
         subgraph backend_run ["Cloud Run"]
             Backend["FastAPI API"]
+            Worker["transcription-worker\n(Silero VAD + Gemini STT)"]
+            DocWorker["document-generation-worker\n(Gemini streaming)"]
             Copilot["copilot-agent-service\n(LangGraph)"]
-        end
-        subgraph functions ["Cloud Functions"]
-            CF_Gen["document-workflow"]
         end
         GCS["Cloud Storage\n(audio clínico)"]
         Vertex["Vertex AI · Gemini"]
@@ -33,18 +32,20 @@ graph LR
 
     Backend -->|"SQLAlchemy async"| PG
     Backend -->|"signed URL"| GCS
-    Backend -->|"JWT + payload"| CF_Gen
+    Backend -->|"Cloud Tasks OIDC\nIDs only"| DocWorker
     Backend -->|"internal broker contract"| Copilot
     Backend -->|"secrets"| SM
 
     Copilot -->|"checkpoints + memory"| PG
     Copilot -->|"Gemini / tools orchestration"| Vertex
 
-    Backend -->|"Cloud Tasks OIDC\ninternal worker"| Backend
-    Backend -->|"Gemini async / gs:// audio"| Vertex
+    Backend -->|"Cloud Tasks OIDC"| Worker
+    Worker -->|"read sections"| GCS
+    Worker -->|"Silero VAD local\n+ Gemini async"| Vertex
+    Worker -->|"OIDC result callbacks"| Backend
 
-    CF_Gen -->|"Gemini streaming"| Vertex
-    CF_Gen -->|"chunks Bearer JWT"| Backend
+    DocWorker -->|"Gemini streaming"| Vertex
+    DocWorker -->|"chunks Bearer JWT"| Backend
 ```
 
 ---
@@ -55,7 +56,7 @@ El camino implementado usa transcripción near realtime por secciones. Mientras
 el médico graba, el navegador corta audio en secciones temporales, conserva una
 cola local en IndexedDB y sube cada blob directo a Cloud Storage mediante signed
 URLs. FastAPI registra cada seccion de forma idempotente, Cloud Tasks dispara el
-worker interno y SSE publica avances parciales. El flujo legacy de audio completo
+servicio `transcription-worker` y SSE publica avances parciales. El flujo legacy de audio completo
 queda como fallback/migración.
 
 ```mermaid
@@ -64,7 +65,7 @@ sequenceDiagram
     participant Browser as React (Browser)
     participant Backend as API Backend
     participant GCS as Cloud Storage
-    participant Worker as FastAPI internal worker
+    participant Worker as transcription-worker Cloud Run
     participant Gemini as Vertex AI · Gemini
 
     rect rgb(240, 248, 255)
@@ -91,19 +92,21 @@ sequenceDiagram
 
     rect rgb(240, 255, 248)
         note over Worker,Gemini: Paso 3 — Procesamiento con IA
-        Worker->>Gemini: async generate_content(gs:// seccion + prompt)
+        Worker->>Worker: Silero ONNX VAD sobre seccion GCS
+        Worker->>Gemini: async generate_content(gs:// seccion + prompt) si hay habla
         Gemini-->>Worker: Texto de seccion
-        Worker->>Backend: Guarda raw_transcript y estado
+        Worker->>Backend: Callback saneado con resultado de seccion
+        Backend->>Backend: Guarda raw_transcript y estado
         Backend-->>Browser: SSE "transcription_update"
     end
 
     rect rgb(248, 240, 255)
-        note over Browser,Browser: Paso 4 — Finalizacion y consolidacion
+        note over Browser,Browser: Paso 4 — Finalizacion deterministica
         Medico->>Browser: Detiene grabacion
         Browser->>Backend: POST /api/v1/transcription/sessions/:id/finish
-        Backend->>Worker: POST /internal/transcription/tasks/sessions/:id/consolidate via OIDC
-        Worker->>Gemini: Consolida secciones ordenadas por section_index
-        Worker->>Backend: Guarda documento y marca encuentro transcrito
+        Backend->>Backend: Ordena secciones completas por section_index
+        Backend->>Backend: Une transcriptos con deduplicacion ligera de overlap
+        Backend->>Backend: Guarda documento y marca encuentro transcrito
         Backend-->>Browser: SSE "transcription_complete"
     end
 ```
@@ -119,7 +122,7 @@ sequenceDiagram
     actor Medico
     participant Browser as React (Browser)
     participant Backend as API Backend
-    participant CF as CF document-workflow
+    participant DocWorker as document-generation-worker Cloud Run
     participant Gemini as Vertex AI · Gemini
 
     rect rgb(240, 248, 255)
@@ -131,31 +134,31 @@ sequenceDiagram
     end
 
     rect rgb(255, 248, 240)
-        note over Browser,CF: Paso 2 — Trigger de generación
+        note over Browser,DocWorker: Paso 2 — Trigger de generación
         Medico->>Browser: Clic en "Generar Documento"
         Browser->>Backend: POST /api/v1/documents/generate
-        Backend->>Backend: Valida permisos y genera JWT callback (30 min)
-        Backend->>CF: POST validate_only=true (síncrono)
-        CF-->>Backend: 200 OK
+        Backend->>Backend: Valida permisos, template y transcripción
+        Backend->>Backend: Encola Cloud Task con IDs, sin PHI
         Backend-->>Browser: 200 OK { process_id }
-        note right of Backend: Lanza hilo background →
     end
 
     rect rgb(240, 255, 248)
         note over Backend,Gemini: Paso 3 — Generación con streaming
-        Backend->>CF: POST payload completo (background)
-        CF->>Gemini: generate_content(prompt, stream=True)
+        Backend->>DocWorker: POST /internal/document-generation/tasks/:process_id via OIDC
+        DocWorker->>Backend: POST /internal/document-generation/work-items/:process_id
+        Backend-->>DocWorker: Contenido clínico + JWT callback
+        DocWorker->>Gemini: generate_content(prompt, stream=True)
 
         loop Cada chunk de texto
-            Gemini-->>CF: chunk
-            CF->>Backend: POST /api/v1/documents/generation-chunk
+            Gemini-->>DocWorker: chunk
+            DocWorker->>Backend: POST /api/v1/documents/generation-chunk
             Backend-->>Browser: SSE "generation_chunk" { chunk }
         end
     end
 
     rect rgb(248, 240, 255)
         note over Backend,Browser: Paso 4 — Finalización
-        CF->>Backend: POST generation-chunk { is_complete: true }
+        DocWorker->>Backend: POST generation-chunk { is_complete: true }
         Backend->>Backend: Guarda documento completo en BD
         Backend-->>Browser: SSE "generation_complete"
     end
@@ -169,9 +172,9 @@ sequenceDiagram
 | ------------------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | **Frontend** `webapp/`               | React 18, Vite, TypeScript, Tailwind    | SPA del médico. Maneja grabación por secciones, IndexedDB, UI del editor y conexión SSE.                                   |
 | **API principal** `backend_fastapi/` | FastAPI, SQLAlchemy async, PostgreSQL   | API bajo `/api/v1`, orquestación, JWTs, hub SSE, callbacks y migraciones Alembic.                                          |
+| **Worker transcripción** `transcription_worker/` | FastAPI, ONNX Runtime, Google Gen AI SDK | Recibe Cloud Tasks por sección, corre Silero VAD, transcribe con Gemini si hay habla y devuelve callbacks saneados a FastAPI. |
+| **Worker generación** `document_generation_worker/` | FastAPI, Google Gen AI SDK | Recibe Cloud Tasks con IDs, pide work-items a FastAPI, genera documentos con Gemini streaming y devuelve chunks saneados. |
 | **Copilot Agent** `copilot_agent/`   | Python, FastAPI, LangGraph              | Runtime del copiloto; broker hacia el API principal.                                                                       |
-| **Worker transcripción**             | FastAPI internal endpoint + Cloud Tasks | Recibe task autenticada por seccion → llama a Gemini async con `gs://` → guarda texto, emite SSE y consolida al finalizar. |
-| **CF Generación**                    | Python, Functions Framework             | Recibe contexto+plantilla → streaming desde Gemini → envía chunks al API.                                                  |
 | **Cloud Storage**                    | GCS                                     | Almacena los audios clínicos. El frontend sube directo vía signed URL.                                                     |
 | **Vertex AI · Gemini**               | Managed (GCP)                           | Modelo de IA para transcripción y generación de documentos clínicos.                                                       |
 | **PostgreSQL**                       | Cloud SQL                               | Base de datos principal: encuentros, documentos, pacientes, plantillas.                                                    |
@@ -186,12 +189,12 @@ sequenceDiagram
 - **Agent runtime separado**: LangGraph no vive dentro del backend principal. El backend hace de broker y conserva la autoridad clínica/transaccional.
 - **Auth interna temporal del copiloto**: el API (FastAPI) y `copilot-agent-service` usan un `shared JWT` temporal en `local`/`stg`; ver deuda canónica en [`../debt/copilot-agent-runtime.md`](../debt/copilot-agent-runtime.md).
 - **Audio no se borra al transcribir**: `audio_expires_at` controla el acceso lógico legacy por 24h, pero el blob en GCS se elimina por lifecycle a los 7 días salvo DELETE explícito. SSE no borra audio.
-- **Cloud Functions IAM-auth**: `document-workflow` está desplegada con `--no-allow-unauthenticated`; la seguridad depende de IAM de invocación + JWT de callback. El `JWT_SECRET_KEY` no debe filtrarse.
+- **Workers privados IAM-auth**: los workers de transcripción y generación están desplegados con `--no-allow-unauthenticated`; Cloud Tasks los invoca con OIDC y los callbacks usan JWTs de vida corta. El `JWT_SECRET_KEY` no debe filtrarse.
 
 ---
 
 ## 6. Observabilidad y trazas
 
-OpenTelemetry enlaza las peticiones **navegador (XHR/axios) → API (FastAPI) → Cloud Functions → callbacks al API** cuando el export está configurado (OTLP/Jaeger en local, Cloud Trace en GCP con `GOOGLE_CLOUD_PROJECT`). Los logs del backend incluyen `trace_id` / `span_id` para correlación. Detalle y variables: [`../backend/tracing.md`](../backend/tracing.md). Limitaciones: SSE (`EventSource` sin cabeceras W3C), subida directa a GCS con signed URL y ejecuciones posteriores de Cloud Tasks no continúan el mismo trace de extremo a extremo.
+OpenTelemetry enlaza peticiones entre el API, workers y callbacks cuando el export está configurado (OTLP/Jaeger en local, Cloud Trace en GCP con `GOOGLE_CLOUD_PROJECT`). Los logs del backend incluyen `trace_id` / `span_id` para correlación. Detalle y variables: [`../backend/tracing.md`](../backend/tracing.md). Limitaciones: SSE (`EventSource` sin cabeceras W3C), subida directa a GCS con signed URL y ejecuciones posteriores de Cloud Tasks no continúan el mismo trace de extremo a extremo.
 
 El baseline operativo todavía no está cerrado para launch: ver deuda canónica en [`../debt/observability-baseline.md`](../debt/observability-baseline.md).

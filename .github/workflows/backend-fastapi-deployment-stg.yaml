@@ -115,15 +115,17 @@ jobs:
         id: function_urls
         run: |
           set -euo pipefail
-          DOCUMENT_URL="$(gcloud functions describe document-workflow --gen2 --region="${REGION}" --format='value(serviceConfig.uri)')"
           DB_IAM_USER="${{ vars.BACKEND_SERVICE_ACCOUNT }}"
           DB_IAM_USER="${DB_IAM_USER%.gserviceaccount.com}"
           BACKEND_URL="$(gcloud run services describe "${SERVICE_NAME}" --region="${REGION}" --format='value(status.url)')"
           COPILOT_URL="$(gcloud run services describe vexthealth-copilot-agent --region="${REGION}" --format='value(status.url)')"
-          echo "document_url=${DOCUMENT_URL}" >> "$GITHUB_OUTPUT"
+          TRANSCRIPTION_WORKER_URL="$(gcloud run services describe vexthealth-transcription-worker --region="${REGION}" --format='value(status.url)')"
+          DOCUMENT_GENERATION_WORKER_URL="$(gcloud run services describe vexthealth-document-generation-worker --region="${REGION}" --format='value(status.url)')"
           echo "db_iam_user=${DB_IAM_USER}" >> "$GITHUB_OUTPUT"
           echo "backend_url=${BACKEND_URL}" >> "$GITHUB_OUTPUT"
           echo "copilot_url=${COPILOT_URL}" >> "$GITHUB_OUTPUT"
+          echo "transcription_worker_url=${TRANSCRIPTION_WORKER_URL}" >> "$GITHUB_OUTPUT"
+          echo "document_generation_worker_url=${DOCUMENT_GENERATION_WORKER_URL}" >> "$GITHUB_OUTPUT"
 
       - name: Deploy to Cloud Run
         id: deploy
@@ -155,9 +157,13 @@ jobs:
             DB_USER=${{ steps.function_urls.outputs.db_iam_user }}
             CLOUD_TASKS_REGION=${{ env.REGION }}
             TRANSCRIPTION_QUEUE_NAME=audio-transcription-queue-stg
+            DOCUMENT_GENERATION_QUEUE_NAME=document-generation-queue-stg
             CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT=cloud-tasks-invoker@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
-            TRANSCRIPTION_TASK_TARGET_URL=${{ steps.function_urls.outputs.backend_url }}/api/v1/internal/transcription/tasks
-            GENERATE_DOCUMENT_CLOUD_FUNCTION_URL=${{ steps.function_urls.outputs.document_url }}
+            TRANSCRIPTION_TASK_TARGET_URL=${{ steps.function_urls.outputs.transcription_worker_url }}/api/v1/internal/transcription/tasks
+            TRANSCRIPTION_WORKER_SERVICE_ACCOUNT=transcription-worker-runner@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+            DOCUMENT_GENERATION_TASK_TARGET_URL=${{ steps.function_urls.outputs.document_generation_worker_url }}/api/v1/internal/document-generation/tasks
+            DOCUMENT_GENERATION_WORKER_SERVICE_ACCOUNT=document-generation-runner@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+            DOCUMENT_GENERATION_GEMINI_MODEL=${{ vars.GEMINI_MODEL || 'gemini-3.1-flash-lite-preview' }}
             COPILOT_AGENT_BASE_URL=${{ steps.function_urls.outputs.copilot_url }}
             FASTAPI_CORS_ALLOWED_ORIGINS=${{ vars.FASTAPI_CORS_ALLOWED_ORIGINS }}
           secrets: |

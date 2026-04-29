@@ -8,6 +8,16 @@ output "copilot_agent_cloud_run_url" {
   value       = module.copilot_agent_cloud_run.service_url
 }
 
+output "transcription_worker_cloud_run_url" {
+  description = "Transcription worker Cloud Run service URL"
+  value       = module.transcription_worker_cloud_run.service_url
+}
+
+output "document_generation_worker_cloud_run_url" {
+  description = "Document generation worker Cloud Run service URL"
+  value       = module.document_generation_worker_cloud_run.service_url
+}
+
 output "cloud_sql_connection_name" {
   description = "Cloud SQL connection name"
   value       = module.cloud_sql.connection_name
@@ -48,6 +58,16 @@ output "copilot_agent_service_account" {
   value       = module.service_accounts.copilot_agent_runner_email
 }
 
+output "transcription_worker_service_account" {
+  description = "Cloud Run transcription worker service account email"
+  value       = module.service_accounts.transcription_worker_runner_email
+}
+
+output "document_generation_worker_service_account" {
+  description = "Cloud Run document generation worker service account email"
+  value       = module.service_accounts.document_generation_runner_email
+}
+
 output "cloud_functions_service_account" {
   description = "Cloud Functions runtime service account email"
   value       = module.service_accounts.cloud_functions_runner_email
@@ -61,6 +81,11 @@ output "cloud_tasks_invoker_service_account" {
 output "cloud_tasks_queue_name" {
   description = "Cloud Tasks queue name"
   value       = module.cloud_tasks.queue_name
+}
+
+output "document_generation_cloud_tasks_queue_name" {
+  description = "Document generation Cloud Tasks queue name"
+  value       = module.document_generation_cloud_tasks.queue_name
 }
 
 output "workload_identity_provider" {

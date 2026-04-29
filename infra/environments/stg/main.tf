@@ -77,6 +77,7 @@ module "secret_manager" {
     "jwt-secret-key",
     "service-account-json",
     "copilot-service-shared-jwt",
+    "langsmith-api-key",
   ]
 
   labels = local.labels
@@ -150,6 +151,8 @@ module "workload_identity" {
   allowed_workflow_files = [
     ".github/workflows/backend-fastapi-deployment-stg.yaml",
     ".github/workflows/copilot-agent-deployment-stg.yaml",
+    ".github/workflows/transcription-worker-deployment-stg.yaml",
+    ".github/workflows/document-generation-worker-deployment-stg.yaml",
     ".github/workflows/deploy-cloud-function-stg.yaml",
     ".github/workflows/frontend-deployment-stg.yaml",
     ".github/workflows/landing-page-deployment-stg.yaml",
@@ -204,6 +207,20 @@ module "cloud_tasks" {
   depends_on = [module.project_services]
 }
 
+module "document_generation_cloud_tasks" {
+  source     = "../../modules/cloud_tasks"
+  project_id = var.project_id
+  region     = var.region
+
+  queue_name                = "document-generation-queue-stg"
+  max_attempts              = 3
+  max_concurrent_dispatches = 5
+  min_backoff_seconds       = 10
+  max_backoff_seconds       = 300
+
+  depends_on = [module.project_services]
+}
+
 # ---------------------------------------------------------------------------
 # 10. Cloud Run (backend)
 # ---------------------------------------------------------------------------
@@ -225,20 +242,24 @@ module "cloud_run" {
   session_affinity = true
 
   env_vars = {
-    ENVIRONMENT                         = var.environment
-    GCP_PROJECT                         = var.project_id
-    GOOGLE_CLOUD_PROJECT                = var.project_id
-    GCP_PROJECT_ID                      = var.project_id
-    GCS_BUCKET_NAME                     = module.storage_buckets.audio_bucket_name
-    DB_HOST                             = "127.0.0.1"
-    DB_PORT                             = "5432"
-    DB_NAME                             = var.db_name
-    DB_USER                             = trimsuffix(module.service_accounts.backend_runner_email, ".gserviceaccount.com")
-    CLOUD_TASKS_REGION                  = var.region
-    TRANSCRIPTION_QUEUE_NAME            = module.cloud_tasks.queue_name
-    CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT = module.service_accounts.cloud_tasks_invoker_email
-    GEMINI_MODEL                        = var.gemini_model
-    VERTEX_AI_LOCATION                  = "global"
+    ENVIRONMENT                                = var.environment
+    GCP_PROJECT                                = var.project_id
+    GOOGLE_CLOUD_PROJECT                       = var.project_id
+    GCP_PROJECT_ID                             = var.project_id
+    GCS_BUCKET_NAME                            = module.storage_buckets.audio_bucket_name
+    DB_HOST                                    = "127.0.0.1"
+    DB_PORT                                    = "5432"
+    DB_NAME                                    = var.db_name
+    DB_USER                                    = trimsuffix(module.service_accounts.backend_runner_email, ".gserviceaccount.com")
+    CLOUD_TASKS_REGION                         = var.region
+    TRANSCRIPTION_QUEUE_NAME                   = module.cloud_tasks.queue_name
+    DOCUMENT_GENERATION_QUEUE_NAME             = module.document_generation_cloud_tasks.queue_name
+    CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT        = module.service_accounts.cloud_tasks_invoker_email
+    TRANSCRIPTION_WORKER_SERVICE_ACCOUNT       = module.service_accounts.transcription_worker_runner_email
+    DOCUMENT_GENERATION_WORKER_SERVICE_ACCOUNT = module.service_accounts.document_generation_runner_email
+    GEMINI_MODEL                               = var.gemini_model
+    DOCUMENT_GENERATION_GEMINI_MODEL           = var.gemini_model
+    VERTEX_AI_LOCATION                         = "global"
   }
 
   secret_env_vars = var.cloud_run_use_secret_manager ? [
@@ -346,17 +367,114 @@ module "copilot_agent_cloud_run" {
 }
 
 # ---------------------------------------------------------------------------
+# 10c. Cloud Run (transcription worker)
+# ---------------------------------------------------------------------------
+
+module "transcription_worker_cloud_run" {
+  source     = "../../modules/cloud_run"
+  project_id = var.project_id
+  region     = var.region
+
+  service_name             = var.transcription_worker_service_name
+  image                    = var.transcription_worker_image
+  service_account_email    = module.service_accounts.transcription_worker_runner_email
+  cloud_sql_volume_enabled = false
+
+  min_instances    = 0
+  max_instances    = var.transcription_worker_max_instances
+  max_concurrency  = var.transcription_worker_max_concurrency
+  session_affinity = false
+  container_port   = 8091
+  timeout          = "300s"
+  cpu              = "2"
+  memory           = "1Gi"
+
+  env_vars = {
+    ENVIRONMENT                         = var.environment
+    PORT                                = "8091"
+    TRANSCRIPTION_WORKER_LOG_LEVEL      = "INFO"
+    GCP_PROJECT_ID                      = var.project_id
+    GOOGLE_CLOUD_PROJECT                = var.project_id
+    GCP_REGION                          = var.region
+    GCS_BUCKET_NAME                     = module.storage_buckets.audio_bucket_name
+    BACKEND_INTERNAL_BASE_URL           = module.cloud_run.service_url
+    CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT = module.service_accounts.cloud_tasks_invoker_email
+    TRANSCRIPTION_GEMINI_MODEL          = "gemini-2.5-flash"
+    VERTEX_AI_LOCATION                  = "global"
+    ORT_INTRA_OP_NUM_THREADS            = "1"
+    VAD_MAX_CONCURRENT                  = "1"
+    GEMINI_MAX_CONCURRENT               = "4"
+  }
+
+  allow_unauthenticated = false
+  labels                = local.labels
+
+  depends_on = [
+    module.service_accounts,
+    module.cloud_run,
+  ]
+}
+
+# ---------------------------------------------------------------------------
+# 10d. Cloud Run (document generation worker)
+# ---------------------------------------------------------------------------
+
+module "document_generation_worker_cloud_run" {
+  source     = "../../modules/cloud_run"
+  project_id = var.project_id
+  region     = var.region
+
+  service_name             = var.document_generation_worker_service_name
+  image                    = var.document_generation_worker_image
+  service_account_email    = module.service_accounts.document_generation_runner_email
+  cloud_sql_volume_enabled = false
+
+  min_instances    = 0
+  max_instances    = var.document_generation_worker_max_instances
+  max_concurrency  = var.document_generation_worker_max_concurrency
+  session_affinity = false
+  container_port   = 8092
+  timeout          = "300s"
+  cpu              = "1"
+  memory           = "1Gi"
+
+  env_vars = {
+    ENVIRONMENT                         = var.environment
+    PORT                                = "8092"
+    DOCUMENT_GENERATION_LOG_LEVEL       = "INFO"
+    GCP_PROJECT_ID                      = var.project_id
+    GOOGLE_CLOUD_PROJECT                = var.project_id
+    GCP_REGION                          = var.region
+    BACKEND_INTERNAL_BASE_URL           = module.cloud_run.service_url
+    CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT = module.service_accounts.cloud_tasks_invoker_email
+    DOCUMENT_GENERATION_GEMINI_MODEL    = var.gemini_model
+    VERTEX_AI_LOCATION                  = "global"
+    GEMINI_MAX_CONCURRENT               = "4"
+    LANGSMITH_TRACING                   = "false"
+  }
+
+  allow_unauthenticated = false
+  labels                = local.labels
+
+  depends_on = [
+    module.service_accounts,
+    module.cloud_run,
+  ]
+}
+
+# ---------------------------------------------------------------------------
 # 11. Monitoring
 # ---------------------------------------------------------------------------
 
 module "monitoring" {
-  source                 = "../../modules/monitoring"
-  project_id             = var.project_id
-  billing_account_name   = var.billing_account_name
-  cloud_run_service_name = var.cloud_run_service_name
+  source                                  = "../../modules/monitoring"
+  project_id                              = var.project_id
+  billing_account_name                    = var.billing_account_name
+  cloud_run_service_name                  = var.cloud_run_service_name
+  transcription_worker_service_name       = var.transcription_worker_service_name
+  document_generation_worker_service_name = var.document_generation_worker_service_name
   cloud_function_service_names = [
     "transcription-endpoint",
-    "document-workflow",
   ]
   cloud_sql_instance_name   = var.db_instance_name
   monthly_budget_amount_usd = var.monthly_budget_amount_usd
@@ -364,6 +482,8 @@ module "monitoring" {
   depends_on = [
     module.project_services,
     module.cloud_run,
+    module.transcription_worker_cloud_run,
+    module.document_generation_worker_cloud_run,
     module.copilot_agent_cloud_run,
     module.cloud_sql,
   ]

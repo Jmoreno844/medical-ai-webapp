@@ -36,6 +36,11 @@ Para local, el backend y el contenedor Docker de PostgreSQL usan `5433` por defe
 - `TRANSCRIPTION_TASK_TARGET_URL=http://localhost:8001/api/v1/internal/transcription/tasks`
 - `GENERATE_DOCUMENT_CLOUD_FUNCTION_URL=http://localhost:8083`
 
+Para transcripcion por secciones, `ENVIRONMENT=local` debe usar `BackgroundTasks`
+como fallback por defecto. Puedes probar Cloud Tasks real desde local solo si la
+cola GCP esta completamente configurada y el worker HTTP es alcanzable desde
+Google; `localhost:8001` no sirve como destino real de entrega para Cloud Tasks.
+
 La ruta recomendada para firmar URLs de GCS en local es ADC + impersonación. Usa `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH` solo como excepción.
 
 ### Frontend
@@ -110,6 +115,27 @@ Para local, el valor recomendado es reutilizar la misma base `medical_web_app` q
 La integración LangSmith del `copilot_agent` y de `cloud_functions` queda limitada a `local` y registra solo metadata sanitizada del request/run. No envía transcripciones completas, documentos generados ni tokens a LangSmith.
 
 ## 2. Base de datos
+
+Desde `backend_fastapi/` puedes usar:
+
+```bash
+make db-up
+```
+
+Si la base es nueva, prepara contenedor + esquema con:
+
+```bash
+make db-ready
+```
+
+O, si prefieres desde la raíz:
+
+```bash
+make -C backend_fastapi db-up
+make -C backend_fastapi db-ready
+```
+
+Ese target crea o arranca el contenedor local `medical-web-app-db` en `5433`.
 
 ```bash
 docker run --name medical-web-app-db \

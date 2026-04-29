@@ -116,6 +116,7 @@ export const useVoiceRecorder = (
   const recordingSessionIdRef = useRef<string | null>(null);
   const isRecordingRef = useRef(false);
   const isPausedRef = useRef(false);
+  const isStoppingRef = useRef(false);
   const audioMimeTypeRef = useRef("audio/webm");
   const sectionFlushRef = useRef<Promise<void> | null>(null);
   const activeSectionRef = useRef<RecorderSection | null>(null);
@@ -156,6 +157,7 @@ export const useVoiceRecorder = (
     recordingSessionIdRef.current = null;
     isRecordingRef.current = false;
     isPausedRef.current = false;
+    isStoppingRef.current = false;
     activeSectionRef.current = null;
     retiringSectionRef.current = null;
     forcedSplitInFlightRef.current = false;
@@ -275,9 +277,12 @@ export const useVoiceRecorder = (
     setPendingAudioSections(sections.length);
   };
 
-  const processPendingSections = async () => {
+  const processPendingSections = async ({
+    finishSessionsWhenDrained = false,
+  }: { finishSessionsWhenDrained?: boolean } = {}) => {
     const sections = await listPendingSections(encounterId);
     setPendingAudioSections(sections.length);
+    const processedSessionIds = new Set<string>();
 
     for (const section of sections) {
       if (!section.blob) {
@@ -370,6 +375,7 @@ export const useVoiceRecorder = (
           backend_section_id: registerResult.backendSectionId,
         });
         await deleteLocalSectionBlob(section.local_section_id);
+        processedSessionIds.add(section.recording_session_id);
       } catch (error) {
         logger.error(
           "[VOICE_RECORDER] Error processing pending section:",
@@ -382,12 +388,24 @@ export const useVoiceRecorder = (
     }
 
     await refreshPendingSectionCount();
+    if (finishSessionsWhenDrained && processedSessionIds.size > 0) {
+      const remainingSections = await listPendingSections(encounterId);
+      if (remainingSections.length === 0) {
+        await Promise.all(
+          Array.from(processedSessionIds).map((sessionId) =>
+            finishRecordingSession(sessionId),
+          ),
+        );
+      }
+    }
   };
 
   useEffect(() => {
-    void processPendingSections();
+    void processPendingSections({ finishSessionsWhenDrained: true });
     const handleOnline = () => {
-      void processPendingSections();
+      void processPendingSections({
+        finishSessionsWhenDrained: !isRecordingRef.current,
+      });
     };
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
@@ -504,7 +522,17 @@ export const useVoiceRecorder = (
 
     return new Promise((resolve) => {
       const mimeType = mediaRecorder.mimeType || audioMimeTypeRef.current;
-      mediaRecorder.onstop = () => {
+      let settled = false;
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+      const settle = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
         const blob =
           section.chunks.length > 0
             ? new Blob(section.chunks, { type: mimeType })
@@ -512,15 +540,27 @@ export const useVoiceRecorder = (
         section.chunks = [];
         resolve({ blob, endTimeMs });
       };
+
+      mediaRecorder.onstop = settle;
+      timeoutId = setTimeout(() => {
+        logger.warn("[VOICE_RECORDER] MediaRecorder stop timed out; finalizing available chunks");
+        settle();
+      }, 2500);
+
       try {
-        mediaRecorder.requestData();
+        if (mediaRecorder.state === "paused") {
+          mediaRecorder.resume();
+        }
+        if (mediaRecorder.state !== "inactive") {
+          mediaRecorder.requestData();
+        }
         mediaRecorder.stop();
       } catch (error) {
         logger.error(
           "[VOICE_RECORDER] Failed to stop section recorder:",
           error,
         );
-        resolve({ blob: null, endTimeMs });
+        settle();
       }
     });
   };
@@ -850,7 +890,8 @@ export const useVoiceRecorder = (
       mediaStreamRef.current = stream;
       audioMimeTypeRef.current = supportedType;
       chunksRef.current = [];
-      recordingStartedAtRef.current = Date.now();
+      const resumeDurationSeconds = audioExists && !isAudioExpired ? duration : 0;
+      recordingStartedAtRef.current = Date.now() - resumeDurationSeconds * 1000;
       nextSectionIndexRef.current = 0;
       activeSectionRef.current = null;
       retiringSectionRef.current = null;
@@ -858,8 +899,7 @@ export const useVoiceRecorder = (
       segmentationModeRef.current = "timer";
       await teardownVadMonitoring();
 
-      // Reset duration if we're starting a new recording
-      if (audioExists) {
+      if (isAudioExpired) {
         setDuration(0);
         setAudioExpiresAt(null);
         setIsAudioExpired(false);
@@ -887,31 +927,40 @@ export const useVoiceRecorder = (
    * Toggles between paused and recording states, managing the timer accordingly
    */
   const pauseResumeRecording = () => {
-    if (!mediaRecorderRef.current || !isRecording) return;
+    if (!mediaRecorderRef.current || !isRecordingRef.current || isStoppingRef.current) {
+      return;
+    }
 
     try {
-      if (isPaused) {
+      if (isPausedRef.current) {
         // Resume recording
-        mediaRecorderRef.current.resume();
+        if (mediaRecorderRef.current.state === "paused") {
+          mediaRecorderRef.current.resume();
+        }
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
         timerRef.current = setInterval(() => {
           setDuration((prev) => prev + 1);
         }, 1000);
-        armSectionBoundaryControl();
         isPausedRef.current = false;
         setIsPaused(false);
+        armSectionBoundaryControl();
       } else {
         // Pause recording
+        isPausedRef.current = true;
+        setIsPaused(true);
         clearSectionBoundaryTimers();
         if (forcedSplitInFlightRef.current) {
           void finalizeRetiringSection();
         }
-        mediaRecorderRef.current.pause();
+        if (mediaRecorderRef.current.state === "recording") {
+          mediaRecorderRef.current.pause();
+        }
         if (timerRef.current) {
           clearInterval(timerRef.current);
           timerRef.current = null;
         }
-        isPausedRef.current = true;
-        setIsPaused(true);
       }
     } catch (error) {
       logger.error("Error pausing/resuming recording:", error);
@@ -924,11 +973,31 @@ export const useVoiceRecorder = (
    * Handles resuming if paused, then stops the recording and cleans up resources
    */
   const stopRecording = async () => {
-    if (mediaRecorderRef.current) {
+    if (isStoppingRef.current) {
+      return;
+    }
+
+    if (
+      mediaRecorderRef.current ||
+      activeSectionRef.current ||
+      retiringSectionRef.current
+    ) {
+      isStoppingRef.current = true;
+      isRecordingRef.current = false;
+      isPausedRef.current = false;
+      setIsRecording(false);
+      setIsPaused(false);
+      clearSectionBoundaryTimers();
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+
       // If paused, we need to resume first before stopping
-      if (isPaused && mediaRecorderRef.current.state === "paused") {
+      const recorderToStop = mediaRecorderRef.current;
+      if (isPaused && recorderToStop?.state === "paused") {
         try {
-          mediaRecorderRef.current.resume();
+          recorderToStop.resume();
         } catch (error) {
           logger.error("Error resuming recording before stop:", error);
         }
@@ -936,112 +1005,103 @@ export const useVoiceRecorder = (
 
       // Now stop the recording
       try {
-        isRecordingRef.current = false;
-        isPausedRef.current = false;
-        clearSectionBoundaryTimers();
         await teardownVadMonitoring();
 
         if (forcedSplitInFlightRef.current) {
           await finalizeRetiringSection();
         }
 
-        void flushCurrentSection(true).then(async () => {
-          if (recordingSessionIdRef.current) {
-            await finishRecordingSession(recordingSessionIdRef.current);
-          }
+        await flushCurrentSection(true);
 
-          // The sectioned transcription flow already uploaded each section to GCS.
-          // The legacy full-audio upload is only used when there is no active
-          // recording session backing the near realtime path.
-          if (transcriptionDocIdRef.current && !recordingSessionIdRef.current) {
-            try {
-              if (!encounterId || encounterId <= 0) {
-                logger.error(
-                  "[VOICE_RECORDER] Invalid encounterId in stopRecording:",
-                  encounterId,
-                );
-                return;
-              }
-              const uploadUrl = await generateAudioUploadUrl(
+        if (recordingSessionIdRef.current) {
+          await finishRecordingSession(recordingSessionIdRef.current);
+        }
+
+        // Sectioned recordings upload each chunk to GCS as they are captured.
+        // Whole-audio upload is only needed when no recording session exists.
+        if (transcriptionDocIdRef.current && !recordingSessionIdRef.current) {
+          try {
+            if (!encounterId || encounterId <= 0) {
+              logger.error(
+                "[VOICE_RECORDER] Invalid encounterId in stopRecording:",
                 encounterId,
-                duration,
+              );
+              return;
+            }
+            const uploadUrl = await generateAudioUploadUrl(
+              encounterId,
+              duration,
+            );
+
+            if (!uploadUrl) {
+              logger.error("[VOICE_RECORDER] Failed to get upload URL");
+              return;
+            }
+
+            // Get the current audio blob
+            const currentAudioBlob =
+              chunksRef.current.length > 0
+                ? new Blob(chunksRef.current, {
+                    type: audioMimeTypeRef.current,
+                  })
+                : null;
+
+            if (currentAudioBlob) {
+              // Upload using the dedicated function
+              const uploadSuccess = await uploadAudioToCloud(
+                currentAudioBlob,
+                uploadUrl,
+                audioMimeTypeRef.current,
               );
 
-              if (!uploadUrl) {
-                logger.error("[VOICE_RECORDER] Failed to get upload URL");
-                return;
-              }
-
-              // Get the current audio blob
-              const currentAudioBlob =
-                chunksRef.current.length > 0
-                  ? new Blob(chunksRef.current, {
-                      type: audioMimeTypeRef.current,
-                    })
-                  : null;
-
-              if (currentAudioBlob) {
-                // Upload using the dedicated function
-                const uploadSuccess = await uploadAudioToCloud(
-                  currentAudioBlob,
-                  uploadUrl,
-                  audioMimeTypeRef.current,
-                );
-
-                if (!uploadSuccess) {
-                  logger.error(
-                    "[VOICE_RECORDER] Failed to upload audio recording",
-                  );
-                } else {
-                  setIsAudioExpired(false);
-                  setAudioExpiresAt(null);
-                }
-              } else {
+              if (!uploadSuccess) {
                 logger.error(
-                  "[VOICE_RECORDER] No audio data available to upload",
+                  "[VOICE_RECORDER] Failed to upload audio recording",
                 );
+              } else {
+                setIsAudioExpired(false);
+                setAudioExpiresAt(null);
               }
-            } catch (error) {
+            } else {
               logger.error(
-                "[VOICE_RECORDER] Error during upload process:",
-                error,
+                "[VOICE_RECORDER] No audio data available to upload",
               );
             }
-          } else if (recordingSessionIdRef.current) {
-            logger.debug(
-              "[VOICE_RECORDER] Sectioned transcription session finished; skipping legacy full-audio upload because sections were already uploaded to GCS",
-            );
-          } else {
-            logger.debug(
-              "[VOICE_RECORDER] No transcription document ID available for legacy full-audio upload; skipping encounter audio upload",
+          } catch (error) {
+            logger.error(
+              "[VOICE_RECORDER] Error during upload process:",
+              error,
             );
           }
-          const finalAudioBlob = new Blob(chunksRef.current, {
-            type: audioMimeTypeRef.current,
-          });
-          const fileSizeKB = finalAudioBlob.size / 1024;
+        } else if (recordingSessionIdRef.current) {
           logger.debug(
-            `[VOICE_RECORDER] Recording complete: ${fileSizeKB.toFixed(
-              2,
-            )} KB, ${duration} seconds`,
+            "[VOICE_RECORDER] Sectioned transcription session finished; skipping whole-audio upload because sections were already uploaded to GCS",
           );
-          setAudioExists(true);
-          mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
-          mediaStreamRef.current = null;
-          mediaRecorderRef.current = null;
+        } else {
+          logger.debug(
+            "[VOICE_RECORDER] No transcription document ID available for whole-audio upload; skipping encounter audio upload",
+          );
+        }
+        const finalAudioBlob = new Blob(chunksRef.current, {
+          type: audioMimeTypeRef.current,
         });
+        const fileSizeKB = finalAudioBlob.size / 1024;
+        logger.debug(
+          `[VOICE_RECORDER] Recording complete: ${fileSizeKB.toFixed(
+            2,
+          )} KB, ${duration} seconds`,
+        );
+        setAudioExists(true);
       } catch (error) {
         logger.error("Error stopping recording:", error);
-      }
-
-      // Update states
-      setIsRecording(false);
-      setIsPaused(false);
-
-      // Clear timer
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
+      } finally {
+        mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        activeSectionRef.current = null;
+        retiringSectionRef.current = null;
+        forcedSplitInFlightRef.current = false;
+        isStoppingRef.current = false;
       }
     }
   };

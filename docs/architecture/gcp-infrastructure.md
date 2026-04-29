@@ -16,7 +16,9 @@ IaC: `infra/` en la raíz del repo.
 | ------------------ | ------------------------------- | ------------------------------------------------- |
 | Cloud Run service  | `vexthealth-backend`            | `vexthealth-backend`                              |
 | Cloud Run copilot  | `vexthealth-copilot-agent`      | `vexthealth-copilot-agent`                        |
-| Cloud Function     | `<nombre-funcional>`            | `document-workflow`                               |
+| Cloud Run worker   | `vexthealth-transcription-worker` | `vexthealth-transcription-worker`               |
+| Cloud Run worker   | `vexthealth-document-generation-worker` | `vexthealth-document-generation-worker`   |
+| Cloud Function     | `<nombre-funcional>`            | `transcription-endpoint`                          |
 | Cloud SQL instance | `vexthealth-db-<env>`           | `vexthealth-db-stg`                               |
 | GCS audio          | `<project>-audio`               | `vext-stg-audio`                                  |
 | GCS frontend       | `<project>-frontend-spa`        | `vext-stg-frontend-spa`                           |
@@ -36,8 +38,7 @@ IaC: `infra/` en la raíz del repo.
 | `roles/secretmanager.secretAccessor`                               | Leer secrets montados como env vars                              |
 | `roles/storage.objectAdmin` sobre `*-audio`                        | Subir/firmar URLs de audio en GCS                                |
 | `roles/cloudtrace.agent`                                           | Enviar trazas a Cloud Trace                                      |
-| `roles/cloudtasks.enqueuer`                                        | Encolar tareas de transcripción                                  |
-| `roles/aiplatform.user`                                            | Llamar Gemini/Vertex AI desde el worker interno de transcripción |
+| `roles/cloudtasks.enqueuer`                                        | Encolar tareas de transcripción y generación documental          |
 | `roles/run.invoker`                                                | Invocar el copilot agent service por contrato interno            |
 | `roles/iam.serviceAccountUser` sobre `cloud-tasks-invoker`         | Crear tasks autenticadas con OIDC                                |
 | `roles/iam.serviceAccountTokenCreator` sobre `cloud-tasks-invoker` | Permitir que Cloud Tasks use la identidad del invoker SA         |
@@ -52,6 +53,24 @@ IaC: `infra/` en la raíz del repo.
 | `roles/secretmanager.secretAccessor` | Leer secret compartido del broker |
 | `roles/cloudtrace.agent`             | Enviar trazas a Cloud Trace       |
 
+### transcription-worker-runner (Cloud Run)
+
+| Rol                                                        | Justificación                                        |
+| ---------------------------------------------------------- | ---------------------------------------------------- |
+| `roles/storage.objectViewer` sobre `*-audio`               | Leer secciones de audio desde GCS                    |
+| `roles/aiplatform.user`                                    | Llamar Gemini para transcripción por sección         |
+| `roles/cloudtrace.agent`                                   | Enviar trazas saneadas a Cloud Trace                 |
+| `roles/run.invoker`                                        | Llamar callbacks internos del backend FastAPI        |
+
+### document-generation-runner (Cloud Run)
+
+| Rol                                  | Justificación                                  |
+| ------------------------------------ | ---------------------------------------------- |
+| `roles/aiplatform.user`              | Llamar Gemini para generación documental       |
+| `roles/cloudtrace.agent`             | Enviar trazas saneadas a Cloud Trace           |
+| `roles/run.invoker`                  | Pedir work-items internos al backend FastAPI   |
+| `roles/secretmanager.secretAccessor` | Leer API key de LangSmith si se habilita en stg |
+
 ### cloud-functions-runner (Cloud Functions)
 
 | Rol                                          | Justificación                        |
@@ -65,7 +84,7 @@ IaC: `infra/` en la raíz del repo.
 
 | Rol                 | Justificación                                                             |
 | ------------------- | ------------------------------------------------------------------------- |
-| `roles/run.invoker` | Invocar el endpoint interno de transcripción en Cloud Run vía Cloud Tasks |
+| `roles/run.invoker` | Invocar workers privados en Cloud Run vía Cloud Tasks |
 
 ### github-actions-deployer (CI/CD via WIF)
 
@@ -90,6 +109,7 @@ echo -n "VALOR" | gcloud secrets versions add SECRET_ID --data-file=-
 | `jwt-secret-key`             | Cloud Run               | Firmado de JWTs (SSE, service)                              |
 | `service-account-json`       | Cloud Run               | Opcional; solo si se fuerza una SA key en lugar de ADC      |
 | `copilot-service-shared-jwt` | Backend + Copilot Agent | JWT compartido para broker interno FastAPI -> agent runtime |
+| `langsmith-api-key`          | Document Worker         | Opcional; necesario si se activa LangSmith en stg           |
 
 ### Rotación de secrets
 
@@ -110,7 +130,8 @@ El bucket `*-audio` también necesita CORS para subida directa desde el navegado
 
 | Queue                           | Max attempts | Min backoff | Max backoff | Target                                                                            |
 | ------------------------------- | ------------ | ----------- | ----------- | --------------------------------------------------------------------------------- |
-| `audio-transcription-queue-stg` | 3            | 10s         | 300s        | FastAPI internal transcription worker (Cloud Run, OIDC con `cloud-tasks-invoker`) |
+| `audio-transcription-queue-stg` | 3            | 10s         | 300s        | `transcription-worker` Cloud Run (OIDC con `cloud-tasks-invoker`) |
+| `document-generation-queue-stg` | 3            | 10s         | 300s        | `document-generation-worker` Cloud Run (OIDC con `cloud-tasks-invoker`) |
 
 ## Cloud Run — configuración clave
 
@@ -138,13 +159,33 @@ sesión hasta que exista un broker compartido.
 | `session-affinity`      | `false`                      | No depende del hub SSE actual           |
 | `Cloud SQL`             | misma instancia, DB separada | Checkpoints y memoria lógica del agente |
 
+### Transcription Worker Cloud Run — configuración inicial
+
+| Parámetro               | Valor (stg)                     | Nota                                                  |
+| ----------------------- | ------------------------------- | ----------------------------------------------------- |
+| `allow-unauthenticated` | `false`                         | Solo Cloud Tasks invoca endpoints de trabajo          |
+| `max-instances`         | `5`                             | Escala independiente del backend con SSE en memoria   |
+| `max-concurrency`       | `8`                             | El worker además limita VAD/Gemini con semáforos      |
+| `cpu` / `memory`        | `2 vCPU` / `1Gi`                | Silero ONNX usa `ORT_INTRA_OP_NUM_THREADS=1`          |
+| `session-affinity`      | `false`                         | No mantiene estado por cliente                        |
+| `Cloud SQL`             | No                              | FastAPI conserva la autoridad de base de datos        |
+
+### Document Generation Worker Cloud Run — configuración inicial
+
+| Parámetro               | Valor (stg)                     | Nota                                                  |
+| ----------------------- | ------------------------------- | ----------------------------------------------------- |
+| `allow-unauthenticated` | `false`                         | Solo Cloud Tasks invoca endpoints de trabajo          |
+| `max-instances`         | `5`                             | Escala independiente del backend con SSE en memoria   |
+| `max-concurrency`       | `8`                             | Gemini streaming se limita además con semáforo        |
+| `cpu` / `memory`        | `1 vCPU` / `1Gi`                | Sin dependencias de audio/ONNX                        |
+| `session-affinity`      | `false`                         | No mantiene estado por cliente                        |
+| `Cloud SQL`             | No                              | FastAPI conserva la autoridad de base de datos        |
+
 ## Cloud Functions — IAM auth
 
-La función `document-workflow` está desplegada con `--no-allow-unauthenticated`.
-
-Solo las service accounts autorizadas pueden invocarlas:
-
-- `document-workflow` ← `backend-runner` (HTTP directo desde Cloud Run)
+La función legacy `transcription-endpoint` está desplegada con
+`--no-allow-unauthenticated`. La generación documental ya no se despliega como
+Cloud Function.
 
 ## Workload Identity Federation
 
@@ -169,18 +210,22 @@ Después de `terraform apply`, configurar las mismas claves como **variables del
 | `GH_DEPLOYER_SA`                | `github-actions-deployer@vext-stg.iam.gserviceaccount.com`                                                                                      |
 | `BACKEND_SERVICE_ACCOUNT`       | `backend-runner@vext-stg.iam.gserviceaccount.com`                                                                                               |
 | `COPILOT_AGENT_SERVICE_ACCOUNT` | `copilot-agent-runner@vext-stg.iam.gserviceaccount.com`                                                                                         |
+| `TRANSCRIPTION_WORKER_SERVICE_ACCOUNT` | `transcription-worker-runner@vext-stg.iam.gserviceaccount.com`                                                                           |
+| `DOCUMENT_GENERATION_WORKER_SERVICE_ACCOUNT` | `document-generation-runner@vext-stg.iam.gserviceaccount.com`                                                                    |
 | `COPILOT_AGENT_DB_NAME`         | `vext-stg-copilot`                                                                                                                              |
 | `GCS_BUCKET_NAME`               | `vext-stg-audio`                                                                                                                                |
 | `FRONTEND_BUCKET_NAME`          | `vext-stg-frontend-spa`                                                                                                                         |
 | `CF_SOURCE_BUCKET`              | output Terraform `cf_source_bucket`                                                                                                             |
 | `VITE_API_URL`                  | URL de Cloud Run (output)                                                                                                                       |
 | `COPILOT_AGENT_URL`             | URL del copilot agent service (output)                                                                                                          |
+| `TRANSCRIPTION_WORKER_URL`      | URL del transcription worker Cloud Run (output `transcription_worker_cloud_run_url`)                                                            |
+| `DOCUMENT_GENERATION_WORKER_URL` | URL del document generation worker Cloud Run (output `document_generation_worker_cloud_run_url`)                                                 |
 | _(build)_ `VITE_BASE_URL`       | El workflow de frontend la deriva de `FRONTEND_BUCKET_NAME` (`/{bucket}/`) para que los assets carguen bajo `storage.googleapis.com/{bucket}/`. |
 | `CF_SOURCE_OBJECT`              | _(opcional)_ Objeto del zip; por defecto `cloud-functions.zip` (igual que `cf_source_object` en Terraform)                                      |
 | `LANDING_BUCKET_NAME`           | Bucket del workflow de landing page si se usa ese deploy                                                                                        |
-| `GEMINI_MODEL`                  | _(opcional)_ Modelo usado por Cloud Functions cuando el workflow de generación lo expone                                                        |
-| `TRANSCRIPTION_GEMINI_MODEL`    | _(opcional)_ Modelo usado por la transcripción de FastAPI; si no existe, se usa `gemini-2.5-flash`                                              |
-| `VERTEX_AI_LOCATION`            | `global` para modelos Gemini 3.x en FastAPI; no confundir con `CLOUD_TASKS_REGION`, que sigue siendo la región de la cola                       |
+| `GEMINI_MODEL`                  | _(opcional)_ Modelo usado por document generation worker; si no existe, se usa `gemini-3.1-flash-lite-preview`                                  |
+| `TRANSCRIPTION_GEMINI_MODEL`    | _(opcional)_ Modelo usado por transcription worker y legacy transcription Cloud Function; si no existe, se usa `gemini-2.5-flash`               |
+| `VERTEX_AI_LOCATION`            | `global` para modelos Gemini en workers; no confundir con `CLOUD_TASKS_REGION`, que sigue siendo la región de la cola                           |
 
 El secret `GCP_SA_KEY` puede eliminarse una vez confirmado que WIF funciona.
 
@@ -192,7 +237,7 @@ El workflow [`.github/workflows/deploy-cloud-function-stg.yaml`](../../.github/w
 
 1. Usa el bucket `gs://{proyecto}-cf-source` creado por Terraform.
 2. Genera un zip del directorio `cloud_functions/functions/` (excluye `__pycache__`, `.venv`, etc.) y lo sube a `cloud-functions.zip`.
-3. Despliega `document-workflow` con `gcloud functions deploy` (origen local, igual que antes).
+3. Despliega `transcription-endpoint` con `gcloud functions deploy` (origen local, igual que antes).
 4. Aplica el binding IAM de invocación para `backend-runner`.
 
 Así el artefacto en GCS queda alineado con Terraform, pero el runtime de las funciones en `stg` queda controlado por CI.

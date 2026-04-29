@@ -48,7 +48,6 @@ def test_local_and_test_settings_have_safe_defaults(
     assert local_settings.debug is True
     assert local_settings.cookie_secure is False
     assert "http://localhost:5173" in local_settings.cors_allowed_origins
-    assert local_settings.transcription_gemini_model == "gemini-2.5-flash"
     assert local_settings.vertex_ai_location == "global"
     assert test_settings.debug is False
     assert test_settings.cookie_secure is False

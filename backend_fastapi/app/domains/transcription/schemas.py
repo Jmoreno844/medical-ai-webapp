@@ -94,3 +94,27 @@ class RecordingSessionFinishResponse(BaseModel):
     success: bool
     status: str | None = None
     error: str | None = None
+
+
+class SectionWorkItemResponse(BaseModel):
+    section_id: str
+    session_id: str
+    encounter_id: int
+    document_id: int
+    section_index: int
+    gcs_object_name: str
+    gcs_uri: str
+    content_type: str
+
+
+class SectionResultRequest(BaseModel):
+    status: str
+    transcript: str | None = None
+    error_code: str | None = None
+    vad_decision: str | None = None
+    vad_speech_ms: int | None = None
+    vad_speech_ratio: float | None = None
+    vad_error_code: str | None = None
+    gemini_model: str | None = None
+    gemini_latency_ms: int | None = None
+    worker_latency_ms: int | None = None

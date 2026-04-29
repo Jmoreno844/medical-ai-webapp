@@ -29,10 +29,11 @@ Browser mic
   -> signed upload URL por seccion
   -> GCS
   -> FastAPI registra metadata idempotente
-  -> Cloud Tasks por seccion o BackgroundTasks en local
-  -> FastAPI internal worker transcribe con Gemini async sobre Vertex AI
+  -> Cloud Tasks por seccion hacia transcription_worker
+  -> transcription_worker corre Silero ONNX VAD y Gemini async sobre Vertex AI
+  -> FastAPI recibe callback saneado, persiste estado y publica SSE
   -> SSE publica updates parciales si el cliente esta conectado
-  -> Cloud Task final consolida los textos ordenados por section_index
+  -> FastAPI finaliza uniendo textos ordenados por section_index
 ```
 
 El navegador conserva una cola local en IndexedDB hasta que FastAPI confirme que
@@ -50,28 +51,30 @@ en el navegador:
   `transcription_audio_section` con unicidad por
   `(recording_session_id, client_section_id)` y por
   `(recording_session_id, section_index)`.
-- Cloud Tasks apunta al worker interno de FastAPI; en desarrollo local el flujo
-  usa `BackgroundTasks` para no depender del emulador de Cloud Tasks.
-- El worker llama Gemini async mediante `google-genai` sobre Vertex AI, guarda
-  `raw_transcript`, evita llamar a Gemini de nuevo si una seccion ya esta
-  transcrita y publica `transcription_update` por SSE. El modelo por defecto de
-  transcripcion es `gemini-2.5-flash` con `VERTEX_AI_LOCATION=global`.
+- Cloud Tasks apunta a `transcription_worker`, un Cloud Run privado que descarga
+  la seccion desde GCS, ejecuta Silero ONNX VAD, llama Gemini async mediante
+  `google-genai` solo cuando hay habla y devuelve callbacks saneados a FastAPI.
+  En desarrollo local, FastAPI puede llamar ese worker mediante
+  `TRANSCRIPTION_WORKER_BASE_URL` sin emulador de Cloud Tasks.
+- FastAPI guarda `raw_transcript`, evita procesar de nuevo si una seccion ya
+  esta `transcribed` o `discarded_no_speech` y publica `transcription_update`
+  por SSE. El modelo por defecto de transcripcion es `gemini-2.5-flash` con
+  `VERTEX_AI_LOCATION=global`.
 - Ademas del `raw_transcript` por seccion, FastAPI sincroniza el merge parcial
   en `document.content_markdown` durante la sesion para que un refresh o
   reconexion recupere el ultimo texto realtime aunque el SSE en memoria se haya
-  perdido. La consolidacion final sigue siendo la que deja el contenido canonico
-  definitivo.
-- La consolidacion final ordena por `section_index`, aplica un prompt
-  conservador para remover duplicados de overlap y escribe el documento final.
+  perdido. La finalizacion deterministica deja el contenido canonico definitivo.
+- La finalizacion ordena por `section_index`, une los textos no vacios y aplica
+  deduplicacion ligera de overlap sin una llamada adicional a Gemini.
 - El frontend graba blobs WebM independientes por seccion, usa VAD basado en
   Web Audio para cerrar por pausa natural, mantiene un maximo forzado de `25s`,
   usa `overlap_ms=1500` solo en cortes forzados, guarda blobs pendientes en
   IndexedDB, reintenta al abrir/reconectar, borra el blob local solo despues
   del registro durable en FastAPI y conserva el flujo legacy de audio completo
   como fallback/migracion.
-- Infraestructura deja la transcripcion en FastAPI/Cloud Tasks, mantiene la
-  Cloud Function para generacion documental, otorga al backend permisos de
-  Vertex AI y reduce la concurrencia inicial de dispatch de tareas.
+- Infraestructura deja la transcripcion en FastAPI/Cloud Tasks y la generacion
+  documental en `document_generation_worker`; Cloud Functions queda solo para
+  transcripcion legacy.
 
 ## Contrato de secciones
 
@@ -119,7 +122,7 @@ PostgreSQL son la fuente de verdad.
 ## Orden
 
 No se debe confiar en el orden de llegada de uploads, callbacks o eventos SSE.
-Toda vista continua y toda consolidacion final deben ordenar por:
+Toda vista continua y toda finalizacion deben ordenar por:
 
 ```sql
 ORDER BY section_index ASC
@@ -146,9 +149,9 @@ navegador con estos parametros operativos:
 
 El overlap protege cortes artificiales, pero produce texto duplicado. Por eso
 cada seccion conserva su `raw_transcript` y la union visible se considera
-preliminar hasta la consolidacion.
+preliminar hasta la finalizacion de la sesion.
 
-## Deduplicacion y consolidacion
+## Deduplicacion y finalizacion
 
 El backend aplica deduplicacion ligera al unir secciones para la vista
 preliminar. La deduplicacion no debe interpretar hechos clinicos; solo debe
@@ -160,18 +163,11 @@ Seccion 2: "desde ayer. Niega fiebre."
 Union:      "El paciente refiere dolor abdominal desde ayer. Niega fiebre."
 ```
 
-La consolidacion final se ejecuta sobre los `raw_transcript` ordenados. El prompt
-de Gemini debe indicar explicitamente:
+La finalizacion se ejecuta en FastAPI sobre los `raw_transcript` ordenados. No
+hace una segunda llamada a Gemini; solo une textos no vacios con la misma
+deduplicacion ligera de overlap.
 
-```text
-Une las secciones en una sola transcripcion.
-Elimina frases o palabras repetidas causadas por audio solapado.
-Mejora solo puntuacion y continuidad textual.
-No resumas, no agregues, no omitas y no cambies hechos clinicos.
-Conserva dudas o partes inaudibles como [inaudible].
-```
-
-Antes de alimentar la vista realtime y la consolidacion final, FastAPI aplica
+Antes de alimentar la vista realtime y la finalizacion, FastAPI aplica
 una normalizacion textual conservadora sobre una copia derivada del
 `raw_transcript`:
 
@@ -205,7 +201,7 @@ debe leer IndexedDB, detectar secciones pendientes y reanudar la subida.
 
 Una vez registrada la seccion, el frontend deja de reintentar transcripcion.
 Desde ese punto, Cloud Tasks y el backend manejan retries, estados y
-consolidacion.
+finalizacion.
 
 ## Alternativas consideradas
 
@@ -229,10 +225,17 @@ durables. Para transcripcion por secciones se mantiene Cloud Tasks.
 
 ### Cloud Function como worker de transcripcion
 
-Fue el patrón original para audio completo, pero la primera version por secciones
-mantiene el worker dentro de FastAPI para reducir piezas operativas. La llamada
-a Gemini debe usar el Google Gen AI SDK async; no se debe usar
-`vertexai.generative_models` dentro del backend.
+Fue el patrón original para audio completo. Para secciones near realtime se
+prefiere Cloud Run porque permite empaquetar ONNX/ffmpeg, controlar concurrencia
+por contenedor y mantener paridad local con Docker. La llamada a Gemini debe
+usar el Google Gen AI SDK async; no se debe usar `vertexai.generative_models`.
+
+### Worker Cloud Run dedicado
+
+La version actual mueve VAD y Gemini de transcripcion a
+`transcription_worker` para aislar CPU/dependencias ONNX y permitir escala
+independiente del backend, que sigue limitado por SSE en memoria. FastAPI
+conserva la base de datos, merge canonico, callbacks y SSE.
 
 ## Consecuencias
 
@@ -249,7 +252,7 @@ a Gemini debe usar el Google Gen AI SDK async; no se debe usar
 - Requiere nuevas tablas o campos para sesiones y secciones.
 - Requiere cola local en IndexedDB y reanudacion en frontend.
 - La deduplicacion debe ser conservadora para no alterar contenido clinico.
-- La consolidacion final debe manejar secciones faltantes o fallidas.
+- La finalizacion debe manejar secciones faltantes o fallidas.
 - El volumen de tasks y objetos GCS crece con secciones cortas.
 
 ## Notas de implementacion
@@ -257,6 +260,8 @@ a Gemini debe usar el Google Gen AI SDK async; no se debe usar
 - Los endpoints de registro de seccion deben ser idempotentes.
 - Los endpoints internos de Cloud Tasks deben actualizar secciones existentes, no
   crear nuevas filas.
+- El worker dedicado no debe escribir directamente en PostgreSQL ni publicar SSE;
+  debe devolver callbacks saneados a FastAPI.
 - Los eventos SSE son solo notificaciones live; el estado recuperable vive en
   PostgreSQL y en la cola local del navegador antes del registro.
 - IndexedDB borra el blob local cuando FastAPI confirma el registro durable de

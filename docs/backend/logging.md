@@ -22,4 +22,13 @@
 ## Relación con otros servicios
 
 - El frontend usa su propia política en [`../frontend/logging.md`](../frontend/logging.md).
-- Cloud Functions debe seguir el mismo principio de saneamiento: metadatos sí, contenido clínico no.
+- Cloud Functions, `transcription_worker` y `document_generation_worker` deben
+  seguir el mismo principio de saneamiento: metadatos sí, contenido clínico no.
+- `transcription_worker` puede loguear `section_id`, `session_id`,
+  `document_id`, `encounter_id`, decisión VAD, latencias, modelo y códigos de
+  error. No debe loguear transcripciones, audio, signed URLs, prompts,
+  respuestas crudas de Gemini, JWTs/OIDC ni payloads completos.
+- `document_generation_worker` puede loguear `process_id`, `document_id`,
+  `encounter_id`, `doctor_template_id`, modelo, latencias y códigos de error.
+  No debe loguear prompts, documentos, transcripciones, chunks generados,
+  respuestas crudas de Gemini, JWTs/OIDC ni payloads completos.

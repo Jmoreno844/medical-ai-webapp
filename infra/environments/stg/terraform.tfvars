@@ -17,18 +17,26 @@ db_name               = "vext-stg"
 copilot_agent_db_name = "vext-stg-copilot"
 
 # Cloud Run
-cloud_run_service_name     = "vexthealth-backend"
-copilot_agent_service_name = "vexthealth-copilot-agent"
+cloud_run_service_name                  = "vexthealth-backend"
+copilot_agent_service_name              = "vexthealth-copilot-agent"
+transcription_worker_service_name       = "vexthealth-transcription-worker"
+document_generation_worker_service_name = "vexthealth-document-generation-worker"
 # Bootstrap with a public image; CI later replaces it with the app image.
-cloud_run_image                     = "us-docker.pkg.dev/cloudrun/container/hello"
-copilot_agent_image                 = "us-docker.pkg.dev/cloudrun/container/hello"
-cloud_run_max_instances             = 1
-cloud_run_max_concurrency           = 250
-copilot_agent_max_instances         = 2
-copilot_agent_max_concurrency       = 20
-cloud_run_use_secret_manager        = false
-cloud_run_allow_unauthenticated     = true # Set false if org policy blocks allUsers on Cloud Run
-copilot_agent_allow_unauthenticated = false
+cloud_run_image                            = "us-docker.pkg.dev/cloudrun/container/hello"
+copilot_agent_image                        = "us-docker.pkg.dev/cloudrun/container/hello"
+transcription_worker_image                 = "us-docker.pkg.dev/cloudrun/container/hello"
+document_generation_worker_image           = "us-docker.pkg.dev/cloudrun/container/hello"
+cloud_run_max_instances                    = 1
+cloud_run_max_concurrency                  = 250
+copilot_agent_max_instances                = 2
+copilot_agent_max_concurrency              = 20
+transcription_worker_max_instances         = 5
+transcription_worker_max_concurrency       = 8
+document_generation_worker_max_instances   = 5
+document_generation_worker_max_concurrency = 8
+cloud_run_use_secret_manager               = false
+cloud_run_allow_unauthenticated            = true # Set false if org policy blocks allUsers on Cloud Run
+copilot_agent_allow_unauthenticated        = false
 
 # Cloud Functions source (deploy from GCS)
 cf_source_bucket = "vext-stg-cf-source"  # TODO: create this bucket or use a deploy script

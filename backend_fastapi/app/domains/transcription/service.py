@@ -25,7 +25,10 @@ from app.domains.transcription.gemini_async import (
     transcribe_gcs_audio,
 )
 from app.domains.transcription.schemas import AudioSectionResponse
-from app.integrations.transcription_tasks import enqueue_transcription_task
+from app.integrations.transcription_tasks import (
+    enqueue_transcription_task,
+    should_use_cloud_tasks,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -105,12 +108,30 @@ async def create_recording_session(
         started_at=now,
         finished_at=None,
         finalized_at=None,
-        consolidated_transcript=None,
+        consolidated_transcript=document.content_markdown.strip() or None,
         error_code=None,
     )
     session.add(recording_session)
     await session.flush()
     return recording_session
+
+
+async def _update_encounter_audio_duration(
+    session: AsyncSession,
+    *,
+    encounter_id: int,
+    end_time_ms: int,
+) -> None:
+    duration_seconds = int((end_time_ms + 999) // 1000)
+    result = await session.execute(
+        select(Encounter).where(Encounter.id == encounter_id)
+    )
+    encounter = result.scalar_one_or_none()
+    if encounter:
+        encounter.audio_duration_seconds = max(
+            encounter.audio_duration_seconds or 0,
+            duration_seconds,
+        )
 
 
 def build_section_object_name(
@@ -162,6 +183,7 @@ async def register_audio_section(
     byte_size: int | None,
 ) -> TranscriptionAudioSection:
     now = datetime.now(timezone.utc)
+    encounter_id = recording_session.encounter_id
     existing = await session.execute(
         select(TranscriptionAudioSection).where(
             TranscriptionAudioSection.recording_session_id == recording_session.id,
@@ -170,6 +192,11 @@ async def register_audio_section(
     )
     section = existing.scalar_one_or_none()
     if section:
+        await _update_encounter_audio_duration(
+            session,
+            encounter_id=encounter_id,
+            end_time_ms=section.end_time_ms,
+        )
         return section
 
     section = TranscriptionAudioSection(
@@ -204,8 +231,18 @@ async def register_audio_section(
         )
         existing_after_race = result.scalar_one_or_none()
         if existing_after_race:
+            await _update_encounter_audio_duration(
+                session,
+                encounter_id=encounter_id,
+                end_time_ms=existing_after_race.end_time_ms,
+            )
             return existing_after_race
         raise
+    await _update_encounter_audio_duration(
+        session,
+        encounter_id=encounter_id,
+        end_time_ms=end_time_ms,
+    )
     return section
 
 
@@ -302,6 +339,28 @@ def _normalize_transcript_for_document(transcript: str | None) -> str:
     return normalized
 
 
+def _merge_session_with_existing_document(
+    recording_session: TranscriptionRecordingSession,
+    session_transcript: str,
+) -> str:
+    base_transcript = _normalize_transcript_for_document(
+        recording_session.consolidated_transcript
+    )
+    if not base_transcript:
+        return session_transcript
+    if not session_transcript:
+        return base_transcript
+    return _merge_with_light_dedup(base_transcript, session_transcript)
+
+
+def is_recording_session_ready_for_consolidation(
+    recording_session: TranscriptionRecordingSession,
+) -> bool:
+    return bool(recording_session.finished_at) and all(
+        item.status == SECTION_STATUS_TRANSCRIBED for item in recording_session.sections
+    )
+
+
 async def process_section_transcription(
     db_session: AsyncSession,
     *,
@@ -362,11 +421,18 @@ async def process_section_transcription(
         _normalize_transcript_for_document(item.raw_transcript)
         for item in sorted(recording_session.sections, key=lambda item: item.section_index)
     ]
-    streaming_content = ""
+    session_streaming_content = ""
     for item in ordered_transcripts:
         if not item:
             continue
-        streaming_content = _merge_with_light_dedup(streaming_content, item)
+        session_streaming_content = _merge_with_light_dedup(
+            session_streaming_content,
+            item,
+        )
+    streaming_content = _merge_session_with_existing_document(
+        recording_session,
+        session_streaming_content,
+    )
 
     # Persist the merged partial transcript so refresh/HMR can recover the last
     # realtime text even before the final consolidation finishes.
@@ -382,11 +448,16 @@ async def process_section_transcription(
         "transcription_update",
         {"content": streaming_content},
     )
-    if recording_session.finished_at and all(
-        item.status == SECTION_STATUS_TRANSCRIBED for item in recording_session.sections
-    ):
+    if is_recording_session_ready_for_consolidation(recording_session):
         try:
-            enqueue_session_consolidation_task(recording_session, settings)
+            if should_use_cloud_tasks(settings):
+                enqueue_session_consolidation_task(recording_session, settings)
+            else:
+                await consolidate_recording_session(
+                    db_session,
+                    session_id=recording_session.session_id,
+                    settings=settings,
+                )
         except Exception:
             logger.exception(
                 "Failed to enqueue consolidation after section %s",
@@ -447,6 +518,7 @@ async def consolidate_recording_session(
         await db_session.commit()
         raise
 
+    consolidated = _merge_session_with_existing_document(recording_session, consolidated)
     set_document_content_fields(
         recording_session.document,
         content_markdown=consolidated,

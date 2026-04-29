@@ -32,6 +32,18 @@ resource "google_service_account" "copilot_agent_runner" {
   display_name = "Cloud Run copilot agent service account"
 }
 
+resource "google_service_account" "transcription_worker_runner" {
+  project      = var.project_id
+  account_id   = "transcription-worker-runner"
+  display_name = "Cloud Run transcription worker service account"
+}
+
+resource "google_service_account" "document_generation_runner" {
+  project      = var.project_id
+  account_id   = "document-generation-runner"
+  display_name = "Cloud Run document generation worker service account"
+}
+
 # ---------------------------------------------------------------------------
 # backend-runner IAM
 # ---------------------------------------------------------------------------
@@ -76,6 +88,56 @@ resource "google_project_iam_member" "backend_run_invoker" {
   project = var.project_id
   role    = "roles/run.invoker"
   member  = "serviceAccount:${google_service_account.backend_runner.email}"
+}
+
+# ---------------------------------------------------------------------------
+# transcription-worker-runner IAM
+# ---------------------------------------------------------------------------
+
+resource "google_project_iam_member" "transcription_worker_aiplatform" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.transcription_worker_runner.email}"
+}
+
+resource "google_project_iam_member" "transcription_worker_trace" {
+  project = var.project_id
+  role    = "roles/cloudtrace.agent"
+  member  = "serviceAccount:${google_service_account.transcription_worker_runner.email}"
+}
+
+resource "google_project_iam_member" "transcription_worker_run_invoker" {
+  project = var.project_id
+  role    = "roles/run.invoker"
+  member  = "serviceAccount:${google_service_account.transcription_worker_runner.email}"
+}
+
+# ---------------------------------------------------------------------------
+# document-generation-runner IAM
+# ---------------------------------------------------------------------------
+
+resource "google_project_iam_member" "document_generation_aiplatform" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.document_generation_runner.email}"
+}
+
+resource "google_project_iam_member" "document_generation_trace" {
+  project = var.project_id
+  role    = "roles/cloudtrace.agent"
+  member  = "serviceAccount:${google_service_account.document_generation_runner.email}"
+}
+
+resource "google_project_iam_member" "document_generation_run_invoker" {
+  project = var.project_id
+  role    = "roles/run.invoker"
+  member  = "serviceAccount:${google_service_account.document_generation_runner.email}"
+}
+
+resource "google_project_iam_member" "document_generation_secrets" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.document_generation_runner.email}"
 }
 
 # ---------------------------------------------------------------------------
@@ -222,6 +284,12 @@ resource "google_storage_bucket_iam_member" "cf_audio_bucket_viewer" {
   member = "serviceAccount:${google_service_account.cloud_functions_runner.email}"
 }
 
+resource "google_storage_bucket_iam_member" "transcription_worker_audio_bucket_viewer" {
+  bucket = var.audio_bucket_name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.transcription_worker_runner.email}"
+}
+
 resource "google_storage_bucket_iam_member" "gh_frontend_bucket_admin" {
   bucket = var.frontend_bucket_name
   role   = "roles/storage.objectAdmin"
@@ -253,10 +321,28 @@ resource "google_service_account_iam_member" "gh_copilot_agent_runner_user" {
   member             = "serviceAccount:${google_service_account.github_actions_deployer.email}"
 }
 
+resource "google_service_account_iam_member" "gh_transcription_worker_runner_user" {
+  service_account_id = google_service_account.transcription_worker_runner.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.github_actions_deployer.email}"
+}
+
+resource "google_service_account_iam_member" "gh_document_generation_runner_user" {
+  service_account_id = google_service_account.document_generation_runner.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.github_actions_deployer.email}"
+}
+
 resource "google_service_account_iam_member" "backend_cloud_tasks_invoker_user" {
   service_account_id = google_service_account.cloud_tasks_invoker.name
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.backend_runner.email}"
+}
+
+resource "google_project_iam_member" "cloud_tasks_run_invoker" {
+  project = var.project_id
+  role    = "roles/run.invoker"
+  member  = "serviceAccount:${google_service_account.cloud_tasks_invoker.email}"
 }
 
 resource "google_service_account_iam_member" "backend_cloud_tasks_invoker_token_creator" {

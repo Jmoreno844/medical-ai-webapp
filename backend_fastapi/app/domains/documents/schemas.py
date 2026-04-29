@@ -65,7 +65,29 @@ class GenerationChunkIn(BaseModel):
     error: str | None = None
 
 
+class DocumentGenerationTaskPayload(BaseModel):
+    process_id: str
+    doctor_id: int
+    new_document_id: int
+    context_document_id: int
+    transcription_document_id: int
+    doctor_template_id: int
+
+
+class DocumentGenerationWorkItemResponse(BaseModel):
+    process_id: str
+    doctor_id: int
+    new_document_id: int
+    context_document_id: int
+    transcription_document_id: int
+    doctor_template_id: int
+    encounter_id: int
+    context_content: str
+    transcription_content: str
+    template_content: str
+    callback_token: str
+
+
 class TranscriptionNotificationIn(BaseModel):
     document_id: int
     status: str | None = None
-

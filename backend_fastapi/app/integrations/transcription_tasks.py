@@ -15,16 +15,13 @@ def _is_configured_value(value: str | None) -> bool:
 
 
 def is_transcription_queue_configured(settings: Settings) -> bool:
-    target_url = settings.transcription_task_target_url or (
-        settings.transcription_cloud_function_url
-    )
     return all(
         _is_configured_value(value)
         for value in (
             settings.gcp_project_id,
             settings.cloud_tasks_region,
             settings.transcription_queue_name,
-            target_url,
+            settings.transcription_task_target_url,
             settings.cloud_tasks_invoker_service_account,
         )
     )
@@ -58,7 +55,7 @@ def enqueue_transcription_task(
         ) from exc
 
     client = task_client or tasks_v2.CloudTasksClient()
-    target_url = str(target_url or settings.transcription_cloud_function_url).strip()
+    target_url = str(target_url or settings.transcription_task_target_url).strip()
     parent = client.queue_path(
         str(settings.gcp_project_id).strip(),
         str(settings.cloud_tasks_region).strip(),

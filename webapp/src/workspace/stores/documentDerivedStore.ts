@@ -18,7 +18,7 @@ type DocumentDerivedStoreState = {
   ) => void;
   completeGeneration: (documentId: string, finalContent?: string) => void;
   failGeneration: (documentId: string, error: string) => void;
-  startTranscription: (documentId: string) => void;
+  startTranscription: (documentId: string, initialContent?: string) => void;
   updateTranscriptionContent: (
     documentId: string,
     streamingContent: string
@@ -139,17 +139,21 @@ export const useDocumentDerivedStore =
           }),
         },
       })),
-    startTranscription: (documentId) =>
+    startTranscription: (documentId, initialContent) =>
       set((state) => ({
         activeTranscriptionDocumentId: documentId,
         derivedByDocumentId: {
           ...state.derivedByDocumentId,
           [documentId]: createEmptyDerivedState(documentId, {
+            ...state.derivedByDocumentId[documentId],
             editorMode: "streaming_preview",
             source: "transcription",
             inProgress: true,
             transcriptionStatus: "pending",
-            streamingContent: "",
+            streamingContent:
+              initialContent ??
+              state.derivedByDocumentId[documentId]?.streamingContent ??
+              "",
           }),
         },
       })),

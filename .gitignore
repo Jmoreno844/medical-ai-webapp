@@ -31,6 +31,12 @@ landing-page/node_modules/
 landing-page/.next/
 landing-page/out/
 backend_fastapi/.venv/
+transcription_worker/.venv/
+transcription_worker/.pytest_cache/
+transcription_worker/.ruff_cache/
+document_generation_worker/.venv/
+document_generation_worker/.pytest_cache/
+document_generation_worker/.ruff_cache/
 backend_fastapi/.pytest_cache/
 backend_fastapi/.ruff_cache/
 copilot_agent/copilot_runtime.db

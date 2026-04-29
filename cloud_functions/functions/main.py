@@ -9,7 +9,6 @@ import functions_framework
 import langsmith_tracing
 import tracing
 from endpoints.transcription_endpoint import transcription_endpoint
-from endpoints.document_workflow import generate_document_workflow
 
 # google-cloud libraries may emit an alias migration FutureWarning at import time.
 # This warning is non-actionable for local runtime and clutters container logs.
@@ -24,4 +23,3 @@ langsmith_tracing.configure_langsmith()
 #
 # Export the Cloud Functions
 transcription_endpoint = functions_framework.http(transcription_endpoint)
-generate_document_workflow = functions_framework.http(generate_document_workflow)

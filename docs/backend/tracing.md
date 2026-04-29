@@ -1,12 +1,14 @@
 # Distributed tracing (OpenTelemetry)
 
-El stack usa **OpenTelemetry** con propagación **W3C** (`traceparent` / `tracestate`) entre `webapp` → FastAPI → Cloud Functions → FastAPI (callbacks).
+El stack usa **OpenTelemetry** con propagación **W3C** (`traceparent` / `tracestate`) entre `webapp` → FastAPI → workers/Cloud Functions → FastAPI (callbacks).
 
 ## Componentes
 
 | Código | Rol |
 |--------|-----|
 | `backend_fastapi/app/` | API principal; emite logs y spans del backend |
+| `transcription_worker/app/` | Worker de VAD/transcripción; emite logs saneados y puede exportar trazas GCP |
+| `document_generation_worker/app/` | Worker de generación documental; emite logs saneados y puede exportar trazas GCP |
 | [cloud_functions/functions/tracing.py](../../cloud_functions/functions/tracing.py) | Span servidor por request HTTP + `requests` al backend |
 | [webapp/src/tracing.ts](../../webapp/src/tracing.ts) | OTLP desde el navegador (opcional) + propagación en XHR/`axios` |
 
@@ -31,7 +33,10 @@ El stack usa **OpenTelemetry** con propagación **W3C** (`traceparent` / `traces
 
 ### Estado actual en `stg`
 
-- `backend` y `cloud functions` sí pueden compartir el mismo `trace_id` en Cloud Trace cuando la petición pasa por HTTP normal (`FastAPI -> Cloud Function -> callback FastAPI`).
+- `backend`, `transcription_worker`, `document_generation_worker` y Cloud
+  Functions legacy pueden compartir
+  correlación por logs/trazas cuando las llamadas HTTP propaguen contexto o
+  incluyan IDs de negocio (`section_id`, `session_id`, `process_id`).
 - `webapp` todavía **no** participa en el mismo trace en `stg`: el workflow de frontend no configura `VITE_OTEL_EXPORTER_OTLP_TRACES_URL` y no hay un OTEL collector público/intermedio.
 - Hasta montar collector OTLP o un backend OTLP accesible desde navegador, la visibilidad de `stg` es **backend/cloud functions**, no navegador de extremo a extremo.
 
@@ -48,6 +53,10 @@ UI Jaeger: `http://localhost:16686`.
 
 - **SSE**: `EventSource` no envía cabeceras W3C; se registra `trace_id` en logs al generar token y al conectar el stream en `backend_fastapi/app/domains/documents/sse_api.py`, no un span continuo en el navegador.
 - **Subida GCS** (`fetch` a signed URL): span cliente local `gcs.signed_url_upload` sin propagación a GCS.
-- **Hilo de generación**: el POST en segundo plano reutiliza el contexto OTel del request que lo disparó (`backend_fastapi/app/domains/documents/generation_runner.py`).
+- **Cloud Tasks -> workers**: la tarea HTTP es el límite durable.
+  Usar `section_id` / `session_id` como correlación de negocio aunque el trace
+  no continúe perfecto desde el registro original.
+- **Generación documental**: usar `process_id` / `document_id` como correlación
+  de negocio entre enqueue, worker y callbacks.
 
 El `process_id` de negocio sigue siendo el identificador de correlación del flujo de generación; no sustituye al `trace_id`.

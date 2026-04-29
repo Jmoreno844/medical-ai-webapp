@@ -13,6 +13,8 @@ Current runtime baseline:
 
 ```bash
 uv sync --group dev
+make db-up
+make db-ready
 uv run alembic upgrade head
 ENVIRONMENT=local uv run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 uv run pytest -q
@@ -30,10 +32,19 @@ docker build -t medical-fastapi-migration:local .
 From the repo root, use `--project`:
 
 ```bash
+make -C backend_fastapi db-up
+make -C backend_fastapi db-ready
 ENVIRONMENT=local uv --project backend_fastapi run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
 Use `8001` for the local API unless another process already owns it.
+
+`make db-up` creates or starts the local PostgreSQL container `medical-web-app-db`
+on `5433`, matching the defaults in `backend_fastapi/.env` and
+`docs/setup-local.md`.
+
+For a fresh local database, use `make db-ready` so the container is up and the
+Alembic schema is applied before starting FastAPI.
 
 ## Current constraints
 

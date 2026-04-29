@@ -65,25 +65,30 @@ class Settings(BaseSettings):
     transcription_callback_token_minutes: int = 15
     generation_callback_token_minutes: int = 30
 
-    transcription_cloud_function_url: str | None = Field(
-        default=None,
-        alias="TRANSCRIPTION_CLOUD_FUNCTION_URL",
-    )
     transcription_task_target_url: str | None = Field(
         default=None,
         alias="TRANSCRIPTION_TASK_TARGET_URL",
     )
-    transcription_gemini_model: str = Field(
-        default="gemini-2.5-flash",
-        alias="TRANSCRIPTION_GEMINI_MODEL",
-    )
     vertex_ai_location: str | None = Field(default="global", alias="VERTEX_AI_LOCATION")
-    generate_document_cloud_function_url: str | None = Field(
+    document_generation_task_target_url: str | None = Field(
         default=None,
-        validation_alias=AliasChoices(
-            "GENERATE_DOCUMENT_CLOUD_FUNCTION_URL",
-            "GENERATE_DOCUMENT_CLOUD_FUNCTION_BASE_URL",
-        ),
+        alias="DOCUMENT_GENERATION_TASK_TARGET_URL",
+    )
+    document_generation_queue_name: str | None = Field(
+        default=None,
+        alias="DOCUMENT_GENERATION_QUEUE_NAME",
+    )
+    document_generation_worker_service_account: str | None = Field(
+        default=None,
+        alias="DOCUMENT_GENERATION_WORKER_SERVICE_ACCOUNT",
+    )
+    document_generation_worker_base_url: str | None = Field(
+        default=None,
+        alias="DOCUMENT_GENERATION_WORKER_BASE_URL",
+    )
+    document_generation_gemini_model: str = Field(
+        default="gemini-3.1-flash-lite-preview",
+        alias="DOCUMENT_GENERATION_GEMINI_MODEL",
     )
     copilot_agent_base_url: str = Field(
         default="http://localhost:8010",
@@ -113,6 +118,14 @@ class Settings(BaseSettings):
     cloud_tasks_invoker_service_account: str | None = Field(
         default=None,
         alias="CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT",
+    )
+    transcription_worker_service_account: str | None = Field(
+        default=None,
+        alias="TRANSCRIPTION_WORKER_SERVICE_ACCOUNT",
+    )
+    transcription_worker_base_url: str | None = Field(
+        default=None,
+        alias="TRANSCRIPTION_WORKER_BASE_URL",
     )
 
     access_cookie_name: str = "medical_access_token"

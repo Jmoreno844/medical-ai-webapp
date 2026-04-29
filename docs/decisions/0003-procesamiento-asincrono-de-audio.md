@@ -14,7 +14,8 @@ Implementar Google Cloud Tasks como el orquestador y buffer entre el backend
 (FastAPI) y el worker de transcripción. En la fase actual el target de las
 tareas de transcripción es un endpoint interno de FastAPI, que llama a Gemini
 mediante el Google Gen AI SDK async sobre Vertex AI usando referencias `gs://`.
-Cloud Functions queda para generación documental.
+La generación documental se mueve a un worker Cloud Run separado; Cloud
+Functions queda solo como fallback legacy para audio completo.
 
 El backend encola la tarea y libera la conexión del usuario de inmediato con un
 estado 200 OK (Processing).

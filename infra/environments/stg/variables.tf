@@ -55,6 +55,18 @@ variable "copilot_agent_service_name" {
   type        = string
 }
 
+variable "transcription_worker_service_name" {
+  description = "Cloud Run transcription worker service name"
+  type        = string
+  default     = "vexthealth-transcription-worker"
+}
+
+variable "document_generation_worker_service_name" {
+  description = "Cloud Run document generation worker service name"
+  type        = string
+  default     = "vexthealth-document-generation-worker"
+}
+
 variable "cloud_run_image" {
   description = "Initial Docker image for Cloud Run (CI/CD updates this)"
   type        = string
@@ -62,6 +74,16 @@ variable "cloud_run_image" {
 
 variable "copilot_agent_image" {
   description = "Initial Docker image for the copilot agent service (CI/CD updates this)"
+  type        = string
+}
+
+variable "transcription_worker_image" {
+  description = "Initial Docker image for the transcription worker service (CI/CD updates this)"
+  type        = string
+}
+
+variable "document_generation_worker_image" {
+  description = "Initial Docker image for the document generation worker service (CI/CD updates this)"
   type        = string
 }
 
@@ -87,6 +109,30 @@ variable "copilot_agent_max_concurrency" {
   description = "Maximum requests per copilot agent Cloud Run instance"
   type        = number
   default     = 20
+}
+
+variable "transcription_worker_max_instances" {
+  description = "Maximum transcription worker Cloud Run instances"
+  type        = number
+  default     = 5
+}
+
+variable "document_generation_worker_max_instances" {
+  description = "Maximum document generation worker Cloud Run instances"
+  type        = number
+  default     = 5
+}
+
+variable "transcription_worker_max_concurrency" {
+  description = "Maximum requests per transcription worker Cloud Run instance"
+  type        = number
+  default     = 8
+}
+
+variable "document_generation_worker_max_concurrency" {
+  description = "Maximum requests per document generation worker Cloud Run instance"
+  type        = number
+  default     = 8
 }
 
 variable "cloud_run_use_secret_manager" {
