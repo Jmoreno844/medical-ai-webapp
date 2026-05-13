@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_v1_router
 from app.core.config import get_settings
@@ -11,6 +14,7 @@ from app.domains.copilot.internal_tools_api import router as copilot_internal_to
 
 
 configure_logging()
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 app = FastAPI(
@@ -41,3 +45,18 @@ app.add_middleware(
 app.include_router(api_v1_router, prefix=settings.api_v1_prefix)
 app.include_router(copilot_internal_tools_router, prefix="/api")
 
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception(
+        "Unhandled API exception path=%s method=%s",
+        request.url.path,
+        request.method,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "error_code": type(exc).__name__,
+        },
+    )

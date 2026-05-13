@@ -423,6 +423,20 @@ export const useVoiceRecorder = (
     }
   };
 
+  const clearRecordingTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const startRecordingTimer = () => {
+    clearRecordingTimer();
+    timerRef.current = setInterval(() => {
+      setDuration((prev) => prev + 1);
+    }, 1000);
+  };
+
   const teardownVadMonitoring = async () => {
     clearSectionBoundaryTimers();
     if (vadIntervalRef.current !== null) {
@@ -927,22 +941,24 @@ export const useVoiceRecorder = (
    * Toggles between paused and recording states, managing the timer accordingly
    */
   const pauseResumeRecording = () => {
-    if (!mediaRecorderRef.current || !isRecordingRef.current || isStoppingRef.current) {
+    if (!isRecordingRef.current || isStoppingRef.current) {
       return;
     }
 
     try {
       if (isPausedRef.current) {
         // Resume recording
-        if (mediaRecorderRef.current.state === "paused") {
+        if (mediaRecorderRef.current?.state === "paused") {
           mediaRecorderRef.current.resume();
+        } else if (!mediaRecorderRef.current) {
+          const stream = mediaStreamRef.current;
+          if (stream?.active) {
+            startActiveSectionRecorder(stream, 0);
+          } else {
+            return;
+          }
         }
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-        }
-        timerRef.current = setInterval(() => {
-          setDuration((prev) => prev + 1);
-        }, 1000);
+        startRecordingTimer();
         isPausedRef.current = false;
         setIsPaused(false);
         armSectionBoundaryControl();
@@ -954,13 +970,10 @@ export const useVoiceRecorder = (
         if (forcedSplitInFlightRef.current) {
           void finalizeRetiringSection();
         }
-        if (mediaRecorderRef.current.state === "recording") {
+        if (mediaRecorderRef.current?.state === "recording") {
           mediaRecorderRef.current.pause();
         }
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
+        clearRecordingTimer();
       }
     } catch (error) {
       logger.error("Error pausing/resuming recording:", error);
@@ -978,24 +991,24 @@ export const useVoiceRecorder = (
     }
 
     if (
+      isRecordingRef.current ||
       mediaRecorderRef.current ||
       activeSectionRef.current ||
-      retiringSectionRef.current
+      retiringSectionRef.current ||
+      sectionFlushRef.current
     ) {
+      const wasPaused = isPausedRef.current;
       isStoppingRef.current = true;
       isRecordingRef.current = false;
       isPausedRef.current = false;
       setIsRecording(false);
       setIsPaused(false);
       clearSectionBoundaryTimers();
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+      clearRecordingTimer();
 
       // If paused, we need to resume first before stopping
       const recorderToStop = mediaRecorderRef.current;
-      if (isPaused && recorderToStop?.state === "paused") {
+      if (wasPaused && recorderToStop?.state === "paused") {
         try {
           recorderToStop.resume();
         } catch (error) {
@@ -1012,6 +1025,7 @@ export const useVoiceRecorder = (
         }
 
         await flushCurrentSection(true);
+        await sectionFlushRef.current;
 
         if (recordingSessionIdRef.current) {
           await finishRecordingSession(recordingSessionIdRef.current);

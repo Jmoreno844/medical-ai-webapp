@@ -8,11 +8,13 @@ import React, {
   useState,
 } from "react";
 import axiosInstance from "@/commons/utils/axiosInstance";
+import { getRecordingSessionStatus } from "../features/encuentroHeader/hooks/audio/uploadService";
 import { useVoiceRecorder } from "../features/encuentroHeader/hooks/audio/useVoiceRecorder";
 import { useContentContext } from "./ContentContext";
 import { useEncuentroContext } from "./EncuentroContext";
 import { logger } from "@/lib/logger";
 import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
+import { buildTranscriptionBlocks } from "@/workspace/utils/transcriptionBlocks";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -83,6 +85,7 @@ export function TranscriptionProvider({
   const eventSourceRef = useRef<EventSource | null>(null);
   const subscribedTranscriptionDocIdRef = useRef<number | null>(null);
   const previousEncounterIdRef = useRef<number | null>(null);
+  const activeRecordingSessionIdRef = useRef<string | null>(null);
   const activeTranscriptionDocumentId = useDocumentDerivedStore(
     (state) => state.activeTranscriptionDocumentId,
   );
@@ -142,6 +145,12 @@ export function TranscriptionProvider({
     transcriptionDocId ?? undefined,
   );
 
+  useEffect(() => {
+    if (voiceRecorder.recordingSessionId) {
+      activeRecordingSessionIdRef.current = voiceRecorder.recordingSessionId;
+    }
+  }, [voiceRecorder.recordingSessionId]);
+
   const loggedSetHasBeenTranscribed = useCallback(
     (value: boolean) => {
       logger.debug(
@@ -175,6 +184,13 @@ export function TranscriptionProvider({
       }
 
       try {
+        let finalBlocks;
+        if (activeRecordingSessionIdRef.current) {
+          const sessionStatus = await getRecordingSessionStatus(
+            activeRecordingSessionIdRef.current,
+          );
+          finalBlocks = buildTranscriptionBlocks(sessionStatus?.sections);
+        }
         const refreshedContent = await contentContext.fetchDocumentContent(
           transcriptionDocId,
           true,
@@ -182,6 +198,7 @@ export function TranscriptionProvider({
         completeTranscription(
           String(transcriptionDocId),
           refreshedContent ?? undefined,
+          finalBlocks,
         );
         contentContext.triggerEditorRefresh();
       } catch (error) {
@@ -198,8 +215,42 @@ export function TranscriptionProvider({
     updateEncuentro,
   ]);
 
+  const refreshTranscriptionBlocks = useCallback(
+    async (
+      documentId: number,
+      fallbackContent: string,
+      mode: "pending" | "complete",
+    ): Promise<boolean> => {
+      const sessionId = activeRecordingSessionIdRef.current;
+      if (!sessionId) {
+        return false;
+      }
+
+      const sessionStatus = await getRecordingSessionStatus(sessionId);
+      if (!sessionStatus) {
+        return false;
+      }
+
+      const blocks = buildTranscriptionBlocks(sessionStatus.sections);
+      const nextContent =
+        mode === "complete"
+          ? sessionStatus.consolidated_transcript ?? fallbackContent
+          : fallbackContent;
+
+      if (mode === "complete") {
+        completeTranscription(String(documentId), nextContent, blocks);
+      } else {
+        updateTranscriptionContent(String(documentId), nextContent, blocks);
+      }
+
+      return true;
+    },
+    [completeTranscription, updateTranscriptionContent],
+  );
+
   const resetTranscriptionState = useCallback(() => {
     setErrorMessage(null);
+    activeRecordingSessionIdRef.current = null;
     if (transcriptionDocId) {
       clearDocumentDerivedState(String(transcriptionDocId));
     } else if (activeTranscriptionDocumentId) {
@@ -243,6 +294,7 @@ export function TranscriptionProvider({
     setTranscriptionCompleteTimestamp(null);
     setLocalHasBeenTranscribed(false);
     setTranscriptionDocId(initialTranscriptionDocId);
+    activeRecordingSessionIdRef.current = null;
   }, [
     closeEventSource,
     encounterId,
@@ -281,7 +333,10 @@ export function TranscriptionProvider({
   );
 
   const subscribeToTranscriptionUpdates = useCallback(
-    async (documentId: number): Promise<boolean> => {
+    async (
+      documentId: number,
+      options: { markPendingOnConnect?: boolean } = {},
+    ): Promise<boolean> => {
       closeEventSource();
 
       try {
@@ -310,7 +365,9 @@ export function TranscriptionProvider({
         const eventSource = new EventSource(sseUrl);
         eventSourceRef.current = eventSource;
         subscribedTranscriptionDocIdRef.current = documentId;
-        startTranscriptionStream(String(documentId), initialStreamingContent);
+        if (options.markPendingOnConnect ?? true) {
+          startTranscriptionStream(String(documentId), initialStreamingContent);
+        }
 
         eventSource.onopen = () => {
           logger.debug(
@@ -342,13 +399,26 @@ export function TranscriptionProvider({
             }
 
             if (data.event === "transcription_complete") {
+              void refreshTranscriptionBlocks(
+                documentId,
+                typeof data?.content === "string" ? data.content : "",
+                "complete",
+              );
               handleTranscriptionComplete();
               closeEventSource();
               return;
             }
 
             if (data.event === "transcription_update" && data.content) {
-              updateTranscriptionContent(String(documentId), data.content);
+              void refreshTranscriptionBlocks(
+                documentId,
+                String(data.content),
+                "pending",
+              ).then((refreshed) => {
+                if (!refreshed) {
+                  updateTranscriptionContent(String(documentId), data.content);
+                }
+              });
               return;
             }
 
@@ -391,6 +461,7 @@ export function TranscriptionProvider({
       failTranscription,
       getSSEToken,
       handleTranscriptionComplete,
+      refreshTranscriptionBlocks,
       startTranscriptionStream,
       transcriptionDocId,
       updateTranscriptionContent,
@@ -548,20 +619,20 @@ export function TranscriptionProvider({
 
   const startRecording = useCallback(() => {
     if (transcriptionDocId) {
-      void subscribeToTranscriptionUpdates(transcriptionDocId);
+      void subscribeToTranscriptionUpdates(transcriptionDocId, {
+        markPendingOnConnect: !hasBeenTranscribed,
+      });
     }
     voiceRecorder.startRecording();
-  }, [subscribeToTranscriptionUpdates, transcriptionDocId, voiceRecorder]);
+  }, [
+    hasBeenTranscribed,
+    subscribeToTranscriptionUpdates,
+    transcriptionDocId,
+    voiceRecorder,
+  ]);
 
   const stopRecording = useCallback(() => {
     voiceRecorder.stopRecording();
-    updateEncuentro({ has_been_transcribed: false }).catch((error) =>
-      logger.error(
-        "[TRANSCRIPTION] Error updating has_been_transcribed:",
-        error,
-      ),
-    );
-    setLocalHasBeenTranscribed(false);
     if (transcriptionDocId && !hasBeenTranscribed) {
       clearDocumentDerivedState(String(transcriptionDocId));
     }
@@ -569,7 +640,6 @@ export function TranscriptionProvider({
     clearDocumentDerivedState,
     hasBeenTranscribed,
     transcriptionDocId,
-    updateEncuentro,
     voiceRecorder,
   ]);
 

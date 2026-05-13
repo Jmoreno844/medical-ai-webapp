@@ -1,8 +1,29 @@
 import { SpanKind, trace } from "@opentelemetry/api";
+import axios from "axios";
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { logger } from "@/lib/logger";
 
 const tracer = trace.getTracer("vexthealth-webapp");
+
+const getApiErrorMessage = (error: unknown): string => {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data;
+    if (data && typeof data === "object") {
+      const payload = data as { error?: unknown; detail?: unknown; message?: unknown };
+      const message = payload.error ?? payload.detail ?? payload.message;
+      if (typeof message === "string" && message.trim()) {
+        return message;
+      }
+    }
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+};
 
 /**
  * Upload audio to cloud storage
@@ -109,6 +130,38 @@ export const createRecordingSession = async (
   }
 };
 
+export type RecordingSessionSection = {
+  section_id: string;
+  client_section_id: string;
+  section_index: number;
+  start_time_ms: number;
+  end_time_ms: number;
+  overlap_ms: number;
+  gcs_object_name: string;
+  content_type: string;
+  byte_size?: number | null;
+  status: string;
+  raw_transcript?: string | null;
+  error_code?: string | null;
+  retry_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RecordingSessionStatus = {
+  success: boolean;
+  session_id: string;
+  encounter_id: number;
+  document_id: number;
+  status: string;
+  started_at: string;
+  finished_at?: string | null;
+  finalized_at?: string | null;
+  consolidated_transcript?: string | null;
+  error_code?: string | null;
+  sections: RecordingSessionSection[];
+};
+
 export const generateSectionUploadUrl = async (
   recordingSessionId: string,
   clientSectionId: string,
@@ -124,13 +177,22 @@ export const generateSectionUploadUrl = async (
         content_type: contentType,
       }
     );
-    if (!response.data?.success) return null;
+    if (!response.data?.success) {
+      logger.error(
+        "[VOICE_RECORDER] Failed to generate section upload URL:",
+        response.data?.error || "Unknown API error"
+      );
+      return null;
+    }
     return {
       uploadUrl: response.data.upload_url,
       gcsObjectName: response.data.gcs_object_name,
     };
   } catch (error) {
-    logger.error("[VOICE_RECORDER] Failed to generate section upload URL:", error);
+    logger.error(
+      "[VOICE_RECORDER] Failed to generate section upload URL:",
+      getApiErrorMessage(error)
+    );
     return null;
   }
 };
@@ -174,5 +236,29 @@ export const finishRecordingSession = async (
   } catch (error) {
     logger.error("[VOICE_RECORDER] Failed to finish recording session:", error);
     return false;
+  }
+};
+
+export const getRecordingSessionStatus = async (
+  recordingSessionId: string
+): Promise<RecordingSessionStatus | null> => {
+  try {
+    const response = await axiosInstance.get(
+      `/api/v1/transcription/sessions/${recordingSessionId}`
+    );
+    if (response.data?.success !== true) {
+      logger.warn("[VOICE_RECORDER] Recording session status not successful", {
+        recordingSessionId,
+        status: response.data?.status,
+      });
+      return null;
+    }
+    return response.data as RecordingSessionStatus;
+  } catch (error) {
+    logger.error(
+      "[VOICE_RECORDER] Failed to fetch recording session status:",
+      getApiErrorMessage(error)
+    );
+    return null;
   }
 };

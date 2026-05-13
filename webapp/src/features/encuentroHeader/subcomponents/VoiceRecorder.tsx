@@ -2,7 +2,6 @@ import React from "react";
 import TimerDisplay from "./TimerDisplay";
 import MicrophoneIcon from "./MicrophoneIcon";
 import PauseResumeButton from "./PauseResumeButton";
-import DeleteButton from "./DeleteButton";
 import SettingsIcon from "./SettingsIcon";
 import { useTranscriptionContext } from "../../../contexts/TranscriptionContext";
 
@@ -26,11 +25,9 @@ const VoiceRecorder: React.FC = () => {
     audioExpiresAt,
     isAudioExpired,
     isCheckingAudio,
-    isDeleting,
     startRecording,
     stopRecording,
     pauseResumeRecording,
-    deleteRecording,
   } = useTranscriptionContext();
 
   /**
@@ -46,13 +43,6 @@ const VoiceRecorder: React.FC = () => {
     } else {
       startRecording();
     }
-  };
-
-  /**
-   * Custom delete handler
-   */
-  const handleDelete = () => {
-    deleteRecording();
   };
 
   const expiredMessage = audioExpiresAt
@@ -97,6 +87,23 @@ const VoiceRecorder: React.FC = () => {
           {expiredMessage}
         </span>
       )}
+
+      {isRecording && (
+        <PauseResumeButton
+          isRecording={isRecording}
+          isPaused={isPaused}
+          onClick={pauseResumeRecording}
+        />
+      )}
+      <button
+        onClick={handlePrimaryAudioAction}
+        className={primaryAudioButtonClasses}
+        aria-label={primaryAudioLabel}
+      >
+        {primaryAudioLabel}
+      </button>
+
+      <MicrophoneIcon isRecording={isRecording} isPaused={isPaused} />
       <TimerDisplay duration={duration} />
       {hasTranscriptionActivity && (
         <span className="text-sm text-gray-600">
@@ -106,31 +113,6 @@ const VoiceRecorder: React.FC = () => {
               ? `${pendingAudioSections} sección${pendingAudioSections === 1 ? "" : "es"} pendiente${pendingAudioSections === 1 ? "" : "s"}`
               : "Consolidando transcripción…"}
         </span>
-      )}
-      <MicrophoneIcon isRecording={isRecording} isPaused={isPaused} />
-
-      {isRecording && (
-        <PauseResumeButton
-          isRecording={isRecording}
-          isPaused={isPaused}
-          onClick={pauseResumeRecording}
-        />
-      )}
-
-      <button
-        onClick={handlePrimaryAudioAction}
-        className={primaryAudioButtonClasses}
-        aria-label={primaryAudioLabel}
-      >
-        {primaryAudioLabel}
-      </button>
-
-      {audioExists && !isCheckingAudio && (
-        <DeleteButton
-          onClick={handleDelete}
-          isDeleting={isDeleting}
-          label={isAudioExpired ? "Eliminar audio vencido" : undefined}
-        />
       )}
 
       <SettingsIcon />

@@ -26,6 +26,7 @@ import {
   resolvePatchReviewPatches,
   setPatchReviewDecorations,
 } from "./tiptap/patchReviewDecorations";
+import SegmentedTranscriptionView from "./SegmentedTranscriptionView";
 
 type EditorSnapshot = {
   markdown: string;
@@ -395,6 +396,9 @@ const TextArea: React.FC = () => {
     editorMode === "streaming_preview"
       ? activeDerivedState?.streamingContent
       : undefined;
+  const transcriptionBlocks = activeDerivedState?.transcriptionBlocks ?? [];
+  const showSegmentedTranscription =
+    activeDocument?.kind === "transcription" && transcriptionBlocks.length > 0;
 
   useEffect(() => {
     if (!editor) {
@@ -671,14 +675,20 @@ const TextArea: React.FC = () => {
         )}
 
         <div className="h-full">
-          <EditorContent editor={editor} className="medical-document-editor h-full" />
-          {!documentContent.trim() &&
-            !derivedContent &&
-            editorMode === "edit" && (
-              <div className="text-gray-400 absolute top-3 left-4 pointer-events-none">
-                Start typing...
-              </div>
-            )}
+          {showSegmentedTranscription ? (
+            <SegmentedTranscriptionView blocks={transcriptionBlocks} />
+          ) : (
+            <>
+              <EditorContent editor={editor} className="medical-document-editor h-full" />
+              {!documentContent.trim() &&
+                !derivedContent &&
+                editorMode === "edit" && (
+                  <div className="text-gray-400 absolute top-3 left-4 pointer-events-none">
+                    Start typing...
+                  </div>
+                )}
+            </>
+          )}
         </div>
       </div>
     </div>

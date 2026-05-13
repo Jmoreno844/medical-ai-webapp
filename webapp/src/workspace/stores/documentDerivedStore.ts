@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { DocumentDerivedState } from "@/workspace/types";
+import { DocumentDerivedState, TranscriptionBlock } from "@/workspace/types";
 
 type DocumentDerivedStoreState = {
   derivedByDocumentId: Record<string, DocumentDerivedState | null>;
@@ -18,12 +18,21 @@ type DocumentDerivedStoreState = {
   ) => void;
   completeGeneration: (documentId: string, finalContent?: string) => void;
   failGeneration: (documentId: string, error: string) => void;
-  startTranscription: (documentId: string, initialContent?: string) => void;
+  startTranscription: (
+    documentId: string,
+    initialContent?: string,
+    transcriptionBlocks?: TranscriptionBlock[],
+  ) => void;
   updateTranscriptionContent: (
     documentId: string,
-    streamingContent: string
+    streamingContent: string,
+    transcriptionBlocks?: TranscriptionBlock[],
   ) => void;
-  completeTranscription: (documentId: string, finalContent?: string) => void;
+  completeTranscription: (
+    documentId: string,
+    finalContent?: string,
+    transcriptionBlocks?: TranscriptionBlock[],
+  ) => void;
   failTranscription: (documentId: string, error: string) => void;
   setPatchPreview: (documentId: string, previewContent: string) => void;
   clearPatchPreview: (documentId: string) => void;
@@ -139,7 +148,7 @@ export const useDocumentDerivedStore =
           }),
         },
       })),
-    startTranscription: (documentId, initialContent) =>
+    startTranscription: (documentId, initialContent, transcriptionBlocks) =>
       set((state) => ({
         activeTranscriptionDocumentId: documentId,
         derivedByDocumentId: {
@@ -147,17 +156,24 @@ export const useDocumentDerivedStore =
           [documentId]: createEmptyDerivedState(documentId, {
             ...state.derivedByDocumentId[documentId],
             editorMode: "streaming_preview",
-            source: "transcription",
-            inProgress: true,
-            transcriptionStatus: "pending",
-            streamingContent:
-              initialContent ??
-              state.derivedByDocumentId[documentId]?.streamingContent ??
+              source: "transcription",
+              inProgress: true,
+              transcriptionStatus: "pending",
+              transcriptionBlocks:
+                transcriptionBlocks ??
+                state.derivedByDocumentId[documentId]?.transcriptionBlocks,
+              streamingContent:
+                initialContent ??
+                state.derivedByDocumentId[documentId]?.streamingContent ??
               "",
           }),
         },
       })),
-    updateTranscriptionContent: (documentId, streamingContent) =>
+    updateTranscriptionContent: (
+      documentId,
+      streamingContent,
+      transcriptionBlocks,
+    ) =>
       set((state) => ({
         derivedByDocumentId: {
           ...state.derivedByDocumentId,
@@ -169,11 +185,14 @@ export const useDocumentDerivedStore =
             transcriptionStatus: "pending",
             error: null,
             streamingContent,
+            transcriptionBlocks:
+              transcriptionBlocks ??
+              state.derivedByDocumentId[documentId]?.transcriptionBlocks,
             updatedAt: new Date().toISOString(),
           }),
         },
       })),
-    completeTranscription: (documentId, finalContent) =>
+    completeTranscription: (documentId, finalContent, transcriptionBlocks) =>
       set((state) => ({
         activeTranscriptionDocumentId: documentId,
         derivedByDocumentId: {
@@ -186,6 +205,9 @@ export const useDocumentDerivedStore =
             isComplete: true,
             error: null,
             transcriptionStatus: "success",
+            transcriptionBlocks:
+              transcriptionBlocks ??
+              state.derivedByDocumentId[documentId]?.transcriptionBlocks,
             streamingContent:
               finalContent ?? state.derivedByDocumentId[documentId]?.streamingContent,
             updatedAt: new Date().toISOString(),

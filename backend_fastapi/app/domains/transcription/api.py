@@ -177,11 +177,22 @@ async def create_section_upload_url(
         client_section_id=payload.client_section_id,
         section_index=payload.section_index,
     )
-    upload_url = generate_section_upload_url(
-        settings=settings,
-        gcs_object_name=gcs_object_name,
-        content_type=payload.content_type,
-    )
+    try:
+        upload_url = generate_section_upload_url(
+            settings=settings,
+            gcs_object_name=gcs_object_name,
+            content_type=payload.content_type,
+        )
+    except Exception as exc:
+        logger.exception(
+            "Failed to generate section upload URL for session_id=%s section_index=%s",
+            session_id,
+            payload.section_index,
+        )
+        return SectionUploadUrlResponse(
+            success=False,
+            error=f"No se pudo preparar la subida de audio: {type(exc).__name__}",
+        )
     return SectionUploadUrlResponse(
         success=True,
         upload_url=upload_url,

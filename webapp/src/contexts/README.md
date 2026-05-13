@@ -43,6 +43,7 @@ Ese orden importa porque los providers se consumen entre sí.
   - persiste tanto markdown como JSON del editor para recuperar drafts locales
 - `DocumentDerivedStore`
   - streaming, modo del editor y estado transitorio de generación/transcripción
+  - para transcripción también guarda bloques de vista con timestamp por sección, sin persistirlos en `contentMarkdown`
 - `PatchStore`
   - preparación de preview/review de patches
 - `AiSessionStore`

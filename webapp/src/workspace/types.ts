@@ -45,6 +45,14 @@ export type TranscriptionProcessStatus =
   | "success"
   | "error";
 
+export type TranscriptionBlock = {
+  sectionId: string;
+  startTimeMs: number;
+  endTimeMs: number;
+  text: string;
+  status: string;
+};
+
 export type WorkspaceDocument = {
   id: string;
   encounterId: string;
@@ -111,6 +119,7 @@ export type DocumentDerivedState = {
   processingId?: string | null;
   transcriptionStatus?: TranscriptionProcessStatus;
   streamingContent?: string;
+  transcriptionBlocks?: TranscriptionBlock[];
   patchPreviewContent?: string;
   regeneratedSummary?: string;
 };

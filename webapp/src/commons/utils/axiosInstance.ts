@@ -108,9 +108,14 @@ axiosInstance.interceptors.response.use(
         .catch((refreshError) => Promise.reject(refreshError));
     }
 
-    // Enhanced error handling with specific CORS error detection
     if (error.message === "Network Error" || error.code === "ERR_NETWORK") {
-      //   logger.error("CORS or network error detected. Check your CORS configuration.");
+      logger.error("Network/API response was not readable:", {
+        method: error.config?.method,
+        url: error.config?.url,
+        message:
+          "The browser could not read the backend response. This is often a backend crash, timeout, or missing CORS headers on an error response.",
+      });
+      return Promise.reject(error);
     }
 
     logger.error("API Error:", {
