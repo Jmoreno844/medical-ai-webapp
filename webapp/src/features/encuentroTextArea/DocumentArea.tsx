@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TabBar from "./TabBar/TabBar";
 import TextArea from "./TextArea/TextArea";
 import LoadingSpinner from "@/commons/components/LoadingSpinner";
@@ -28,6 +28,18 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
         .filter(Boolean),
     [documentOrder, documentsById]
   );
+  const [lingeringGenerationDocumentId, setLingeringGenerationDocumentId] =
+    useState<number | null>(null);
+  const previousGenerationSnapshotRef = useRef<{
+    documentId: number | null;
+    inProgress: boolean;
+    isComplete: boolean;
+  }>({
+    documentId: null,
+    inProgress: false,
+    isComplete: false,
+  });
+  const lingeringClearTimerRef = useRef<number | null>(null);
 
   const {
     isModalOpen,
@@ -77,6 +89,111 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
   }, [generateDocumentation]);
 
   const generationTargetDocumentId = generationStatus.documentId;
+  const shouldKeepGenerationPanelVisible =
+    Boolean(generationStatus?.inProgress) ||
+    lingeringGenerationDocumentId === generationTargetDocumentId;
+
+  useEffect(() => {
+    const previousSnapshot = previousGenerationSnapshotRef.current;
+    const justCompleted =
+      previousSnapshot.documentId === generationTargetDocumentId &&
+      previousSnapshot.inProgress &&
+      generationStatus.isComplete;
+
+    logger.debug("[GENERATION_PANEL] Completion transition check", {
+      previousDocumentId: previousSnapshot.documentId,
+      previousInProgress: previousSnapshot.inProgress,
+      previousIsComplete: previousSnapshot.isComplete,
+      currentDocumentId: generationTargetDocumentId,
+      currentInProgress: generationStatus.inProgress,
+      currentIsComplete: generationStatus.isComplete,
+      activeDocumentId,
+      lingeringGenerationDocumentId,
+      justCompleted,
+    });
+
+    previousGenerationSnapshotRef.current = {
+      documentId: generationTargetDocumentId,
+      inProgress: generationStatus.inProgress,
+      isComplete: generationStatus.isComplete,
+    };
+
+    if (
+      !justCompleted ||
+      !generationTargetDocumentId ||
+      activeDocumentId === String(generationTargetDocumentId)
+    ) {
+      logger.debug("[GENERATION_PANEL] Completion linger not scheduled", {
+        generationTargetDocumentId,
+        activeDocumentId,
+        justCompleted,
+      });
+      return;
+    }
+
+    if (lingeringClearTimerRef.current !== null) {
+      logger.debug("[GENERATION_PANEL] Clearing previous completion linger timer", {
+        generationTargetDocumentId,
+      });
+      window.clearTimeout(lingeringClearTimerRef.current);
+      lingeringClearTimerRef.current = null;
+    }
+
+    logger.debug("[GENERATION_PANEL] Scheduling completion linger", {
+      generationTargetDocumentId,
+      activeDocumentId,
+    });
+    setLingeringGenerationDocumentId(generationTargetDocumentId);
+    lingeringClearTimerRef.current = window.setTimeout(() => {
+      logger.debug("[GENERATION_PANEL] Clearing completion linger", {
+        generationTargetDocumentId,
+      });
+      setLingeringGenerationDocumentId((current) =>
+        current === generationTargetDocumentId ? null : current
+      );
+      lingeringClearTimerRef.current = null;
+    }, 2000);
+  }, [
+    activeDocumentId,
+    generationStatus.inProgress,
+    generationStatus.isComplete,
+    generationTargetDocumentId,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (lingeringClearTimerRef.current !== null) {
+        logger.debug("[GENERATION_PANEL] Cancelling completion linger timer on unmount");
+        window.clearTimeout(lingeringClearTimerRef.current);
+        lingeringClearTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    logger.debug("[GENERATION_PANEL] Visibility state", {
+      activeDocumentId,
+      generationTargetDocumentId,
+      inProgress: generationStatus.inProgress,
+      isComplete: generationStatus.isComplete,
+      hasError: Boolean(generationStatus.error),
+      lingeringGenerationDocumentId,
+      shouldKeepGenerationPanelVisible,
+      willRenderPanel:
+        !isModalOpen &&
+        shouldKeepGenerationPanelVisible &&
+        activeDocumentId !== String(generationTargetDocumentId),
+    });
+  }, [
+    activeDocumentId,
+    generationStatus.error,
+    generationStatus.inProgress,
+    generationStatus.isComplete,
+    generationTargetDocumentId,
+    isModalOpen,
+    lingeringGenerationDocumentId,
+    shouldKeepGenerationPanelVisible,
+  ]);
 
   // Loading state
   if (loading) {
@@ -125,7 +242,7 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
 
       {/* Display real-time generation progress */}
       {!isModalOpen &&
-        generationStatus?.inProgress &&
+        shouldKeepGenerationPanelVisible &&
         activeDocumentId !== String(generationTargetDocumentId) && (
           <div className="p-4 bg-white border-t">
             <DocumentGenerationProgress

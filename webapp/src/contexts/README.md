@@ -27,9 +27,11 @@ Ese orden importa porque los providers se consumen entre sí.
   - compat bridge del editor sobre `DocumentSnapshotStore` + `DocumentDraftStore`
 - `TranscriptionContext`
   - kickoff de transcripción, SSE y flags compartidos del encounter
+  - rehidrata la sesión canónica del documento de transcripción para recuperar bloques y timestamps tras recargar
 - `GenerationContext`
   - plantillas, kickoff de generación y SSE
   - al completar generación, refresca el documento desde backend para rehidratar `contentJson` canónico además del markdown final
+  - si una generación falla, conserva el documento destino y permite reintentar sobre el mismo documento
 
 ## Qué es dueño de cada store del workspace
 

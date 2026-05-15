@@ -46,12 +46,26 @@ async def _post_document_worker_task_background(
         return
     url = f"{settings.document_generation_worker_base_url.rstrip('/')}{path}"
     try:
-        await asyncio.to_thread(post_json, url, payload, timeout=5)
+        await asyncio.to_thread(post_json, url, payload, timeout=15)
     except Exception:
         logger.exception(
             "Local document generation worker dispatch failed process_id=%s",
             payload.get("process_id"),
         )
+        document_id = payload.get("new_document_id")
+        process_id = payload.get("process_id")
+        if isinstance(document_id, int):
+            await publish_document_event(
+                document_id,
+                "generation_error",
+                {
+                    "process_id": process_id,
+                    "error": (
+                        "No se pudo iniciar la generación del documento. "
+                        "Reintente en unos momentos."
+                    ),
+                },
+            )
 
 
 @router.post(

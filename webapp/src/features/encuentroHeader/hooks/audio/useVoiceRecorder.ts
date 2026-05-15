@@ -4,8 +4,8 @@ import { getBestSupportedAudioType } from "./utils";
 import {
   createRecordingSession,
   finishRecordingSession,
-  generateAudioUploadUrl,
   generateSectionUploadUrl,
+  getRecordingSessionStatus,
   registerAudioSection,
   uploadAudioToCloud,
 } from "./uploadService";
@@ -74,6 +74,39 @@ const checkAudioExists = async (encounterId: number) => {
       is_expired: false,
     };
   }
+};
+
+const getPendingSectionsDurationSeconds = (
+  sections: LocalAudioSection[],
+): number => {
+  const maxEndTimeMs = sections.reduce(
+    (maxEndTime, section) => Math.max(maxEndTime, section.end_time_ms ?? 0),
+    0,
+  );
+  return Math.ceil(maxEndTimeMs / 1000);
+};
+
+const getNextSectionIndex = async (
+  encounterId: number,
+  recordingSessionId: string,
+): Promise<number> => {
+  const [pendingSections, sessionStatus] = await Promise.all([
+    listPendingSections(encounterId),
+    getRecordingSessionStatus(recordingSessionId),
+  ]);
+
+  const highestPendingIndex = pendingSections
+    .filter((section) => section.recording_session_id === recordingSessionId)
+    .reduce(
+      (highestIndex, section) => Math.max(highestIndex, section.section_index),
+      -1,
+    );
+  const highestRegisteredIndex = (sessionStatus?.sections ?? []).reduce(
+    (highestIndex, section) => Math.max(highestIndex, section.section_index),
+    -1,
+  );
+
+  return Math.max(highestPendingIndex, highestRegisteredIndex) + 1;
 };
 /**
  * Custom hook to manage voice recording functionality
@@ -208,20 +241,32 @@ export const useVoiceRecorder = (
             expires_at,
             is_expired,
           } = await checkAudioExists(encounterId);
+          const pendingSections = await listPendingSections(encounterId);
+          const pendingSectionsDuration = getPendingSectionsDurationSeconds(
+            pendingSections,
+          );
+          const hasPendingLocalAudio = pendingSections.length > 0;
+          const resolvedDuration = Math.max(
+            existingDuration,
+            pendingSectionsDuration,
+          );
 
           logger.debug(
             `[VOICE_RECORDER] Audio check result for ${encounterId}:`,
             {
               exists,
               existingDuration,
+              pendingSections: pendingSections.length,
+              pendingSectionsDuration,
               has_been_transcribed,
               expires_at,
               is_expired,
             },
           );
 
-          setAudioExists(exists);
-          setDuration(exists ? existingDuration : 0);
+          setPendingAudioSections(pendingSections.length);
+          setAudioExists(exists || hasPendingLocalAudio);
+          setDuration(resolvedDuration);
           setAudioExpiresAt(exists ? expires_at : null);
           setIsAudioExpired(exists ? is_expired : false);
           setHasBeenTranscribed(exists ? has_been_transcribed : false);
@@ -275,6 +320,12 @@ export const useVoiceRecorder = (
   const refreshPendingSectionCount = async () => {
     const sections = await listPendingSections(encounterId);
     setPendingAudioSections(sections.length);
+    if (sections.length > 0) {
+      setAudioExists(true);
+      setDuration((currentDuration) =>
+        Math.max(currentDuration, getPendingSectionsDurationSeconds(sections)),
+      );
+    }
   };
 
   const processPendingSections = async ({
@@ -869,19 +920,28 @@ export const useVoiceRecorder = (
    */
   const startRecording = async () => {
     try {
-      let nextRecordingSessionId = recordingSessionIdRef.current;
-      if (transcriptionDocIdRef.current) {
-        nextRecordingSessionId = await createRecordingSession(
-          encounterId,
-          transcriptionDocIdRef.current,
+      if (!transcriptionDocIdRef.current) {
+        logger.warn(
+          "[VOICE_RECORDER] Blocking recording start until transcription document is ready",
         );
-        if (!nextRecordingSessionId) {
-          logger.error("[VOICE_RECORDER] Could not create recording session");
-          return;
-        }
-        recordingSessionIdRef.current = nextRecordingSessionId;
-        setRecordingSessionId(nextRecordingSessionId);
+        return;
       }
+
+      let nextRecordingSessionId = recordingSessionIdRef.current;
+      nextRecordingSessionId = await createRecordingSession(
+        encounterId,
+        transcriptionDocIdRef.current,
+      );
+      if (!nextRecordingSessionId) {
+        logger.error("[VOICE_RECORDER] Could not create recording session");
+        return;
+      }
+      recordingSessionIdRef.current = nextRecordingSessionId;
+      setRecordingSessionId(nextRecordingSessionId);
+      nextSectionIndexRef.current = await getNextSectionIndex(
+        encounterId,
+        nextRecordingSessionId,
+      );
 
       // 1. Define optimized audio constraints
       const audioConstraints = {
@@ -906,7 +966,6 @@ export const useVoiceRecorder = (
       chunksRef.current = [];
       const resumeDurationSeconds = audioExists && !isAudioExpired ? duration : 0;
       recordingStartedAtRef.current = Date.now() - resumeDurationSeconds * 1000;
-      nextSectionIndexRef.current = 0;
       activeSectionRef.current = null;
       retiringSectionRef.current = null;
       forcedSplitInFlightRef.current = false;
@@ -1031,69 +1090,13 @@ export const useVoiceRecorder = (
           await finishRecordingSession(recordingSessionIdRef.current);
         }
 
-        // Sectioned recordings upload each chunk to GCS as they are captured.
-        // Whole-audio upload is only needed when no recording session exists.
-        if (transcriptionDocIdRef.current && !recordingSessionIdRef.current) {
-          try {
-            if (!encounterId || encounterId <= 0) {
-              logger.error(
-                "[VOICE_RECORDER] Invalid encounterId in stopRecording:",
-                encounterId,
-              );
-              return;
-            }
-            const uploadUrl = await generateAudioUploadUrl(
-              encounterId,
-              duration,
-            );
-
-            if (!uploadUrl) {
-              logger.error("[VOICE_RECORDER] Failed to get upload URL");
-              return;
-            }
-
-            // Get the current audio blob
-            const currentAudioBlob =
-              chunksRef.current.length > 0
-                ? new Blob(chunksRef.current, {
-                    type: audioMimeTypeRef.current,
-                  })
-                : null;
-
-            if (currentAudioBlob) {
-              // Upload using the dedicated function
-              const uploadSuccess = await uploadAudioToCloud(
-                currentAudioBlob,
-                uploadUrl,
-                audioMimeTypeRef.current,
-              );
-
-              if (!uploadSuccess) {
-                logger.error(
-                  "[VOICE_RECORDER] Failed to upload audio recording",
-                );
-              } else {
-                setIsAudioExpired(false);
-                setAudioExpiresAt(null);
-              }
-            } else {
-              logger.error(
-                "[VOICE_RECORDER] No audio data available to upload",
-              );
-            }
-          } catch (error) {
-            logger.error(
-              "[VOICE_RECORDER] Error during upload process:",
-              error,
-            );
-          }
-        } else if (recordingSessionIdRef.current) {
+        if (recordingSessionIdRef.current) {
           logger.debug(
             "[VOICE_RECORDER] Sectioned transcription session finished; skipping whole-audio upload because sections were already uploaded to GCS",
           );
         } else {
-          logger.debug(
-            "[VOICE_RECORDER] No transcription document ID available for whole-audio upload; skipping encounter audio upload",
+          logger.warn(
+            "[VOICE_RECORDER] Recording stopped without a transcription session; legacy whole-audio upload is disabled",
           );
         }
         const finalAudioBlob = new Blob(chunksRef.current, {
@@ -1172,6 +1175,9 @@ export const useVoiceRecorder = (
     setAudioExpiresAt(null);
     setIsAudioExpired(false);
     setHasBeenTranscribed(false);
+    recordingSessionIdRef.current = null;
+    setRecordingSessionId(null);
+    setPendingAudioSections(0);
     chunksRef.current = [];
     isRecordingRef.current = false;
     isPausedRef.current = false;

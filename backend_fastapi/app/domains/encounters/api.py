@@ -22,6 +22,11 @@ from app.db.models import (
 from app.db.session import get_db_session
 from app.domains.auth.service import get_current_user
 from app.domains.documents.service import new_empty_document
+from app.domains.documents.content import set_document_content_fields
+from app.domains.transcription.service import (
+    get_canonical_recording_session_for_document,
+    reset_recording_session,
+)
 from app.integrations.storage import get_storage_client
 from app.core.schemas import SuccessResponse
 from app.domains.encounters.schemas import (
@@ -392,16 +397,46 @@ async def delete_audio(
             if blob.exists():
                 blob.delete()
 
+    transcription_document_result = await session.execute(
+        select(Document)
+        .where(
+            Document.encounter_id == encounter.id,
+            Document.doctor_id == user.id,
+            Document.kind == "transcription",
+        )
+        .order_by(Document.id.asc())
+    )
+    transcription_document = transcription_document_result.scalars().first()
+
     encounter.audio_file_name = None
     encounter.audio_uploaded_at = None
     encounter.audio_expires_at = None
     encounter.audio_duration_seconds = None
+    encounter.has_been_transcribed = False
+
+    canonical_session = None
+    if transcription_document:
+        canonical_session = await get_canonical_recording_session_for_document(
+            session,
+            document_id=transcription_document.id,
+            doctor_id=user.id,
+        )
+
+    if canonical_session:
+        await reset_recording_session(
+            session,
+            recording_session=canonical_session,
+            clear_document_content=True,
+        )
+
     await session.execute(
         delete(TranscriptionAudioSection).where(
             TranscriptionAudioSection.recording_session_id.in_(
                 select(TranscriptionRecordingSession.id).where(
                     TranscriptionRecordingSession.encounter_id == encounter.id,
                     TranscriptionRecordingSession.doctor_id == user.id,
+                    TranscriptionRecordingSession.id
+                    != (canonical_session.id if canonical_session else -1),
                 )
             )
         )
@@ -410,7 +445,15 @@ async def delete_audio(
         delete(TranscriptionRecordingSession).where(
             TranscriptionRecordingSession.encounter_id == encounter.id,
             TranscriptionRecordingSession.doctor_id == user.id,
+            TranscriptionRecordingSession.id != (canonical_session.id if canonical_session else -1),
         )
     )
+
+    if transcription_document and not canonical_session:
+        set_document_content_fields(
+            transcription_document,
+            content_markdown="",
+            preferred_source="markdown",
+        )
     await session.commit()
     return SuccessResponse(success=True)

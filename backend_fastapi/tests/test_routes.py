@@ -35,6 +35,7 @@ def test_app_usable_routes_are_registered() -> None:
         "/api/v1/documents/{document_id}/sse-token",
         "/api/v1/transcription/start",
         "/api/v1/transcription/sessions",
+        "/api/v1/transcription/documents/{document_id}/session",
         "/api/v1/transcription/sessions/{session_id}",
         "/api/v1/transcription/sessions/{session_id}/sections/upload-url",
         "/api/v1/transcription/sessions/{session_id}/sections",

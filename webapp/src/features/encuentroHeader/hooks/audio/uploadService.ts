@@ -262,3 +262,30 @@ export const getRecordingSessionStatus = async (
     return null;
   }
 };
+
+export const getRecordingSessionStatusForDocument = async (
+  documentId: number
+): Promise<RecordingSessionStatus | null> => {
+  try {
+    const response = await axiosInstance.get(
+      `/api/v1/transcription/documents/${documentId}/session`
+    );
+    if (response.data?.success !== true) {
+      logger.warn("[VOICE_RECORDER] Document recording session status not successful", {
+        documentId,
+        status: response.data?.status,
+      });
+      return null;
+    }
+    return response.data as RecordingSessionStatus;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return null;
+    }
+    logger.error(
+      "[VOICE_RECORDER] Failed to fetch recording session status for document:",
+      getApiErrorMessage(error)
+    );
+    return null;
+  }
+};

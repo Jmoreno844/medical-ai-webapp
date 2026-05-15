@@ -15,8 +15,10 @@ import { useTranscriptionContext } from "./TranscriptionContext";
 import { logger } from "@/lib/logger";
 import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
 import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
+import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
 
 const API_URL = import.meta.env.VITE_API_URL;
+const INITIAL_GENERATION_STATUS_CHUNK = "Iniciando generación de documento...";
 
 interface GenerationStatus {
   inProgress: boolean;
@@ -52,6 +54,7 @@ type GenerationContextType = {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   generateDocumentation: () => Promise<DocumentoOut | null>;
+  retryGeneration: (documentId: number) => Promise<boolean>;
   fetchPlantillas: () => Promise<void>;
 };
 
@@ -61,6 +64,7 @@ const GenerationContext = createContext<GenerationContextType | undefined>(
 
 export function GenerationProvider({
   children,
+  encounterId,
 }: {
   children: React.ReactNode;
   encounterId: number;
@@ -97,6 +101,9 @@ export function GenerationProvider({
     (state) => state.resetDraftFromSnapshot
   );
   const markDraftClean = useDocumentDraftStore((state) => state.markDraftClean);
+  const upsertDocumentInWorkspace = useWorkspaceStore(
+    (state) => state.upsertDocument
+  );
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -193,6 +200,30 @@ export function GenerationProvider({
     }
   }, [createDocument]);
 
+  const getGenerationSourceDocuments = useCallback(() => {
+    const transcriptionDoc = documents.find((doc) => doc.kind === "transcription");
+    const contextDoc = documents.find((doc) => doc.kind === "context");
+
+    if (!transcriptionDoc) {
+      throw new Error("No se encontró el documento de transcripción");
+    }
+
+    if (!contextDoc) {
+      throw new Error("No se encontró el documento de contexto");
+    }
+
+    if (!hasBeenTranscribed) {
+      throw new Error(
+        "Debe transcribir el audio antes de generar un documento"
+      );
+    }
+
+    return {
+      transcriptionDoc,
+      contextDoc,
+    };
+  }, [documents, hasBeenTranscribed]);
+
   const getSSEToken = useCallback(async (documentId: number) => {
     try {
       const response = await axiosInstance.post(
@@ -244,7 +275,12 @@ export function GenerationProvider({
 
               case "generation_chunk": {
                 const newChunk = data.chunk || "";
-                const updatedContent = streamedContentRef.current + newChunk;
+                const shouldSkipStatusChunk =
+                  streamedContentRef.current.length === 0 &&
+                  newChunk.trim() === INITIAL_GENERATION_STATUS_CHUNK;
+                const updatedContent = shouldSkipStatusChunk
+                  ? streamedContentRef.current
+                  : streamedContentRef.current + newChunk;
                 streamedContentRef.current = updatedContent;
                 updateGenerationContent(String(documentId), updatedContent);
                 return;
@@ -318,6 +354,87 @@ export function GenerationProvider({
     ]
   );
 
+  const startGenerationForDocument = useCallback(
+    async (
+      documentId: number,
+      doctorTemplateId: number,
+      documentSnapshot?: DocumentoOut | null,
+    ): Promise<boolean> => {
+      const { transcriptionDoc, contextDoc } = getGenerationSourceDocuments();
+      const selectedTemplateName =
+        plantillas.find((template) => template.id === doctorTemplateId)?.name ?? null;
+
+      setError(null);
+      streamedContentRef.current = "";
+      streamingDocumentIdRef.current = documentId;
+
+      if (
+        activeGenerationDocumentId &&
+        activeGenerationDocumentId !== String(documentId)
+      ) {
+        clearDocumentDerivedState(activeGenerationDocumentId);
+      }
+
+      startGeneration(String(documentId));
+      updateDocumentContent(documentId, "");
+      resetDraftFromSnapshot(String(documentId));
+      markDraftClean(String(documentId));
+
+      const sseToken = await getSSEToken(documentId);
+      if (!sseToken) {
+        throw new Error(
+          "No se pudo autenticar para las actualizaciones en tiempo real"
+        );
+      }
+
+      connectToSSE(documentId, sseToken);
+
+      const response = await axiosInstance.post("/api/v1/documents/generate", {
+        context_document_id: contextDoc.id,
+        transcription_document_id: transcriptionDoc.id,
+        doctor_template_id: doctorTemplateId,
+        new_document_id: documentId,
+      });
+
+      if (!response.data.success) {
+        throw new Error(response.data.error || "Error al iniciar generación");
+      }
+
+      const currentDocument =
+        documentSnapshot ?? documents.find((doc) => doc.id === documentId) ?? null;
+      if (currentDocument) {
+        upsertDocumentInWorkspace(
+          {
+            ...currentDocument,
+            doctor_template_id: doctorTemplateId,
+            doctor_template_name:
+              currentDocument.doctor_template_name ?? selectedTemplateName,
+          },
+          encounterId
+        );
+      }
+
+      setGenerationProcessingId(String(documentId), response.data.process_id ?? null);
+      return true;
+    },
+    [
+      activeGenerationDocumentId,
+      clearDocumentDerivedState,
+      connectToSSE,
+      getGenerationSourceDocuments,
+      getSSEToken,
+      documents,
+      encounterId,
+      plantillas,
+      markDraftClean,
+      resetDraftFromSnapshot,
+      setGenerationProcessingId,
+      startGeneration,
+      upsertDocumentInWorkspace,
+      updateDocumentContent,
+    ]
+  );
+
   const generateDocumentation = useCallback(async () => {
     let createdDocumentId: number | null = null;
 
@@ -326,28 +443,7 @@ export function GenerationProvider({
         throw new Error("Por favor seleccione una plantilla");
       }
 
-      setError(null);
-      streamedContentRef.current = "";
-      streamingDocumentIdRef.current = null;
-
-      const transcriptionDoc = documents.find(
-        (doc) => doc.kind === "transcription"
-      );
-      const contextDoc = documents.find((doc) => doc.kind === "context");
-
-      if (!transcriptionDoc) {
-        throw new Error("No se encontró el documento de transcripción");
-      }
-
-      if (!contextDoc) {
-        throw new Error("No se encontró el documento de contexto");
-      }
-
-      if (!hasBeenTranscribed) {
-        throw new Error(
-          "Debe transcribir el audio antes de generar un documento"
-        );
-      }
+      const { transcriptionDoc, contextDoc } = getGenerationSourceDocuments();
 
       logger.debug("📄 Documents found:", {
         transcripcion: transcriptionDoc.id,
@@ -360,44 +456,11 @@ export function GenerationProvider({
       }
 
       createdDocumentId = newDocument.id;
-      streamingDocumentIdRef.current = newDocument.id;
-
-      if (
-        activeGenerationDocumentId &&
-        activeGenerationDocumentId !== String(newDocument.id)
-      ) {
-        clearDocumentDerivedState(activeGenerationDocumentId);
-      }
-
-      startGeneration(String(newDocument.id));
-      updateDocumentContent(newDocument.id, "");
-      resetDraftFromSnapshot(String(newDocument.id));
-      markDraftClean(String(newDocument.id));
-
-      const sseToken = await getSSEToken(newDocument.id);
-      if (!sseToken) {
-        throw new Error(
-          "No se pudo autenticar para las actualizaciones en tiempo real"
-        );
-      }
-
-      connectToSSE(newDocument.id, sseToken);
       setIsModalOpen(false);
-
-      const response = await axiosInstance.post("/api/v1/documents/generate", {
-        context_document_id: contextDoc.id,
-        transcription_document_id: transcriptionDoc.id,
-        doctor_template_id: selectedPlantillaId,
-        new_document_id: newDocument.id,
-      });
-
-      if (!response.data.success) {
-        throw new Error(response.data.error || "Error al iniciar generación");
-      }
-
-      setGenerationProcessingId(
-        String(newDocument.id),
-        response.data.process_id ?? null
+      await startGenerationForDocument(
+        newDocument.id,
+        selectedPlantillaId,
+        newDocument,
       );
 
       try {
@@ -423,22 +486,47 @@ export function GenerationProvider({
       return null;
     }
   }, [
-    activeGenerationDocumentId,
-    clearDocumentDerivedState,
     closeEventSource,
-    connectToSSE,
     createNewDocument,
-    documents,
     failGeneration,
-    getSSEToken,
-    hasBeenTranscribed,
-    markDraftClean,
-    resetDraftFromSnapshot,
+    getGenerationSourceDocuments,
     selectedPlantillaId,
-    setGenerationProcessingId,
-    startGeneration,
-    updateDocumentContent,
+    startGenerationForDocument,
   ]);
+
+  const retryGeneration = useCallback(
+    async (documentId: number): Promise<boolean> => {
+      const retryDocument = documents.find((doc) => doc.id === documentId);
+      const doctorTemplateId = retryDocument?.doctor_template_id ?? null;
+
+      if (!doctorTemplateId) {
+        const message =
+          "No se encontró la plantilla original para reintentar la generación.";
+        failGeneration(String(documentId), message);
+        setError(message);
+        return false;
+      }
+
+      try {
+        await startGenerationForDocument(documentId, doctorTemplateId);
+        return true;
+      } catch (err) {
+        closeEventSource();
+        const message =
+          err instanceof Error ? err.message : "Error desconocido";
+        failGeneration(String(documentId), message);
+        setError(message);
+        logger.error("❌ Error reintentando documentación:", err);
+        return false;
+      }
+    },
+    [
+      closeEventSource,
+      documents,
+      failGeneration,
+      startGenerationForDocument,
+    ]
+  );
 
   const filteredPlantillas = searchQuery
     ? plantillas.filter((plantilla) =>
@@ -461,6 +549,7 @@ export function GenerationProvider({
     searchQuery,
     setSearchQuery,
     generateDocumentation,
+    retryGeneration,
     fetchPlantillas,
   };
 

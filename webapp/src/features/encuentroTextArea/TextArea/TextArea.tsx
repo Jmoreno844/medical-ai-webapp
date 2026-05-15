@@ -37,6 +37,8 @@ function normalizeEditorText(value: string): string {
   return value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
 }
 
+const INITIAL_GENERATION_STATUS_CHUNK = "Iniciando generación de documento...";
+
 function markdownLooksStructured(markdown: string): boolean {
   return /(^|\n)\s{0,3}#{1,6}\s+/.test(markdown) ||
     /(^|\n)\s*[-*+]\s+/.test(markdown) ||
@@ -98,7 +100,8 @@ const TextArea: React.FC = () => {
     editorRefreshTrigger,
     documentContentCache,
   } = useContentContext();
-  const { generationStatus } = useGenerationContext();
+  const { generationStatus, retryGeneration, isGenerating } =
+    useGenerationContext();
   const { transcriptionCompleteTimestamp } = useTranscriptionContext();
   const setDraftContent = useDocumentDraftStore((state) => state.setDraftContent);
   const derivedByDocumentId = useDocumentDerivedStore(
@@ -111,9 +114,18 @@ const TextArea: React.FC = () => {
   const isCopilotRunning = useWorkspaceStore((state) => state.isCopilotRunning);
   const { submitDecision } = usePatchDecision();
 
-  const [showGenerationSuccess, setShowGenerationSuccess] = useState(false);
+  const [generationSuccessDocumentId, setGenerationSuccessDocumentId] =
+    useState<number | null>(null);
   const previousDocIdRef = useRef<number | null>(null);
   const previousRefreshTriggerRef = useRef(editorRefreshTrigger);
+  const previousGenerationSnapshotRef = useRef<{
+    documentId: number | null;
+    isComplete: boolean;
+  }>({
+    documentId: null,
+    isComplete: false,
+  });
+  const generationSuccessTimerRef = useRef<number | null>(null);
   const ignoreEditorUpdatesRef = useRef(true);
   const hasHydratedDocumentRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
@@ -187,6 +199,7 @@ const TextArea: React.FC = () => {
       if (
         !editor ||
         !activeDocumentId ||
+        !editor.isEditable ||
         saveInFlightRef.current ||
         !hasHydratedDocumentRef.current
       ) {
@@ -317,18 +330,47 @@ const TextArea: React.FC = () => {
   }, [activeDocumentId]);
 
   useEffect(() => {
+    const previousSnapshot = previousGenerationSnapshotRef.current;
+    const justCompleted =
+      previousSnapshot.documentId === generationStatus.documentId &&
+      !previousSnapshot.isComplete &&
+      generationStatus.isComplete;
+
+    previousGenerationSnapshotRef.current = {
+      documentId: generationStatus.documentId,
+      isComplete: generationStatus.isComplete,
+    };
+
     if (
-      generationStatus?.isComplete &&
-      activeDocument &&
-      generationStatus.documentId === activeDocument.id
+      !justCompleted ||
+      !activeDocument ||
+      generationStatus.documentId !== activeDocument.id
     ) {
-      setShowGenerationSuccess(true);
-      const timer = setTimeout(() => {
-        setShowGenerationSuccess(false);
-      }, 2000);
-      return () => clearTimeout(timer);
+      return;
     }
+
+    if (generationSuccessTimerRef.current !== null) {
+      window.clearTimeout(generationSuccessTimerRef.current);
+      generationSuccessTimerRef.current = null;
+    }
+
+    setGenerationSuccessDocumentId(activeDocument.id);
+    generationSuccessTimerRef.current = window.setTimeout(() => {
+      setGenerationSuccessDocumentId((current) =>
+        current === activeDocument.id ? null : current
+      );
+      generationSuccessTimerRef.current = null;
+    }, 2000);
   }, [generationStatus, activeDocument]);
+
+  useEffect(() => {
+    return () => {
+      if (generationSuccessTimerRef.current !== null) {
+        window.clearTimeout(generationSuccessTimerRef.current);
+        generationSuccessTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const activeDerivedState = activeDocument
     ? (derivedByDocumentId[String(activeDocument.id)] ?? null)
@@ -541,10 +583,47 @@ const TextArea: React.FC = () => {
 
   const isStreamingActiveDocument = editorMode === "streaming_preview";
   const isPatchPreviewMode = editorMode === "patch_review";
+  const normalizedCanonicalContent = normalizeEditorText(documentContent ?? "");
+  const isStalledGeneratedDocument = Boolean(
+    activeDocument &&
+      activeDocument.kind === "note" &&
+      activeDocument.doctor_template_id &&
+      !activeDerivedState?.error &&
+      !activeDerivedState?.inProgress &&
+      !activeDerivedState?.isComplete &&
+      (normalizedCanonicalContent === "" ||
+        normalizedCanonicalContent === INITIAL_GENERATION_STATUS_CHUNK),
+  );
+  const showGenerationRetryBanner = Boolean(
+    activeDocument &&
+      !isGenerating &&
+      ((activeDerivedState?.source === "generation" &&
+        activeDerivedState?.error &&
+        !activeDerivedState?.inProgress) ||
+        isStalledGeneratedDocument),
+  );
   const unresolvedPatchCount = patchReviewResolutions.filter(
     (resolution) =>
       resolution.status === "missing" || resolution.status === "unsupported",
   ).length;
+  const isStreamingTranscription =
+    isStreamingActiveDocument && activeDerivedState?.source === "transcription";
+  const transcriptionBlockCount =
+    activeDerivedState?.transcriptionBlocks?.length ?? 0;
+  const streamingStatusCopy = isStreamingTranscription
+    ? transcriptionBlockCount > 0
+      ? `${transcriptionBlockCount} sección${transcriptionBlockCount === 1 ? "" : "es"} transcrita${transcriptionBlockCount === 1 ? "" : "s"}`
+      : "Procesando audio…"
+    : derivedContent && normalizeEditorText(derivedContent).length > 0
+      ? "Generando documento…"
+      : "Preparando documento…";
+  const streamingHintCopy = isStreamingTranscription
+    ? transcriptionBlockCount > 0
+      ? "La transcripción sigue consolidándose y aparecerá con timestamps."
+      : "Esperando los primeros fragmentos transcritos."
+    : derivedContent && normalizeEditorText(derivedContent).length > 0
+      ? "Estamos redactando el contenido clínico."
+      : "Esto puede tardar unos segundos.";
 
   return (
     <div className="flex flex-col h-full">
@@ -555,19 +634,16 @@ const TextArea: React.FC = () => {
       )}
 
       {isStreamingActiveDocument && (
-        <div className="bg-purple-100 p-2 border-b border-purple-200">
+        <div className="border-b border-violet-200 bg-violet-50 px-4 py-3">
           <div className="flex items-center justify-between">
-            <div className="w-24 invisible"></div>
-            <div className="flex items-center">
-              <div className="animate-pulse h-3 w-3 rounded-full bg-purple-500 mr-2"></div>
-              <span className="text-purple-800 font-medium">
-                {activeDerivedState?.source === "transcription"
-                  ? "Transcribiendo documento…"
-                  : "Generando documento…"}
+            <div className="flex items-center gap-2">
+              <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-violet-500" />
+              <span className="font-medium text-violet-900">
+                {streamingStatusCopy}
               </span>
             </div>
-            <div className="text-purple-600 text-sm w-24 text-right">
-              {derivedContent?.length ?? 0} caracteres
+            <div className="text-sm text-violet-700">
+              {streamingHintCopy}
             </div>
           </div>
 
@@ -579,7 +655,7 @@ const TextArea: React.FC = () => {
         </div>
       )}
 
-      {isStreamingActiveDocument && (
+      {isStreamingActiveDocument && !isStreamingTranscription && (
         <div className="h-1 w-full bg-purple-200">
           <div
             className="h-1 bg-purple-600 transition-all duration-300"
@@ -590,6 +666,33 @@ const TextArea: React.FC = () => {
               )}%`,
             }}
           />
+        </div>
+      )}
+
+      {showGenerationRetryBanner && activeDocument && (
+        <div className="border-b border-rose-200 bg-rose-50 px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="font-medium text-rose-900">
+                {isStalledGeneratedDocument
+                  ? "La generación anterior no se completó"
+                  : "No se pudo generar el documento"}
+              </p>
+              <p className="text-sm text-rose-700">
+                {activeDerivedState?.error ??
+                  "Puedes reintentar sobre este mismo documento cuando el servicio esté disponible."}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="shrink-0 rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-rose-700"
+              onClick={() => {
+                void retryGeneration(activeDocument.id);
+              }}
+            >
+              Reintentar generación
+            </button>
+          </div>
         </div>
       )}
 
@@ -635,9 +738,9 @@ const TextArea: React.FC = () => {
         </div>
       )}
 
-      {showGenerationSuccess && (
+      {generationSuccessDocumentId === activeDocument.id && (
         <div className="bg-green-100 p-2 border-b border-green-200 text-green-800">
-          <div className="flex items-center justify-center">
+          <div className="flex items-center">
             <svg
               className="h-4 w-4 mr-2"
               fill="currentColor"
@@ -650,7 +753,7 @@ const TextArea: React.FC = () => {
               />
             </svg>
             <span className="font-medium">
-              Documento generado correctamente
+              Documento generado
             </span>
           </div>
         </div>

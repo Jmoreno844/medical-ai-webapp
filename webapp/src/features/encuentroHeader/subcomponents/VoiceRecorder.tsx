@@ -16,6 +16,7 @@ import { useTranscriptionContext } from "../../../contexts/TranscriptionContext"
 const VoiceRecorder: React.FC = () => {
   // Use transcription context
   const {
+    transcriptionDocId,
     isRecording,
     isPaused,
     duration,
@@ -54,8 +55,16 @@ const VoiceRecorder: React.FC = () => {
     pendingAudioSections > 0 ||
     transcriptionStatus === "pending";
 
+  const statusLabel = isRecording
+    ? "Transcripción automática en curso"
+    : pendingAudioSections > 0
+      ? "Transcripción pendiente"
+      : "Consolidando transcripción…";
+
   const primaryAudioLabel = isRecording
     ? "Detener transcripción"
+    : !transcriptionDocId
+      ? "Preparando..."
     : audioExists || pendingAudioSections > 0 || isAudioExpired
       ? isAudioExpired
         ? "Grabar de nuevo"
@@ -63,7 +72,9 @@ const VoiceRecorder: React.FC = () => {
       : "Grabar";
 
   const primaryAudioButtonClasses = `px-4 py-2 rounded-md text-white font-medium transition-colors ${
-    isRecording
+    !transcriptionDocId && !isRecording
+      ? "bg-gray-300 cursor-not-allowed"
+      : isRecording
       ? "bg-red-500 hover:bg-red-600"
       : "bg-purple-500 hover:bg-purple-600"
   }`;
@@ -99,6 +110,7 @@ const VoiceRecorder: React.FC = () => {
         onClick={handlePrimaryAudioAction}
         className={primaryAudioButtonClasses}
         aria-label={primaryAudioLabel}
+        disabled={!transcriptionDocId && !isRecording}
       >
         {primaryAudioLabel}
       </button>
@@ -106,13 +118,10 @@ const VoiceRecorder: React.FC = () => {
       <MicrophoneIcon isRecording={isRecording} isPaused={isPaused} />
       <TimerDisplay duration={duration} />
       {hasTranscriptionActivity && (
-        <span className="text-sm text-gray-600">
-          {isRecording
-            ? "Transcripción automática en curso"
-            : pendingAudioSections > 0
-              ? `${pendingAudioSections} sección${pendingAudioSections === 1 ? "" : "es"} pendiente${pendingAudioSections === 1 ? "" : "s"}`
-              : "Consolidando transcripción…"}
-        </span>
+        <div className="flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-sm text-violet-800">
+          <div className="h-2 w-2 rounded-full bg-violet-500 animate-pulse" />
+          <span className="font-medium">{statusLabel}</span>
+        </div>
       )}
 
       <SettingsIcon />

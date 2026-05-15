@@ -3,7 +3,10 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+import pytest
+
 from app.core.config import Settings
+from app.domains.documents.generation_api import _post_document_worker_task_background
 from app.integrations.document_generation_tasks import enqueue_document_generation_task
 
 
@@ -55,3 +58,53 @@ def test_document_generation_task_payload_excludes_clinical_content() -> None:
     assert "auth_token" not in body
     assert "transcription_document" not in body
     assert client.created_task["http_request"]["url"].endswith("/gen_1")
+
+
+@pytest.mark.asyncio
+async def test_local_generation_dispatch_failure_publishes_sse_error(monkeypatch) -> None:
+    settings = Settings(JWT_SECRET_KEY="test-secret-at-least-32-bytes-long")
+    settings.document_generation_worker_base_url = "http://localhost:8092"
+
+    published: list[tuple[int, str, dict]] = []
+
+    def fake_post_json(*args, **kwargs) -> None:
+        raise RuntimeError("worker down")
+
+    async def fake_publish_document_event(
+        document_id: int,
+        event: str,
+        payload: dict | None = None,
+    ) -> None:
+        published.append((document_id, event, payload or {}))
+
+    monkeypatch.setattr(
+        "app.domains.documents.generation_api.post_json",
+        fake_post_json,
+    )
+    monkeypatch.setattr(
+        "app.domains.documents.generation_api.publish_document_event",
+        fake_publish_document_event,
+    )
+
+    await _post_document_worker_task_background(
+        "/api/v1/internal/document-generation/tasks/gen_77",
+        {
+            "process_id": "gen_77",
+            "new_document_id": 77,
+        },
+        settings,
+    )
+
+    assert published == [
+        (
+            77,
+            "generation_error",
+            {
+                "process_id": "gen_77",
+                "error": (
+                    "No se pudo iniciar la generación del documento. "
+                    "Reintente en unos momentos."
+                ),
+            },
+        )
+    ]

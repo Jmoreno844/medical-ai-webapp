@@ -1,60 +1,58 @@
 import React from "react";
 
 interface DocumentGenerationProgressProps {
-    isGenerating: boolean;
-    content: string;
-    isComplete: boolean;
-    error: string | null;
-    onViewDocument?: () => void; // Add this prop
+  isGenerating: boolean;
+  content: string;
+  isComplete: boolean;
+  error: string | null;
+  onViewDocument?: () => void;
 }
 
 export const DocumentGenerationProgress: React.FC<
-    DocumentGenerationProgressProps
+  DocumentGenerationProgressProps
 > = ({ isGenerating, content, isComplete, error, onViewDocument }) => {
-    if (!isGenerating && !content && !error) return null;
+  if (!isGenerating && !content && !error && !isComplete) {
+    return null;
+  }
 
-    return (
-        <div className="mt-4 p-4 border rounded-md">
-            <div className="flex justify-between items-center mb-2">
-                <h3 className="text-lg font-semibold">
-                    {isComplete
-                        ? "Generación completada"
-                        : error
-                        ? "Error en la generación"
-                        : "Generando documento..."}
-                </h3>
+  const title = isComplete
+    ? "Documento generado"
+    : error
+      ? "Falló la generación"
+      : "Generando nota clínica en otro documento…";
 
-                {/* Add button to view the document */}
-                {onViewDocument && (
-                    <button
-                        onClick={onViewDocument}
-                        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
-                    >
-                        Ver en editor
-                    </button>
-                )}
-            </div>
+  const detail = error
+    ? error
+    : isComplete
+      ? "La nota ya está lista para revisión."
+      : "Puedes seguir escribiendo aquí mientras se completa en segundo plano.";
 
-            {error && (
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                    <p>{error}</p>
-                </div>
-            )}
-
-            {isGenerating && !error && (
-                <div className="flex items-center mb-4">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
-                    <span>Procesando...</span>
-                </div>
-            )}
-
-            {content && (
-                <div className="bg-white border rounded-md p-3 max-h-96 overflow-y-auto">
-                    <pre className="whitespace-pre-wrap font-sans text-sm">
-                        {content}
-                    </pre>
-                </div>
-            )}
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-slate-900">{title}</p>
+          <p className="truncate text-xs text-slate-600">{detail}</p>
         </div>
-    );
+
+        <div className="flex items-center gap-2">
+          {isGenerating && !error && (
+            <div
+              className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-violet-500"
+              aria-hidden="true"
+            />
+          )}
+
+          {onViewDocument && (
+            <button
+              onClick={onViewDocument}
+              className="shrink-0 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-slate-700"
+            >
+              {error ? "Abrir y reintentar" : isComplete ? "Abrir" : "Ver"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 };

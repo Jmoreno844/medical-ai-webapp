@@ -6,7 +6,7 @@ import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -90,6 +90,28 @@ async def get_recording_session_for_doctor(
     return result.scalar_one_or_none()
 
 
+async def get_canonical_recording_session_for_document(
+    session: AsyncSession,
+    *,
+    document_id: int,
+    doctor_id: int,
+) -> TranscriptionRecordingSession | None:
+    result = await session.execute(
+        select(TranscriptionRecordingSession)
+        .options(
+            selectinload(TranscriptionRecordingSession.sections),
+            selectinload(TranscriptionRecordingSession.document),
+            selectinload(TranscriptionRecordingSession.encounter),
+        )
+        .where(
+            TranscriptionRecordingSession.document_id == document_id,
+            TranscriptionRecordingSession.doctor_id == doctor_id,
+        )
+        .order_by(TranscriptionRecordingSession.started_at.desc(), TranscriptionRecordingSession.id.desc())
+    )
+    return result.scalars().first()
+
+
 async def create_recording_session(
     session: AsyncSession,
     *,
@@ -97,6 +119,14 @@ async def create_recording_session(
     document: Document,
     doctor_id: int,
 ) -> TranscriptionRecordingSession:
+    existing_session = await get_canonical_recording_session_for_document(
+        session,
+        document_id=document.id,
+        doctor_id=doctor_id,
+    )
+    if existing_session:
+        return existing_session
+
     now = datetime.now(timezone.utc)
     recording_session = TranscriptionRecordingSession(
         session_id=uuid.uuid4().hex,
@@ -113,6 +143,37 @@ async def create_recording_session(
     session.add(recording_session)
     await session.flush()
     return recording_session
+
+
+async def reset_recording_session(
+    session: AsyncSession,
+    *,
+    recording_session: TranscriptionRecordingSession,
+    clear_document_content: bool = False,
+) -> None:
+    await session.execute(
+        delete(TranscriptionAudioSection).where(
+            TranscriptionAudioSection.recording_session_id == recording_session.id,
+        )
+    )
+    recording_session.status = SESSION_STATUS_RECORDING
+    recording_session.started_at = datetime.now(timezone.utc)
+    recording_session.finished_at = None
+    recording_session.finalized_at = None
+    recording_session.consolidated_transcript = None
+    recording_session.error_code = None
+
+    if recording_session.encounter:
+        recording_session.encounter.has_been_transcribed = False
+
+    if clear_document_content and recording_session.document:
+        set_document_content_fields(
+            recording_session.document,
+            content_markdown="",
+            preferred_source="markdown",
+        )
+
+    await session.flush()
 
 
 async def _update_encounter_audio_duration(
@@ -223,9 +284,11 @@ async def register_audio_section(
         await session.rollback()
         result = await session.execute(
             select(TranscriptionAudioSection).where(
-                TranscriptionAudioSection.recording_session_id
-                == recording_session.id,
-                TranscriptionAudioSection.client_section_id == client_section_id,
+                TranscriptionAudioSection.recording_session_id == recording_session.id,
+                (
+                    TranscriptionAudioSection.client_section_id == client_section_id
+                )
+                | (TranscriptionAudioSection.section_index == section_index),
             )
         )
         existing_after_race = result.scalar_one_or_none()

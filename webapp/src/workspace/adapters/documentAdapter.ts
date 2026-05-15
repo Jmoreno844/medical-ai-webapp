@@ -76,6 +76,7 @@ export function adaptDocumentoToWorkspaceDocument(
       created_on: doc.created_on,
       doctor_id: doc.doctor_id,
       doctor_template_id: doc.doctor_template_id ?? null,
+      doctor_template_name: doc.doctor_template_name ?? null,
       encounter_id: doc.encounter_id,
     },
     createdAt: doc.created_on,
@@ -94,6 +95,11 @@ export function adaptWorkspaceDocumentToDocumentoOut(
       typeof doc.metadata.doctor_template_id === "number" ||
       doc.metadata.doctor_template_id === null
         ? (doc.metadata.doctor_template_id as number | null)
+        : null,
+    doctor_template_name:
+      typeof doc.metadata.doctor_template_name === "string" ||
+      doc.metadata.doctor_template_name === null
+        ? (doc.metadata.doctor_template_name as string | null)
         : null,
     content: doc.contentMarkdown,
     content_markdown: doc.contentMarkdown,

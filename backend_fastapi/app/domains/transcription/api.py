@@ -34,10 +34,11 @@ from app.domains.transcription.service import (
     create_recording_session,
     enqueue_section_task,
     generate_section_upload_url,
+    get_canonical_recording_session_for_document,
     get_recording_session_for_doctor,
     get_section_work_item,
-    register_audio_section,
     is_recording_session_ready_for_consolidation,
+    register_audio_section,
     serialize_section,
 )
 from app.domains.transcription.worker_auth import verify_transcription_worker_request
@@ -308,6 +309,46 @@ async def get_transcription_recording_session_status(
     )
     if not recording_session:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Sesión no encontrada")
+    return RecordingSessionStatusResponse(
+        success=True,
+        session_id=recording_session.session_id,
+        encounter_id=recording_session.encounter_id,
+        document_id=recording_session.document_id,
+        status=recording_session.status,
+        started_at=recording_session.started_at,
+        finished_at=recording_session.finished_at,
+        finalized_at=recording_session.finalized_at,
+        consolidated_transcript=recording_session.consolidated_transcript,
+        error_code=recording_session.error_code,
+        sections=[serialize_section(section) for section in recording_session.sections],
+    )
+
+
+@router.get(
+    "/transcription/documents/{document_id}/session",
+    response_model=RecordingSessionStatusResponse,
+)
+async def get_transcription_document_recording_session_status(
+    document_id: int,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> RecordingSessionStatusResponse:
+    document = await get_document_for_doctor(
+        session,
+        document_id=document_id,
+        doctor_id=user.id,
+    )
+    if not document:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Documento no encontrado")
+
+    recording_session = await get_canonical_recording_session_for_document(
+        session,
+        document_id=document_id,
+        doctor_id=user.id,
+    )
+    if not recording_session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Sesión no encontrada")
+
     return RecordingSessionStatusResponse(
         success=True,
         session_id=recording_session.session_id,

@@ -8,12 +8,17 @@ import React, {
   useState,
 } from "react";
 import axiosInstance from "@/commons/utils/axiosInstance";
-import { getRecordingSessionStatus } from "../features/encuentroHeader/hooks/audio/uploadService";
+import {
+  getRecordingSessionStatus,
+  getRecordingSessionStatusForDocument,
+  type RecordingSessionStatus,
+} from "../features/encuentroHeader/hooks/audio/uploadService";
 import { useVoiceRecorder } from "../features/encuentroHeader/hooks/audio/useVoiceRecorder";
 import { useContentContext } from "./ContentContext";
 import { useEncuentroContext } from "./EncuentroContext";
 import { logger } from "@/lib/logger";
 import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
+import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
 import { buildTranscriptionBlocks } from "@/workspace/utils/transcriptionBlocks";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -21,6 +26,13 @@ const API_URL = import.meta.env.VITE_API_URL;
 const getTranscriptionErrorMessage = (error?: string | null) => {
   if (error === "Audio file has expired") {
     return "El audio expiró. Grabe uno nuevo o elimine el audio vencido.";
+  }
+
+  if (
+    error ===
+    "Legacy full-audio transcription is no longer supported by FastAPI. Use segmented recording sessions so transcription runs in the worker."
+  ) {
+    return "Este audio pertenece al flujo anterior y no puede transcribirse. Graba uno nuevo para usar la transcripción por secciones.";
   }
 
   return error || "Error al transcribir el audio";
@@ -73,6 +85,16 @@ export function TranscriptionProvider({
 }) {
   const contentContext = useContentContext();
   const { encuentro, updateEncuentro } = useEncuentroContext();
+  const activeWorkspaceDocumentId = useWorkspaceStore(
+    (state) => state.activeDocumentId,
+  );
+  const documentsById = useWorkspaceStore((state) => state.documentsById);
+  const activeDocumentId = activeWorkspaceDocumentId
+    ? Number(activeWorkspaceDocumentId)
+    : null;
+  const activeDocument = activeWorkspaceDocumentId
+    ? documentsById[activeWorkspaceDocumentId] ?? null
+    : null;
 
   const [transcriptionDocId, setTranscriptionDocId] = useState<number | null>(
     initialTranscriptionDocId,
@@ -81,6 +103,9 @@ export function TranscriptionProvider({
     useState<number | null>(null);
   const [localHasBeenTranscribed, setLocalHasBeenTranscribed] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [knownRecordingSessionId, setKnownRecordingSessionId] = useState<
+    string | null
+  >(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const subscribedTranscriptionDocIdRef = useRef<number | null>(null);
@@ -148,8 +173,57 @@ export function TranscriptionProvider({
   useEffect(() => {
     if (voiceRecorder.recordingSessionId) {
       activeRecordingSessionIdRef.current = voiceRecorder.recordingSessionId;
+      setKnownRecordingSessionId(voiceRecorder.recordingSessionId);
     }
   }, [voiceRecorder.recordingSessionId]);
+
+  const applyRecordingSessionState = useCallback(
+    (
+      documentId: number,
+      sessionStatus: RecordingSessionStatus,
+      fallbackContent: string,
+    ): boolean => {
+      const blocks = buildTranscriptionBlocks(sessionStatus.sections);
+      const nextContent =
+        sessionStatus.consolidated_transcript ?? fallbackContent;
+      const hasUsefulBlocks = blocks.length > 0
+      const hasCanonicalContent = nextContent.trim().length > 0;
+
+      if (
+        !hasUsefulBlocks &&
+        !hasCanonicalContent &&
+        sessionStatus.status === "recording"
+      ) {
+        return false;
+      }
+
+      activeRecordingSessionIdRef.current = sessionStatus.session_id;
+      setKnownRecordingSessionId(sessionStatus.session_id);
+
+      if (sessionStatus.status === "consolidated") {
+        completeTranscription(String(documentId), nextContent, blocks);
+        return true;
+      }
+
+      if (
+        sessionStatus.status === "recording" ||
+        sessionStatus.status === "finishing" ||
+        sessionStatus.status === "consolidating"
+      ) {
+        updateTranscriptionContent(String(documentId), nextContent, blocks);
+        return true;
+      }
+
+      if (sessionStatus.status === "needs_review") {
+        failTranscription(
+          String(documentId),
+          getTranscriptionErrorMessage(sessionStatus.error_code),
+        );
+      }
+      return true;
+    },
+    [completeTranscription, failTranscription, updateTranscriptionContent],
+  );
 
   const loggedSetHasBeenTranscribed = useCallback(
     (value: boolean) => {
@@ -251,6 +325,7 @@ export function TranscriptionProvider({
   const resetTranscriptionState = useCallback(() => {
     setErrorMessage(null);
     activeRecordingSessionIdRef.current = null;
+    setKnownRecordingSessionId(null);
     if (transcriptionDocId) {
       clearDocumentDerivedState(String(transcriptionDocId));
     } else if (activeTranscriptionDocumentId) {
@@ -295,12 +370,66 @@ export function TranscriptionProvider({
     setLocalHasBeenTranscribed(false);
     setTranscriptionDocId(initialTranscriptionDocId);
     activeRecordingSessionIdRef.current = null;
+    setKnownRecordingSessionId(null);
   }, [
     closeEventSource,
     encounterId,
     initialTranscriptionDocId,
     resetTranscriptionState,
     transcriptionDocId,
+  ]);
+
+  useEffect(() => {
+    if (
+      !activeDocumentId ||
+      String(activeDocument?.metadata?.kind ?? activeDocument?.type) !==
+        "transcription"
+    ) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const hydrateCanonicalSession = async () => {
+      const sessionStatus = await getRecordingSessionStatusForDocument(
+        activeDocumentId,
+      );
+      if (!sessionStatus || isCancelled) {
+        return;
+      }
+
+      const fallbackContent =
+        contentContext.documentContentCache.get(activeDocumentId) ??
+        (transcriptionDocId === activeDocumentId
+          ? contentContext.documentContent
+          : "") ??
+        "";
+
+      const applied = applyRecordingSessionState(
+        activeDocumentId,
+        sessionStatus,
+        fallbackContent,
+      );
+      if (!applied && !voiceRecorder.recordingSessionId) {
+        activeRecordingSessionIdRef.current = null;
+        setKnownRecordingSessionId(null);
+      }
+    };
+
+    void hydrateCanonicalSession();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    activeDocument?.metadata?.kind,
+    activeDocument?.type,
+    activeDocumentId,
+    applyRecordingSessionState,
+    contentContext.documentContent,
+    contentContext.documentContentCache,
+    transcriptionDocId,
+    voiceRecorder.recordingSessionId,
   ]);
 
   const getSSEToken = useCallback(
@@ -483,6 +612,9 @@ export function TranscriptionProvider({
       try {
         const subscribed = await subscribeToTranscriptionUpdates(
           id_documento_transcripcion,
+          {
+            markPendingOnConnect: false,
+          },
         );
         if (!subscribed) {
           throw new Error(
@@ -490,11 +622,28 @@ export function TranscriptionProvider({
           );
         }
 
-        if (voiceRecorder.recordingSessionId) {
+        if (
+          !hasBeenTranscribed &&
+          (voiceRecorder.pendingAudioSections > 0 ||
+            transcriptionStatus === "pending")
+        ) {
           return {
             success: true,
             message: "Transcripción por secciones en proceso",
           };
+        }
+
+        if (
+          voiceRecorder.audioExists &&
+          voiceRecorder.pendingAudioSections === 0 &&
+          !knownRecordingSessionId
+        ) {
+          const message =
+            "Este audio pertenece al flujo anterior y no puede transcribirse. Graba uno nuevo para usar la transcripción por secciones.";
+          setErrorMessage(message);
+          failTranscription(String(id_documento_transcripcion), message);
+          closeEventSource();
+          throw new Error(message);
         }
 
         const response = await axiosInstance.post(
@@ -537,8 +686,12 @@ export function TranscriptionProvider({
     [
       closeEventSource,
       failTranscription,
+      hasBeenTranscribed,
+      knownRecordingSessionId,
       subscribeToTranscriptionUpdates,
-      voiceRecorder.recordingSessionId,
+      transcriptionStatus,
+      voiceRecorder.audioExists,
+      voiceRecorder.pendingAudioSections,
     ],
   );
 
@@ -549,7 +702,6 @@ export function TranscriptionProvider({
 
     const hasBackgroundTranscriptionWork =
       voiceRecorder.pendingAudioSections > 0 ||
-      Boolean(voiceRecorder.recordingSessionId) ||
       transcriptionStatus === "pending";
 
     if (!hasBackgroundTranscriptionWork) {
@@ -566,11 +718,11 @@ export function TranscriptionProvider({
     void subscribeToTranscriptionUpdates(transcriptionDocId);
   }, [
     hasBeenTranscribed,
+    knownRecordingSessionId,
     subscribeToTranscriptionUpdates,
     transcriptionDocId,
     transcriptionStatus,
     voiceRecorder.pendingAudioSections,
-    voiceRecorder.recordingSessionId,
   ]);
 
   /**
@@ -633,18 +785,12 @@ export function TranscriptionProvider({
 
   const stopRecording = useCallback(() => {
     voiceRecorder.stopRecording();
-    if (transcriptionDocId && !hasBeenTranscribed) {
-      clearDocumentDerivedState(String(transcriptionDocId));
-    }
-  }, [
-    clearDocumentDerivedState,
-    hasBeenTranscribed,
-    transcriptionDocId,
-    voiceRecorder,
-  ]);
+  }, [voiceRecorder]);
 
   const deleteRecording = useCallback(async () => {
     await voiceRecorder.deleteRecording();
+    activeRecordingSessionIdRef.current = null;
+    setKnownRecordingSessionId(null);
   }, [voiceRecorder]);
 
   const value: TranscriptionContextType = {
@@ -656,7 +802,7 @@ export function TranscriptionProvider({
     duration: voiceRecorder.duration,
     audioBlob: voiceRecorder.audioBlob,
     audioExists: voiceRecorder.audioExists,
-    recordingSessionId: voiceRecorder.recordingSessionId,
+    recordingSessionId: knownRecordingSessionId,
     pendingAudioSections: voiceRecorder.pendingAudioSections,
     audioExpiresAt: voiceRecorder.audioExpiresAt,
     isAudioExpired: voiceRecorder.isAudioExpired,

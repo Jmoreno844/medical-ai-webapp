@@ -11,13 +11,13 @@ const SegmentedTranscriptionView: React.FC<SegmentedTranscriptionViewProps> = ({
 }) => {
   return (
     <div className="h-full overflow-auto bg-white px-4 py-3">
-      <div className="mx-auto max-w-4xl space-y-6">
+      <div className="space-y-4">
         {blocks.map((block) => (
           <section
             key={block.sectionId}
-            className="rounded-lg border border-slate-200 bg-slate-50/55 px-4 py-3"
+            className="grid grid-cols-[72px_minmax(0,1fr)] gap-3 border-b border-slate-100 py-1 last:border-b-0"
           >
-            <div className="mb-3 text-xs font-semibold tracking-wide text-slate-500">
+            <div className="pt-1 text-xs font-semibold tabular-nums tracking-wide text-slate-500">
               [{formatTranscriptionTimestamp(block.startTimeMs)}]
             </div>
             <div className="whitespace-pre-wrap text-[15px] leading-7 text-slate-800">

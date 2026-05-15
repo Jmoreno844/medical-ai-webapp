@@ -28,7 +28,6 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
     audioExists,
     isAudioExpired,
     hasBeenTranscribed,
-    recordingSessionId,
     pendingAudioSections,
     isTranscribing,
     transcriptionStatus,
@@ -45,7 +44,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
   }, [resetKey, audioExists, audioBlob, resetTranscriptionState]);
 
   const hasRealtimeSession = Boolean(
-    recordingSessionId || pendingAudioSections > 0,
+    pendingAudioSections > 0 || transcriptionStatus === "pending",
   );
   const shouldContinueRealtimeTranscription =
     hasRealtimeSession &&
