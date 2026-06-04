@@ -15,6 +15,7 @@ from app.db.models import (
     Document,
     Encounter,
     Patient,
+    PatientDoctor,
     TranscriptionAudioSection,
     TranscriptionRecordingSession,
     User,
@@ -246,7 +247,12 @@ async def update_encounter(
 
     if "patient_id" in payload_dict and payload_dict["patient_id"] is not None:
         patient_result = await session.execute(
-            select(Patient).where(Patient.id == payload_dict["patient_id"])
+            select(Patient)
+            .join(PatientDoctor, PatientDoctor.patient_id == Patient.id)
+            .where(
+                Patient.id == payload_dict["patient_id"],
+                PatientDoctor.doctor_id == user.id,
+            )
         )
         if not patient_result.scalar_one_or_none():
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Paciente no encontrado")

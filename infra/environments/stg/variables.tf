@@ -55,6 +55,12 @@ variable "copilot_agent_service_name" {
   type        = string
 }
 
+variable "frontend_service_name" {
+  description = "Cloud Run frontend service name"
+  type        = string
+  default     = "vexthealth-frontend"
+}
+
 variable "transcription_worker_service_name" {
   description = "Cloud Run transcription worker service name"
   type        = string
@@ -65,6 +71,11 @@ variable "document_generation_worker_service_name" {
   description = "Cloud Run document generation worker service name"
   type        = string
   default     = "vexthealth-document-generation-worker"
+}
+
+variable "frontend_image" {
+  description = "Initial Docker image for the frontend service (CI/CD updates this)"
+  type        = string
 }
 
 variable "cloud_run_image" {
@@ -85,6 +96,18 @@ variable "transcription_worker_image" {
 variable "document_generation_worker_image" {
   description = "Initial Docker image for the document generation worker service (CI/CD updates this)"
   type        = string
+}
+
+variable "frontend_max_instances" {
+  description = "Maximum frontend Cloud Run instances"
+  type        = number
+  default     = 3
+}
+
+variable "frontend_max_concurrency" {
+  description = "Maximum requests per frontend Cloud Run instance"
+  type        = number
+  default     = 80
 }
 
 variable "cloud_run_max_instances" {
@@ -187,6 +210,18 @@ variable "frontend_public_read_enabled" {
   description = "Whether to grant allUsers read access to the frontend bucket"
   type        = bool
   default     = true
+}
+
+variable "frontend_domain_name" {
+  description = "Custom domain mapped directly to the staging frontend Cloud Run service"
+  type        = string
+  default     = null
+}
+
+variable "backend_domain_name" {
+  description = "Custom domain mapped directly to the staging backend Cloud Run service"
+  type        = string
+  default     = null
 }
 
 # --- Artifact Registry ---

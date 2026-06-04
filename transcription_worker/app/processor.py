@@ -9,7 +9,7 @@ import anyio
 
 from app.audio import decode_audio_to_float32_pcm, download_gcs_object
 from app.backend_client import BackendClient
-from app.gemini import transcribe_gcs_audio
+from app.gemini import transcribe_audio
 from app.settings import Settings
 from app.text_filters import normalize_transcript
 from app.vad import VadResult, run_silero_vad
@@ -36,7 +36,8 @@ class Processor:
     async def process_section(self, section_id: str) -> None:
         started_at = time.monotonic()
         work_item = await self.backend.get_section_work_item(section_id)
-        vad_result = await self._run_vad(work_item["gcs_object_name"])
+        audio_bytes = await self._download_audio_bytes(work_item["gcs_object_name"])
+        vad_result = await self._run_vad(audio_bytes)
 
         if not vad_result.is_speech and vad_result.error_code is None:
             await self.backend.post_section_result(
@@ -61,12 +62,15 @@ class Processor:
             )
             return
 
-        gemini_started_at = time.monotonic()
+        llm_started_at = time.monotonic()
         async with self.gemini_semaphore:
-            transcript = await transcribe_gcs_audio(
+            transcript = await transcribe_audio(
                 gcs_uri=work_item["gcs_uri"],
                 content_type=work_item["content_type"],
                 settings=self.settings,
+                audio_bytes=audio_bytes
+                if self.settings.transcription_provider_name in {"openai", "openai_api"}
+                else None,
             )
         normalized = normalize_transcript(transcript)
         error_code = None if normalized else "empty_or_noise_only_transcript"
@@ -82,29 +86,34 @@ class Processor:
                 "vad_speech_ms": vad_result.speech_ms,
                 "vad_speech_ratio": vad_result.speech_ratio,
                 "vad_error_code": vad_result.error_code,
-                "gemini_model": self.settings.transcription_gemini_model,
-                "gemini_latency_ms": self._elapsed_ms(gemini_started_at),
+                "transcription_provider": self.settings.transcription_provider_name,
+                "transcription_model": self.settings.effective_transcription_model,
+                "llm_latency_ms": self._elapsed_ms(llm_started_at),
                 "worker_latency_ms": self._elapsed_ms(started_at),
             },
         )
         logger.info(
             "section_processed section_id=%s session_id=%s vad_decision=%s "
-            "gemini_latency_ms=%s worker_latency_ms=%s",
+            "provider=%s model=%s llm_latency_ms=%s worker_latency_ms=%s",
             section_id,
             work_item["session_id"],
             "fail_open" if vad_result.error_code else "speech",
-            self._elapsed_ms(gemini_started_at),
+            self.settings.transcription_provider_name,
+            self.settings.effective_transcription_model,
+            self._elapsed_ms(llm_started_at),
             self._elapsed_ms(started_at),
         )
 
-    async def _run_vad(self, gcs_object_name: str) -> VadResult:
+    async def _download_audio_bytes(self, gcs_object_name: str) -> bytes:
+        return await anyio.to_thread.run_sync(
+            download_gcs_object,
+            self.settings,
+            gcs_object_name,
+        )
+
+    async def _run_vad(self, audio_bytes: bytes) -> VadResult:
         try:
             async with self.vad_semaphore:
-                audio_bytes = await anyio.to_thread.run_sync(
-                    download_gcs_object,
-                    self.settings,
-                    gcs_object_name,
-                )
                 samples = await anyio.to_thread.run_sync(
                     decode_audio_to_float32_pcm,
                     audio_bytes,
@@ -116,8 +125,7 @@ class Processor:
                 )
         except Exception as exc:
             logger.warning(
-                "vad_fail_open object_name_hash=%s error_code=%s",
-                hash(gcs_object_name),
+                "vad_fail_open error_code=%s",
                 exc.__class__.__name__,
             )
             return VadResult(

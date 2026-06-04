@@ -46,6 +46,7 @@ def test_app_usable_routes_are_registered() -> None:
         "/api/v1/sse/documents/{document_id}/{token}",
         "/api/v1/patients",
         "/api/v1/patients/search",
+        "/api/v1/patients/{patient_id}",
         "/api/v1/doctor-templates",
         "/api/v1/doctor-templates/short",
         "/api/v1/doctor-templates/{template_id}",

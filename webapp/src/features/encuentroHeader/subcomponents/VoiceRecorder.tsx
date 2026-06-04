@@ -1,6 +1,6 @@
 import React from "react";
+import { Square } from "lucide-react";
 import TimerDisplay from "./TimerDisplay";
-import MicrophoneIcon from "./MicrophoneIcon";
 import PauseResumeButton from "./PauseResumeButton";
 import SettingsIcon from "./SettingsIcon";
 import { useTranscriptionContext } from "../../../contexts/TranscriptionContext";
@@ -22,7 +22,6 @@ const VoiceRecorder: React.FC = () => {
     duration,
     audioExists,
     pendingAudioSections,
-    transcriptionStatus,
     audioExpiresAt,
     isAudioExpired,
     isCheckingAudio,
@@ -50,19 +49,8 @@ const VoiceRecorder: React.FC = () => {
     ? `Audio expirado el ${new Date(audioExpiresAt).toLocaleString()}`
     : "Audio expirado";
 
-  const hasTranscriptionActivity =
-    isRecording ||
-    pendingAudioSections > 0 ||
-    transcriptionStatus === "pending";
-
-  const statusLabel = isRecording
-    ? "Transcripción automática en curso"
-    : pendingAudioSections > 0
-      ? "Transcripción pendiente"
-      : "Consolidando transcripción…";
-
   const primaryAudioLabel = isRecording
-    ? "Detener transcripción"
+    ? "Detener"
     : !transcriptionDocId
       ? "Preparando..."
     : audioExists || pendingAudioSections > 0 || isAudioExpired
@@ -71,12 +59,12 @@ const VoiceRecorder: React.FC = () => {
         : "Reanudar"
       : "Grabar";
 
-  const primaryAudioButtonClasses = `px-4 py-2 rounded-md text-white font-medium transition-colors ${
+  const primaryAudioButtonClasses = `inline-flex items-center gap-1.5 px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 ${
     !transcriptionDocId && !isRecording
-      ? "bg-gray-300 cursor-not-allowed"
+      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
       : isRecording
-      ? "bg-red-500 hover:bg-red-600"
-      : "bg-purple-500 hover:bg-purple-600"
+        ? "bg-red-500 text-white hover:bg-red-600"
+        : "bg-purple-500 text-white hover:bg-purple-600"
   }`;
 
   // Show loading state while checking audio existence
@@ -109,21 +97,17 @@ const VoiceRecorder: React.FC = () => {
       <button
         onClick={handlePrimaryAudioAction}
         className={primaryAudioButtonClasses}
-        aria-label={primaryAudioLabel}
+        aria-label={isRecording ? "Detener transcripción" : primaryAudioLabel}
+        title={isRecording ? "Detener transcripción" : undefined}
         disabled={!transcriptionDocId && !isRecording}
       >
+        {isRecording && (
+          <Square size={14} strokeWidth={2.5} fill="currentColor" />
+        )}
         {primaryAudioLabel}
       </button>
 
-      <MicrophoneIcon isRecording={isRecording} isPaused={isPaused} />
       <TimerDisplay duration={duration} />
-      {hasTranscriptionActivity && (
-        <div className="flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-sm text-violet-800">
-          <div className="h-2 w-2 rounded-full bg-violet-500 animate-pulse" />
-          <span className="font-medium">{statusLabel}</span>
-        </div>
-      )}
-
       <SettingsIcon />
     </div>
   );

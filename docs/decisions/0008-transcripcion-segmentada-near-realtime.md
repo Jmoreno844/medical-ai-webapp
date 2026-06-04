@@ -67,8 +67,8 @@ en el navegador:
 - La finalizacion ordena por `section_index`, une los textos no vacios y aplica
   deduplicacion ligera de overlap sin una llamada adicional a Gemini.
 - El frontend graba blobs WebM independientes por seccion, usa VAD basado en
-  Web Audio para cerrar por pausa natural, mantiene un maximo forzado de `25s`,
-  usa `overlap_ms=1500` solo en cortes forzados, guarda blobs pendientes en
+  Web Audio para cerrar por pausa natural, mantiene un maximo forzado de `33s`,
+  usa `overlap_ms=400` solo en cortes forzados, guarda blobs pendientes en
   IndexedDB, reintenta al abrir/reconectar, borra el blob local solo despues
   del registro durable en FastAPI y conserva el flujo legacy de audio completo
   como fallback/migracion.
@@ -140,11 +140,12 @@ primer recorte pueden faltar metadatos del contenedor y Vertex puede responder
 `Failed to decode audio or visual data`. El corte principal ya usa VAD en el
 navegador con estos parametros operativos:
 
-- `pre-roll`: `650ms` como ventana de pausa confirmada antes de rearmar una nueva seccion;
-- `tail`: `900ms` antes de cerrar por pausa natural;
+- `pre-roll`: `400ms` como ventana de pausa confirmada antes de rearmar una nueva seccion;
+- `tail`: `600ms` antes de cerrar por pausa natural;
+- `silencio natural adaptativo`: `1000ms` al inicio, `500ms` entre `20s` y `25s`, y `350ms` entre `25s` y `33s`;
 - `duracion minima por seccion`: `1000ms`;
-- `maximo forzado`: `25000ms` si no aparece una pausa util;
-- `overlap forzado`: `1500ms` solo cuando se supera ese maximo;
+- `maximo forzado`: `33000ms` si no aparece una pausa util;
+- `overlap forzado`: `400ms` solo cuando se supera ese maximo;
 - `fallback por tiempo`: `20000ms` si el VAD no puede inicializarse.
 
 El overlap protege cortes artificiales, pero produce texto duplicado. Por eso

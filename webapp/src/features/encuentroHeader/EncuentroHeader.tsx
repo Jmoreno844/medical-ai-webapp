@@ -6,6 +6,7 @@ import Modal from "@/commons/components/Modal";
 import GenerateDocumentationButton from "./subcomponents/GenerateDocumentationButton";
 
 import { useEncuentroContext } from "../../contexts/EncuentroContext";
+import { useTranscriptionContext } from "../../contexts/TranscriptionContext";
 
 /**
  * EncuentroHeader component for the encounter page
@@ -48,12 +49,35 @@ const EncuentroHeaderContent: React.FC = () => {
     handleSelectPatient,
     handleCreatePatient,
     handleUpdatePatientAndEncounter,
-    handleUnlinkClick,
+    updateEncounterName,
+    linkPatientToEncounter,
+    createAndLinkPatient,
+    updateLinkedPatientName,
+    deleteLinkedPatient,
     handleUnlinkConfirm,
     handleDeleteClick,
     handleDeleteConfirm,
     updateEncounterDate,
   } = useEncuentroContext();
+  const {
+    isRecording,
+    isPaused,
+    pendingAudioSections,
+    transcriptionStatus,
+  } = useTranscriptionContext();
+
+  const showTranscriptionStatus =
+    isRecording ||
+    (!isRecording &&
+      (pendingAudioSections > 0 || transcriptionStatus === "pending"));
+
+  const transcriptionStatusLabel = isRecording
+    ? isPaused
+      ? "Pausado"
+      : "Transcribiendo"
+    : pendingAudioSections > 0
+      ? "Pendiente"
+      : "Transcribiendo";
 
   return (
     <>
@@ -66,10 +90,12 @@ const EncuentroHeaderContent: React.FC = () => {
             <PatientInfo
               encounterName={encounterName}
               encounterDate={encounterDate}
-              onEdit={handleEditClick}
+              onOpenPatientModal={handleEditClick}
+              onUpdateEncounterName={updateEncounterName}
+              onSelectPatient={linkPatientToEncounter}
+              onCreateAndLinkPatient={createAndLinkPatient}
               onUpdateDate={updateEncounterDate}
               isPatientConnected={isPatientConnected}
-              onUnlink={handleUnlinkClick}
               onDelete={handleDeleteClick}
               originalDateString={originalEncounterDateString}
               isDateUpdating={isDateUpdating}
@@ -80,6 +106,22 @@ const EncuentroHeaderContent: React.FC = () => {
           </div>
 
           <div className="flex items-center">
+            {showTranscriptionStatus && (
+              <div className="mr-4 flex items-center gap-2 text-[15px] text-slate-800">
+                <span className="relative flex h-2.5 w-2.5">
+                  {!isPaused && (
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-75" />
+                  )}
+                  <span
+                    className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
+                      isPaused ? "bg-slate-400" : "bg-teal-500"
+                    }`}
+                  />
+                </span>
+                <span className="font-medium">{transcriptionStatusLabel}</span>
+              </div>
+            )}
+
             {/* Generate Documentation Button - Now using context */}
             <div className="mr-4">
               <GenerateDocumentationButton />
@@ -102,6 +144,10 @@ const EncuentroHeaderContent: React.FC = () => {
         currentPatientId={patientId}
         currentPatientName={patientName}
         onUpdatePatientAndEncounter={handleUpdatePatientAndEncounter}
+        onUpdatePatient={updateLinkedPatientName}
+        onUnlinkEncounter={handleUnlinkConfirm}
+        onDeletePatient={deleteLinkedPatient}
+        isUpdating={isEncounterUpdating}
       />
 
       {/* Unlink Confirmation Modal */}

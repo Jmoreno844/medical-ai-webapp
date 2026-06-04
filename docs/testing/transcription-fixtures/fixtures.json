@@ -1,0 +1,102 @@
+[
+  {
+    "id": "prueba-01",
+    "transcript_script": "Paciente Xiomara Yulietzha Quishpe Cifuentes, cedula 1 0 3 7 8 4 5 2 1 9. Consulta por dolor toracico desde hace 2 dias. Toma losartan 50 miligramos cada 12 horas, carvedilol 6 punto 25 miligramos cada 12 horas y furosemida 40 miligramos al dia. Presion arterial 168 sobre 96, frecuencia cardiaca 104, saturacion 89 por ciento al aire ambiente.",
+    "audio_file": "audio/prueba-01.webm",
+    "focus": [
+      "nombres_dificiles",
+      "numeros_fragmentados",
+      "dosis_y_frecuencias"
+    ]
+  },
+  {
+    "id": "prueba-02",
+    "transcript_script": "Paciente llamado Jhoan Stiven Yepez Gnecco, fecha de nacimiento 17 de septiembre de 1987. Refiere que usa levotiroxina 112 microgramos al desayuno, metformina 850 miligramos cada 12 horas y apixaban 5 miligramos cada 12 horas. Glucemia capilar 243, creatinina 1 punto 37, potasio 3 punto 4.",
+    "audio_file": "audio/prueba-02.webm",
+    "focus": [
+      "fechas",
+      "medicamentos",
+      "decimales"
+    ]
+  },
+  {
+    "id": "prueba-03",
+    "transcript_script": "Maria Jose Dzib Etxeberria, de 74 anos, trae formula antigua con amoxicilina clavulanato 875 slash 125 cada 8 horas, pero dice que solo tomo 2 dosis. Ademas usa insulina glargina 18 unidades nocturnas e insulina lispro 6 unidades antes del almuerzo, digo, insulina lispro 6 unidades antes del almuerzo.",
+    "audio_file": "audio/prueba-03.webm",
+    "focus": [
+      "autocorreccion",
+      "combinaciones_de_dosis",
+      "medicamentos_parecidos"
+    ]
+  },
+  {
+    "id": "prueba-04",
+    "transcript_script": "Paciente Brais Xabier Llwyd Fernandez, telefono 3 1 5 7 0 2 4 8 1 6. Refiere disnea clase funcional 3, ortopnea con 3 almohadas y edema de miembros inferiores grado 2. Peso 78 punto 4 kilos, talla 1 punto 58 metros, indice de masa corporal 31 punto 4.",
+    "audio_file": "audio/prueba-04.webm",
+    "focus": [
+      "telefono_fragmentado",
+      "decimales",
+      "terminos_clinicos"
+    ]
+  },
+  {
+    "id": "prueba-05",
+    "transcript_script": "Se formula warfarina 2 punto 5 miligramos lunes, miercoles y viernes, y 5 miligramos martes, jueves, sabado y domingo. Ultimo INR 1 punto 8, meta entre 2 y 3. Control en 7 dias. No automedicarse con ibuprofeno, diclofenaco ni naproxeno.",
+    "audio_file": "audio/prueba-05.webm",
+    "focus": [
+      "esquema_variable",
+      "siglas_clinicas",
+      "numeros"
+    ]
+  },
+  {
+    "id": "prueba-06",
+    "transcript_script": "Paciente pediatrico Ian Gael Tzompantzi Rios, 14 kilos 700 gramos. Acetaminofen 160 miligramos por 5 mililitros, indicar 7 mililitros cada 6 horas si fiebre. Amoxicilina suspension 400 miligramos por 5 mililitros, dar 8 mililitros cada 12 horas por 10 dias.",
+    "audio_file": "audio/prueba-06.webm",
+    "focus": [
+      "pediatria",
+      "presentaciones",
+      "volumenes_y_frecuencias"
+    ]
+  },
+  {
+    "id": "prueba-07",
+    "transcript_script": "Antecedente de alergia a trimetoprim sulfametoxazol, penicilina y claritromicina, con ronchas, prurito y sensacion de opresion faringea. Niega alergia a dipirona, aunque una vez presento nauseas. Hospitalizacion el 03 slash 11 slash 2025 y reingreso el 14 slash 01 slash 2026.",
+    "audio_file": "audio/prueba-07.webm",
+    "focus": [
+      "alergias",
+      "fechas",
+      "negaciones"
+    ]
+  },
+  {
+    "id": "prueba-08",
+    "transcript_script": "Paciente Nthabiseng Alejandra Huaman Kruger. Documento CE 4 5 8 9 1 3 7. Medicacion actual: empagliflozina 25 miligramos al dia, espironolactona 25 miligramos al dia, sacubitrilo valsartan 49 slash 51 cada 12 horas, y rivaroxaban 20 miligramos con la cena.",
+    "audio_file": "audio/prueba-08.webm",
+    "focus": [
+      "nombres_inusuales",
+      "documento_fragmentado",
+      "medicamentos"
+    ]
+  },
+  {
+    "id": "prueba-09",
+    "transcript_script": "Laboratorios de hoy: hemoglobina 9 punto 8, hematocrito 29 punto 6, leucocitos 12 mil 430, neutrofilos 78 punto 2 por ciento, plaquetas 412 mil, sodio 131, potasio 5 punto 7, BUN 43, creatinina 2 punto 09, BNP 1 284.",
+    "audio_file": "audio/prueba-09.webm",
+    "focus": [
+      "laboratorios",
+      "siglas",
+      "numeros_compuestos"
+    ]
+  },
+  {
+    "id": "prueba-10",
+    "transcript_script": "Indicacion verbal: iniciar oxigeno por canula nasal a 2 litros por minuto, subir a 3 litros si saturacion baja de 92 por ciento, repetir gasometria en 30 minutos y llamar si frecuencia respiratoria supera 28 por minuto o si presion sistolica cae por debajo de 90.",
+    "audio_file": "audio/prueba-10.webm",
+    "focus": [
+      "indicaciones_verbales",
+      "umbrales_numericos",
+      "signos_vitales"
+    ]
+  }
+]

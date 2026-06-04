@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { UseVoiceRecorderReturn } from "./types";
 import { getBestSupportedAudioType } from "./utils";
+import { getStoredMicrophoneDeviceId } from "./useMicrophoneDevices";
 import {
   createRecordingSession,
   finishRecordingSession,
@@ -944,18 +945,41 @@ export const useVoiceRecorder = (
       );
 
       // 1. Define optimized audio constraints
-      const audioConstraints = {
+      const preferredDeviceId = getStoredMicrophoneDeviceId();
+      const audioConstraints: MediaStreamConstraints = {
         audio: {
           channelCount: 1, // Mono audio (instead of stereo)
           sampleRate: 16000, // 16kHz is good for voice (lower than default)
           echoCancellation: true, // Improve voice clarity
           noiseSuppression: true, // Reduce background noise
+          ...(preferredDeviceId
+            ? { deviceId: { exact: preferredDeviceId } }
+            : {}),
         },
       };
 
       // 2. Get audio stream with optimized constraints
-      const stream =
-        await navigator.mediaDevices.getUserMedia(audioConstraints);
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(audioConstraints);
+      } catch (error) {
+        if (preferredDeviceId) {
+          logger.warn(
+            "[VOICE_RECORDER] Preferred microphone unavailable, falling back to default:",
+            error,
+          );
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              channelCount: 1,
+              sampleRate: 16000,
+              echoCancellation: true,
+              noiseSuppression: true,
+            },
+          });
+        } else {
+          throw error;
+        }
+      }
 
       // 3. Find best supported audio format
       const supportedType = getBestSupportedAudioType();

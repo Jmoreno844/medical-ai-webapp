@@ -221,6 +221,10 @@ Tabla de relación N:M entre `User` (médico) y `Paciente`.
 Restricciones:
 
 - `unique_together = (id_medico, id_paciente)` — un médico no puede tener el mismo paciente dos veces.
+- Las rutas de pacientes siempre filtran por esta relación. Borrar un paciente
+  desde FastAPI elimina solo los encuentros y datos asociados del médico actual;
+  el registro `Paciente` se borra únicamente si no quedan otros médicos
+  vinculados.
 
 Índices (definidos en `Meta`):
 
@@ -526,8 +530,9 @@ Cloud SQL y la arquitectura descrita en `docs/architecture/system-overview.md`.
 | `pacientes`  | `0001_initial`, `0002_initial`                                  | ✓      |
 | `encuentro`  | `0001–0005` (audio fields, has_been_transcribed)                | ✓      |
 | `documentos` | `0001_initial`, `0002_alter_tipo`                               | ✓      |
-| `plantillas` | `0001_initial`, `0002_usoplantilla`, `0003_seed_base_templates` | ✓      |
+| `plantillas` | `0001_initial`, `0002_usoplantilla`, `0003_seed_base_templates`; FastAPI `0004_seed_clinical_base_templates` | ✓      |
 | `copilot`    | `0001_initial`–`0006_copilotpatchset_and_granular_patches`      | ✓      |
 
-La migración `plantillas/0003_seed_base_templates.py` inyecta datos iniciales de `PlantillaBase`
+La migración histórica `plantillas/0003_seed_base_templates.py` y la migración FastAPI
+`0004_seed_clinical_base_templates.py` inyectan datos iniciales de `PlantillaBase`
 (en el despliegue, los nuevos usuarios reciben automáticamente una `PlantillaDoctor` por cada fila existente en `PlantillaBase`).

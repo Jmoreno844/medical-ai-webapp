@@ -48,11 +48,11 @@ const GenerateDocumentationButton: React.FC = () => {
       return "Generación en curso…";
     }
     if (isRecording) {
-      return "Pause la grabación para consolidar la transcripción automática";
+      return "Detén la grabación para terminar la transcripción automática";
     }
     if (!hasBeenTranscribed) {
       if (pendingAudioSections > 0 || transcriptionStatus === "pending") {
-        return "Espere a que termine la consolidación automática de la transcripción";
+        return "Espera a que termine la transcripción automática";
       }
       return "Grabe o continúe el audio para producir una transcripción";
     }
@@ -72,7 +72,7 @@ const GenerateDocumentationButton: React.FC = () => {
           className={`flex items-center px-3 py-1.5 rounded text-base font-medium transition-colors
                   ${
                     !isEnabled
-                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                      ? "border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed"
                       : "bg-purple-500 text-white hover:bg-purple-700 rounded-md"
                   }`}
           aria-label="Generar documentación clínica"

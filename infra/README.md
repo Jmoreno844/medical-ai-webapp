@@ -15,7 +15,7 @@ infra/
     artifact_registry/  Repositorio Docker
     cloud_sql/          PostgreSQL
     storage_buckets/    Audio + frontend SPA
-    cloud_run/          Cloud Run services (backend + copilot agent + transcription worker)
+    cloud_run/          Cloud Run services (backend + frontend + copilot agent + workers)
     cloud_tasks/        Cola de transcripción
     workload_identity/  WIF para GitHub Actions
     monitoring/         Alertas básicas + budget
@@ -46,6 +46,7 @@ infra/
 5. **CI**:
    - Ejecutar primero los workflows de `transcription_worker` y `document_generation_worker` para que existan las URLs privadas.
    - Luego ejecutar backend / frontend, o dejar que corran por `push` / `workflow_dispatch`.
+   - El workflow de frontend despliega `vexthealth-frontend` en Cloud Run; para `stg` barato, la SPA y el API pueden exponerse con subdominios separados usando `Cloud Run domain mapping`.
 
 **Autenticación local de Terraform:** con usuario humano basta `gcloud auth application-default login` en muchos casos; si usas la SA `terraform-admin`, exporta `GOOGLE_APPLICATION_CREDENTIALS` a la clave JSON (solo transitoria; revócala tras validar WIF).
 
@@ -121,6 +122,7 @@ Después del primer apply exitoso, copiar los outputs de Terraform a las variabl
 - `WIF_PROVIDER` (output `workload_identity_provider`)
 - `GH_DEPLOYER_SA` (output `github_actions_deployer_email`)
 - `BACKEND_SERVICE_ACCOUNT` (output `backend_service_account`)
+- `FRONTEND_SERVICE_ACCOUNT` (output `frontend_service_account`)
 - `COPILOT_AGENT_SERVICE_ACCOUNT` (output `copilot_agent_service_account`)
 - `TRANSCRIPTION_WORKER_SERVICE_ACCOUNT` (output `transcription_worker_service_account`)
 - `COPILOT_AGENT_DB_NAME` (valor de `terraform.tfvars`)
@@ -128,6 +130,7 @@ Después del primer apply exitoso, copiar los outputs de Terraform a las variabl
 - `FRONTEND_BUCKET_NAME` (output `frontend_bucket`)
 - `CF_SOURCE_BUCKET` (output `cf_source_bucket`)
 - `VITE_API_URL` (output `cloud_run_url`)
+- `FRONTEND_DOMAIN_NAME` y `BACKEND_DOMAIN_NAME` si quieres documentarlos en tu inventario de entorno
 - `COPILOT_AGENT_URL` (output `copilot_agent_cloud_run_url`)
 - `LANDING_BUCKET_NAME` si el workflow de landing page usa un bucket distinto
 - *(opcional)* `CF_SOURCE_OBJECT` — ver `docs/architecture/gcp-infrastructure.md`
@@ -137,7 +140,7 @@ Luego se puede eliminar el secret `GCP_SA_KEY` de GitHub.
 ## Terraform y GitHub Actions (matiz)
 
 - **Cloud Run**: el módulo fija una imagen inicial y la topología base de backend,
-  copilot, transcription worker y document generation worker. Los workflows sustituyen las imágenes y
+  frontend, copilot, transcription worker y document generation worker. Los workflows sustituyen las imágenes y
   actualizan env vars por servicio.
 - **Cloud Functions**: en `stg`, Terraform **no** crea las funciones legacy. Terraform solo crea el bucket fuente y las cuentas/roles necesarios; el workflow **sube el zip** y despliega `transcription-endpoint`.
 

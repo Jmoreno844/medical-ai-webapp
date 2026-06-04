@@ -25,10 +25,23 @@ class Settings(BaseSettings):
     gcp_region: str = Field(default="us-east1", alias="GCP_REGION")
     vertex_ai_location: str = Field(default="global", alias="VERTEX_AI_LOCATION")
     gcs_bucket_name: str | None = Field(default=None, alias="GCS_BUCKET_NAME")
+    transcription_provider: str = Field(
+        default="google_genai",
+        alias="TRANSCRIPTION_PROVIDER",
+    )
+    transcription_model: str | None = Field(
+        default=None,
+        alias="TRANSCRIPTION_MODEL",
+    )
     transcription_gemini_model: str = Field(
         default="gemini-2.5-flash",
         alias="TRANSCRIPTION_GEMINI_MODEL",
     )
+    transcription_openai_model: str = Field(
+        default="gpt-4o-mini-transcribe",
+        alias="TRANSCRIPTION_OPENAI_MODEL",
+    )
+    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     cloud_tasks_invoker_service_account: str | None = Field(
         default=None,
         alias="CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT",
@@ -48,3 +61,16 @@ class Settings(BaseSettings):
     @property
     def is_local(self) -> bool:
         return self.environment.strip().lower() in {"local", "dev", "develop", "test"}
+
+    @property
+    def transcription_provider_name(self) -> str:
+        return self.transcription_provider.strip().lower()
+
+    @property
+    def effective_transcription_model(self) -> str:
+        model = (self.transcription_model or "").strip()
+        if model:
+            return model
+        if self.transcription_provider_name in {"openai", "openai_api"}:
+            return self.transcription_openai_model
+        return self.transcription_gemini_model

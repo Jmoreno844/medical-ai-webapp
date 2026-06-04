@@ -53,7 +53,8 @@ class Processor:
             "template_length": len(work_item["template_content"] or ""),
             "context_length": len(work_item["context_content"] or ""),
             "transcription_length": len(work_item["transcription_content"] or ""),
-            "model": self.settings.document_generation_gemini_model,
+            "provider": self.settings.document_generation_provider_name,
+            "model": self.settings.effective_document_generation_model,
         }
 
         try:
@@ -87,9 +88,10 @@ class Processor:
                 run.end(
                     {
                         "success": True,
-                        "model": self.settings.document_generation_gemini_model,
+                        "provider": self.settings.document_generation_provider_name,
+                        "model": self.settings.effective_document_generation_model,
                         "text_length": len(complete_text),
-                        "gemini_latency_ms": self._elapsed_ms(gemini_started_at),
+                        "llm_latency_ms": self._elapsed_ms(gemini_started_at),
                     }
                 )
         except Exception as exc:
@@ -117,13 +119,14 @@ class Processor:
 
         logger.info(
             "document_generated process_id=%s document_id=%s encounter_id=%s "
-            "doctor_template_id=%s gemini_model=%s gemini_latency_ms=%s "
+            "doctor_template_id=%s provider=%s model=%s llm_latency_ms=%s "
             "worker_latency_ms=%s",
             process_id,
             work_item["new_document_id"],
             work_item["encounter_id"],
             work_item["doctor_template_id"],
-            self.settings.document_generation_gemini_model,
+            self.settings.document_generation_provider_name,
+            self.settings.effective_document_generation_model,
             self._elapsed_ms(gemini_started_at),
             self._elapsed_ms(started_at),
         )

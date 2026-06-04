@@ -22,8 +22,16 @@ class Settings(BaseSettings):
     gcp_project_id: str | None = Field(default=None, alias="GCP_PROJECT_ID")
     gcp_region: str = Field(default="us-east1", alias="GCP_REGION")
     vertex_ai_location: str = Field(default="global", alias="VERTEX_AI_LOCATION")
+    document_generation_provider: str = Field(
+        default="google_genai",
+        alias="DOCUMENT_GENERATION_PROVIDER",
+    )
+    document_generation_model: str | None = Field(
+        default=None,
+        alias="DOCUMENT_GENERATION_MODEL",
+    )
     document_generation_gemini_model: str = Field(
-        default="gemini-3.1-flash-lite-preview",
+        default="gemini-3-flash-preview",
         alias="DOCUMENT_GENERATION_GEMINI_MODEL",
     )
     cloud_tasks_invoker_service_account: str | None = Field(
@@ -61,3 +69,14 @@ class Settings(BaseSettings):
             and bool((self.langsmith_project or "").strip())
             and bool((self.langsmith_api_key or "").strip())
         )
+
+    @property
+    def document_generation_provider_name(self) -> str:
+        return self.document_generation_provider.strip().lower()
+
+    @property
+    def effective_document_generation_model(self) -> str:
+        model = (self.document_generation_model or "").strip()
+        if model:
+            return model
+        return self.document_generation_gemini_model

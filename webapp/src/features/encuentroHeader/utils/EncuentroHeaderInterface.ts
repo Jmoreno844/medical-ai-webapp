@@ -56,8 +56,6 @@ export interface PatientInfoProps {
   encounterName: string;
   /** Formatted date of the encounter */
   encounterDate: string;
-  /** Function to handle edit button click */
-  onEdit: () => void;
 }
 
 /**
@@ -86,6 +84,14 @@ export interface PatientEditModalProps {
     patientName: string,
     encounterName: string
   ) => void;
+  /** Function to update the linked patient name */
+  onUpdatePatient?: (patientId: number, patientName: string) => Promise<void>;
+  /** Function to unlink the current encounter from the patient */
+  onUnlinkEncounter?: () => Promise<void>;
+  /** Function to delete the linked patient and related data */
+  onDeletePatient?: () => Promise<void>;
+  /** Whether a patient action is currently saving */
+  isUpdating?: boolean;
 }
 
 /**

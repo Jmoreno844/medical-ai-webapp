@@ -8,6 +8,11 @@ output "copilot_agent_cloud_run_url" {
   value       = module.copilot_agent_cloud_run.service_url
 }
 
+output "frontend_cloud_run_url" {
+  description = "Frontend Cloud Run service URL"
+  value       = module.frontend_cloud_run.service_url
+}
+
 output "transcription_worker_cloud_run_url" {
   description = "Transcription worker Cloud Run service URL"
   value       = module.transcription_worker_cloud_run.service_url
@@ -68,6 +73,11 @@ output "document_generation_worker_service_account" {
   value       = module.service_accounts.document_generation_runner_email
 }
 
+output "frontend_service_account" {
+  description = "Cloud Run frontend service account email"
+  value       = module.service_accounts.frontend_runner_email
+}
+
 output "cloud_functions_service_account" {
   description = "Cloud Functions runtime service account email"
   value       = module.service_accounts.cloud_functions_runner_email
@@ -96,4 +106,24 @@ output "workload_identity_provider" {
 output "github_actions_deployer_email" {
   description = "GitHub Actions deployer service account email"
   value       = module.service_accounts.github_actions_deployer_email
+}
+
+output "frontend_domain_name" {
+  description = "Custom domain mapped to the staging frontend Cloud Run service, if enabled"
+  value       = try(google_cloud_run_domain_mapping.frontend[0].name, null)
+}
+
+output "frontend_domain_resource_records" {
+  description = "DNS records required by the staging frontend Cloud Run domain mapping, if enabled"
+  value       = try(google_cloud_run_domain_mapping.frontend[0].status[0].resource_records, [])
+}
+
+output "backend_domain_name" {
+  description = "Custom domain mapped to the staging backend Cloud Run service, if enabled"
+  value       = try(google_cloud_run_domain_mapping.backend[0].name, null)
+}
+
+output "backend_domain_resource_records" {
+  description = "DNS records required by the staging backend Cloud Run domain mapping, if enabled"
+  value       = try(google_cloud_run_domain_mapping.backend[0].status[0].resource_records, [])
 }

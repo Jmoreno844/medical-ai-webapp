@@ -4,11 +4,13 @@ version = "0.1.0"
 description = "Cloud Run worker for VextHealth clinical document generation"
 requires-python = ">=3.11"
 dependencies = [
+  "anthropic[vertex]>=0.57.1,<1",
   "fastapi>=0.115.0,<0.116",
   "google-auth>=2.38.0,<3",
   "google-genai>=1.55.0,<2",
   "httpx>=0.28.0,<0.29",
   "langsmith>=0.7.24,<0.8",
+  "openai>=1.99.9,<2",
   "opentelemetry-api>=1.27.0,<2",
   "opentelemetry-sdk>=1.27.0,<2",
   "opentelemetry-exporter-gcp-trace>=1.7.0,<2",

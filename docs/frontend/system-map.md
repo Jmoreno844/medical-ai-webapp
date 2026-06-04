@@ -141,6 +141,16 @@ Si `preSeedExcluded=true` en los logs del chat debug, el agente no recibió el m
 | Plantillas                           | `src/features/plantillas/`                      |
 | Páginas estáticas                    | `src/pages/`                                    |
 
+### Cabecera de paciente y encuentro
+
+`PatientInfo` consume estado y acciones de `EncuentroContext`. Si el encuentro
+no tiene paciente vinculado, el nombre se edita inline y el dropdown permite
+crear/vincular pacientes del médico actual. Si ya existe paciente vinculado, el
+nombre abre el modal de paciente; desde ahí se edita el paciente, se desvincula
+el encuentro o se confirma el borrado destructivo del paciente y sus datos
+asociados. La UI no debe consultar ni mutar pacientes fuera de las acciones del
+contexto salvo búsquedas locales del dropdown.
+
 ### Cabecera de audio y transcripción
 
 `VoiceRecorder` consume `TranscriptionContext` directamente. En transcripción

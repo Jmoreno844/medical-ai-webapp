@@ -9,6 +9,7 @@ import SpecialLayout from "./features/app_layout/SpecialLayout";
 import PlantillasPage from "./features/plantillas/PlantillaPage";
 import EncuentroPage from "./features/encuentro/EncuentroPage";
 import EncuentroDetailPage from "./features/encuentro/EncuentroDetailPage";
+import DebugTranscriptionPage from "./features/debugTranscription/DebugTranscriptionPage";
 
 const routes: RouteObject[] = [
   {
@@ -62,6 +63,14 @@ const routes: RouteObject[] = [
         element: (
           <SpecialLayout>
             <PlantillasPage />
+          </SpecialLayout>
+        ),
+      },
+      {
+        path: "debug/transcripcion",
+        element: (
+          <SpecialLayout>
+            <DebugTranscriptionPage />
           </SpecialLayout>
         ),
       },

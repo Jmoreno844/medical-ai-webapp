@@ -38,6 +38,11 @@ output "document_generation_runner_email" {
   value       = google_service_account.document_generation_runner.email
 }
 
+output "frontend_runner_email" {
+  description = "Email of the Cloud Run frontend service account"
+  value       = google_service_account.frontend_runner.email
+}
+
 output "backend_local_gcs_signer_email" {
   description = "Email of the local GCS URL signer SA for development impersonation"
   value       = google_service_account.backend_local_gcs_signer.email

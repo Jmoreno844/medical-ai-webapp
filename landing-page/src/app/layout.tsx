@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MedScribe AI | AI-Powered Medical Transcription & Documentation",
+  title: "Notia | Transcripción y notas clínicas con IA",
   description:
-    "MedScribe AI leverages cutting-edge AI to transcribe patient encounters and generate structured clinical notes, freeing you to focus on care.",
+    "Notia escucha la consulta, transcribe la conversación y genera un borrador de nota clínica para que lo revises, edites y copies a tu historia clínica.",
 };
 
 export default function RootLayout({

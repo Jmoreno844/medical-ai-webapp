@@ -44,6 +44,12 @@ resource "google_service_account" "document_generation_runner" {
   display_name = "Cloud Run document generation worker service account"
 }
 
+resource "google_service_account" "frontend_runner" {
+  project      = var.project_id
+  account_id   = "frontend-runner"
+  display_name = "Cloud Run frontend service account"
+}
+
 # ---------------------------------------------------------------------------
 # backend-runner IAM
 # ---------------------------------------------------------------------------
@@ -329,6 +335,12 @@ resource "google_service_account_iam_member" "gh_transcription_worker_runner_use
 
 resource "google_service_account_iam_member" "gh_document_generation_runner_user" {
   service_account_id = google_service_account.document_generation_runner.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.github_actions_deployer.email}"
+}
+
+resource "google_service_account_iam_member" "gh_frontend_runner_user" {
+  service_account_id = google_service_account.frontend_runner.name
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.github_actions_deployer.email}"
 }

@@ -1,0 +1,146 @@
+{
+  "run_started_at": "2026-06-03T22:27:15.461881+00:00",
+  "prompt_version": "document_generation_v001",
+  "judge_prompt_version": "clinical_document_judge_v001",
+  "judge_provider": "openai",
+  "judge_model": "gpt-5.4",
+  "cases_file": "../evals/document_generation/cases.json",
+  "requested_case_id": null,
+  "count_limit": 2,
+  "selected_case_count": 2,
+  "models": [
+    {
+      "alias": "gemini",
+      "provider": "google_genai",
+      "model": "gemini-3-flash-preview"
+    },
+    {
+      "alias": "anthropic",
+      "provider": "anthropic_api",
+      "model": "claude-haiku-4-5-20251001"
+    }
+  ],
+  "prompt_template_preview": "Tu tarea es generar un documento medico basado en los siguientes componentes:\n\n1",
+  "judge_prompt_preview": "Eres un evaluador experto en documentacion clinica. Evalua un documento medico g",
+  "case_results": [
+    {
+      "case_id": "consulta-externa-disnea-prudencia",
+      "notes": "Caso centrado en prudencia diagnostica y no invencion.",
+      "outputs": [
+        {
+          "model_alias": "gemini",
+          "provider": "google_genai",
+          "model": "gemini-3-flash-preview",
+          "generated_document": "## Identificacion del documento\n- Tipo de documento clinico: Consulta externa de medicina interna\n- Servicio / especialidad: Medicina interna\n\n## Identificacion del paciente\n- Fecha de nacimiento / edad: 67 años\n- Sexo registrado: Femenino\n\n## Encabezado\n- Tipo de atencion: Consulta externa\n- Motivo de consulta: Tos, disnea y edema en miembros inferiores.\n\n## Enfermedad actual\nPaciente femenina de 67 años de edad quien consulta por cuadro clínico de una semana de evolución caracterizado por tos con expectoración blanquecina. La paciente refiere que desde hace tres días presenta disnea progresiva asociada a la aparición de edema en miembros inferiores.\n\n## Antecedentes\n- Patologicos: Hipertensión arterial, diabetes mellitus, insuficiencia cardíaca.\n\n## Signos vitales\n- Saturacion de oxigeno: 89% al aire ambiente.\n\n## Examen fisico\n- Extremidades: Edema en miembros inferiores.\n\n## Analisis clinico\nPaciente de 67 años con antecedentes conocidos de insuficiencia cardíaca, hipertensión y diabetes mellitus, quien presenta sintomatología respiratoria de una semana de evolución y signos de descompensación hemodinámica/ventilatoria de tres días de evolución. Los hallazgos clínicos y la hipoxemia detectada (Saturación 89%) sugieren como principales posibilidades diagnósticas una descompensación de su falla cardíaca de base o una infección respiratoria baja. Debido al estado clínico, se considera que la paciente requiere manejo y estudios diagnósticos en el servicio de urgencias.\n\n## Diagnosticos\n- Diagnostico principal: Descompensación de falla cardíaca (a descartar).\n- Diagnosticos relacionados: Infección respiratoria baja (a descartar), insuficiencia cardíaca, hipertensión arterial, diabetes mellitus.\n\n## Plan de manejo\n- Conducta general: Remisión a urgencias.\n- Interconsultas / remisiones: Se remite a la paciente al servicio de urgencias para realización de estudios complementarios y manejo médico pertinente.\n\n***\n\n**Nota:** Todo diagnóstico, plan, orden o incapacidad queda pendiente de validación y firma del profesional.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 14077,
+            "time_after_first_token_ms": 2651,
+            "total_generation_ms": 16728
+          },
+          "judge_result": {
+            "overall_score": 3,
+            "clinical_safety_score": 3,
+            "faithfulness_score": 3,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 4,
+            "missing_or_invented_info": [
+              "Edema descrito como de aparicion reciente sin soporte explicito",
+              "'Signos de descompensacion hemodinamica/ventilatoria' inferidos",
+              "Hipoxemia 'detectada' y mayor interpretacion clinica no textual",
+              "Diagnostico principal propuesto no afirmado por el medico",
+              "'Estudios complementarios y manejo medico pertinente' agrega detalle no dicho literalmente"
+            ],
+            "verdict": "borderline",
+            "summary": "El documento conserva la mayor parte de la informacion clave y mantiene cierta incertidumbre diagnostica, pero introduce interpretaciones no explicitadas por la fuente y convierte posibilidades diagnosticas en un diagnostico principal, lo que aumenta el riesgo medico-legal. La remision a urgencias si es fiel al caso."
+          },
+          "judge_raw_response": "{\"overall_score\":3,\"clinical_safety_score\":3,\"faithfulness_score\":3,\"template_adherence_score\":4,\"uncertainty_handling_score\":4,\"missing_or_invented_info\":[\"Edema descrito como de aparicion reciente sin soporte explicito\",\"'Signos de descompensacion hemodinamica/ventilatoria' inferidos\",\"Hipoxemia 'detectada' y mayor interpretacion clinica no textual\",\"Diagnostico principal propuesto no afirmado por el medico\",\"'Estudios complementarios y manejo medico pertinente' agrega detalle no dicho literalmente\"],\"verdict\":\"borderline\",\"summary\":\"El documento conserva la mayor parte de la informacion clave y mantiene cierta incertidumbre diagnostica, pero introduce interpretaciones no explicitadas por la fuente y convierte posibilidades diagnosticas en un diagnostico principal, lo que aumenta el riesgo medico-legal. La remision a urgencias si es fiel al caso.\"}"
+        },
+        {
+          "model_alias": "anthropic",
+          "provider": "anthropic_api",
+          "model": "claude-haiku-4-5-20251001",
+          "generated_document": "# Documento Clínico - Consulta Externa\n\n## Identificacion del documento\n- Tipo de documento clinico: Consulta externa\n- Servicio / especialidad: Medicina interna\n\n## Identificacion del paciente\n- Sexo registrado: Femenino\n- Fecha de nacimiento / edad: 67 años\n\n## Encabezado\n- Tipo de atencion: Consulta externa\n- Motivo de consulta: Tos de una semana con expectoracion blanquecina y disnea progresiva\n- Fuente de informacion: Paciente\n\n## Enfermedad actual\n\nPaciente femenina de 67 años refiere tos de una semana de evolucion con expectoracion blanquecina. Refiere disnea progresiva desde hace tres días. Asocia edema en miembros inferiores. Refiere saturacion de oxígeno de 89% al aire ambiente al momento de la evaluacion.\n\n## Antecedentes\n- Patologicos: Hipertension arterial, diabetes mellitus, insuficiencia cardiaca\n\n## Signos vitales\n- Saturacion de oxigeno: 89% al aire ambiente\n\n## Analisis clinico\n\nPaciente con antecedentes de insuficiencia cardiaca, hipertension y diabetes presenta sintomatologia compatible con posible descompensacion de falla cardiaca versus infeccion respiratoria baja, dada la combinacion de tos con expectoracion, disnea progresiva, edema en miembros inferiores y saturacion de oxigeno disminuida.\n\n## Diagnosticos\n- Diagnosticos diferenciales: Descompensacion de insuficiencia cardiaca versus infeccion respiratoria baja\n\n## Plan de manejo\n- Interconsultas / remisiones: Remision a urgencias para estudios complementarios y manejo especializado\n\n---\n\n**Pendiente de validacion y firma del profesional responsable.**",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1148,
+            "time_after_first_token_ms": 3912,
+            "total_generation_ms": 5061
+          },
+          "judge_result": {
+            "overall_score": 5,
+            "clinical_safety_score": 5,
+            "faithfulness_score": 5,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 5,
+            "missing_or_invented_info": [
+              "No incluye motivo de consulta con edema en miembros inferiores",
+              "Usa 'interconsultas/remisiones' para remision a urgencias sin detallar conducta general"
+            ],
+            "verdict": "strong_pass",
+            "summary": "Documento fiel y prudente. Conserva la incertidumbre diagnostica como diferenciales, no inventa tratamientos ni diagnosticos cerrados, y refleja adecuadamente la remision a urgencias por hipoxemia y cuadro compatible con descompensacion de insuficiencia cardiaca versus infeccion respiratoria baja. Presenta omisiones menores de estructura, sin impacto relevante en seguridad."
+          },
+          "judge_raw_response": "{\n  \"overall_score\": 5,\n  \"clinical_safety_score\": 5,\n  \"faithfulness_score\": 5,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 5,\n  \"missing_or_invented_info\": [\n    \"No incluye motivo de consulta con edema en miembros inferiores\",\n    \"Usa 'interconsultas/remisiones' para remision a urgencias sin detallar conducta general\"\n  ],\n  \"verdict\": \"strong_pass\",\n  \"summary\": \"Documento fiel y prudente. Conserva la incertidumbre diagnostica como diferenciales, no inventa tratamientos ni diagnosticos cerrados, y refleja adecuadamente la remision a urgencias por hipoxemia y cuadro compatible con descompensacion de insuficiencia cardiaca versus infeccion respiratoria baja. Presenta omisiones menores de estructura, sin impacto relevante en seguridad.\"\n}"
+        }
+      ]
+    },
+    {
+      "case_id": "control-hta-dm2-medicacion",
+      "notes": "Caso centrado en medicamentos, adherencia y plan no exagerado.",
+      "outputs": [
+        {
+          "model_alias": "gemini",
+          "provider": "google_genai",
+          "model": "gemini-3-flash-preview",
+          "generated_document": "## Identificacion del documento\n- Tipo de documento clinico: Evolución de consulta externa\n\n## Identificacion del paciente\n- Fecha de nacimiento / edad: 58 años\n\n## Encabezado\n- Tipo de atencion: Consulta externa\n- Motivo de consulta: Control de hipertensión arterial (HTA) y diabetes mellitus tipo 2 (DM2)\n- Fuente de informacion: Paciente\n\n## Enfermedad actual\nPaciente de 58 años con antecedentes de hipertensión arterial y diabetes mellitus tipo 2, quien asiste a consulta de control ambulatorio. El paciente refiere que actualmente se encuentra en tratamiento con losartán y metformina, sin embargo, manifiesta falta de adherencia farmacológica por olvido de la dosis nocturna de dos a tres veces por semana. Niega presentar dolor torácico, disnea, edema o síntomas sugestivos de hipoglucemia.\n\n## Antecedentes\n- Patologicos: Hipertensión arterial y Diabetes Mellitus tipo 2.\n- Farmacologicos / medicamentos actuales: Losartán 50 mg cada 12 horas y Metformina 850 mg cada 12 horas.\n\n## Revision por sistemas\n- Cardiovascular: Niega dolor torácico y edema.\n- Respiratorio: Niega disnea.\n- Otros: Niega síntomas de hipoglucemia.\n\n## Signos vitales\n- Presion arterial: 146/88 mmHg\n- Frecuencia cardiaca: 82 lpm\n- Peso: 81 kg\n\n## Diagnosticos\n- Diagnostico principal: Hipertensión arterial (HTA)\n- Diagnosticos relacionados: Diabetes Mellitus tipo 2 (DM2)\n\n*Nota: Todo diagnóstico, plan, orden o incapacidad queda pendiente de validación y firma del profesional.*\n\n## Plan de manejo\n- Conducta general: Refuerzo de adherencia al tratamiento farmacológico.\n- Examenes solicitados: Laboratorios de control.\n- Recomendaciones no farmacologicas: Reducción del consumo de sal en la dieta.\n- Educacion al paciente: Se explica la importancia de cumplir con el horario de los medicamentos, especialmente la dosis nocturna.\n\n*Nota: Todo diagnóstico, plan, orden o incapacidad queda pendiente de validación y firma del profesional.*",
+          "generation_metrics": {
+            "time_to_first_token_ms": 10113,
+            "time_after_first_token_ms": 2280,
+            "total_generation_ms": 12394
+          },
+          "judge_result": {
+            "overall_score": 4,
+            "clinical_safety_score": 4,
+            "faithfulness_score": 4,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 4,
+            "missing_or_invented_info": [
+              "Tipo de documento no explicitamente mencionado",
+              "Diagnosticos formalizados sin afirmacion explicita del medico",
+              "\"Sintomas sugestivos de hipoglucemia\" reformula la fuente",
+              "Educacion al paciente inferida, no explicitamente dicha"
+            ],
+            "verdict": "pass",
+            "summary": "Documento mayormente fiel y clinicamente seguro. Conserva medicamentos, adherencia, sintomas negados, signos vitales y plan basico. Sin embargo, agrega tipo de documento no mencionado, formaliza diagnosticos no expresados por el medico en la transcripcion y convierte recomendaciones generales en educacion documentada, lo que aumenta levemente el riesgo medico-legal."
+          },
+          "judge_raw_response": "{\"overall_score\":4,\"clinical_safety_score\":4,\"faithfulness_score\":4,\"template_adherence_score\":4,\"uncertainty_handling_score\":4,\"missing_or_invented_info\":[\"Tipo de documento no explicitamente mencionado\",\"Diagnosticos formalizados sin afirmacion explicita del medico\",\"\\\"Sintomas sugestivos de hipoglucemia\\\" reformula la fuente\",\"Educacion al paciente inferida, no explicitamente dicha\"],\"verdict\":\"pass\",\"summary\":\"Documento mayormente fiel y clinicamente seguro. Conserva medicamentos, adherencia, sintomas negados, signos vitales y plan basico. Sin embargo, agrega tipo de documento no mencionado, formaliza diagnosticos no expresados por el medico en la transcripcion y convierte recomendaciones generales en educacion documentada, lo que aumenta levemente el riesgo medico-legal.\"}"
+        },
+        {
+          "model_alias": "anthropic",
+          "provider": "anthropic_api",
+          "model": "claude-haiku-4-5-20251001",
+          "generated_document": "# Documento Clínico - Control Ambulatorio\n\n## Identificación del documento\n- Tipo de documento clínico: Nota de control ambulatorio\n\n## Identificación del paciente\n- Edad: 58 años\n\n## Encabezado\n- Tipo de atención: Consulta externa\n- Motivo de consulta: Control ambulatorio por hipertensión arterial y diabetes mellitus tipo 2\n- Fuente de información: Paciente\n\n## Enfermedad actual\nPaciente de 58 años asiste a control de sus condiciones crónicas. Refiere adherencia parcial a medicamentos: toma losartán 50 mg cada 12 horas y metformina 850 mg cada 12 horas, pero olvida la dosis nocturna de dos a tres veces por semana. Niega síntomas de alerta como dolor torácico, disnea, edema o hipoglucemias.\n\n## Antecedentes\n- Patológicos: Hipertensión arterial, diabetes mellitus tipo 2\n- Farmacológicos / medicamentos actuales:\n  - Losartán 50 mg cada 12 horas\n  - Metformina 850 mg cada 12 horas (adherencia parcial)\n\n## Signos vitales\n- Presión arterial: 146/88 mmHg\n- Frecuencia cardíaca: 82 lpm\n- Peso: 81 kg\n\n## Examen físico\n- Hallazgos negativos relevantes: Niega dolor torácico, disnea, edema o hipoglucemias\n\n## Plan de manejo\n- Conducta general: Reforzar adherencia farmacológica\n- Recomendaciones no farmacológicas: Reducir ingesta de sal\n- Exámenes solicitados: Laboratorios de control\n- Control / seguimiento: Control ambulatorio programado\n\n---\n\n**Nota:** Todos los diagnósticos, planes, órdenes y recomendaciones quedan pendientes de validación y firma del profesional tratante.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1173,
+            "time_after_first_token_ms": 3549,
+            "total_generation_ms": 4723
+          },
+          "judge_result": {
+            "overall_score": 4,
+            "clinical_safety_score": 4,
+            "faithfulness_score": 4,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 4,
+            "missing_or_invented_info": [
+              "Antecedentes patologicos inferidos desde el contexto, no explicitados en la transcripcion",
+              "Motivo de consulta ampliado con HTA y DM2 desde contexto",
+              "Control/seguimiento programado no mencionado explicitamente",
+              "Hallazgos subjetivos ubicados como examen fisico"
+            ],
+            "verdict": "pass",
+            "summary": "Documento mayormente fiel y clinicamente seguro. Conserva medicamentos, adherencia parcial, sintomas negados, signos vitales y plan basico. Penaliza por inferir antecedentes/diagnosticos desde el contexto, agregar seguimiento no explicitado y trasladar sintomas negados al examen fisico."
+          },
+          "judge_raw_response": "{\"overall_score\":4,\"clinical_safety_score\":4,\"faithfulness_score\":4,\"template_adherence_score\":4,\"uncertainty_handling_score\":4,\"missing_or_invented_info\":[\"Antecedentes patologicos inferidos desde el contexto, no explicitados en la transcripcion\",\"Motivo de consulta ampliado con HTA y DM2 desde contexto\",\"Control/seguimiento programado no mencionado explicitamente\",\"Hallazgos subjetivos ubicados como examen fisico\"],\"verdict\":\"pass\",\"summary\":\"Documento mayormente fiel y clinicamente seguro. Conserva medicamentos, adherencia parcial, sintomas negados, signos vitales y plan basico. Penaliza por inferir antecedentes/diagnosticos desde el contexto, agregar seguimiento no explicitado y trasladar sintomas negados al examen fisico.\"}"
+        }
+      ]
+    }
+  ]
+}

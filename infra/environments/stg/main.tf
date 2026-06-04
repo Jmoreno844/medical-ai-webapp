@@ -367,7 +367,36 @@ module "copilot_agent_cloud_run" {
 }
 
 # ---------------------------------------------------------------------------
-# 10c. Cloud Run (transcription worker)
+# 10c. Cloud Run (frontend)
+# ---------------------------------------------------------------------------
+
+module "frontend_cloud_run" {
+  source     = "../../modules/cloud_run"
+  project_id = var.project_id
+  region     = var.region
+
+  service_name             = var.frontend_service_name
+  image                    = var.frontend_image
+  service_account_email    = module.service_accounts.frontend_runner_email
+  cloud_sql_volume_enabled = false
+
+  min_instances    = 0
+  max_instances    = var.frontend_max_instances
+  max_concurrency  = var.frontend_max_concurrency
+  session_affinity = false
+  container_port   = 8080
+  timeout          = "60s"
+  cpu              = "1"
+  memory           = "512Mi"
+
+  allow_unauthenticated = true
+  labels                = local.labels
+
+  depends_on = [module.service_accounts]
+}
+
+# ---------------------------------------------------------------------------
+# 10d. Cloud Run (transcription worker)
 # ---------------------------------------------------------------------------
 
 module "transcription_worker_cloud_run" {
@@ -416,7 +445,7 @@ module "transcription_worker_cloud_run" {
 }
 
 # ---------------------------------------------------------------------------
-# 10d. Cloud Run (document generation worker)
+# 10e. Cloud Run (document generation worker)
 # ---------------------------------------------------------------------------
 
 module "document_generation_worker_cloud_run" {
@@ -460,6 +489,44 @@ module "document_generation_worker_cloud_run" {
     module.service_accounts,
     module.cloud_run,
   ]
+}
+
+# ---------------------------------------------------------------------------
+# 10f. Cloud Run custom domain mappings for staging subdomains
+# ---------------------------------------------------------------------------
+
+resource "google_cloud_run_domain_mapping" "frontend" {
+  count = var.frontend_domain_name == null ? 0 : 1
+
+  location = var.region
+  name     = var.frontend_domain_name
+
+  metadata {
+    namespace = var.project_id
+  }
+
+  spec {
+    route_name = module.frontend_cloud_run.service_name
+  }
+
+  depends_on = [module.frontend_cloud_run]
+}
+
+resource "google_cloud_run_domain_mapping" "backend" {
+  count = var.backend_domain_name == null ? 0 : 1
+
+  location = var.region
+  name     = var.backend_domain_name
+
+  metadata {
+    namespace = var.project_id
+  }
+
+  spec {
+    route_name = module.cloud_run.service_name
+  }
+
+  depends_on = [module.cloud_run]
 }
 
 # ---------------------------------------------------------------------------

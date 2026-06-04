@@ -1,10 +1,14 @@
 export const AUDIO_SEGMENTATION_CONFIG = {
-  preRollMs: 650,
-  tailMs: 900,
+  preRollMs: 400,
+  tailMs: 600,
+  midSectionSilenceMs: 500,
+  midSectionThresholdMs: 20000,
+  endSectionSilenceMs: 350,
+  endSectionThresholdMs: 25000,
   minSectionMs: 1000,
   minSpeechFramesPerSection: 4,
-  maxSectionMs: 25000,
-  forcedOverlapMs: 1500,
+  maxSectionMs: 33000,
+  forcedOverlapMs: 400,
   fallbackSectionMs: 20000,
   vadPollIntervalMs: 120,
   vadRmsThreshold: 0.018,
@@ -30,6 +34,20 @@ export type SectionVoiceDecision = {
   hasDetectedSpeech: boolean;
   speechFrameCount: number;
   sectionDurationMs: number;
+};
+
+export const getNaturalPauseThresholdMs = (
+  sectionDurationMs: number,
+): number => {
+  if (sectionDurationMs >= AUDIO_SEGMENTATION_CONFIG.endSectionThresholdMs) {
+    return AUDIO_SEGMENTATION_CONFIG.endSectionSilenceMs;
+  }
+
+  if (sectionDurationMs >= AUDIO_SEGMENTATION_CONFIG.midSectionThresholdMs) {
+    return AUDIO_SEGMENTATION_CONFIG.midSectionSilenceMs;
+  }
+
+  return AUDIO_SEGMENTATION_CONFIG.preRollMs + AUDIO_SEGMENTATION_CONFIG.tailMs;
 };
 
 export const detectVoiceActivity = (
@@ -74,10 +92,8 @@ export const shouldFlushOnNaturalPause = ({
   }
 
   const stableSilenceMs = nowMs - lastSpeechAtMs;
-  return (
-    stableSilenceMs >=
-    AUDIO_SEGMENTATION_CONFIG.preRollMs + AUDIO_SEGMENTATION_CONFIG.tailMs
-  );
+  const naturalPauseThresholdMs = getNaturalPauseThresholdMs(sectionDurationMs);
+  return stableSilenceMs >= naturalPauseThresholdMs;
 };
 
 export const shouldForceSectionCut = (sectionDurationMs: number): boolean => {

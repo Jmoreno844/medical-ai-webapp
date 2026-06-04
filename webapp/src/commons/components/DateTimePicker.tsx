@@ -152,7 +152,7 @@ export function DateTimePicker({
   };
 
   const selectedStyle =
-    "bg-purple-500 text-white font-bold  ring-purple-900 shadow-md border-black";
+    "bg-purple-500 text-white font-bold hover:bg-purple-500 hover:text-white focus:bg-purple-500 focus:text-white active:bg-purple-500 active:text-white ring-purple-900 shadow-md";
 
   const timeButtonStyle =
     "h-9 w-9 p-0 font-normal text-sm rounded-md flex items-center justify-center m-1";
@@ -163,14 +163,9 @@ export function DateTimePicker({
         <Button
           variant="outline"
           className={cn(
-            "w-full justify-start text-left font-normal",
+            "w-[12.5rem] justify-start text-left font-normal",
             !currentDate && "text-muted-foreground"
           )}
-          // Prevent any unexpected click behavior
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsOpen(!isOpen);
-          }}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
           {/* Force evaluation of currentDate to trigger render */}
@@ -197,8 +192,9 @@ export function DateTimePicker({
             locale={es}
             className="bg-white"
             classNames={{
+              day: "h-9 w-9 p-0 font-normal text-slate-900 rounded-md hover:bg-purple-50 hover:text-purple-700 focus:bg-purple-100 focus:text-purple-800 active:bg-purple-100 active:text-purple-800 aria-selected:opacity-100",
               day_selected:
-                "bg-purple-500 text-white font-bold hover:bg-purple-400 ring-purple-300",
+                "bg-purple-500 text-white font-bold hover:bg-purple-500 hover:text-white focus:bg-purple-500 focus:text-white active:bg-purple-500 active:text-white ring-purple-300",
               day_today: "bg-accent text-accent-foreground",
             }}
           />
@@ -208,7 +204,7 @@ export function DateTimePicker({
                 {hours.map((hour) => (
                   <Button
                     key={hour}
-                    variant={isHourSelected(hour) ? "default" : "ghost"}
+                    variant="ghost"
                     className={cn(
                       timeButtonStyle,
                       isHourSelected(hour) && selectedStyle
@@ -238,7 +234,7 @@ export function DateTimePicker({
                     buttons.push(
                       <Button
                         key={`min-${minute}`}
-                        variant={isMinuteSelected(minute) ? "default" : "ghost"}
+                        variant="ghost"
                         className={cn(
                           timeButtonStyle,
                           isMinuteSelected(minute) && selectedStyle
@@ -260,10 +256,10 @@ export function DateTimePicker({
                       buttons.push(
                         <Button
                           key={`exact-${exactMinute}`}
-                          variant="default"
+                          variant="ghost"
                           className={cn(
                             timeButtonStyle,
-                            "bg-purple-500 text-white font-semibold border border-purple-300"
+                            "bg-purple-500 text-white font-semibold hover:bg-purple-500 hover:text-white focus:bg-purple-500 focus:text-white active:bg-purple-500 active:text-white border border-purple-300"
                           )}
                           onClick={(e) => {
                             /* Already selected */
@@ -286,7 +282,7 @@ export function DateTimePicker({
                 {["AM", "PM"].map((ampm) => (
                   <Button
                     key={ampm}
-                    variant={isAMPMSelected(ampm) ? "default" : "ghost"}
+                    variant="ghost"
                     className={cn(
                       timeButtonStyle,
                       isAMPMSelected(ampm) && selectedStyle

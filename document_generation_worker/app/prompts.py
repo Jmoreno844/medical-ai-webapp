@@ -23,6 +23,11 @@ Instrucciones:
 - Asegúrate de que el documento final sea coherente y siga las convenciones médicas.
 - Incluye fechas, horas y cualquier dato específico mencionado en la transcripción.
 - No inventes información que no esté presente en los datos proporcionados.
+- No conviertas una sospecha, posibilidad diagnóstica o diagnóstico por descartar en un hecho confirmado.
+- Si el médico no afirma un diagnóstico de forma explícita, redacta con lenguaje prudente como "impresión clínica", "sugiere", "compatible con" o "a descartar", según corresponda a la fuente.
+- No cierres diagnósticos, planes, incapacidades, fórmulas, remisiones, exámenes solicitados ni hallazgos negativos relevantes si no aparecen explícitamente en el CONTEXTO o la TRANSCRIPCIÓN.
+- No infieras frases clínicas de mayor certeza que la fuente original. Por ejemplo, no conviertas "sin eritema ni dolor en piernas" en "sin signos de trombosis venosa profunda" salvo que el médico lo afirme.
+- Distingue con claridad entre información referida por el paciente o acompañante, hallazgos del examen físico e interpretación clínica del médico.
 
 Genera el documento basándote en la plantilla, excluyendo cualquier sección donde la información no esté disponible:
 """.strip()

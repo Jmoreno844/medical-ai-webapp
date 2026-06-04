@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import axiosInstance from "@/commons/utils/axiosInstance";
 import { AxiosError } from "axios";
 import { logger } from "@/lib/logger";
@@ -19,7 +19,7 @@ export const usePatients = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getErrorMessage = (error: unknown): string => {
+  const getErrorMessage = useCallback((error: unknown): string => {
     if (error instanceof AxiosError) {
       const errorData = error.response?.data as ApiErrorResponse | undefined;
       return (
@@ -30,9 +30,9 @@ export const usePatients = () => {
       );
     }
     return error instanceof Error ? error.message : "Error desconocido";
-  };
+  }, []);
 
-  const searchPatients = async (query: string): Promise<Patient[]> => {
+  const searchPatients = useCallback(async (query: string): Promise<Patient[]> => {
     setIsLoading(true);
     setError(null);
 
@@ -57,9 +57,9 @@ export const usePatients = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getErrorMessage]);
 
-  const createPatient = async (patientName: string) => {
+  const createPatient = useCallback(async (patientName: string) => {
     setIsLoading(true);
     setError(null);
 
@@ -76,9 +76,9 @@ export const usePatients = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getErrorMessage]);
 
-  const updatePatient = async (
+  const updatePatient = useCallback(async (
     patientId: number,
     patientName: string
   ): Promise<boolean> => {
@@ -103,12 +103,34 @@ export const usePatients = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getErrorMessage]);
+
+  const deletePatient = useCallback(async (patientId: number): Promise<boolean> => {
+    if (!patientId) {
+      setError("No se especificó un ID de paciente válido");
+      return false;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await axiosInstance.delete(`/api/v1/patients/${patientId}`);
+      return true;
+    } catch (err) {
+      logger.error("Error deleting patient:", err);
+      setError(getErrorMessage(err));
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getErrorMessage]);
 
   return {
     searchPatients,
     createPatient,
     updatePatient,
+    deletePatient,
     isLoading,
     error,
   };

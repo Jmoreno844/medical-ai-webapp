@@ -1,0 +1,37 @@
+[
+  {
+    "id": "consulta-externa-disnea-contexto-valido",
+    "template_file": "templates/clinical_document_template_v001.md",
+    "context": "Consulta externa de medicina interna. El medico escribio manualmente antes de generar el documento: paciente de 67 anos con antecedente de hipertension arterial, diabetes mellitus tipo 2 e insuficiencia cardiaca; impresion clinica prudente de posible descompensacion de falla cardiaca versus infeccion respiratoria baja; decision de remision inmediata a urgencias. Este contexto debe considerarse fuente clinica valida.",
+    "transcription": "Buen dia doctora, cuenteme que la trae por aca. Eh doctora vine porque me he sentido peor estos dias, me falta el aire, primero era como una tos seca, luego ya con flemitas blancas, y desde hace como tres dias me ahogo hasta caminando dentro de la casa. La hija dice, doctor, anoche tuvo que dormir con tres almohadas, casi no podia acostarse. La paciente agrega, si, y se me han hinchado los pies, sobre todo en la tarde, como desde hace dos semanas. El medico pregunta por fiebre. La paciente responde que no ha medido temperatura pero de noche se siente caliente. Niega vomito, diarrea, ardor al orinar. La hija comenta que toma unas pastas para la presion y para la azucar, pero no siempre la furosemida porque la hace orinar mucho. Signos vitales tomados en consulta: presion 168 sobre 96, frecuencia cardiaca 104, frecuencia respiratoria 24, temperatura 37 punto 6, saturacion 89 por ciento al aire ambiente y 91 por ciento en reposo. El medico dice en voz alta, esto puede ser descompensacion de falla cardiaca versus infeccion respiratoria baja, la voy a remitir a urgencias para estudios y manejo.",
+    "notes": "Caso dificil para evaluar uso correcto del contexto manual del medico, prudencia diagnostica, no inventar examen fisico y remision explicita."
+  },
+  {
+    "id": "control-cronico-medicacion-autocorrecciones",
+    "template_file": "templates/clinical_document_template_v001.md",
+    "context": "Control ambulatorio por HTA y DM2 en medicina familiar. El medico quiere un documento sobrio, sin inflar el plan. Debe quedar claro que la informacion de adherencia y medicamentos viene referida por el paciente.",
+    "transcription": "Hola doctor, vine al control, en general me he sentido bien. El medico pregunta por medicamentos actuales. Paciente responde: tomo losartan de cincuenta cada doce horas, metformina de ochocientos cincuenta cada doce horas, bueno, a veces la de la noche se me olvida, dos o tres veces por semana, y la atorvastatina de veinte en la noche. Niega dolor en el pecho, ahogo, hinchazon de piernas o bajones de azucar. Dice que no se toma la tension en casa casi nunca. Signos vitales en consulta: presion arterial 146 sobre 88, frecuencia cardiaca 82, peso 81 kilos. El medico comenta, vamos a reforzar adherencia, reducir sal y pedir laboratorios de control, hemoglobina glicosilada, perfil lipidico y funcion renal. Paciente pregunta si necesita incapacidad y el medico responde que no, por ahora no.",
+    "notes": "Caso dificil para no convertir informacion referida en examen fisico, respetar un plan compacto y no agregar seguimiento o incapacidad no indicada."
+  },
+  {
+    "id": "urgencias-neurologia-sospecha-ecv-habla-coloquial",
+    "template_file": "templates/clinical_document_template_v001.md",
+    "context": "Atencion prioritaria. El medico desea una remision clara para otro servicio, util y medico-legalmente prudente. No se debe documentar tratamiento no administrado en consulta.",
+    "transcription": "Doctor, mi papa estaba bien y hace como una hora se le torcio la boca y no podia agarrar bien el vaso. El medico pregunta, exactamente hace cuanto comenzo. Acompanante responde, como a las diez y veinte, mas o menos, ahorita son las once y pico. Paciente intenta hablar pero tiene dificultad para articular palabras. El medico describe en voz alta: debilidad de hemicuerpo derecho, disartria y desviacion de comisura bucal. Presion arterial 190 sobre 100. El medico dice, esto es sospecha de evento cerebrovascular agudo, requiere remision inmediata a urgencias, no vamos a retrasar la salida. Acompanante pregunta si le van a poner algo aqui y el medico responde que no, que sale ya a urgencias.",
+    "notes": "Caso dificil para evaluar claridad de remision, no inventar manejo farmacologico y manejar tiempo de inicio de sintomas con prudencia."
+  },
+  {
+    "id": "dolor-abdominal-incertidumbre-y-negativos",
+    "template_file": "templates/clinical_document_template_v001.md",
+    "context": "Consulta prioritaria de medicina general. El medico quiere que el analisis mantenga incertidumbre y no cierre apendicitis ni gastroenteritis si no estan confirmadas. Solo usar hallazgos negativos si quedaron explicitamente dichos.",
+    "transcription": "Buen dia doctor. Vine porque desde ayer en la tarde me empezo un dolor en la barriga, primero como alrededor del ombligo y hoy lo siento mas abajo a la derecha. Dice la paciente que ha tenido nauseas pero no ha vomitado. El medico pregunta por fiebre y diarrea. Paciente responde que diarrea no, fiebre no sabe, se sintio caliente en la madrugada. Refiere poco apetito. Niega flujo vaginal y niega sintomas urinarios. El medico examina y dice en voz alta: abdomen blando, dolor en fosa iliaca derecha, sin defensa involuntaria, sin signos claros de irritacion peritoneal en este momento. Signos vitales: presion 112 sobre 70, frecuencia cardiaca 96, temperatura 37 punto 8. El medico concluye: dolor abdominal en estudio, no puedo descartar apendicitis temprana, si empeora o presenta fiebre, vomito persistente o mayor dolor, urgencias.",
+    "notes": "Caso dificil para diferenciar sintomas, hallazgos objetivos, negativos explicitamente mencionados y uso prudente de diagnosticos diferenciales."
+  },
+  {
+    "id": "pediatria-dosis-y-aclaraciones-del-acompanante",
+    "template_file": "templates/clinical_document_template_v001.md",
+    "context": "Consulta de pediatria general. El medico quiere exactitud en peso, dosis y via, sin inventar examen fisico no descrito. Si una dosis fue corregida en la conversacion, debe quedar la version corregida.",
+    "transcription": "Doctor, vine con mi hijo porque tiene fiebre y tos desde hace dos dias. El medico pregunta edad y peso. La mama responde, tiene cuatro anos, pesa catorce kilos setecientos. Dice que ha comido menos pero si toma liquidos. Niega dificultad respiratoria. El medico explora y verbaliza: orofaringe eritematosa, sin placas visibles, murmullo vesicular conservado, sin sibilancias, sin tirajes. Temperatura 38 punto 4. El medico dice: vamos a manejarlo ambulatorio, acetaminofen ciento sesenta miligramos por cinco mililitros, dar siete mililitros cada seis horas si fiebre. La mama pregunta si eran ocho mililitros y el medico corrige, no, siete mililitros cada seis horas si fiebre. Ademas amoxicilina suspension cuatrocientos miligramos por cinco mililitros, dar ocho mililitros cada doce horas por diez dias. Signos de alarma: respiracion rapida, se hunden las costillas, no recibe liquidos o decaimiento marcado.",
+    "notes": "Caso dificil para respetar correcciones de dosis, conservar hallazgos del examen solo cuando fueron verbalizados y mantener un plan exacto."
+  }
+]

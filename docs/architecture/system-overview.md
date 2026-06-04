@@ -73,7 +73,7 @@ sequenceDiagram
         Medico->>Browser: Inicia grabacion
         Browser->>Backend: POST /api/v1/transcription/sessions
         Backend-->>Browser: { session_id }
-        loop Cada seccion independiente cerrada por pausa natural o maximo 25s
+        loop Cada seccion independiente cerrada por pausa natural o maximo 33s
             Browser->>Browser: Guarda blob pendiente en IndexedDB
             Browser->>Backend: POST /api/v1/transcription/sessions/:id/sections/upload-url
             Backend-->>Browser: { upload_url, gcs_object_name }
@@ -184,7 +184,7 @@ sequenceDiagram
 ## 5. Puntos de Atención Arquitectónica
 
 - **Hub SSE en memoria**: el hub en `backend_fastapi` usa memoria de proceso. Con múltiples réplicas en Cloud Run, un evento en la instancia A no llega a clientes en la B. Resolver con Redis o Pub/Sub antes de escalar a más de una instancia.
-- **Transcripción near realtime con VAD**: el navegador usa VAD ligero basado en Web Audio para cerrar secciones en pausas naturales, con `pre-roll=650ms`, `tail=900ms`, mínimo de `1s`, máximo forzado de `25s` y `overlap=1500ms` solo en ese corte forzado. Si el VAD no inicia, el frontend vuelve al fallback por tiempo (`20s`).
+- **Transcripción near realtime con VAD**: el navegador usa VAD ligero basado en Web Audio para cerrar secciones en pausas naturales, con umbral base de `1s` de silencio estable (`pre-roll=400ms`, `tail=600ms`). Entre `20s` y `25s` reduce ese silencio a `500ms`, y entre `25s` y `33s` lo reduce a `350ms` para encontrar una pausa útil antes del corte forzado. Mantiene mínimo de `1s`, máximo forzado de `33s` y `overlap=400ms` solo en ese corte forzado. Si el VAD no inicia, el frontend vuelve al fallback por tiempo (`20s`).
 - **Backend público + DB privada**: Cloud Run sigue público para la SPA, pero PostgreSQL queda aislado por IP privada y acceso vía Cloud SQL Auth Proxy + IAM DB auth.
 - **Agent runtime separado**: LangGraph no vive dentro del backend principal. El backend hace de broker y conserva la autoridad clínica/transaccional.
 - **Auth interna temporal del copiloto**: el API (FastAPI) y `copilot-agent-service` usan un `shared JWT` temporal en `local`/`stg`; ver deuda canónica en [`../debt/copilot-agent-runtime.md`](../debt/copilot-agent-runtime.md).

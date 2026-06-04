@@ -586,6 +586,8 @@ const TextArea: React.FC = () => {
   const normalizedCanonicalContent = normalizeEditorText(documentContent ?? "");
   const isStalledGeneratedDocument = Boolean(
     activeDocument &&
+      contentLoadedSuccessfully &&
+      !isLoadingContent &&
       activeDocument.kind === "note" &&
       activeDocument.doctor_template_id &&
       !activeDerivedState?.error &&
@@ -608,19 +610,13 @@ const TextArea: React.FC = () => {
   ).length;
   const isStreamingTranscription =
     isStreamingActiveDocument && activeDerivedState?.source === "transcription";
-  const transcriptionBlockCount =
-    activeDerivedState?.transcriptionBlocks?.length ?? 0;
   const streamingStatusCopy = isStreamingTranscription
-    ? transcriptionBlockCount > 0
-      ? `${transcriptionBlockCount} sección${transcriptionBlockCount === 1 ? "" : "es"} transcrita${transcriptionBlockCount === 1 ? "" : "s"}`
-      : "Procesando audio…"
+    ? "Transcribiendo audio…"
     : derivedContent && normalizeEditorText(derivedContent).length > 0
       ? "Generando documento…"
       : "Preparando documento…";
   const streamingHintCopy = isStreamingTranscription
-    ? transcriptionBlockCount > 0
-      ? "La transcripción sigue consolidándose y aparecerá con timestamps."
-      : "Esperando los primeros fragmentos transcritos."
+    ? "Los primeros fragmentos aparecerán en unos momentos."
     : derivedContent && normalizeEditorText(derivedContent).length > 0
       ? "Estamos redactando el contenido clínico."
       : "Esto puede tardar unos segundos.";
@@ -633,7 +629,7 @@ const TextArea: React.FC = () => {
         </div>
       )}
 
-      {isStreamingActiveDocument && (
+      {isStreamingActiveDocument && !isStreamingTranscription && (
         <div className="border-b border-violet-200 bg-violet-50 px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -642,9 +638,11 @@ const TextArea: React.FC = () => {
                 {streamingStatusCopy}
               </span>
             </div>
-            <div className="text-sm text-violet-700">
-              {streamingHintCopy}
-            </div>
+            {streamingHintCopy && (
+              <div className="text-sm text-violet-700">
+                {streamingHintCopy}
+              </div>
+            )}
           </div>
 
           {activeDerivedState?.error && (

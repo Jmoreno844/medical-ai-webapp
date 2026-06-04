@@ -1,0 +1,215 @@
+{
+  "run_started_at": "2026-06-03T22:40:24.093531+00:00",
+  "prompt_version": "document_generation_v001",
+  "judge_prompt_version": "clinical_document_judge_v001",
+  "judge_provider": "openai",
+  "judge_model": "gpt-5.4",
+  "cases_file": "../evals/document_generation/cases.json",
+  "requested_case_id": null,
+  "count_limit": 3,
+  "selected_case_count": 3,
+  "models": [
+    {
+      "alias": "gemini",
+      "provider": "google_genai",
+      "model": "gemini-3-flash-preview"
+    },
+    {
+      "alias": "anthropic",
+      "provider": "anthropic_api",
+      "model": "claude-haiku-4-5-20251001"
+    }
+  ],
+  "prompt_template_preview": "Tu tarea es generar un documento medico basado en los siguientes componentes:\n\n1",
+  "judge_prompt_preview": "Eres un evaluador experto en documentacion clinica. Evalua un documento medico g",
+  "case_results": [
+    {
+      "case_id": "consulta-externa-disnea-contexto-valido",
+      "notes": "Caso dificil para evaluar uso correcto del contexto manual del medico, prudencia diagnostica, no inventar examen fisico y remision explicita.",
+      "outputs": [
+        {
+          "model_alias": "gemini",
+          "provider": "google_genai",
+          "model": "gemini-3-flash-preview",
+          "generated_document": "## Identificacion del documento\n- Tipo de documento clinico: Consulta externa\n- Servicio / especialidad: Medicina interna\n\n## Identificacion del paciente\n- Fecha de nacimiento / edad: 67 años\n- Sexo registrado: Femenino\n- Acompanante: Hija\n\n## Encabezado\n- Tipo de atencion: Consulta externa\n- Motivo de consulta: \"me he sentido peor estos dias, me falta el aire\", \"se me han hinchado los pies\"\n- Fuente de informacion: Paciente y acompañante (hija)\n\n## Enfermedad actual\nPaciente de 67 años con antecedentes de insuficiencia cardíaca, hipertensión arterial y diabetes mellitus tipo 2. Consulta por cuadro clínico de aproximadamente dos semanas de evolución caracterizado por edema en miembros inferiores de predominio vespertino. Refiere que en los últimos días se asocia disnea progresiva que inició con tos seca, evolucionando a tos con expectoración hialina (\"flemitas blancas\") y disnea de pequeños esfuerzos (refiere ahogo al caminar dentro de la casa) desde hace tres días. La acompañante informa que la paciente presentó ortopnea la noche anterior, requiriendo el uso de tres almohadas para conciliar el sueño. La paciente refiere sensación febril no cuantificada de predominio nocturno. Niega emesis, diarrea o disuria.\n\n## Antecedentes\n- Patologicos: Hipertensión arterial, diabetes mellitus tipo 2 e insuficiencia cardíaca.\n- Farmacologicos / medicamentos actuales: Medicamentos para la presión arterial y diabetes (nombres no especificados). Refiere prescripción de furosemida, la cual toma de forma irregular debido al aumento de la frecuencia urinaria.\n\n## Revision por sistemas\n- General: Sensación febril nocturna.\n- Cardiovascular: Edema de miembros inferiores (vespertino), ortopnea.\n- Respiratorio: Disnea de pequeños esfuerzos, tos con expectoración hialina.\n- Gastrointestinal: Niega vómito y diarrea.\n- Genitourinario: Niega ardor al orinar.\n\n## Signos vitales\n- Presion arterial: 168/96 mmHg\n- Frecuencia cardiaca: 104 lpm\n- Frecuencia respiratoria: 24 rpm\n- Temperatura: 37.6 °C\n- Saturacion de oxigeno: 89% al aire ambiente y 91% en reposo.\n\n## Analisis clinico\nPaciente femenina de 67 años con antecedentes crónicos de falla cardíaca, HTA y DM2. Presenta cuadro clínico sugerente de descompensación de insuficiencia cardíaca (edema, disnea progresiva, ortopnea) asociado a signos de respuesta inflamatoria y compromiso ventilatorio (taquipnea, taquicardia, febrícula y desaturación). Se plantea como impresión clínica una descompensación de su falla cardíaca de base frente a un posible proceso infeccioso respiratorio bajo. Dada la estabilidad clínica limítrofe y los hallazgos en signos vitales, se decide traslado a nivel de mayor complejidad.\n\n## Diagnosticos\n- Diagnostico principal: Impresión clínica de descompensación de falla cardíaca.\n- Diagnosticos relacionados: Hipertensión arterial, Diabetes mellitus tipo 2.\n- Diagnosticos diferenciales: Infección respiratoria baja.\n\n## Plan de manejo\n- Conducta general: Remisión inmediata al servicio de urgencias.\n- Procedimientos solicitados o realizados: Remisión para estudios diagnósticos y manejo médico integral.\n- Interconsultas / remisiones: Remisión a urgencias.\n\n## Cierre\n- Observaciones: Todo diagnóstico, plan, orden o incapacidad queda pendiente de validación y firma del profesional.\n- Profesional responsable: Profesional tratante de medicina interna.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 11196,
+            "time_after_first_token_ms": 4487,
+            "total_generation_ms": 15683
+          },
+          "judge_result": {
+            "overall_score": 3,
+            "clinical_safety_score": 3,
+            "faithfulness_score": 3,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 3,
+            "missing_or_invented_info": [
+              "Sexo femenino inferido no explicito",
+              "Estabilidad clinica limitrofe no afirmada",
+              "Respuesta inflamatoria no afirmada",
+              "Compromiso ventilatorio no afirmado",
+              "Traslado a nivel de mayor complejidad no explicito",
+              "Diagnostico principal presentado con certeza mayor a la fuente"
+            ],
+            "verdict": "borderline",
+            "summary": "El documento conserva gran parte de la informacion clinica relevante y la remision a urgencias si esta sustentada. Sin embargo, agrega inferencias no explicitadas por la fuente (sexo, estabilidad limitrofe, respuesta inflamatoria, compromiso ventilatorio, mayor complejidad) y aumenta la certeza diagnostica al formular una descompensacion de falla cardiaca como diagnostico principal en lugar de mantenerla como impresion diferencial prudente."
+          },
+          "judge_raw_response": "{\n  \"overall_score\": 3,\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 3,\n  \"missing_or_invented_info\": [\n    \"Sexo femenino inferido no explicito\",\n    \"Estabilidad clinica limitrofe no afirmada\",\n    \"Respuesta inflamatoria no afirmada\",\n    \"Compromiso ventilatorio no afirmado\",\n    \"Traslado a nivel de mayor complejidad no explicito\",\n    \"Diagnostico principal presentado con certeza mayor a la fuente\"\n  ],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento conserva gran parte de la informacion clinica relevante y la remision a urgencias si esta sustentada. Sin embargo, agrega inferencias no explicitadas por la fuente (sexo, estabilidad limitrofe, respuesta inflamatoria, compromiso ventilatorio, mayor complejidad) y aumenta la certeza diagnostica al formular una descompensacion de falla cardiaca como diagnostico principal en lugar de mantenerla como impresion diferencial prudente.\"\n}"
+        },
+        {
+          "model_alias": "anthropic",
+          "provider": "anthropic_api",
+          "model": "claude-haiku-4-5-20251001",
+          "generated_document": "# DOCUMENTO CLÍNICO\n\n## Identificación del documento\n- Tipo de documento clínico: Nota de consulta externa\n- Servicio / especialidad: Medicina interna\n\n## Identificación del paciente\n- Edad: 67 años\n- Sexo registrado: Femenino\n\n## Encabezado\n- Tipo de atencion: Consulta externa\n- Motivo de consulta: Disnea progresiva y edema en miembros inferiores\n- Fuente de informacion: Paciente y acompanante (hija)\n\n## Enfermedad actual\n\nPaciente refiere malestar progresivo en los últimos días caracterizado por disnea de esfuerzo que ha evolucionado a disnea en reposo. Inició con tos seca que posteriormente evolucionó a tos productiva con expectoración de flemas blancas. Refiere que desde hace aproximadamente tres días presenta ahogo incluso con actividades dentro del hogar como caminar. La acompañante (hija) reporta que la noche anterior a la consulta la paciente requirió dormir con tres almohadas debido a dificultad para acostarse. Adicionalmente, refiere edema en miembros inferiores, principalmente en las tardes, de aproximadamente dos semanas de evolución. Niega fiebre documentada, aunque refiere sensación de calor nocturno. Niega vómito, diarrea y ardor al orinar. La acompañante comenta que la paciente toma medicamentos para la presión arterial y para el control glucémico, pero refiere incumplimiento ocasional de la furosemida por efectos diuréticos.\n\n## Antecedentes\n- Patologicos: Hipertensión arterial, diabetes mellitus tipo 2, insuficiencia cardíaca\n- Farmacologicos / medicamentos actuales: Medicamentos para control de presión arterial, medicamentos para control glucémico, furosemida (con cumplimiento irregular según reporte de acompañante)\n\n## Signos vitales\n- Presion arterial: 168/96 mmHg\n- Frecuencia cardiaca: 104 latidos por minuto\n- Frecuencia respiratoria: 24 respiraciones por minuto\n- Temperatura: 37.6 °C\n- Saturacion de oxigeno: 89% al aire ambiente; 91% en reposo\n\n## Análisis clínico\n\nPaciente de 67 años con antecedentes de hipertensión arterial, diabetes mellitus tipo 2 e insuficiencia cardíaca que presenta cuadro clínico de disnea progresiva, tos con expectoración, ortopnea (requiere múltiples almohadas para dormir) y edema periférico bilateral. Los signos vitales muestran presión arterial elevada (168/96 mmHg), taquicardia (104 lpm), taquipnea (24 rpm), temperatura subfebril (37.6 °C) y saturación de oxígeno disminuida (89% al aire ambiente). La presentación clínica es compatible con **descompensación de insuficiencia cardíaca versus infección respiratoria baja**, siendo necesario descartar ambas entidades mediante estudios complementarios y manejo en servicio de urgencias.\n\n## Diagnosticos\n- Diagnostico principal: Impresión clínica de posible descompensación de insuficiencia cardíaca versus infección respiratoria baja (a descartar y confirmar)\n\n## Plan de manejo\n- Conducta general: Remisión inmediata a servicio de urgencias para evaluación, estudios complementarios y manejo especializado\n\n---\n\n**Nota:** Este documento queda pendiente de validación y firma del profesional responsable. Todos los diagnósticos, órdenes y decisiones clínicas están sujetos a confirmación por el médico tratante.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1272,
+            "time_after_first_token_ms": 8201,
+            "total_generation_ms": 9473
+          },
+          "judge_result": {
+            "overall_score": 4,
+            "clinical_safety_score": 4,
+            "faithfulness_score": 4,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 5,
+            "missing_or_invented_info": [
+              "Sexo femenino no explicitado en fuentes",
+              "Disnea en reposo aumenta certeza frente a fuente",
+              "Edema periférico bilateral no explicitado",
+              "Temperatura subfebril es interpretación no textual",
+              "Tipo de documento 'Nota de consulta externa' no explicitado literalmente"
+            ],
+            "verdict": "pass",
+            "summary": "Documento mayormente fiel y clínicamente seguro. Conserva la incertidumbre diagnóstica y la remisión inmediata a urgencias, sin agregar tratamientos ni órdenes no sustentadas. Presenta pocas inferencias que aumentan algo la certeza documental, especialmente sexo, bilateralidad del edema y disnea en reposo."
+          },
+          "judge_raw_response": "{\"overall_score\":4,\"clinical_safety_score\":4,\"faithfulness_score\":4,\"template_adherence_score\":4,\"uncertainty_handling_score\":5,\"missing_or_invented_info\":[\"Sexo femenino no explicitado en fuentes\",\"Disnea en reposo aumenta certeza frente a fuente\",\"Edema periférico bilateral no explicitado\",\"Temperatura subfebril es interpretación no textual\",\"Tipo de documento 'Nota de consulta externa' no explicitado literalmente\"],\"verdict\":\"pass\",\"summary\":\"Documento mayormente fiel y clínicamente seguro. Conserva la incertidumbre diagnóstica y la remisión inmediata a urgencias, sin agregar tratamientos ni órdenes no sustentadas. Presenta pocas inferencias que aumentan algo la certeza documental, especialmente sexo, bilateralidad del edema y disnea en reposo.\"}"
+        }
+      ]
+    },
+    {
+      "case_id": "control-cronico-medicacion-autocorrecciones",
+      "notes": "Caso dificil para no convertir informacion referida en examen fisico, respetar un plan compacto y no agregar seguimiento o incapacidad no indicada.",
+      "outputs": [
+        {
+          "model_alias": "gemini",
+          "provider": "google_genai",
+          "model": "gemini-3-flash-preview",
+          "generated_document": "## Identificacion del documento\n- Tipo de documento clinico: Control ambulatorio\n\n## Encabezado\n- Tipo de atencion: Consulta externa\n- Motivo de consulta: Control de hipertensión arterial (HTA) y diabetes mellitus tipo 2 (DM2).\n- Fuente de informacion: Paciente\n\n## Enfermedad actual\nPaciente con antecedentes de hipertensión arterial y diabetes mellitus tipo 2 quien asiste a consulta de control programado. Refiere sentirse bien en general. Niega de forma dirigida dolor precordial, disnea, edema en miembros inferiores o síntomas sugestivos de hipoglucemia. El paciente manifiesta que realiza automonitoreo de presión arterial en domicilio de forma muy infrecuente.\n\n## Antecedentes\n- Patologicos: Hipertensión arterial (HTA) y Diabetes mellitus tipo 2 (DM2).\n- Farmacologicos / medicamentos actuales: (Información referida por el paciente)\n    - **Losartán**: 50 mg cada 12 horas.\n    - **Metformina**: 850 mg cada 12 horas (el paciente refiere falta de adherencia a la dosis nocturna, omitiéndola 2 a 3 veces por semana).\n    - **Atorvastatina**: 20 mg cada noche.\n\n## Revision por sistemas\n- Cardiovascular: Niega dolor en el pecho o hinchazón de piernas.\n- Respiratorio: Niega ahogo (disnea).\n- Neurologico: Niega síntomas de \"bajones de azúcar\" (hipoglucemia).\n\n## Signos vitales\n- Presion arterial: 146/88 mmHg\n- Frecuencia cardiaca: 82 lpm\n- Peso: 81 kg\n\n## Analisis clinico\nPaciente con diagnóstico de HTA y DM2 en seguimiento ambulatorio. Durante la consulta se evidencia una presión arterial de 146/88 mmHg, cifra que se encuentra por encima de las metas de control. Se identifica una adherencia parcial al tratamiento farmacológico, específicamente con la metformina, y falta de seguimiento tensional domiciliario. Se requiere reforzar medidas no farmacológicas, mejorar la adherencia terapéutica y solicitar paraclínicos para evaluar el estado actual de sus patologías de base.\n\n## Diagnosticos\n- Diagnostico principal: Hipertensión esencial (primaria)\n- Diagnosticos relacionados: Diabetes mellitus tipo 2\n\n## Plan de manejo\n- Conducta general: Refuerzo de la adherencia al tratamiento farmacológico.\n- Examenes solicitados: \n    - Hemoglobina glicosilada (HbA1c)\n    - Perfil lipídico\n    - Pruebas de función renal\n- Recomendaciones no farmacológicas: Reducción del consumo de sal en la dieta.\n- Incapacidad medica: No se requiere en el momento.\n\n*Todo diagnostico, plan, orden o incapacidad queda pendiente de validacion y firma del profesional.*",
+          "generation_metrics": {
+            "time_to_first_token_ms": 7162,
+            "time_after_first_token_ms": 3418,
+            "total_generation_ms": 10581
+          },
+          "judge_result": {
+            "overall_score": 4,
+            "clinical_safety_score": 4,
+            "faithfulness_score": 4,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 3,
+            "missing_or_invented_info": [
+              "Diagnostico principal cerrado como hipertension esencial sin soporte explicito",
+              "Analisis agrega juicio de estar por encima de metas de control no dicho por la fuente",
+              "Revision por sistemas ubica hipoglucemia en neurologico, interpretacion no literal",
+              "No incluye explicitamente que no hay incapacidad por ahora como respuesta del medico"
+            ],
+            "verdict": "pass",
+            "summary": "Documento mayormente fiel y util, con buen respeto a medicamentos y adherencia como informacion referida por el paciente. Sin embargo, cierra un diagnostico de hipertension esencial no explicitado y aumenta la interpretacion clinica al afirmar que la presion esta fuera de metas, lo que reduce fidelidad y manejo de incertidumbre."
+          },
+          "judge_raw_response": "{\n  \"overall_score\": 4,\n  \"clinical_safety_score\": 4,\n  \"faithfulness_score\": 4,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 3,\n  \"missing_or_invented_info\": [\n    \"Diagnostico principal cerrado como hipertension esencial sin soporte explicito\",\n    \"Analisis agrega juicio de estar por encima de metas de control no dicho por la fuente\",\n    \"Revision por sistemas ubica hipoglucemia en neurologico, interpretacion no literal\",\n    \"No incluye explicitamente que no hay incapacidad por ahora como respuesta del medico\"\n  ],\n  \"verdict\": \"pass\",\n  \"summary\": \"Documento mayormente fiel y util, con buen respeto a medicamentos y adherencia como informacion referida por el paciente. Sin embargo, cierra un diagnostico de hipertension esencial no explicitado y aumenta la interpretacion clinica al afirmar que la presion esta fuera de metas, lo que reduce fidelidad y manejo de incertidumbre.\"\n}"
+        },
+        {
+          "model_alias": "anthropic",
+          "provider": "anthropic_api",
+          "model": "claude-haiku-4-5-20251001",
+          "generated_document": "# DOCUMENTO CLÍNICO\n\n## Identificacion del documento\n- Tipo de documento clinico: Nota de control ambulatorio\n\n## Encabezado\n- Tipo de atencion: Consulta externa\n- Motivo de consulta: Control de hipertensión arterial y diabetes mellitus tipo 2\n- Fuente de informacion: Paciente\n\n## Enfermedad actual\nPaciente refiere sentirse bien en general. Niega dolor en el pecho, disnea, edema de miembros inferiores o episodios de hipoglucemia.\n\n## Antecedentes\n- Patologicos: Hipertensión arterial, diabetes mellitus tipo 2\n- Farmacologicos / medicamentos actuales: Según refiere el paciente, toma losartán 50 mg cada 12 horas, metformina 850 mg cada 12 horas (refiere olvidos de la dosis nocturna aproximadamente 2-3 veces por semana) y atorvastatina 20 mg en la noche.\n\n## Revision por sistemas\n- Cardiovascular: Niega dolor en el pecho\n- Respiratorio: Niega disnea\n- Genitourinario: Sin síntomas reportados\n- Otros: Niega edema de miembros inferiores. Niega episodios de hipoglucemia. Refiere no tomarse la tensión arterial en casa casi nunca.\n\n## Signos vitales\n- Presion arterial: 146/88 mmHg\n- Frecuencia cardiaca: 82 lpm\n- Peso: 81 kg\n\n## Analisis clinico\nPaciente con antecedentes de hipertensión arterial y diabetes mellitus tipo 2 en control ambulatorio. Refiere adherencia parcial a metformina (olvidos nocturnos 2-3 veces por semana). Presión arterial en rango elevado en consulta. Sin síntomas de descompensación aguda cardiovascular o metabólica.\n\n## Plan de manejo\n- Conducta general: Refuerzo de adherencia farmacológica. Recomendación de reducción de ingesta de sal.\n- Examenes solicitados: Hemoglobina glicosilada, perfil lipídico, función renal.\n- Control / seguimiento: Control posterior a resultados de laboratorios.\n\n---\n\n**Nota:** Todos los diagnósticos, planes, órdenes y recomendaciones quedan pendientes de validación y firma del profesional tratante.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1257,
+            "time_after_first_token_ms": 4993,
+            "total_generation_ms": 6250
+          },
+          "judge_result": {
+            "overall_score": 4,
+            "clinical_safety_score": 4,
+            "faithfulness_score": 4,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 4,
+            "missing_or_invented_info": [
+              "Agrega 'control posterior a resultados de laboratorios' no afirmado explicitamente",
+              "Incluye 'sin sintomas reportados' en genitourinario sin sustento explicito",
+              "Analisis afirma 'sin sintomas de descompensacion aguda cardiovascular o metabolica' con mayor interpretacion que la fuente",
+              "Omite que no requiere incapacidad por ahora"
+            ],
+            "verdict": "pass",
+            "summary": "Documento mayormente fiel y clinicamente seguro. Conserva medicamentos y adherencia como informacion referida por el paciente y no infla el plan principal. Sin embargo, agrega un seguimiento no explicitado, introduce un ROS genitourinario negativo inventado y aumenta algo la certeza interpretativa en el analisis. Tambien omite dejar consignado que no se dio incapacidad."
+          },
+          "judge_raw_response": "{\n  \"overall_score\": 4,\n  \"clinical_safety_score\": 4,\n  \"faithfulness_score\": 4,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 4,\n  \"missing_or_invented_info\": [\n    \"Agrega 'control posterior a resultados de laboratorios' no afirmado explicitamente\",\n    \"Incluye 'sin sintomas reportados' en genitourinario sin sustento explicito\",\n    \"Analisis afirma 'sin sintomas de descompensacion aguda cardiovascular o metabolica' con mayor interpretacion que la fuente\",\n    \"Omite que no requiere incapacidad por ahora\"\n  ],\n  \"verdict\": \"pass\",\n  \"summary\": \"Documento mayormente fiel y clinicamente seguro. Conserva medicamentos y adherencia como informacion referida por el paciente y no infla el plan principal. Sin embargo, agrega un seguimiento no explicitado, introduce un ROS genitourinario negativo inventado y aumenta algo la certeza interpretativa en el analisis. Tambien omite dejar consignado que no se dio incapacidad.\"\n}"
+        }
+      ]
+    },
+    {
+      "case_id": "urgencias-neurologia-sospecha-ecv-habla-coloquial",
+      "notes": "Caso dificil para evaluar claridad de remision, no inventar manejo farmacologico y manejar tiempo de inicio de sintomas con prudencia.",
+      "outputs": [
+        {
+          "model_alias": "gemini",
+          "provider": "google_genai",
+          "model": "gemini-3-flash-preview",
+          "generated_document": "## Identificacion del documento\n- **Tipo de documento clinico:** Historia de atención prioritaria\n- **Fecha y hora de atencion:** 11:00 horas (aproximadamente)\n\n## Identificacion del paciente\n- **Acompanante:** Hijo/a (relación referida en la transcripción)\n\n## Encabezado\n- **Tipo de atencion:** Consulta externa\n- **Motivo de consulta:** \"Se le torció la boca y no podía agarrar bien el vaso\"\n- **Fuente de informacion:** Acompañante y paciente\n- **Confiabilidad de la informacion:** Confiable\n\n## Enfermedad actual\nPaciente masculino que ingresa traído por familiar por cuadro clínico de inicio súbito de aproximadamente una hora de evolución (inicio reportado a las 10:20 horas). El acompañante refiere que el paciente presentó desviación de la comisura bucal y pérdida de fuerza en la extremidad superior derecha que le impedía sostener objetos. Durante la consulta, el paciente presenta dificultad para articular palabras. No se reportan manejos previos para el episodio actual.\n\n## Signos vitales\n- **Presion arterial:** 190/100 mmHg\n\n## Examen fisico\n- **Neurológico:** Se observa disartria (dificultad para articular palabras), debilidad en hemicuerpo derecho y desviación de la comisura bucal.\n\n## Analisis clinico\nPaciente con déficit neurológico focal de inicio agudo (ventana de una hora) caracterizado por compromiso motor en hemicuerpo derecho, desviación facial y alteración del lenguaje, asociado a emergencia hipertensiva. Los hallazgos clínicos son altamente sugestivos de un evento cerebrovascular agudo (ACV). Dada la naturaleza del cuadro, se requiere traslado inmediato a un centro de mayor complejidad para diagnóstico por neuroimagen y manejo especializado.\n\n## Diagnosticos\n- **Diagnostico principal:** Sospecha de evento cerebrovascular agudo\n\n## Plan de manejo\n- **Conducta general:** Remisión inmediata a un servicio de urgencias de alta complejidad.\n- **Interconsultas / remisiones:** Remisión prioritaria a urgencias para valoración por neurología y realización de TAC de cráneo simple.\n- **Recomendaciones no farmacologicas:** No retrasar el traslado.\n- **Educacion al paciente:** Se explica al acompañante la gravedad del cuadro clínico y la importancia de la atención inmediata en un entorno hospitalario para evitar secuelas permanentes.\n- **Observaciones:** No se administra tratamiento farmacológico en el consultorio para no retrasar la salida del paciente hacia el centro hospitalario.\n\n## Cierre\n- **Observaciones:** El paciente es trasladado de forma inmediata para manejo de sospecha de ACV agudo.\n- **Profesional responsable:** Pendiente de validación y firma del profesional.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 21457,
+            "time_after_first_token_ms": 3491,
+            "total_generation_ms": 24949
+          },
+          "judge_result": {
+            "overall_score": 2,
+            "clinical_safety_score": 2,
+            "faithfulness_score": 2,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 2,
+            "missing_or_invented_info": [
+              "Diagnostico/analisis agrega emergencia hipertensiva no afirmada",
+              "Remision a neurologia no mencionada",
+              "Solicitud de TAC de craneo simple no mencionada",
+              "Educacion sobre evitar secuelas permanentes no documentada",
+              "Cierre afirma traslado inmediato como hecho no explicitamente confirmado",
+              "Confiabilidad de la informacion inferida",
+              "Paciente masculino inferido",
+              "Perdida de fuerza en extremidad superior derecha en vez de hemicuerpo derecho"
+            ],
+            "verdict": "fail",
+            "summary": "El documento conserva la idea central de sospecha de evento cerebrovascular agudo y la remision inmediata, pero agrega elementos no sustentados por la fuente (emergencia hipertensiva, neurologia, TAC, educacion especifica) y aumenta la certeza en varios puntos. Esto lo hace medico-legalmente mas riesgoso pese a una estructura aceptable."
+          },
+          "judge_raw_response": "{\n  \"overall_score\": 2,\n  \"clinical_safety_score\": 2,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 2,\n  \"missing_or_invented_info\": [\n    \"Diagnostico/analisis agrega emergencia hipertensiva no afirmada\",\n    \"Remision a neurologia no mencionada\",\n    \"Solicitud de TAC de craneo simple no mencionada\",\n    \"Educacion sobre evitar secuelas permanentes no documentada\",\n    \"Cierre afirma traslado inmediato como hecho no explicitamente confirmado\",\n    \"Confiabilidad de la informacion inferida\",\n    \"Paciente masculino inferido\",\n    \"Perdida de fuerza en extremidad superior derecha en vez de hemicuerpo derecho\"\n  ],\n  \"verdict\": \"fail\",\n  \"summary\": \"El documento conserva la idea central de sospecha de evento cerebrovascular agudo y la remision inmediata, pero agrega elementos no sustentados por la fuente (emergencia hipertensiva, neurologia, TAC, educacion especifica) y aumenta la certeza en varios puntos. Esto lo hace medico-legalmente mas riesgoso pese a una estructura aceptable.\"\n}"
+        },
+        {
+          "model_alias": "anthropic",
+          "provider": "anthropic_api",
+          "model": "claude-haiku-4-5-20251001",
+          "generated_document": "# Documento Clínico\n\n## Identificación del documento\n- Tipo de documento clínico: Consulta externa con remisión urgente\n\n## Identificación del paciente\n- Sexo registrado: Masculino\n\n## Encabezado\n- Tipo de atención: Consulta externa\n- Motivo de consulta: Debilidad de hemicuerpo derecho, dificultad para articular palabras y desviación de comisura bucal\n- Fuente de información: Acompañante y paciente\n- Confiabilidad de la información: Acompañante proporciona información sobre el inicio de síntomas; paciente presenta dificultad para articular palabras\n\n## Enfermedad actual\nSegún refiere el acompañante, el paciente se encontraba en buen estado de salud hace aproximadamente una hora. Presentó inicio súbito de debilidad de hemicuerpo derecho, dificultad para agarrar objetos (vaso) e imposibilidad para articular palabras adecuadamente. El acompañante refiere que los síntomas iniciaron aproximadamente a las 10:20 de la mañana. Al momento de la consulta (aproximadamente las 11:00 de la mañana), el paciente presenta dificultad evidente para articular palabras.\n\n## Signos vitales\n- Presión arterial: 190/100 mmHg\n\n## Examen físico\n- Estado general: Paciente con dificultad para la comunicación verbal\n- Neurologico: Debilidad de hemicuerpo derecho, disartria, desviación de comisura bucal hacia la izquierda\n\n## Análisis clínico\nLos hallazgos clínicos (debilidad de hemicuerpo derecho, disartria y desviación de comisura bucal) con inicio súbito hace aproximadamente 40 minutos, asociados a presión arterial elevada (190/100 mmHg), son **compatibles con sospecha de evento cerebrovascular agudo**.\n\n## Diagnosticos\n- Diagnóstico principal: Sospecha de evento cerebrovascular agudo\n\n## Plan de manejo\n- Conducta general: Remisión inmediata a urgencias sin retrasar la salida del paciente\n- Interconsultas / remisiones: Remisión urgente a Servicio de Urgencias para evaluación y manejo de sospecha de evento cerebrovascular agudo\n\n## Cierre\n- Observaciones: No se administra tratamiento en esta consulta. El paciente requiere evaluación urgente en el servicio de urgencias para confirmación diagnóstica y manejo inmediato según protocolos de atención de evento cerebrovascular agudo.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 884,
+            "time_after_first_token_ms": 5166,
+            "total_generation_ms": 6051
+          },
+          "judge_result": {
+            "overall_score": 4,
+            "clinical_safety_score": 4,
+            "faithfulness_score": 4,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 5,
+            "missing_or_invented_info": [
+              "Sexo masculino no explicitado",
+              "Desviación de comisura bucal hacia la izquierda no explicitada",
+              "Hora de consulta aproximada 11:00 no exacta en fuente",
+              "Tipo de documento 'consulta externa con remisión urgente' no textual",
+              "Manejo según protocolos en urgencias no afirmado por la fuente"
+            ],
+            "verdict": "pass",
+            "summary": "Documento mayormente fiel y clínicamente prudente. Conserva la sospecha diagnóstica, la remisión inmediata y que no se administró tratamiento. Presenta pocas adiciones no sustentadas o con exceso de precisión, pero sin cambiar de forma importante la conducta ni cerrar el diagnóstico."
+          },
+          "judge_raw_response": "{\"overall_score\":4,\"clinical_safety_score\":4,\"faithfulness_score\":4,\"template_adherence_score\":4,\"uncertainty_handling_score\":5,\"missing_or_invented_info\":[\"Sexo masculino no explicitado\",\"Desviación de comisura bucal hacia la izquierda no explicitada\",\"Hora de consulta aproximada 11:00 no exacta en fuente\",\"Tipo de documento 'consulta externa con remisión urgente' no textual\",\"Manejo según protocolos en urgencias no afirmado por la fuente\"],\"verdict\":\"pass\",\"summary\":\"Documento mayormente fiel y clínicamente prudente. Conserva la sospecha diagnóstica, la remisión inmediata y que no se administró tratamiento. Presenta pocas adiciones no sustentadas o con exceso de precisión, pero sin cambiar de forma importante la conducta ni cerrar el diagnóstico.\"}"
+        }
+      ]
+    }
+  ]
+}

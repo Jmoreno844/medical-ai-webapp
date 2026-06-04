@@ -1,24 +1,29 @@
-name: Deploy Vite.js Static Site to GCS
+name: Frontend Staging Deployment
 
 on:
   push:
     branches:
       - main
+    paths:
+      - "webapp/**"
+      - ".github/workflows/frontend-deployment-stg.yaml"
   workflow_dispatch:
-
-# Variables de GCP en GitHub Environment "stg" (ver job build-and-deploy).
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
-  build-and-deploy:
+  build-and-push:
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
     environment: stg
     env:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-      BUCKET_NAME: ${{ vars.FRONTEND_BUCKET_NAME }}
+      SERVICE_NAME: vexthealth-frontend
+      REGION: us-east1
+      REPOSITORY: vexthealth-containers
+      IMAGE_NAME: webapp-frontend
       NODE_ENV: production
 
     steps:
@@ -37,17 +42,11 @@ jobs:
             CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
             APP_CHANGES=$(echo "$CHANGED_FILES" | grep "^webapp/" || echo "")
             WORKFLOW_CHANGED=$(echo "$CHANGED_FILES" | grep "^.github/workflows/frontend-deployment-stg.yaml$" || echo "")
-            
+
             if [ -z "$APP_CHANGES" ] && [ -z "$WORKFLOW_CHANGED" ]; then
               echo "No changes in webapp directory or workflow file"
               echo "changes=false" >> $GITHUB_OUTPUT
             else
-              if [ -n "$APP_CHANGES" ]; then
-                echo "Changes detected in webapp directory"
-              fi
-              if [ -n "$WORKFLOW_CHANGED" ]; then
-                echo "Changes detected in workflow file"
-              fi
               echo "changes=true" >> $GITHUB_OUTPUT
             fi
           fi
@@ -56,7 +55,7 @@ jobs:
         if: steps.check_changes.outputs.changes == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"
           cache: "npm"
           cache-dependency-path: webapp/package-lock.json
 
@@ -65,14 +64,10 @@ jobs:
         working-directory: ./webapp
         run: npm ci
 
-      - name: Build Vite.js static site
+      - name: Lint frontend
         if: steps.check_changes.outputs.changes == 'true'
         working-directory: ./webapp
-        env:
-          VITE_API_URL: ${{ vars.VITE_API_URL }}
-          # storage.googleapis.com/<bucket>/ — assets must not be rooted at /assets on the host
-          VITE_BASE_URL: ${{ format('/{0}/', vars.FRONTEND_BUCKET_NAME) }}
-        run: npm run build:skip-ts
+        run: npm run lint
 
       - name: Authenticate to Google Cloud
         if: steps.check_changes.outputs.changes == 'true'
@@ -87,13 +82,74 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
-      - name: Deploy to GCS bucket
+      - name: Configure Docker for Artifact Registry
         if: steps.check_changes.outputs.changes == 'true'
-        working-directory: ./webapp
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push frontend image
+        if: steps.check_changes.outputs.changes == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./webapp
+          push: true
+          tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          build-args: |
+            VITE_API_URL=${{ vars.VITE_API_URL }}
+            VITE_BASE_URL=/
+          cache-from: |
+            type=registry,ref=${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
+            type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Tag with latest for caching
+        if: steps.check_changes.outputs.changes == 'true' && github.ref == 'refs/heads/main'
         run: |
-          echo "Syncing the dist directory to GCS bucket gs://${{ env.BUCKET_NAME }}"
-          gsutil -m rsync -r -d dist/ gs://${{ env.BUCKET_NAME }}/
+          docker pull ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker tag ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
 
-          gsutil -m setmeta -h "Cache-Control:public, max-age=31536000" gs://${{ env.BUCKET_NAME }}/assets/**
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: stg
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      SERVICE_NAME: vexthealth-frontend
+      REGION: us-east1
+      REPOSITORY: vexthealth-containers
+      IMAGE_NAME: webapp-frontend
 
-          gsutil -m setmeta -h "Cache-Control:public, max-age=0, must-revalidate" gs://${{ env.BUCKET_NAME }}/*.html
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.GH_DEPLOYER_SA }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Deploy frontend to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          region: ${{ env.REGION }}
+          flags: |
+            --ingress=all
+            --allow-unauthenticated
+            --service-account=${{ vars.FRONTEND_SERVICE_ACCOUNT }}
+            --cpu=1
+            --memory=512Mi
+            --min-instances=0
+            --max-instances=3
+            --concurrency=80
+            --port=8080
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Show Output
+        run: echo ${{ steps.deploy.outputs.url }}

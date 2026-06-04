@@ -101,6 +101,11 @@ type EncuentroContextType = {
   handleDeleteClick: () => void;
   handleDeleteConfirm: () => Promise<void>;
   updateEncounterDate: (date: Date) => Promise<boolean>;
+  updateEncounterName: (name: string) => Promise<boolean>;
+  linkPatientToEncounter: (patientId: number, patientName: string) => Promise<void>;
+  createAndLinkPatient: (patientName: string) => Promise<void>;
+  updateLinkedPatientName: (patientId: number, patientName: string) => Promise<void>;
+  deleteLinkedPatient: () => Promise<void>;
 
   // Voice recorder
   voiceRecorder: ReturnType<typeof useVoiceRecorder>;
@@ -201,9 +206,15 @@ export function EncuentroProvider({
           setPatientName("");
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const candidate = err as {
+        response?: { data?: { message?: string } };
+        message?: string;
+      };
       const errorMsg =
-        err.response?.data?.message || err.message || "Error desconocido";
+        candidate.response?.data?.message ||
+        candidate.message ||
+        "Error desconocido";
       setError(errorMsg);
       logger.error("Error fetching encounter:", errorMsg, err);
     } finally {
@@ -339,6 +350,22 @@ export function EncuentroProvider({
     [encounterId]
   );
 
+  const updateEncounterName = useCallback(
+    async (name: string): Promise<boolean> => {
+      const normalizedName = name.trim() || "Encuentro Nuevo";
+      const success = await updateEncounter(encounterId, {
+        encounter_name: normalizedName,
+      });
+
+      if (success) {
+        setEncounterName(normalizedName);
+      }
+
+      return success;
+    },
+    [encounterId, updateEncounter]
+  );
+
   /**
    * Handle patient selection from modal
    */
@@ -363,6 +390,28 @@ export function EncuentroProvider({
       }
     },
     [encounterId, updateEncounter]
+  );
+
+  const linkPatientToEncounter = handleSelectPatient;
+
+  const createAndLinkPatient = useCallback(
+    async (patientName: string) => {
+      const normalizedName = patientName.trim();
+      if (!normalizedName) {
+        return;
+      }
+
+      try {
+        const response = await axiosInstance.post("/api/v1/patients", {
+          name: normalizedName,
+        });
+        const createdPatient = response.data as { id: number; name: string };
+        await handleSelectPatient(createdPatient.id, createdPatient.name);
+      } catch (error) {
+        logger.error("Failed to create and link patient:", error);
+      }
+    },
+    [handleSelectPatient]
   );
 
   /**
@@ -400,6 +449,38 @@ export function EncuentroProvider({
     [encounterId, updateEncounter]
   );
 
+  const updateLinkedPatientName = useCallback(
+    async (patientId: number, nextPatientName: string) => {
+      const normalizedName = nextPatientName.trim();
+      if (!patientId || !normalizedName) {
+        return;
+      }
+
+      try {
+        const patientResponse = await axiosInstance.put(
+          `/api/v1/patients/${patientId}`,
+          { name: normalizedName }
+        );
+        const updatedPatient = patientResponse.data as { id: number; name: string };
+        const success = await updateEncounter(encounterId, {
+          patient_id: updatedPatient.id,
+          patient_connected: true,
+          encounter_name: updatedPatient.name,
+        });
+
+        if (success) {
+          setEncounterName(updatedPatient.name);
+          setIsPatientConnected(true);
+          setPatientId(updatedPatient.id);
+          setPatientName(updatedPatient.name);
+        }
+      } catch (error) {
+        logger.error("Failed to update linked patient:", error);
+      }
+    },
+    [encounterId, updateEncounter]
+  );
+
   /**
    * Opens the unlink confirmation modal
    */
@@ -419,11 +500,44 @@ export function EncuentroProvider({
 
     if (success) {
       logger.debug("Patient unlinked successfully");
-      window.location.reload();
+      setEncounterName("Encuentro Nuevo");
+      setIsPatientConnected(false);
+      setPatientId(null);
+      setPatientName("");
+      setEncuentro((current) =>
+        current
+          ? {
+              ...current,
+              patient_connected: false,
+              patient_id: undefined,
+              patient_name: undefined,
+              encounter_name: "Encuentro Nuevo",
+            }
+          : current
+      );
     }
 
     setIsUnlinkModalOpen(false);
   }, [encounterId, updateEncounter]);
+
+  const deleteLinkedPatient = useCallback(async () => {
+    if (!patientId) {
+      return;
+    }
+
+    try {
+      const deletedPatientId = patientId;
+      await axiosInstance.delete(`/api/v1/patients/${deletedPatientId}`);
+      const nextEncounter = encuentros.find(
+        (item) => item.id !== encounterId && item.patient_id !== deletedPatientId
+      );
+      navigate(nextEncounter ? `/encuentro/${nextEncounter.id}` : "/home", {
+        replace: true,
+      });
+    } catch (error) {
+      logger.error("Failed to delete linked patient:", error);
+    }
+  }, [encounterId, encuentros, navigate, patientId]);
 
   /**
    * Opens the delete confirmation modal
@@ -519,6 +633,11 @@ export function EncuentroProvider({
     handleDeleteClick,
     handleDeleteConfirm,
     updateEncounterDate,
+    updateEncounterName,
+    linkPatientToEncounter,
+    createAndLinkPatient,
+    updateLinkedPatientName,
+    deleteLinkedPatient,
 
     // Voice recorder
     voiceRecorder,

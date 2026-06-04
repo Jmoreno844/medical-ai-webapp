@@ -37,6 +37,8 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -46,6 +48,8 @@
 :root {
   --navbar-height: 64px;
   --radius: 0.625rem;
+  --brand: oklch(0.627 0.247 303.9); /* ≈ #a855f7 */
+  --brand-foreground: oklch(0.985 0 0);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -139,6 +143,17 @@
 }
 .animate-blob {
   animation: blob 12s infinite ease-in-out;
+}
+
+/* Hero violet card background (lila glow → violet base, like the reference image) */
+.bg-hero-violet {
+  background:
+    radial-gradient(
+      120% 120% at 30% 25%,
+      #ffffff 0%,
+      rgba(255, 255, 255, 0) 45%
+    ),
+    linear-gradient(160deg, #e9d5ff 0%, #d8b4fe 45%, #c084fc 100%);
 }
 
 /* Add this utility if needed for grid pattern */

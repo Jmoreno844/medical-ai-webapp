@@ -1,0 +1,92 @@
+{
+  "run_started_at": "2026-06-03T22:37:38.877933+00:00",
+  "prompt_version": "document_generation_v001",
+  "judge_prompt_version": "clinical_document_judge_v001",
+  "judge_provider": "openai",
+  "judge_model": "gpt-5.4",
+  "cases_file": "../evals/document_generation/cases.json",
+  "requested_case_id": "consulta-externa-disnea-contexto-valido",
+  "count_limit": null,
+  "selected_case_count": 1,
+  "models": [
+    {
+      "alias": "gemini",
+      "provider": "google_genai",
+      "model": "gemini-3-flash-preview"
+    },
+    {
+      "alias": "anthropic",
+      "provider": "anthropic_api",
+      "model": "claude-haiku-4-5-20251001"
+    }
+  ],
+  "prompt_template_preview": "Tu tarea es generar un documento medico basado en los siguientes componentes:\n\n1",
+  "judge_prompt_preview": "Eres un evaluador experto en documentacion clinica. Evalua un documento medico g",
+  "case_results": [
+    {
+      "case_id": "consulta-externa-disnea-contexto-valido",
+      "notes": "Caso dificil para evaluar uso correcto del contexto manual del medico, prudencia diagnostica, no inventar examen fisico y remision explicita.",
+      "outputs": [
+        {
+          "model_alias": "gemini",
+          "provider": "google_genai",
+          "model": "gemini-3-flash-preview",
+          "generated_document": "## Identificacion del documento\n- Tipo de documento clinico: Historia de consulta externa\n- Servicio / especialidad: Medicina interna\n\n## Identificacion del paciente\n- Fecha de nacimiento / edad: 67 años\n- Acompanante: Hija\n\n## Encabezado\n- Tipo de atencion: Consulta externa\n- Motivo de consulta: \"Me he sentido peor estos días, me falta el aire\"\n- Fuente de informacion: Paciente y acompañante (hija)\n\n## Enfermedad actual\nPaciente de 67 años con antecedentes de falla cardíaca, hipertensión y diabetes, quien consulta por cuadro clínico de aproximadamente dos semanas de evolución. Inicia con tos seca que posteriormente se torna productiva con expectoración hialina (\"flemitas blancas\"). En los últimos tres días, la paciente refiere progresión de la disnea, presentándose actualmente en reposo (refiere ahogo al caminar dentro de la casa). La acompañante informa que la paciente presentó ortopnea la noche anterior, requiriendo el uso de tres almohadas para conciliar el sueño. Adicionalmente, la paciente reporta edema de miembros inferiores de predominio vespertino desde hace 15 días. Niega emesis, diarrea o disuria. Refiere sensación subjetiva de fiebre nocturna, sin cuantificación.\n\n## Antecedentes\n- Patologicos: Hipertensión arterial, diabetes mellitus tipo 2 e insuficiencia cardíaca.\n- Farmacologicos / medicamentos actuales: Medicamentos para la presión arterial y la diabetes (nombres no especificados). Furosemida, con reporte de adherencia irregular por parte de la paciente debido al aumento de la frecuencia urinaria.\n\n## Revision por sistemas\n- General: Sensación subjetiva de fiebre nocturna.\n- Cardiovascular: Edema de miembros inferiores (pies).\n- Respiratorio: Disnea de reposo, ortopnea, tos con expectoración hialina.\n- Gastrointestinal: Niega vómito y diarrea.\n- Genitourinario: Niega ardor al orinar.\n\n## Signos vitales\n- Presion arterial: 168/96 mmHg\n- Frecuencia cardiaca: 104 lpm\n- Frecuencia respiratoria: 24 rpm\n- Temperatura: 37.6 °C\n- Saturacion de oxigeno: 89% al aire ambiente y 91% en reposo\n\n## Analisis clinico\nPaciente femenina de 67 años con múltiples comorbilidades cardiovasculares y metabólicas. El cuadro clínico actual y los hallazgos en los signos vitales (taquicardia, taquipnea, desaturación de oxígeno y cifras tensionales elevadas) sugieren una descompensación de su falla cardíaca de base, posiblemente exacerbada por una infección respiratoria baja o falta de adherencia al tratamiento diurético. Por la severidad de los síntomas y el riesgo de falla ventilatoria, requiere manejo hospitalario inmediato.\n\n## Diagnosticos\n- Diagnostico principal: Impresión clínica de descompensación de falla cardíaca.\n- Diagnosticos relacionados: Sospecha de infección respiratoria baja; Hipertensión arterial; Diabetes mellitus tipo 2.\n\n## Plan de manejo\n- Conducta general: Remisión inmediata al servicio de urgencias.\n- Interconsultas / remisiones: Remisión a urgencias para estudios complementarios y manejo médico.\n- Recomendaciones no farmacologicas: Traslado inmediato para valoración hospitalaria.\n\n## Cierre\n- Profesional responsable: Medicina Interna (Pendiente de validación y firma)",
+          "generation_metrics": {
+            "time_to_first_token_ms": 9621,
+            "time_after_first_token_ms": 4035,
+            "total_generation_ms": 13656
+          },
+          "judge_result": {
+            "overall_score": 3,
+            "clinical_safety_score": 2,
+            "faithfulness_score": 3,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 2,
+            "missing_or_invented_info": [
+              "Sexo femenino inferido no explicitado",
+              "Disnea de reposo sobredicha; fuente describe ahogo al caminar dentro de la casa",
+              "Duracion global de dos semanas no sustentada para todo el cuadro",
+              "Adherencia irregular atribuida a la paciente sin soporte; lo refiere la hija sobre furosemida",
+              "Analisis aumenta certeza: sugiere descompensacion y posible exacerbacion por no adherencia",
+              "Riesgo de falla ventilatoria no mencionado por la fuente",
+              "Estudios complementarios y manejo medico agregados en remision",
+              "Diagnostico principal cerrado en vez de impresion diferencial prudente"
+            ],
+            "verdict": "borderline",
+            "summary": "El documento conserva buena parte de la informacion clinica y la remision a urgencias, pero aumenta la certeza diagnostica y agrega inferencias no explicitadas por las fuentes. Lo mas riesgoso es convertir una impresion diferencial prudente en diagnostico principal y añadir causalidad por mala adherencia y riesgo de falla ventilatoria sin soporte directo."
+          },
+          "judge_raw_response": "{\n  \"overall_score\": 3,\n  \"clinical_safety_score\": 2,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 2,\n  \"missing_or_invented_info\": [\n    \"Sexo femenino inferido no explicitado\",\n    \"Disnea de reposo sobredicha; fuente describe ahogo al caminar dentro de la casa\",\n    \"Duracion global de dos semanas no sustentada para todo el cuadro\",\n    \"Adherencia irregular atribuida a la paciente sin soporte; lo refiere la hija sobre furosemida\",\n    \"Analisis aumenta certeza: sugiere descompensacion y posible exacerbacion por no adherencia\",\n    \"Riesgo de falla ventilatoria no mencionado por la fuente\",\n    \"Estudios complementarios y manejo medico agregados en remision\",\n    \"Diagnostico principal cerrado en vez de impresion diferencial prudente\"\n  ],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento conserva buena parte de la informacion clinica y la remision a urgencias, pero aumenta la certeza diagnostica y agrega inferencias no explicitadas por las fuentes. Lo mas riesgoso es convertir una impresion diferencial prudente en diagnostico principal y añadir causalidad por mala adherencia y riesgo de falla ventilatoria sin soporte directo.\"\n}"
+        },
+        {
+          "model_alias": "anthropic",
+          "provider": "anthropic_api",
+          "model": "claude-haiku-4-5-20251001",
+          "generated_document": "# DOCUMENTO CLÍNICO\n\n## Identificación del documento\n- Tipo de documento clínico: Nota de consulta externa\n- Servicio / especialidad: Medicina interna\n\n## Identificación del paciente\n- Edad: 67 años\n- Sexo registrado: Femenino\n- Acompañante: Hija\n\n## Encabezado\n- Tipo de atención: Consulta externa\n- Motivo de consulta: Disnea progresiva y tos\n- Fuente de información: Paciente y acompañante (hija)\n\n## Enfermedad actual\n\nPaciente de 67 años que refiere haber presentado deterioro clínico en los últimos días. Inició con tos seca que posteriormente evolucionó a tos productiva con expectoración de flemas blancas. Hace aproximadamente tres días presenta disnea progresiva, refiriendo que actualmente se ahoga incluso con actividades dentro del domicilio. La acompañante (hija) refiere que la noche anterior a la consulta la paciente requirió dormir con tres almohadas debido a la dificultad respiratoria y presentó limitación importante para acostarse. Adicionalmente, la paciente refiere edema en miembros inferiores, predominantemente en las tardes, con evolución de aproximadamente dos semanas. Respecto a síntomas sistémicos, niega medición de temperatura pero refiere sensación de calor durante la noche. Niega vómito, diarrea y ardor al orinar. La acompañante comenta que la paciente toma medicamentos para la presión arterial y para el control glucémico, pero refiere incumplimiento con la furosemida debido a que le ocasiona poliuria.\n\n## Antecedentes\n- Patológicos: Hipertensión arterial, diabetes mellitus tipo 2, insuficiencia cardíaca\n- Farmacológicos / medicamentos actuales: Medicamentos para control de presión arterial, medicamentos para control glucémico, furosemida (con cumplimiento irregular según refiere la acompañante)\n\n## Signos vitales\n- Presión arterial: 168/96 mmHg\n- Frecuencia cardíaca: 104 latidos por minuto\n- Frecuencia respiratoria: 24 respiraciones por minuto\n- Temperatura: 37.6 °C\n- Saturación de oxígeno: 89% al aire ambiente; 91% en reposo\n\n## Examen físico\n- Hallazgos negativos relevantes: Niega vómito, diarrea y ardor al orinar\n\n## Análisis clínico\n\nPaciente con antecedentes de hipertensión arterial, diabetes mellitus tipo 2 e insuficiencia cardíaca que presenta cuadro clínico de disnea progresiva, tos productiva, ortopnea (requiere tres almohadas para dormir) y edema en miembros inferiores. Los signos vitales muestran presión arterial elevada (168/96 mmHg), taquicardia (104 lpm), taquipnea (24 rpm), fiebre leve (37.6 °C) e hipoxemia (89% al aire ambiente). El cuadro clínico es compatible con descompensación de insuficiencia cardíaca; sin embargo, la presencia de tos productiva, fiebre leve e hipoxemia también sugiere la posibilidad de infección respiratoria baja. La impresión clínica es prudente respecto a ambas entidades nosológicas.\n\n## Diagnósticos\n- Diagnóstico principal: Impresión clínica de posible descompensación de insuficiencia cardíaca versus infección respiratoria baja (a descartar y definir)\n\n## Plan de manejo\n- Conducta general: Remisión inmediata a servicio de urgencias para evaluación, estudios complementarios y manejo especializado\n\n---\n\n**Nota:** Todos los diagnósticos, planes, órdenes y procedimientos quedan pendientes de validación y firma del profesional tratante.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1435,
+            "time_after_first_token_ms": 8308,
+            "total_generation_ms": 9743
+          },
+          "judge_result": {
+            "overall_score": 4,
+            "clinical_safety_score": 4,
+            "faithfulness_score": 4,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 4,
+            "missing_or_invented_info": [
+              "Sexo femenino no explicitado en fuentes",
+              "Edad puesta como campo distinto a plantilla",
+              "Niega vomito/diarrea/disuria ubicado como examen fisico",
+              "Fiebre leve inferida desde 37.6 C",
+              "Compatible con descompensacion de insuficiencia cardiaca aumenta certeza"
+            ],
+            "verdict": "pass",
+            "summary": "Documento mayormente fiel al contexto y la transcripcion, conserva la impresion diagnostica como posibilidad y la remision a urgencias. Sin embargo, agrega sexo no explicitado, reubica sintomas negados como examen fisico y aumenta algo la certeza clinica al llamar fiebre leve y cuadro compatible con falla cardiaca."
+          },
+          "judge_raw_response": "{\n  \"overall_score\": 4,\n  \"clinical_safety_score\": 4,\n  \"faithfulness_score\": 4,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 4,\n  \"missing_or_invented_info\": [\n    \"Sexo femenino no explicitado en fuentes\",\n    \"Edad puesta como campo distinto a plantilla\",\n    \"Niega vomito/diarrea/disuria ubicado como examen fisico\",\n    \"Fiebre leve inferida desde 37.6 C\",\n    \"Compatible con descompensacion de insuficiencia cardiaca aumenta certeza\"\n  ],\n  \"verdict\": \"pass\",\n  \"summary\": \"Documento mayormente fiel al contexto y la transcripcion, conserva la impresion diagnostica como posibilidad y la remision a urgencias. Sin embargo, agrega sexo no explicitado, reubica sintomas negados como examen fisico y aumenta algo la certeza clinica al llamar fiebre leve y cuadro compatible con falla cardiaca.\"\n}"
+        }
+      ]
+    }
+  ]
+}

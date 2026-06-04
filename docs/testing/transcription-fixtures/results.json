@@ -1,0 +1,58 @@
+[
+  {
+    "fixture_id": "prueba-01",
+    "reviewed_at": "2026-06-03",
+    "notes": "Ambos bien.",
+    "gemini-2.5-flash": "",
+    "gpt-4o-mini-transcribe": ""
+  },
+  {
+    "fixture_id": "prueba-02",
+    "reviewed_at": "2026-06-03",
+    "notes": "Hice un stutter tipo \"uno punto treinta-- uno punto treinta y siete\" y gpt lo tomo como solo 1.37 y gemini como 1.37, 1.37, cual es mas correcto?.",
+    "gemini-2.5-flash": "",
+    "gpt-4o-mini-transcribe": ""
+  },
+  {
+    "fixture_id": "prueba-03",
+    "reviewed_at": "2026-06-03",
+    "notes": "Gpt entendio mal la palabra clavulanato, pero al repetir la prueba lo hizo bien",
+    "gemini-2.5-flash": "",
+    "gpt-4o-mini-transcribe": "Error grave en la primera transcripcion, pero al repetir la prueba lo hizo bien"
+  }
+  {
+    "fixture_id": "prueba-04",
+    "reviewed_at": "2026-06-03",
+    "notes": "Error de gpt",
+    "gemini-2.5-flash": "respondio: 48 16",
+    "gpt-4o-mini-transcribe": "respondio: cuarenta y ocho dieciséis. (el audio no tenia y)" 
+  }
+    {
+        "fixture_id": "prueba-04",
+        "reviewed_at": "2026-06-03",
+        "notes": "2da parte, gemini pequeño error aunque significa lo mismo, (kilos vs kilogramos)",
+        "gemini-2.5-flash": "respondio 78.4 kilogramos",
+        "gpt-4o-mini-transcribe": "respondio 78.4 kilos"
+    },
+    {
+        "fixture_id": "prueba-05",
+        "reviewed_at": "2026-06-03",
+        "notes": "Ambos bien.",
+        "gemini-2.5-flash": "",
+        "gpt-4o-mini-transcribe": ""
+    },
+    {
+        "fixture_id": "prueba-06",
+        "reviewed_at": "2026-06-03",
+        "notes": "Ambos bien.",
+        "gemini-2.5-flash": "",
+        "gpt-4o-mini-transcribe": ""
+     },
+        {
+            "fixture_id": "prueba-07",
+            "reviewed_at": "2026-06-03",
+            "notes": "Un poco mejor gemini, minimo,, eran palabras separadas, la segunda se corto",
+            "gemini-2.5-flash": "trimetoprim sulfametot. Sarsol",
+            "gpt-4o-mini-transcribe": "trimetoprim-sulfametot. Sa sol"
+        }
+]

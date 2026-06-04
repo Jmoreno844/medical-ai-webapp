@@ -52,6 +52,7 @@ cp webapp/.env.example webapp/.env.local
 Por defecto:
 
 - `VITE_API_URL=http://localhost:8001`
+- `VITE_TRANSCRIPTION_WORKER_URL=http://localhost:8091` para la pagina local `/debug/transcripcion`
 
 ### Cloud Functions
 
@@ -72,6 +73,66 @@ Variables clave:
 - `LANGSMITH_PROJECT=cloud-functions-local`
 
 `cloud_functions/docker-compose.yml` ya monta ADC del host en `/app/adc.json`.
+
+### Document Generation Worker
+
+No hay `.env.example` propio hoy; normalmente se corre exportando variables en la
+misma shell o con `document_generation_worker/.env.local`.
+
+Variables clave:
+
+- `ENVIRONMENT=local`
+- `BACKEND_INTERNAL_BASE_URL=http://localhost:8001`
+- `GCP_PROJECT_ID`
+- `VERTEX_AI_LOCATION=global` para Gemini; para Claude via Vertex AI usa una
+  region compatible como `us-east5`
+- `DOCUMENT_GENERATION_PROVIDER=google_genai` por defecto, o
+  `anthropic_vertex` para Claude en Vertex AI
+- `DOCUMENT_GENERATION_MODEL` para override explicito del modelo
+- `DOCUMENT_GENERATION_GEMINI_MODEL` sigue funcionando como fallback legado para Gemini
+
+Ejemplo con Claude en Vertex AI:
+
+```bash
+cd document_generation_worker
+uv sync --group dev
+ENVIRONMENT=local \
+BACKEND_INTERNAL_BASE_URL=http://localhost:8001 \
+GCP_PROJECT_ID=tu-proyecto \
+DOCUMENT_GENERATION_PROVIDER=anthropic_vertex \
+DOCUMENT_GENERATION_MODEL=claude-3-5-sonnet-v2@20241022 \
+VERTEX_AI_LOCATION=us-east5 \
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8092 --reload
+```
+
+### Transcription Worker
+
+Variables clave:
+
+- `ENVIRONMENT=local`
+- `BACKEND_INTERNAL_BASE_URL=http://localhost:8001`
+- `GCS_BUCKET_NAME`
+- `GCP_PROJECT_ID`
+- `TRANSCRIPTION_PROVIDER=google_genai` por defecto, o `openai` para pruebas directas
+- `TRANSCRIPTION_MODEL` para override explicito del modelo
+- `TRANSCRIPTION_GEMINI_MODEL=gemini-2.5-flash` como fallback legado para Gemini
+- `TRANSCRIPTION_OPENAI_MODEL=gpt-4o-mini-transcribe` como fallback para OpenAI
+- `OPENAI_API_KEY` solo si `TRANSCRIPTION_PROVIDER=openai`
+
+Ejemplo con OpenAI para pruebas:
+
+```bash
+cd transcription_worker
+uv sync --group dev
+ENVIRONMENT=local \
+BACKEND_INTERNAL_BASE_URL=http://localhost:8001 \
+GCS_BUCKET_NAME=tu-bucket-audio \
+GCP_PROJECT_ID=tu-proyecto \
+TRANSCRIPTION_PROVIDER=openai \
+TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe \
+OPENAI_API_KEY=tu-api-key \
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8091 --reload
+```
 
 ### Copilot Agent
 

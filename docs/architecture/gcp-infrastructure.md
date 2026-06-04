@@ -15,6 +15,7 @@ IaC: `infra/` en la raíz del repo.
 | Recurso            | Patrón                          | Ejemplo (stg)                                     |
 | ------------------ | ------------------------------- | ------------------------------------------------- |
 | Cloud Run service  | `vexthealth-backend`            | `vexthealth-backend`                              |
+| Cloud Run service  | `vexthealth-frontend`           | `vexthealth-frontend`                             |
 | Cloud Run copilot  | `vexthealth-copilot-agent`      | `vexthealth-copilot-agent`                        |
 | Cloud Run worker   | `vexthealth-transcription-worker` | `vexthealth-transcription-worker`               |
 | Cloud Run worker   | `vexthealth-document-generation-worker` | `vexthealth-document-generation-worker`   |
@@ -209,6 +210,7 @@ Después de `terraform apply`, configurar las mismas claves como **variables del
 | `WIF_PROVIDER`                  | `projects/<num>/locations/global/workloadIdentityPools/github-actions-pool/providers/github-oidc-provider`                                      |
 | `GH_DEPLOYER_SA`                | `github-actions-deployer@vext-stg.iam.gserviceaccount.com`                                                                                      |
 | `BACKEND_SERVICE_ACCOUNT`       | `backend-runner@vext-stg.iam.gserviceaccount.com`                                                                                               |
+| `FRONTEND_SERVICE_ACCOUNT`      | `frontend-runner@vext-stg.iam.gserviceaccount.com`                                                                                              |
 | `COPILOT_AGENT_SERVICE_ACCOUNT` | `copilot-agent-runner@vext-stg.iam.gserviceaccount.com`                                                                                         |
 | `TRANSCRIPTION_WORKER_SERVICE_ACCOUNT` | `transcription-worker-runner@vext-stg.iam.gserviceaccount.com`                                                                           |
 | `DOCUMENT_GENERATION_WORKER_SERVICE_ACCOUNT` | `document-generation-runner@vext-stg.iam.gserviceaccount.com`                                                                    |
@@ -216,11 +218,11 @@ Después de `terraform apply`, configurar las mismas claves como **variables del
 | `GCS_BUCKET_NAME`               | `vext-stg-audio`                                                                                                                                |
 | `FRONTEND_BUCKET_NAME`          | `vext-stg-frontend-spa`                                                                                                                         |
 | `CF_SOURCE_BUCKET`              | output Terraform `cf_source_bucket`                                                                                                             |
-| `VITE_API_URL`                  | URL de Cloud Run (output)                                                                                                                       |
+| `VITE_API_URL`                  | Para `stg`, usar el subdominio del backend, por ejemplo `https://api-stg.notiahealth.com`.                                                   |
 | `COPILOT_AGENT_URL`             | URL del copilot agent service (output)                                                                                                          |
 | `TRANSCRIPTION_WORKER_URL`      | URL del transcription worker Cloud Run (output `transcription_worker_cloud_run_url`)                                                            |
 | `DOCUMENT_GENERATION_WORKER_URL` | URL del document generation worker Cloud Run (output `document_generation_worker_cloud_run_url`)                                                 |
-| _(build)_ `VITE_BASE_URL`       | El workflow de frontend la deriva de `FRONTEND_BUCKET_NAME` (`/{bucket}/`) para que los assets carguen bajo `storage.googleapis.com/{bucket}/`. |
+| _(build)_ `VITE_BASE_URL`       | El workflow de frontend la fija en `/`, porque el frontend Cloud Run sirve la SPA desde la raiz de su propio subdominio.                      |
 | `CF_SOURCE_OBJECT`              | _(opcional)_ Objeto del zip; por defecto `cloud-functions.zip` (igual que `cf_source_object` en Terraform)                                      |
 | `LANDING_BUCKET_NAME`           | Bucket del workflow de landing page si se usa ese deploy                                                                                        |
 | `GEMINI_MODEL`                  | _(opcional)_ Modelo usado por document generation worker; si no existe, se usa `gemini-3.1-flash-lite-preview`                                  |
@@ -249,7 +251,7 @@ Así el artefacto en GCS queda alineado con Terraform, pero el runtime de las fu
 | Variables `GCP_PROJECT_ID`, `WIF_PROVIDER`, `GH_DEPLOYER_SA` definidas y WIF creado en GCP                                                          | Backend, Copilot Agent, Cloud Functions, Frontend |
 | `BACKEND_SERVICE_ACCOUNT`, `GCS_BUCKET_NAME`, `VITE_API_URL`                                                                                        | Backend deploy                                    |
 | `COPILOT_AGENT_SERVICE_ACCOUNT`, `COPILOT_AGENT_DB_NAME`, `VITE_API_URL`                                                                            | Copilot Agent deploy                              |
-| `FRONTEND_BUCKET_NAME`                                                                                                                              | Frontend deploy                                   |
+| `FRONTEND_BUCKET_NAME`, `FRONTEND_SERVICE_ACCOUNT`                                                                                                   | Frontend deploy                                   |
 | `LANDING_BUCKET_NAME`                                                                                                                               | Landing page deploy                               |
 | SA `github-actions-deployer` con los roles del módulo Terraform (p. ej. `cloudfunctions.developer`, `storage.objectAdmin` sobre los buckets usados) | Todos los despliegues                             |
 
@@ -276,8 +278,8 @@ Así el artefacto en GCS queda alineado con Terraform, pero el runtime de las fu
 
 ## Fuera de este documento (aún no en IaC)
 
-- Dominio, certificado y load balancer para `app.vexthealth.com` (decisión explícita: fuera de alcance del Terraform actual).
-- Dominio, certificado y load balancer para `app.vexthealth.com` siguen fuera de alcance del Terraform actual.
+- Para reducir costo en `stg`, el repo puede mapear subdominios separados directamente a Cloud Run, por ejemplo `app-stg.notiahealth.com` para la SPA y `api-stg.notiahealth.com` para FastAPI.
+- Este path usa `Cloud Run domain mapping`, que según la doc oficial sigue en `Preview` y no se recomienda como ruta principal de producción.
 - Cloud Armor queda como endurecimiento posterior.
 
 ## Cómo agregar el entorno de producción

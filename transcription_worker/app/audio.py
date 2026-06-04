@@ -17,6 +17,11 @@ def download_gcs_object(settings: Settings, object_name: str) -> bytes:
 
 
 def decode_audio_to_float32_pcm(audio_bytes: bytes) -> np.ndarray:
+    pcm_bytes = convert_audio_to_pcm_wav(audio_bytes)
+    return np.frombuffer(pcm_bytes, dtype=np.float32)
+
+
+def convert_audio_to_pcm_wav(audio_bytes: bytes) -> bytes:
     process = subprocess.run(
         [
             "ffmpeg",
@@ -40,4 +45,37 @@ def decode_audio_to_float32_pcm(audio_bytes: bytes) -> np.ndarray:
     )
     if process.returncode != 0:
         raise ValueError("audio_decode_failed")
-    return np.frombuffer(process.stdout, dtype=np.float32)
+    return process.stdout
+
+
+def convert_audio_to_openai_wav(audio_bytes: bytes) -> bytes:
+    return convert_audio_to_wav(audio_bytes)
+
+
+def convert_audio_to_wav(audio_bytes: bytes) -> bytes:
+    process = subprocess.run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            "pipe:0",
+            "-ac",
+            "1",
+            "-ar",
+            "16000",
+            "-c:a",
+            "pcm_s16le",
+            "-f",
+            "wav",
+            "pipe:1",
+        ],
+        input=audio_bytes,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if process.returncode != 0:
+        raise ValueError("audio_transcode_failed")
+    return process.stdout
