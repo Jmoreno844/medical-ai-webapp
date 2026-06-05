@@ -96,6 +96,7 @@ jobs:
     env:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       SERVICE_NAME: vexthealth-backend
+      ADMIN_BOOTSTRAP_JOB_NAME: vexthealth-backend-admin-bootstrap
       REGION: us-east1
       REPOSITORY: vexthealth-containers
       IMAGE_NAME: fastapi-backend
