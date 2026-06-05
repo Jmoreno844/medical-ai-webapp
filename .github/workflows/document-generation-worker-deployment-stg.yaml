@@ -140,6 +140,7 @@ jobs:
           secrets: |
             ANTHROPIC_API_KEY=anthropic-api-key:latest
           project_id: ${{ env.GCP_PROJECT_ID }}
+          secrets_update_strategy: overwrite
 
       - name: Deploy Document Generation Worker to Cloud Run (Vertex)
         id: deploy-vertex
@@ -176,6 +177,7 @@ jobs:
             VERTEX_AI_LOCATION=${{ vars.DOCUMENT_GENERATION_VERTEX_AI_LOCATION || 'global' }}
             LLM_MAX_CONCURRENT=4
           project_id: ${{ env.GCP_PROJECT_ID }}
+          secrets_update_strategy: overwrite
 
       - name: Show Output
         run: echo "${{ steps.deploy.outputs.url || steps.deploy-vertex.outputs.url }}"
