@@ -136,12 +136,8 @@ jobs:
             DOCUMENT_GENERATION_GOOGLE_MODEL=${{ vars.DOCUMENT_GENERATION_GOOGLE_MODEL || 'gemini-3.1-flash-lite-preview' }}
             VERTEX_AI_LOCATION=${{ vars.DOCUMENT_GENERATION_VERTEX_AI_LOCATION || 'global' }}
             LLM_MAX_CONCURRENT=4
-            LANGSMITH_TRACING=${{ vars.DOCUMENT_GENERATION_LANGSMITH_TRACING || 'false' }}
-            LANGSMITH_PROJECT=${{ vars.LANGSMITH_PROJECT || '' }}
-            LANGSMITH_ENDPOINT=${{ vars.LANGSMITH_ENDPOINT || '' }}
           secrets: |
             ANTHROPIC_API_KEY=anthropic-api-key:latest
-            LANGSMITH_API_KEY=langsmith-api-key:latest
           project_id: ${{ env.GCP_PROJECT_ID }}
 
       - name: Show Output

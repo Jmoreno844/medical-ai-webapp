@@ -109,7 +109,6 @@ echo -n "VALOR" | gcloud secrets versions add SECRET_ID --data-file=-
 | `copilot-service-shared-jwt` | Backend + Copilot Agent | JWT compartido para broker interno FastAPI -> agent runtime |
 | `admin-bootstrap-password`   | Admin bootstrap job     | Password temporal leído por `ADMIN_BOOTSTRAP_PASSWORD`      |
 | `anthropic-api-key`          | Document Worker         | Opcional; requerido si el worker usa `DOCUMENT_GENERATION_PROVIDER=anthropic_api` |
-| `langsmith-api-key`          | Document Worker         | Opcional; necesario si se activa LangSmith en stg           |
 
 Ni Terraform ni GitHub Actions cargan valores dentro de Secret Manager. Terraform
 crea los secretos vacíos; los workflows y Cloud Run solo **referencian** esos
@@ -239,7 +238,7 @@ Después de `terraform apply`, configurar las mismas claves como **variables del
 | `DOCUMENT_GENERATION_WORKER_URL` | URL del document generation worker Cloud Run (output `document_generation_worker_cloud_run_url`)                                                 |
 | _(build)_ `VITE_BASE_URL`       | El workflow de frontend la fija en `/`, porque el frontend Cloud Run sirve la SPA desde la raiz de su propio subdominio.                      |
 | `LANDING_BUCKET_NAME`           | Bucket del workflow de landing page si se usa ese deploy                                                                                        |
-| `DOCUMENT_GENERATION_PROVIDER`  | _(opcional)_ Provider del worker; por defecto `anthropic_api`                                                                                   |
+| `DOCUMENT_GENERATION_PROVIDER`  | _(opcional)_ Provider del worker; usa `anthropic_api`, `anthropic_vertex` o `google_vertex`                                                    |
 | `DOCUMENT_GENERATION_MODEL`     | _(opcional)_ Override explícito del modelo del worker                                                                                            |
 | `DOCUMENT_GENERATION_ANTHROPIC_MODEL` | _(opcional)_ Fallback para Anthropic; por defecto `claude-haiku-4-5-20251001`                                                           |
 | `DOCUMENT_GENERATION_GOOGLE_MODEL` | _(opcional)_ Fallback para Google Vertex; por defecto `gemini-3.1-flash-lite-preview`                                                      |
@@ -247,6 +246,47 @@ Después de `terraform apply`, configurar las mismas claves como **variables del
 | `VERTEX_AI_LOCATION`            | `global` para Gemini; para Claude en Vertex usar una región compatible. No confundir con `CLOUD_TASKS_REGION`, que sigue siendo la región de la cola |
 
 El secret `GCP_SA_KEY` puede eliminarse una vez confirmado que WIF funciona.
+
+### Seleccionar provider/modelo para document generation
+
+El workflow `stg-document-generation-worker` lee la configuración del worker
+desde GitHub Environment Variables (`stg`).
+
+Regla recomendada: define siempre estas dos variables juntas:
+
+- `DOCUMENT_GENERATION_PROVIDER`
+- `DOCUMENT_GENERATION_MODEL`
+
+Providers soportados:
+
+- `anthropic_api`
+- `anthropic_vertex`
+- `google_vertex`
+
+Comportamiento:
+
+- Si `DOCUMENT_GENERATION_MODEL` existe, ese valor manda.
+- Si no existe:
+  - `google_vertex` cae a `DOCUMENT_GENERATION_GOOGLE_MODEL`
+  - `anthropic_api` y `anthropic_vertex` caen a `DOCUMENT_GENERATION_ANTHROPIC_MODEL`
+
+Ejemplos recomendados:
+
+| Caso | Variables |
+| ---- | --------- |
+| Anthropic directo | `DOCUMENT_GENERATION_PROVIDER=anthropic_api` + `DOCUMENT_GENERATION_MODEL=claude-haiku-4-5-20251001` |
+| Gemini en Vertex | `DOCUMENT_GENERATION_PROVIDER=google_vertex` + `DOCUMENT_GENERATION_MODEL=gemini-3.1-flash-lite-preview` + `VERTEX_AI_LOCATION=global` |
+| Claude en Vertex | `DOCUMENT_GENERATION_PROVIDER=anthropic_vertex` + `DOCUMENT_GENERATION_MODEL=claude-3-5-sonnet-v2@20241022` + `VERTEX_AI_LOCATION=us-east5` |
+
+Secrets asociados:
+
+- `anthropic_api` requiere `anthropic-api-key` en Secret Manager.
+- `google_vertex` y `anthropic_vertex` usan la identidad del service account del
+  worker en Vertex AI y no requieren `anthropic-api-key`.
+
+Para evitar ambigüedad operativa, no dependas del fallback salvo que tengas una
+razón explícita; en `stg` conviene declarar `DOCUMENT_GENERATION_MODEL`
+directamente cuando cambies de provider o de modelo.
 
 **`service-account-json` (opcional en Cloud Run):** el backend puede usar **Application Default Credentials** del service account del servicio (`backend-runner`), que ya tiene acceso a GCS. Si el secreto está vacío o no tiene versión, `get_storage_client()` usa ADC. En local, con `config.settings.develop`, la ruta recomendada es **ADC + impersonación** mediante `GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT`; `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH` queda como fallback solo si existe una excepción aprobada para usar JSON keys.
 
