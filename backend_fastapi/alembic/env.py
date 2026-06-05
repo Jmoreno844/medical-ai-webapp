@@ -15,9 +15,11 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 settings = get_settings()
+# Alembic stores this value through ConfigParser, which treats "%" as
+# interpolation syntax. IAM DB usernames are URL-encoded and include "%40".
 config.set_main_option(
     "sqlalchemy.url",
-    settings.async_database_url.replace("+asyncpg", ""),
+    settings.async_database_url.replace("+asyncpg", "").replace("%", "%%"),
 )
 
 
@@ -51,4 +53,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-
