@@ -29,7 +29,7 @@
 - Settings are environment-variable driven through `backend_fastapi/app/core/config.py`;
   `backend_fastapi/.env.local` may override local values.
 
-## JWT de callbacks Cloud Functions (FastAPI callbacks)
+## JWT de callbacks de workers (FastAPI callbacks)
 
 Verificado en:
 

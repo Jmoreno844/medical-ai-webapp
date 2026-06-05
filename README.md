@@ -5,13 +5,14 @@ Producto fullstack para documentación médica asistida por IA. El flujo princip
 1. El médico crea un `Encuentro` y graba audio.
 2. El frontend sube el audio directo a GCS con signed URL.
 3. FastAPI dispara la transcripción y la generación documental.
-4. Cloud Functions llama a Gemini y devuelve resultados a FastAPI.
+4. Los workers privados en Cloud Run procesan transcripción y generación documental.
 5. El frontend recibe transcripción y generación por SSE.
 
 ## Mapa del repo
 
 - `backend_fastapi/` — API FastAPI, modelos SQLAlchemy, auth, SSE, orquestación y migraciones Alembic.
-- `cloud_functions/` — transcripción y generación documental en GCP Functions.
+- `transcription_worker/` — worker Cloud Run para transcripción por secciones.
+- `document_generation_worker/` — worker Cloud Run para generación documental.
 - `copilot_agent/` — runtime dedicado del copiloto clínico basado en LangGraph.
 - `webapp/` — SPA React/Vite usada por el médico.
 - `infra/` — Terraform, IAM, Cloud Run, Cloud SQL, buckets, budgets.
@@ -45,11 +46,10 @@ npm --prefix webapp run lint
 npm --prefix webapp run build
 ```
 
-Cloud Functions:
+Workers:
 ```bash
-cp cloud_functions/functions/.env.example cloud_functions/functions/.env.local
-docker compose -f cloud_functions/docker-compose.yml up --build
-python -m pytest cloud_functions/functions/tests
+python -m pytest transcription_worker/tests
+python -m pytest document_generation_worker/tests
 ```
 
 Copilot agent:

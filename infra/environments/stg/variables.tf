@@ -187,18 +187,6 @@ variable "copilot_agent_allow_unauthenticated" {
   default     = false
 }
 
-# --- Cloud Functions source ---
-
-variable "cf_source_bucket" {
-  description = "GCS bucket containing Cloud Functions source code"
-  type        = string
-}
-
-variable "cf_source_object" {
-  description = "GCS object path for Cloud Functions source zip"
-  type        = string
-}
-
 # --- Buckets ---
 
 variable "audio_bucket_name" {
@@ -212,7 +200,7 @@ variable "frontend_bucket_name" {
 }
 
 variable "gemini_model" {
-  description = "Gemini model used by Cloud Functions"
+  description = "Gemini model used by the transcription/document generation stack where applicable"
   type        = string
   default     = "gemini-3.1-flash-lite-preview"
 }
@@ -303,12 +291,6 @@ variable "cloud_run_db_proxy_image" {
   description = "Cloud SQL Auth Proxy image for the Cloud Run sidecar"
   type        = string
   default     = "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.1"
-}
-
-variable "cloud_functions_max_instances" {
-  description = "Maximum instances for staging Cloud Functions"
-  type        = number
-  default     = 3
 }
 
 variable "monthly_budget_amount_usd" {

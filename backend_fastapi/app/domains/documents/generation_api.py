@@ -51,7 +51,7 @@ async def _post_document_worker_task_background(
             process_id=payload.get("process_id"),
             document_id=payload.get("new_document_id"),
         ):
-            await post_json_async(url, payload, timeout=15)
+            await post_json_async(url, payload, timeout=600)
     except Exception:
         log_event(
             logger,

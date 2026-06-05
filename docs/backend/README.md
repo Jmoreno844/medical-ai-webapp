@@ -1,6 +1,6 @@
 # Backend
 
-`backend_fastapi/` es la API central del sistema. Orquesta autenticación, encuentros, documentos, SSE y la comunicación con Cloud Functions.
+`backend_fastapi/` es la API central del sistema. Orquesta autenticación, encuentros, documentos, SSE y la comunicación con los workers privados de transcripción y generación.
 
 ## Qué leer aquí
 
@@ -21,7 +21,7 @@
 ## Cómo se relaciona con el resto
 
 - Recibe requests del frontend con cookies JWT + CSRF.
-- Emite JWT de vida corta para Cloud Functions.
+- Emite JWT de vida corta para callbacks de workers.
 - Publica eventos SSE para transcripción y generación en tiempo real.
 
 ## Local Development GCS Token Impersonation

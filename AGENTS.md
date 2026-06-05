@@ -25,7 +25,8 @@ Priorities, in order:
 ## Repo Map
 
 - `backend_fastapi/` — FastAPI API, SQLAlchemy models, auth, SSE, orchestration, Alembic migrations
-- `cloud_functions/` — transcribe audio and generate clinical documents with Gemini
+- `transcription_worker/` — Cloud Run worker for section transcription
+- `document_generation_worker/` — Cloud Run worker for document generation
 - `webapp/` — React + TypeScript SPA for doctors
 - `infra/` — Terraform for GCP resources, IAM, budgets, deploy foundations
 - `landing-page/` — separate marketing site, not part of the clinical flow
@@ -45,8 +46,8 @@ Do not treat these as source of truth unless the task is specifically about gene
 ## Architecture Rules
 
 - Browser -> FastAPI uses JWT cookies + CSRF.
-- FastAPI -> Cloud Functions uses short-lived service JWTs.
-- Cloud Functions -> FastAPI callbacks use Bearer JWTs validated in FastAPI.
+- FastAPI -> private workers uses authenticated Cloud Tasks and short-lived callback JWTs.
+- Workers -> FastAPI callbacks use Bearer JWTs validated in FastAPI.
 - SSE uses a separate short-lived token and an in-memory hub in `backend_fastapi/app/domains/documents/sse_hub.py`.
 - Audio uploads go browser -> GCS directly through signed URLs; FastAPI stores metadata and triggers background work.
 
@@ -57,7 +58,6 @@ Do not treat these as source of truth unless the task is specifically about gene
 - `backend_fastapi/app/domains/transcription/` owns transcription dispatch and Cloud Tasks integration.
 - `backend_fastapi/app/domains/templates/` owns base templates and doctor templates.
 - `backend_fastapi/app/domains/auth/` owns login/JWT for user-facing auth.
-- `cloud_functions/functions/` owns Gemini-facing logic only; it should not grow direct database responsibilities.
 - `copilot_agent/` owns the LangGraph runtime for the future clinical copilot and must stay outside the backend monolith.
 - In the frontend, `webapp/src/workspace/` is the state layer for encounter-document workspace concerns such as tabs, active document, snapshot, draft, derived state, AI session state, and patch-review preparation.
 - `webapp/src/contexts/` remains the orchestration and compat layer around encounter detail flows; it owns SSE lifecycle and API side effects while delegating durable workspace state to the stores.
@@ -72,7 +72,7 @@ Do not treat these as source of truth unless the task is specifically about gene
 - Keep FastAPI -> copilot broker auth separate from `copilot_agent -> FastAPI` tools auth, even if both are temporarily backed by `COPILOT_SERVICE_SHARED_JWT`.
 - The current copilot slice supports `patch proposal + review + safe apply`, but the agent still must not write directly to canonical clinical documents; FastAPI owns apply and any future audit trail.
 - Temporary cross-service copilot auth debt lives in `docs/debt/copilot-agent-runtime.md`; do not duplicate that explanation in every file.
-- If you change JWT claims, token purpose, token TTL, or callback endpoints, update FastAPI, Cloud Functions, and docs together.
+- If you change JWT claims, token purpose, token TTL, or callback endpoints, update FastAPI, workers, and docs together.
 - Never log full transcripts, generated documents, raw secrets, or tokens.
 
 ### Data Models / Migrations
@@ -184,7 +184,7 @@ Do not treat these as source of truth unless the task is specifically about gene
 
 - Backend: `uv --project backend_fastapi run ruff check . && ENVIRONMENT=test uv --project backend_fastapi run pytest -q`
 - Frontend: `npm --prefix webapp run lint && npm --prefix webapp run build`
-- Cloud Functions: `python -m pytest cloud_functions/functions/tests`
+- Workers: `python -m pytest transcription_worker/tests && python -m pytest document_generation_worker/tests`
 
 ## Change Notes
 

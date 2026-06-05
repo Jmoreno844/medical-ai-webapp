@@ -22,7 +22,6 @@ module "project_services" {
     "artifactregistry.googleapis.com",
     "billingbudgets.googleapis.com",
     "cloudbuild.googleapis.com",
-    "cloudfunctions.googleapis.com",
     "cloudresourcemanager.googleapis.com",
     "cloudtasks.googleapis.com",
     "cloudtrace.googleapis.com",
@@ -113,7 +112,6 @@ module "storage_buckets" {
   region                       = var.region
   audio_bucket_name            = var.audio_bucket_name
   frontend_bucket_name         = var.frontend_bucket_name
-  cf_source_bucket_name        = var.cf_source_bucket
   frontend_public_read_enabled = var.frontend_public_read_enabled
   audio_retention_days         = 7
   force_destroy                = true
@@ -127,13 +125,11 @@ module "storage_buckets" {
 # ---------------------------------------------------------------------------
 
 module "service_accounts" {
-  source                                = "../../modules/service_accounts"
-  project_id                            = var.project_id
-  audio_bucket_name                     = module.storage_buckets.audio_bucket_name
-  frontend_bucket_name                  = module.storage_buckets.frontend_bucket_name
-  cf_source_bucket_name                 = module.storage_buckets.cf_source_bucket_name
-  grant_cloud_functions_secret_accessor = false
-  grant_copilot_agent_secret_accessor   = true
+  source                              = "../../modules/service_accounts"
+  project_id                          = var.project_id
+  audio_bucket_name                   = module.storage_buckets.audio_bucket_name
+  frontend_bucket_name                = module.storage_buckets.frontend_bucket_name
+  grant_copilot_agent_secret_accessor = true
 
   depends_on = [
     module.project_services,
@@ -157,7 +153,6 @@ module "workload_identity" {
     ".github/workflows/copilot-agent-deployment-stg.yaml",
     ".github/workflows/transcription-worker-deployment-stg.yaml",
     ".github/workflows/document-generation-worker-deployment-stg.yaml",
-    ".github/workflows/deploy-cloud-function-stg.yaml",
     ".github/workflows/frontend-deployment-stg.yaml",
     ".github/workflows/landing-page-deployment-stg.yaml",
   ]
@@ -251,6 +246,8 @@ module "cloud_run" {
     GOOGLE_CLOUD_PROJECT                       = var.project_id
     GCP_PROJECT_ID                             = var.project_id
     GCS_BUCKET_NAME                            = module.storage_buckets.audio_bucket_name
+    FASTAPI_CORS_ALLOWED_ORIGINS               = var.fastapi_cors_allowed_origins
+    FASTAPI_COOKIE_SECURE                      = "true"
     DB_HOST                                    = "127.0.0.1"
     DB_PORT                                    = "5432"
     DB_NAME                                    = var.db_name
@@ -635,11 +632,9 @@ module "monitoring" {
   cloud_run_service_name                  = var.cloud_run_service_name
   transcription_worker_service_name       = var.transcription_worker_service_name
   document_generation_worker_service_name = var.document_generation_worker_service_name
-  cloud_function_service_names = [
-    "transcription-endpoint",
-  ]
-  cloud_sql_instance_name   = var.db_instance_name
-  monthly_budget_amount_usd = var.monthly_budget_amount_usd
+  cloud_function_service_names            = []
+  cloud_sql_instance_name                 = var.db_instance_name
+  monthly_budget_amount_usd               = var.monthly_budget_amount_usd
 
   depends_on = [
     module.project_services,

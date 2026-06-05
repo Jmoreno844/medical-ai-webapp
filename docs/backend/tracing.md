@@ -1,6 +1,6 @@
 # Distributed tracing (OpenTelemetry)
 
-El stack usa **OpenTelemetry** con propagación **W3C** (`traceparent` / `tracestate`) entre `webapp` → FastAPI → workers/Cloud Functions → FastAPI (callbacks).
+El stack usa **OpenTelemetry** con propagación **W3C** (`traceparent` / `tracestate`) entre `webapp` → FastAPI → workers → FastAPI (callbacks).
 
 ## Componentes
 
@@ -9,10 +9,9 @@ El stack usa **OpenTelemetry** con propagación **W3C** (`traceparent` / `traces
 | `backend_fastapi/app/` | API principal; emite logs JSON metadata-only y spans del backend |
 | `transcription_worker/app/` | Worker de VAD/transcripción; emite logs JSON metadata-only y exporta trazas |
 | `document_generation_worker/app/` | Worker de generación documental; emite logs JSON metadata-only y exporta trazas |
-| [cloud_functions/functions/tracing.py](../../cloud_functions/functions/tracing.py) | Span servidor por request HTTP + `requests` al backend |
 | [webapp/src/tracing.ts](../../webapp/src/tracing.ts) | OTLP desde el navegador (opcional) + propagación en XHR/`axios` |
 
-## Variables de entorno (backend y Cloud Functions)
+## Variables de entorno (backend y workers)
 
 | Variable | Descripción |
 |----------|-------------|
@@ -47,7 +46,7 @@ La observabilidad no reemplaza un audit trail clinico.
 
 ## GCP (stg / producción)
 
-- En **Cloud Run** y **Cloud Functions**, suele existir `GOOGLE_CLOUD_PROJECT`; el exportador **GCP Trace** usa la cuenta de servicio del workload.
+- En **Cloud Run**, suele existir `GOOGLE_CLOUD_PROJECT`; el exportador **GCP Trace** usa la cuenta de servicio del workload.
 - Concede a esa cuenta el rol **Cloud Trace Agent** (`roles/cloudtrace.agent`) si no viene ya en el rol de ejecución recomendado por GCP.
 - El navegador **no** envía trazas directamente a Cloud Trace en el modelo habitual (sin collector expuesto). Las trazas del front en producción suelen limitarse a spans locales o quedar desactivadas (`VITE_OTEL_EXPORTER_OTLP_TRACES_URL` vacío).
 
@@ -57,13 +56,13 @@ La observabilidad no reemplaza un audit trail clinico.
   correlacion por logs/trazas cuando las llamadas HTTP propaguen contexto o
   incluyan IDs de negocio (`section_id`, `process_id`).
 - `webapp` **no** participa en el mismo trace en `stg`: el workflow de frontend no configura `VITE_OTEL_EXPORTER_OTLP_TRACES_URL` y no hay un OTEL collector público/intermedio.
-- Hasta montar collector OTLP o un backend OTLP accesible desde navegador, la visibilidad de `stg` es **backend/cloud functions**, no navegador de extremo a extremo.
+- Hasta montar collector OTLP o un backend OTLP accesible desde navegador, la visibilidad de `stg` es **backend/workers**, no navegador de extremo a extremo.
 
 ## Local con Jaeger
 
 1. Levanta Jaeger con OTLP (por ejemplo [docker-compose.tracing.yml](../../docker-compose.tracing.yml) en la raíz del repo).
 2. **Backend**: `OTEL_TRACES_EXPORTER=otlp`, `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces`, `OTEL_SERVICE_NAME=vexthealth-backend`. Si tu shell exporta `GOOGLE_CLOUD_PROJECT`, añade `OTEL_FORCE_OTLP=1`.
-3. **Cloud Functions** (emulador Docker): mismo endpoint hacia el host, p. ej. `http://host.docker.internal:4318/v1/traces`.
+3. **Workers**: mismo endpoint OTLP hacia el host, p. ej. `http://host.docker.internal:4318/v1/traces` si corren en Docker.
 4. **Webapp**: en `.env.local`, `VITE_OTEL_EXPORTER_OTLP_TRACES_URL=/otel/v1/traces` y `VITE_OTEL_SERVICE_NAME=vexthealth-webapp`. Vite reenvía `/otel/*` al puerto 4318 (ver [webapp/vite.config.ts](../../webapp/vite.config.ts)).
 
 En local, `webapp` exporta spans solo en modo desarrollo (`vite dev`). No hay

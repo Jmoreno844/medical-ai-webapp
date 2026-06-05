@@ -48,11 +48,6 @@ output "frontend_bucket" {
   value       = module.storage_buckets.frontend_bucket_name
 }
 
-output "cf_source_bucket" {
-  description = "Cloud Functions source bucket name"
-  value       = module.storage_buckets.cf_source_bucket_name
-}
-
 output "artifact_registry_url" {
   description = "Artifact Registry Docker URL prefix"
   value       = module.artifact_registry.repository_url
@@ -81,11 +76,6 @@ output "document_generation_worker_service_account" {
 output "frontend_service_account" {
   description = "Cloud Run frontend service account email"
   value       = module.service_accounts.frontend_runner_email
-}
-
-output "cloud_functions_service_account" {
-  description = "Cloud Functions runtime service account email"
-  value       = module.service_accounts.cloud_functions_runner_email
 }
 
 output "cloud_tasks_invoker_service_account" {

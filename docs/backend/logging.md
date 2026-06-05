@@ -24,7 +24,7 @@
 ## Relación con otros servicios
 
 - El frontend usa su propia política en [`../frontend/logging.md`](../frontend/logging.md).
-- Cloud Functions, `transcription_worker` y `document_generation_worker` deben
+- `transcription_worker` y `document_generation_worker` deben
   seguir el mismo principio de saneamiento: metadatos sí, contenido clínico no.
 - `transcription_worker` puede loguear `section_id`, `session_id`,
   `document_id`, `encounter_id`, decisión VAD, latencias, modelo y códigos de

@@ -36,7 +36,7 @@ infra/
 1. **Bootstrap** (`bootstrap/README.md`): bucket de estado + SA `terraform-admin` + IAM.
 2. **Terraform** (como tu usuario o con clave temporal de `terraform-admin`):
    - `cd environments/stg && terraform init && terraform plan`.
-   - En `stg`, Terraform crea la VPC privada, Cloud SQL con IP privada + IAM DB auth, workers Cloud Run, colas Cloud Tasks, el bucket fuente para Cloud Functions legacy y las alertas básicas.
+   - En `stg`, Terraform crea la VPC privada, Cloud SQL con IP privada + IAM DB auth, workers Cloud Run, colas Cloud Tasks y las alertas básicas.
    - En `stg`, `cloud_run_image` arranca con una imagen publica de bootstrap para permitir el primer `apply`; el workflow de backend la reemplaza luego por la imagen real.
    - En `stg`, `cloud_run_use_secret_manager = false` evita que el primer `apply` falle mientras los secrets existen pero todavía no tienen versiones; vuelve a `true` cuando cargues esas versiones.
    - En `stg`, `cloud_run_allow_unauthenticated = false` evita fallos si la organizacion bloquea `allUsers`; luego defines otra estrategia de acceso publico si la necesitas.
@@ -136,7 +136,6 @@ Después del primer apply exitoso, copiar los outputs de Terraform a las variabl
 - `COPILOT_AGENT_DB_NAME` (valor de `terraform.tfvars`)
 - `GCS_BUCKET_NAME` (output `audio_bucket`)
 - `FRONTEND_BUCKET_NAME` (output `frontend_bucket`)
-- `CF_SOURCE_BUCKET` (output `cf_source_bucket`)
 - `VITE_API_URL` (output `cloud_run_url`)
 - `FRONTEND_DOMAIN_NAME` y `BACKEND_DOMAIN_NAME` si quieres documentarlos en tu inventario de entorno
 - `COPILOT_AGENT_URL` (output `copilot_agent_cloud_run_url`)
@@ -150,8 +149,6 @@ Luego se puede eliminar el secret `GCP_SA_KEY` de GitHub.
 - **Cloud Run**: el módulo fija una imagen inicial y la topología base de backend,
   frontend, copilot, transcription worker y document generation worker. Los workflows sustituyen las imágenes y
   actualizan env vars por servicio.
-- **Cloud Functions**: en `stg`, Terraform **no** crea las funciones legacy. Terraform solo crea el bucket fuente y las cuentas/roles necesarios; el workflow **sube el zip** y despliega `transcription-endpoint`.
-
 ## Documentación relacionada
 
 - `bootstrap/README.md` — comandos `gcloud` para el bootstrap inicial

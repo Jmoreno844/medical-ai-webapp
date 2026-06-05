@@ -39,13 +39,9 @@ transcription_worker_max_instances         = 5
 transcription_worker_max_concurrency       = 8
 document_generation_worker_max_instances   = 5
 document_generation_worker_max_concurrency = 8
-cloud_run_use_secret_manager               = false
+cloud_run_use_secret_manager               = true
 cloud_run_allow_unauthenticated            = true # Set false if org policy blocks allUsers on Cloud Run
 copilot_agent_allow_unauthenticated        = false
-
-# Cloud Functions source (deploy from GCS)
-cf_source_bucket = "vext-stg-cf-source"  # TODO: create this bucket or use a deploy script
-cf_source_object = "cloud-functions.zip" # TODO: zip and upload before first apply
 
 # Storage buckets
 audio_bucket_name            = "vext-stg-audio"

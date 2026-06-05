@@ -9,7 +9,6 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 | `backend_fastapi/`                                                                                                                            | API central, modelos SQLAlchemy, auth, JWT, SSE, orquestación y migraciones Alembic | Sí                                             |
 | `transcription_worker/`                                                                                                                       | Worker Cloud Run para VAD Silero + Gemini de transcripción por secciones            | Sí                                             |
 | `document_generation_worker/`                                                                                                                 | Worker Cloud Run para generación documental con provider LLM configurable           | Sí                                             |
-| `cloud_functions/`                                                                                                                            | Transcripción legacy                                                                | Sí                                             |
 | `webapp/`                                                                                                                                     | SPA del médico                                                                      | Sí                                             |
 | `infra/`                                                                                                                                      | Infra GCP, IAM, budgets, deploy base                                                | Sí                                             |
 | `landing-page/`                                                                                                                               | Sitio marketing separado                                                            | Sí, pero no es parte del flujo clínico central |
@@ -51,10 +50,6 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
   - `app/domains/auth/` es dueño de login/JWT/CSRF de usuario.
   - Alembic aplica el schema clínico completo en bases nuevas (`alembic/baseline/baseline_clinical_v1.sql` vía `0001`). Ver `docs/architecture/backend-fastapi-migration.md`.
   - SSE en memoria en la primera fase; limita Cloud Run a `max-instances=1`.
-- `cloud_functions/functions/endpoints/`
-  - Adaptadores HTTP; validan request y delegan.
-- `cloud_functions/functions/services/`
-  - Lógica de negocio serverless y callbacks al API (`BACKEND_API_BASE_URL` / `services/backend_api.py`).
 - `webapp/src/contexts/`
   - Fuente de verdad oficial del estado del detalle de encuentro y de sus side effects compartidos.
 - `webapp/src/features/`
@@ -91,15 +86,15 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 ### Auth y seguridad
 
 - Navegador -> API usa cookies JWT + CSRF.
-- Cloud Functions -> API usan Bearer JWT de callback de vida corta.
+- Workers -> API usan Bearer JWT de callback de vida corta.
 - SSE usa un token distinto y de vida corta.
-- Si cambias claims, expiración o propósito de un token, actualiza API, Cloud Functions y docs en el mismo cambio.
+- Si cambias claims, expiración o propósito de un token, actualiza API, workers y docs en el mismo cambio.
 
 ### Data models y migraciones
 
 - Los modelos viven en `backend_fastapi/app/db/models.py`.
 - Las migraciones son parte del contrato del sistema; no las regeneres “por si acaso”.
-- Si renombras un campo, actualiza también schemas, frontend, docs y cualquier payload de Cloud Functions.
+- Si renombras un campo, actualiza también schemas, frontend, docs y cualquier payload de workers.
 
 ### Background jobs
 

@@ -20,7 +20,6 @@ IaC: `infra/` en la raíz del repo.
 | Cloud Run copilot  | `vexthealth-copilot-agent`      | `vexthealth-copilot-agent`                        |
 | Cloud Run worker   | `vexthealth-transcription-worker` | `vexthealth-transcription-worker`               |
 | Cloud Run worker   | `vexthealth-document-generation-worker` | `vexthealth-document-generation-worker`   |
-| Cloud Function     | `<nombre-funcional>`            | `transcription-endpoint`                          |
 | Cloud SQL instance | `vexthealth-db-<env>`           | `vexthealth-db-stg`                               |
 | GCS audio          | `<project>-audio`               | `vext-stg-audio`                                  |
 | GCS frontend       | `<project>-frontend-spa`        | `vext-stg-frontend-spa`                           |
@@ -78,15 +77,6 @@ Para cumplimiento operativo, restringe `roles/logging.viewer` y
 algún bucket de logs almacenara campos sensibles, evaluar `field-level access`
 antes de ampliar accesos.
 
-### cloud-functions-runner (Cloud Functions)
-
-| Rol                                          | Justificación                        |
-| -------------------------------------------- | ------------------------------------ |
-| `roles/aiplatform.user`                      | Llamar a Gemini/Vertex AI            |
-| `roles/storage.objectViewer` sobre `*-audio` | Leer audio de GCS                    |
-| `roles/cloudtrace.agent`                     | Enviar trazas a Cloud Trace          |
-| `roles/run.invoker`                          | Callback a Cloud Run si es necesario |
-
 ### cloud-tasks-invoker
 
 | Rol                 | Justificación                                                             |
@@ -98,10 +88,9 @@ antes de ampliar accesos.
 | Rol                                                                              | Justificación                           |
 | -------------------------------------------------------------------------------- | --------------------------------------- |
 | `roles/run.admin`                                                                | Desplegar Cloud Run                     |
-| `roles/cloudfunctions.developer`                                                 | Desplegar Cloud Functions               |
 | `roles/artifactregistry.writer`                                                  | Pushear imágenes Docker                 |
-| `roles/storage.objectAdmin` sobre buckets de frontend / CF source                | Subir frontend y zip de Cloud Functions |
-| `roles/iam.serviceAccountUser` sobre `backend-runner` y `cloud-functions-runner` | Actuar como otros SAs al desplegar      |
+| `roles/storage.objectAdmin` sobre buckets de frontend                            | Subir assets de frontend                |
+| `roles/iam.serviceAccountUser` sobre `backend-runner`                            | Actuar como otros SAs al desplegar      |
 
 ## Secret Manager
 
@@ -213,12 +202,6 @@ sesión hasta que exista un broker compartido.
 | `session-affinity`      | `false`                         | No mantiene estado por cliente                        |
 | `Cloud SQL`             | No                              | FastAPI conserva la autoridad de base de datos        |
 
-## Cloud Functions — IAM auth
-
-La función legacy `transcription-endpoint` está desplegada con
-`--no-allow-unauthenticated`. La generación documental ya no se despliega como
-Cloud Function.
-
 ## Workload Identity Federation
 
 Elimina la necesidad de claves JSON (`GCP_SA_KEY`) en GitHub Actions.
@@ -249,14 +232,12 @@ Después de `terraform apply`, configurar las mismas claves como **variables del
 | `COPILOT_AGENT_DB_NAME`         | `vext-stg-copilot`                                                                                                                              |
 | `GCS_BUCKET_NAME`               | `vext-stg-audio`                                                                                                                                |
 | `FRONTEND_BUCKET_NAME`          | `vext-stg-frontend-spa`                                                                                                                         |
-| `CF_SOURCE_BUCKET`              | output Terraform `cf_source_bucket`                                                                                                             |
 | `VITE_API_URL`                  | Para `stg`, usar el subdominio del backend, por ejemplo `https://api-stg.notiahealth.com`.                                                   |
 | `COPILOT_AGENT_URL`             | URL del copilot agent service (output)                                                                                                          |
 | `ADMIN_BOOTSTRAP_JOB_NAME`      | _(opcional)_ Si quieres documentarlo en GitHub vars; por defecto `vexthealth-backend-admin-bootstrap`                                          |
 | `TRANSCRIPTION_WORKER_URL`      | URL del transcription worker Cloud Run (output `transcription_worker_cloud_run_url`)                                                            |
 | `DOCUMENT_GENERATION_WORKER_URL` | URL del document generation worker Cloud Run (output `document_generation_worker_cloud_run_url`)                                                 |
 | _(build)_ `VITE_BASE_URL`       | El workflow de frontend la fija en `/`, porque el frontend Cloud Run sirve la SPA desde la raiz de su propio subdominio.                      |
-| `CF_SOURCE_OBJECT`              | _(opcional)_ Objeto del zip; por defecto `cloud-functions.zip` (igual que `cf_source_object` en Terraform)                                      |
 | `LANDING_BUCKET_NAME`           | Bucket del workflow de landing page si se usa ese deploy                                                                                        |
 | `DOCUMENT_GENERATION_PROVIDER`  | _(opcional)_ Provider del worker; por defecto `anthropic_api`                                                                                   |
 | `DOCUMENT_GENERATION_MODEL`     | _(opcional)_ Override explícito del modelo del worker                                                                                            |
@@ -269,28 +250,19 @@ El secret `GCP_SA_KEY` puede eliminarse una vez confirmado que WIF funciona.
 
 **`service-account-json` (opcional en Cloud Run):** el backend puede usar **Application Default Credentials** del service account del servicio (`backend-runner`), que ya tiene acceso a GCS. Si el secreto está vacío o no tiene versión, `get_storage_client()` usa ADC. En local, con `config.settings.develop`, la ruta recomendada es **ADC + impersonación** mediante `GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT`; `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH` queda como fallback solo si existe una excepción aprobada para usar JSON keys.
 
-### Zip del código de Cloud Functions en CI
-
-El workflow [`.github/workflows/deploy-cloud-function-stg.yaml`](../../.github/workflows/deploy-cloud-function-stg.yaml) hace, en cada push a `main` que toque `cloud_functions/functions/`:
-
-1. Usa el bucket `gs://{proyecto}-cf-source` creado por Terraform.
-2. Genera un zip del directorio `cloud_functions/functions/` (excluye `__pycache__`, `.venv`, etc.) y lo sube a `cloud-functions.zip`.
-3. Despliega `transcription-endpoint` con `gcloud functions deploy` (origen local, igual que antes).
-4. Aplica el binding IAM de invocación para `backend-runner`.
-
-Así el artefacto en GCS queda alineado con Terraform, pero el runtime de las funciones en `stg` queda controlado por CI.
-
 ### Checklist: que los workflows no fallen
 
 | Requisito                                                                                                                                           | Workflows afectados                               |
 | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| Variables `GCP_PROJECT_ID`, `WIF_PROVIDER`, `GH_DEPLOYER_SA` definidas y WIF creado en GCP                                                          | Backend, Copilot Agent, Cloud Functions, Frontend |
+| Variables `GCP_PROJECT_ID`, `WIF_PROVIDER`, `GH_DEPLOYER_SA` definidas y WIF creado en GCP                                                          | Backend, Copilot Agent, Workers, Frontend |
 | `BACKEND_SERVICE_ACCOUNT`, `GCS_BUCKET_NAME`, `VITE_API_URL`                                                                                        | Backend deploy                                    |
 | `FASTAPI_CORS_ALLOWED_ORIGINS`                                                                                                                       | Backend deploy / admin bootstrap job              |
 | `COPILOT_AGENT_SERVICE_ACCOUNT`, `COPILOT_AGENT_DB_NAME`, `VITE_API_URL`                                                                            | Copilot Agent deploy                              |
 | `FRONTEND_BUCKET_NAME`, `FRONTEND_SERVICE_ACCOUNT`                                                                                                   | Frontend deploy                                   |
+| `TRANSCRIPTION_WORKER_SERVICE_ACCOUNT`, `TRANSCRIPTION_WORKER_URL`                                                                                   | Transcription worker / backend deploy             |
+| `DOCUMENT_GENERATION_WORKER_SERVICE_ACCOUNT`, `DOCUMENT_GENERATION_WORKER_URL`                                                                       | Document generation worker / backend deploy       |
 | `LANDING_BUCKET_NAME`                                                                                                                               | Landing page deploy                               |
-| SA `github-actions-deployer` con los roles del módulo Terraform (p. ej. `cloudfunctions.developer`, `storage.objectAdmin` sobre los buckets usados) | Todos los despliegues                             |
+| SA `github-actions-deployer` con los roles del módulo Terraform (p. ej. `run.admin`, `artifactregistry.writer`, `storage.objectAdmin` sobre los buckets usados) | Todos los despliegues                             |
 
 ## Problemas frecuentes
 
@@ -300,14 +272,9 @@ Así el artefacto en GCS queda alineado con Terraform, pero el runtime de las fu
 | Backend no conecta a Cloud SQL                                                          | Revisar VPC privada, sidecar `cloud-sql-proxy`, `DB_HOST=127.0.0.1`, `DB_USER=backend-runner@<project>.iam` y que el usuario IAM exista en Cloud SQL.                                                                                         |
 | `password authentication failed for user "…"`                                           | En `stg` no debería usarse password. Verifica que el sidecar use `--auto-iam-authn`, que `backend-runner` tenga `roles/cloudsql.instanceUser` y que el usuario IAM exista en la instancia.                                                    |
 | `terraform apply` bloqueado por state lock                                              | Otro `plan`/`apply` colgado o Ctrl+C; `terraform force-unlock <id>` tras confirmar que no hay otro proceso usando el state.                                                                                                                   |
-| Zip de Cloud Functions inválido en CI                                                   | No usar `mktemp … .zip` como destino de `zip` (archivo vacío previo); no usar exclusiones `**/` con `zip` en Ubuntu. El workflow ya usa ruta `$$` + patrones simples y `unzip -t`.                                                            |
 | Assets del SPA en `storage.googleapis.com/assets/...` 404                               | `Vite` con `base: '/'` rompe en bucket; el workflow define `VITE_BASE_URL` desde `FRONTEND_BUCKET_NAME` y el router usa `basename`.                                                                                                           |
 | Variables de GitHub vacías en Actions                                                   | Las variables solo en el environment `stg` no se ven en `env` a nivel workflow; los jobs de deploy deben tener `environment: stg` (ya aplicado en los workflows).                                                                             |
 | `403` al crear bucket / APIs                                                            | Facturación del proyecto activa; APIs habilitadas (`terraform` o bootstrap).                                                                                                                                                                  |
-| Workflow de Cloud Functions falla subiendo el zip                                       | Que exista `gs://{proyecto}-cf-source` creado por Terraform y que `github-actions-deployer` tenga `storage.objectAdmin` sobre ese bucket.                                                                                                     |
-| Cloud Functions falla con `missing permission on the build service account`             | Dar `roles/storage.objectViewer` al service account de build (`PROJECT_NUMBER-compute@developer.gserviceaccount.com`) sobre el bucket interno `gcf-v2-sources-*`; el módulo `service_accounts` ya contempla este binding para nuevos applies. |
-| Cloud Functions falla porque la build SA no puede escribir logs                         | Dar `roles/logging.logWriter` a `PROJECT_NUMBER-compute@developer.gserviceaccount.com`; el módulo `service_accounts` ya contempla este binding para nuevos applies.                                                                           |
-| Cloud Functions falla con `artifactregistry.repositories.downloadArtifacts denied`      | Dar `roles/artifactregistry.reader` y `roles/artifactregistry.writer` al service account de build `PROJECT_NUMBER-compute@developer.gserviceaccount.com`; el módulo `service_accounts` ya contempla estos bindings para nuevos applies.       |
 | Cloud Run falla con `Image ... not found`                                               | Usar una imagen bootstrap publica en `cloud_run_image` para el primer `apply`, o publicar primero `fastapi-backend:latest` en Artifact Registry.                                                                                              |
 | Cloud Run falla porque `Secret ... versions/latest was not found`                       | En bootstrap, usar `cloud_run_use_secret_manager = false`; después de cargar versiones en Secret Manager, volver a `true` para que el backend lea secretos reales.                                                                            |
 | Cloud Run falla al aplicar IAM con `allUsers ... do not belong to a permitted customer` | La organizacion bloquea acceso publico; poner `cloud_run_allow_unauthenticated = false` y exponer el servicio luego mediante una estrategia compatible con tu tenant.                                                                         |

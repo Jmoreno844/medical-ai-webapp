@@ -118,10 +118,24 @@ jobs:
           set -euo pipefail
           DB_IAM_USER="${{ vars.BACKEND_SERVICE_ACCOUNT }}"
           DB_IAM_USER="${DB_IAM_USER%.gserviceaccount.com}"
-          BACKEND_URL="$(gcloud run services describe "${SERVICE_NAME}" --region="${REGION}" --format='value(status.url)')"
-          COPILOT_URL="$(gcloud run services describe vexthealth-copilot-agent --region="${REGION}" --format='value(status.url)')"
-          TRANSCRIPTION_WORKER_URL="$(gcloud run services describe vexthealth-transcription-worker --region="${REGION}" --format='value(status.url)')"
-          DOCUMENT_GENERATION_WORKER_URL="$(gcloud run services describe vexthealth-document-generation-worker --region="${REGION}" --format='value(status.url)')"
+          BACKEND_URL="$(gcloud run services describe "${SERVICE_NAME}" --region="${REGION}" --format='value(status.url)' || true)"
+          COPILOT_URL="${{ vars.COPILOT_AGENT_URL || '' }}"
+          if [ -z "${COPILOT_URL}" ]; then
+            COPILOT_URL="$(gcloud run services describe vexthealth-copilot-agent --region="${REGION}" --format='value(status.url)' 2>/dev/null || true)"
+          fi
+          if [ -z "${COPILOT_URL}" ]; then
+            COPILOT_URL="http://127.0.0.1:8090"
+          fi
+
+          TRANSCRIPTION_WORKER_URL="${{ vars.TRANSCRIPTION_WORKER_URL || '' }}"
+          if [ -z "${TRANSCRIPTION_WORKER_URL}" ]; then
+            TRANSCRIPTION_WORKER_URL="$(gcloud run services describe vexthealth-transcription-worker --region="${REGION}" --format='value(status.url)' 2>/dev/null || true)"
+          fi
+
+          DOCUMENT_GENERATION_WORKER_URL="${{ vars.DOCUMENT_GENERATION_WORKER_URL || '' }}"
+          if [ -z "${DOCUMENT_GENERATION_WORKER_URL}" ]; then
+            DOCUMENT_GENERATION_WORKER_URL="$(gcloud run services describe vexthealth-document-generation-worker --region="${REGION}" --format='value(status.url)' 2>/dev/null || true)"
+          fi
           echo "db_iam_user=${DB_IAM_USER}" >> "$GITHUB_OUTPUT"
           echo "backend_url=${BACKEND_URL}" >> "$GITHUB_OUTPUT"
           echo "copilot_url=${COPILOT_URL}" >> "$GITHUB_OUTPUT"

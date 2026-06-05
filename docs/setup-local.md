@@ -40,7 +40,7 @@ simular staging conviene usar secretos explícitos.
 - `GCP_PROJECT_ID`
 - `GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT`
 - `TRANSCRIPTION_TASK_TARGET_URL=http://localhost:8001/api/v1/internal/transcription/tasks`
-- `GENERATE_DOCUMENT_CLOUD_FUNCTION_URL=http://localhost:8083`
+- `DOCUMENT_GENERATION_TASK_TARGET_URL=http://localhost:8001/api/v1/internal/document-generation/tasks`
 
 Para transcripcion por secciones, `ENVIRONMENT=local` debe usar `BackgroundTasks`
 como fallback por defecto. Puedes probar Cloud Tasks real desde local solo si la
@@ -59,26 +59,6 @@ Por defecto:
 
 - `VITE_API_URL=http://localhost:8001`
 - `VITE_TRANSCRIPTION_WORKER_URL=http://localhost:8091` para la pagina local `/debug/transcripcion`
-
-### Cloud Functions
-
-```bash
-cp cloud_functions/functions/.env.example cloud_functions/functions/.env.local
-```
-
-Variables clave:
-
-- `ENVIRONMENT=local`
-- `GCP_PROJECT`
-- `GCP_REGION`
-- `GEMINI_MODEL`
-- `BACKEND_API_BASE_URL=http://localhost:8001`
-- `BACKEND_API_VERSION=v1`
-- `LANGSMITH_TRACING=true` si quieres tracing local en LangSmith
-- `LANGSMITH_API_KEY`
-- `LANGSMITH_PROJECT=cloud-functions-local`
-
-`cloud_functions/docker-compose.yml` ya monta ADC del host en `/app/adc.json`.
 
 ### Document Generation Worker
 
@@ -213,7 +193,7 @@ Si quieres separar planner y drafter por proveedor/modelo, puedes usar overrides
 
 Para local, el valor recomendado es reutilizar la misma base `medical_web_app` que usa `backend_fastapi`. No necesitas crear una DB adicional solo para el agent runtime.
 
-La integración LangSmith del `copilot_agent` y de `cloud_functions` queda limitada a `local` y registra solo metadata sanitizada del request/run. No envía transcripciones completas, documentos generados ni tokens a LangSmith.
+La integración LangSmith del `copilot_agent` y de los workers queda limitada a `local` y registra solo metadata sanitizada del request/run. No envía transcripciones completas, documentos generados ni tokens a LangSmith.
 
 ## 2. Base de datos
 
@@ -359,15 +339,10 @@ npm --prefix webapp run dev
 
 Frontend: `http://localhost:5173`
 
-## 5. Cloud Functions locales
+## 5. Workers locales
 
-```bash
-docker compose -f cloud_functions/docker-compose.yml up --build
-```
-
-Puertos locales:
-
-- `8083` — `document-workflow`
+Levanta `transcription_worker` en `8091` y `document_generation_worker` en
+`8092` siguiendo los ejemplos de esta guia.
 
 ## 6. Smoke test recomendado
 
@@ -375,7 +350,7 @@ Puertos locales:
 2. Crear o abrir un `Encuentro`.
 3. Verificar que el API responda en `http://localhost:8001/api/v1/health`.
 4. Confirmar que el flujo de transcripción apunte al worker interno de FastAPI.
-5. Confirmar que la generación documental apunte a `http://localhost:8083`.
+5. Confirmar que la generación documental apunte al worker en `http://localhost:8092`.
 6. Confirmar que `copilot_agent` responda en `http://localhost:8090/healthz`.
 
 ## 7. Checks rápidos
@@ -394,10 +369,11 @@ npm --prefix webapp run lint
 npm --prefix webapp run build
 ```
 
-Cloud Functions:
+Workers:
 
 ```bash
-python -m pytest cloud_functions/functions/tests
+python -m pytest transcription_worker/tests
+python -m pytest document_generation_worker/tests
 ```
 
 Copilot agent:
@@ -410,9 +386,8 @@ Para el slice actual del broker, backend y `copilot_agent` deben compartir el mi
 
 ## 8. Trazas distribuidas opcionales
 
-Para un trace local de `webapp -> FastAPI -> Cloud Tasks/worker -> FastAPI` o
-`webapp -> FastAPI -> Cloud Functions -> FastAPI` (mismo
-camino lógico de producción):
+Para un trace local de `webapp -> FastAPI -> Cloud Tasks/worker -> FastAPI`
+(mismo camino lógico de producción):
 
 ```bash
 docker compose -f docker-compose.tracing.yml up -d
@@ -422,7 +397,7 @@ Luego configura:
 
 - Backend: `OTEL_TRACES_EXPORTER`, `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_SERVICE_NAME`
 - Frontend: `VITE_OTEL_EXPORTER_OTLP_TRACES_URL`, `VITE_OTEL_SERVICE_NAME`
-- Cloud Functions: `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_SERVICE_NAME`
+- Workers: `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_SERVICE_NAME`
 
 Detalle completo en [`docs/backend/tracing.md`](backend/tracing.md).
 
@@ -431,7 +406,8 @@ Detalle completo en [`docs/backend/tracing.md`](backend/tracing.md).
 - `5173` — frontend Vite
 - `8001` — API backend (FastAPI)
 - `5433` — PostgreSQL local
-- `8083` — Cloud Function de generación
+- `8091` — transcription worker
+- `8092` — document generation worker
 - `8090` — copilot agent service
 - `16686` — Jaeger UI
 - `4318` — OTLP HTTP para Jaeger

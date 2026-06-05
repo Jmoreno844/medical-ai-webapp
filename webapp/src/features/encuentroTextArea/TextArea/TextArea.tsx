@@ -27,6 +27,7 @@ import {
   setPatchReviewDecorations,
 } from "./tiptap/patchReviewDecorations";
 import SegmentedTranscriptionView from "./SegmentedTranscriptionView";
+import SelectionBubbleMenu from "./SelectionBubbleMenu";
 import { postClientAuditEvent } from "@/api/audit";
 
 type EditorSnapshot = {
@@ -201,7 +202,7 @@ const TextArea: React.FC = () => {
       attributes: {
         class:
           "h-full overflow-auto px-4 py-3 focus:outline-none leading-normal text-[15px] text-slate-800",
-        spellcheck: "true",
+        spellcheck: "false",
       },
     },
   });
@@ -794,6 +795,7 @@ const TextArea: React.FC = () => {
           ) : (
             <>
               <EditorContent editor={editor} className="medical-document-editor h-full" />
+              <SelectionBubbleMenu editor={editor} onCopy={handleCopy} />
               {!documentContent.trim() &&
                 !derivedContent &&
                 editorMode === "edit" && (
