@@ -8,8 +8,10 @@ from pathlib import Path
 
 import sqlparse
 from alembic import op
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.engine import Connection
+
+from app.db.models import RevokedToken
 
 _BASELINE = (
     Path(__file__).resolve().parents[2] / "alembic" / "baseline" / "baseline_clinical_v1.sql"
@@ -45,6 +47,21 @@ def apply_clinical_baseline_ddl(connection: Connection) -> None:
         connection.execute(text(statement))
 
 
+def _has_existing_clinical_schema(connection: Connection) -> bool:
+    inspector = inspect(connection)
+    return inspector.has_table("auth_group") or inspector.has_table("users_user")
+
+
+def _ensure_fastapi_revoked_token_table(connection: Connection) -> None:
+    RevokedToken.__table__.create(bind=connection, checkfirst=True)
+
+
 def run_baseline_upgrade() -> None:
     connection = op.get_bind()
+    if _has_existing_clinical_schema(connection):
+        # Staging/prod can point at a populated legacy schema. In that case we
+        # treat the baseline as already satisfied and only backfill the FastAPI
+        # token table if the historical cluster never created it.
+        _ensure_fastapi_revoked_token_table(connection)
+        return
     apply_clinical_baseline_ddl(connection)
