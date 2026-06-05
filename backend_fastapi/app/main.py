@@ -18,38 +18,22 @@ settings = get_settings()
 configure_logging(settings, service_name="vexthealth-backend")
 logger = logging.getLogger(__name__)
 
-app = FastAPI(
+fastapi_app = FastAPI(
     title="Medical API FastAPI Migration",
     version="0.1.0",
     docs_url="/api/v1/docs",
     openapi_url="/api/v1/openapi.json",
 )
-app.state.settings = settings
-configure_tracing(app, settings, service_name="vexthealth-backend")
+fastapi_app.state.settings = settings
+configure_tracing(fastapi_app, settings, service_name="vexthealth-backend")
 
-app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_allowed_origins,
-    allow_credentials=True,
-    allow_methods=["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"],
-    allow_headers=[
-        "accept",
-        "authorization",
-        "content-type",
-        "origin",
-        "traceparent",
-        "tracestate",
-        "x-csrftoken",
-        "x-requested-with",
-    ],
-)
+fastapi_app.add_middleware(SecurityHeadersMiddleware)
 
-app.include_router(api_v1_router, prefix=settings.api_v1_prefix)
-app.include_router(copilot_internal_tools_router, prefix="/api")
+fastapi_app.include_router(api_v1_router, prefix=settings.api_v1_prefix)
+fastapi_app.include_router(copilot_internal_tools_router, prefix="/api")
 
 
-@app.exception_handler(Exception)
+@fastapi_app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     log_event(
         logger,
@@ -65,3 +49,28 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
             "error_code": type(exc).__name__,
         },
     )
+
+
+# Keep CORS as the outermost ASGI layer so browser clients can read real 4xx/5xx
+# responses instead of collapsing them into opaque CORS/network failures.
+app = CORSMiddleware(
+    app=fastapi_app,
+    allow_origins=settings.cors_allowed_origins,
+    allow_credentials=True,
+    allow_methods=["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"],
+    allow_headers=[
+        "accept",
+        "authorization",
+        "content-type",
+        "origin",
+        "traceparent",
+        "tracestate",
+        "x-csrftoken",
+        "x-requested-with",
+    ],
+)
+
+# Test modules and some internal code import `app` directly and expect access to
+# the FastAPI route table and state, so mirror the underlying app attributes.
+app.routes = fastapi_app.routes
+app.state = fastapi_app.state
