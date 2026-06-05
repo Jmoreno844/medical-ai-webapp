@@ -128,6 +128,25 @@ secretos por nombre/versión.
 - Observabilidad y auditoría clínica son concerns distintos; no usar Cloud
   Logging como sustituto de un audit trail funcional.
 
+## Decisión de hosting público por costo
+
+- Decisión actual: mantener `webapp` y `landing-page` como servicios separados
+  en Cloud Run mientras el tráfico siga siendo bajo o moderado y el foco siga
+  siendo Colombia.
+- Motivo principal: para este stage del producto, Cloud Run con
+  `min-instances=0` deja un piso de costo menor que `Cloud Storage + External
+  Application Load Balancer + Cloud CDN`, donde el LB introduce un costo fijo
+  aproximado de `USD 18/mes` antes de tráfico.
+- SEO no obliga a salir de Cloud Run. Para la landing, SEO depende del HTML
+  indexable y del rendering, no del runtime. El LB solo se vuelve obligatorio
+  si se quiere servir un bucket de Cloud Storage con custom domain y HTTPS
+  administrado en GCP.
+- El `webapp` clínico no obtiene un beneficio material de SEO al migrarse a
+  bucket/CDN, por lo que hoy no compensa la complejidad extra.
+- Revaluar bucket/CDN solo si la landing pública crece en tráfico, necesita una
+  estrategia de edge caching más agresiva o se busca una arquitectura estática
+  pura para marketing.
+
 ## Políticas de ciclo de vida (GCS)
 
 | Bucket           | Regla               | Detalle                                         |

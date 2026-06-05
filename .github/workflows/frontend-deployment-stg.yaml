@@ -126,6 +126,7 @@ jobs:
       REGION: us-east1
       REPOSITORY: vexthealth-containers
       IMAGE_NAME: webapp-frontend
+      FRONTEND_SERVICE_ACCOUNT: frontend-runner@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
 
     steps:
       - name: Authenticate to Google Cloud
@@ -149,7 +150,7 @@ jobs:
           flags: |
             --ingress=all
             --allow-unauthenticated
-            --service-account=${{ vars.FRONTEND_SERVICE_ACCOUNT }}
+            --service-account=${{ env.FRONTEND_SERVICE_ACCOUNT }}
             --cpu=1
             --memory=512Mi
             --min-instances=0
