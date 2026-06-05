@@ -80,7 +80,7 @@ jobs:
 
   deploy:
     name: deploy
-""    needs: build-and-push
+    needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     environment: stg
@@ -123,7 +123,6 @@ jobs:
             --timeout=300s
           env_vars: |
             ENVIRONMENT=stg
-            PORT=8092
             DOCUMENT_GENERATION_LOG_LEVEL=INFO
             GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }}
             GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT_ID }}

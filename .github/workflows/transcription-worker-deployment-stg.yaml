@@ -123,7 +123,6 @@ jobs:
             --timeout=300s
           env_vars: |
             ENVIRONMENT=stg
-            PORT=8091
             TRANSCRIPTION_WORKER_LOG_LEVEL=INFO
             GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }}
             GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT_ID }}
