@@ -198,8 +198,12 @@ jobs:
           set -euo pipefail
           IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
           if gcloud run jobs describe "${ADMIN_BOOTSTRAP_JOB_NAME}" --region="${REGION}" >/dev/null 2>&1; then
+            PRIMARY_CONTAINER="$(gcloud run jobs describe "${ADMIN_BOOTSTRAP_JOB_NAME}" \
+              --region="${REGION}" \
+              --format='value(template.template.containers[0].name)')"
             gcloud run jobs update "${ADMIN_BOOTSTRAP_JOB_NAME}" \
               --region="${REGION}" \
+              --container="${PRIMARY_CONTAINER}" \
               --image="${IMAGE}"
           else
             echo "Cloud Run Job ${ADMIN_BOOTSTRAP_JOB_NAME} not found; skipping image sync."
