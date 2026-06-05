@@ -58,6 +58,14 @@ jobs:
           cache: "npm"
           cache-dependency-path: webapp/package-lock.json
 
+      - name: Set up Docker Buildx
+        if: steps.check_changes.outputs.changes == 'true'
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            network=host
+            image=moby/buildkit:latest
+
       - name: Install dependencies
         if: steps.check_changes.outputs.changes == 'true'
         working-directory: ./webapp
