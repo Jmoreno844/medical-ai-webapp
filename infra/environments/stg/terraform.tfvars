@@ -52,5 +52,8 @@ backend_domain_name          = "api-stg.notiahealth.com"
 fastapi_cors_allowed_origins = "https://app-stg.notiahealth.com"
 gemini_model                 = "gemini-3.1-flash-lite-preview"
 
+#Document Generation Worker 
+document_generation_provider    ="google_vertex"
+
 # Artifact Registry
 artifact_registry_repo = "vexthealth-containers"

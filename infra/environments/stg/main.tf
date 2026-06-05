@@ -504,7 +504,6 @@ module "transcription_worker_cloud_run" {
 
   env_vars = {
     ENVIRONMENT                         = var.environment
-    PORT                                = "8091"
     TRANSCRIPTION_WORKER_LOG_LEVEL      = "INFO"
     GCP_PROJECT_ID                      = var.project_id
     GOOGLE_CLOUD_PROJECT                = var.project_id
@@ -553,7 +552,6 @@ module "document_generation_worker_cloud_run" {
 
   env_vars = {
     ENVIRONMENT                         = var.environment
-    PORT                                = "8092"
     DOCUMENT_GENERATION_LOG_LEVEL       = "INFO"
     GCP_PROJECT_ID                      = var.project_id
     GOOGLE_CLOUD_PROJECT                = var.project_id
@@ -565,12 +563,10 @@ module "document_generation_worker_cloud_run" {
     DOCUMENT_GENERATION_GOOGLE_MODEL    = var.document_generation_google_model
     VERTEX_AI_LOCATION                  = var.document_generation_vertex_ai_location
     LLM_MAX_CONCURRENT                  = "4"
-    LANGSMITH_TRACING                   = "false"
   }
 
-  secret_env_vars = var.cloud_run_use_secret_manager ? [
+  secret_env_vars = var.cloud_run_use_secret_manager && var.document_generation_provider == "anthropic_api" ? [
     { name = "ANTHROPIC_API_KEY", secret_id = "anthropic-api-key" },
-    { name = "LANGSMITH_API_KEY", secret_id = "langsmith-api-key" },
   ] : []
 
   allow_unauthenticated = false

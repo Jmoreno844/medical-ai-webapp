@@ -63,10 +63,10 @@ jobs:
         working-directory: ./webapp
         run: npm ci
 
-      - name: Lint frontend
+      - name: Build frontend
         if: steps.check_changes.outputs.changes == 'true'
         working-directory: ./webapp
-        run: npm run lint
+        run: npm run build
 
       - name: Authenticate to Google Cloud
         if: steps.check_changes.outputs.changes == 'true'
