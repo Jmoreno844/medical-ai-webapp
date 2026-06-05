@@ -161,6 +161,7 @@ jobs:
             --concurrency=8
             --port=8092
             --timeout=300s
+            --clear-secrets
           env_vars: |
             ENVIRONMENT=stg
             DOCUMENT_GENERATION_LOG_LEVEL=INFO
