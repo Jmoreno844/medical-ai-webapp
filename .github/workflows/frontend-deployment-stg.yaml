@@ -1,4 +1,4 @@
-name: Frontend Staging Deployment
+name: stg-webapp
 
 on:
   push:
@@ -24,7 +24,6 @@ jobs:
       REGION: us-east1
       REPOSITORY: vexthealth-containers
       IMAGE_NAME: webapp-frontend
-      NODE_ENV: production
 
     steps:
       - name: Checkout repository

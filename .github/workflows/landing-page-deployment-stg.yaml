@@ -1,4 +1,4 @@
-name: Deploy Landing Page to GCS
+name: stg-landing-page
 
 on:
   push:

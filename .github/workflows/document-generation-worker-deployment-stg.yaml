@@ -1,4 +1,4 @@
-name: Document Generation Worker Staging Deployment
+name: stg-document-generation-worker
 
 on:
   push:
@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   build-and-push:
-    name: Build and Push Document Generation Worker Image
+    name: build
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     environment: stg
@@ -79,8 +79,8 @@ jobs:
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
 
   deploy:
-    name: Deploy Document Generation Worker to Cloud Run
-    needs: build-and-push
+    name: deploy
+""    needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     environment: stg

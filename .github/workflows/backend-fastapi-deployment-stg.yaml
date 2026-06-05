@@ -1,7 +1,7 @@
 # Primary staging API: FastAPI.
 # Required GitHub Environment `stg` var: FASTAPI_CORS_ALLOWED_ORIGINS (comma-separated
 # origins, e.g. the staging SPA URL). Maps to env on Cloud Run.
-name: Backend FastAPI Staging Deployment
+name: stg-backend
 
 on:
   push:
@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   build-and-push:
-    name: Build and Push FastAPI Image
+    name: build
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     environment: stg
@@ -88,7 +88,7 @@ jobs:
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
 
   deploy:
-    name: Deploy FastAPI to Cloud Run
+    name: deploy
     needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'

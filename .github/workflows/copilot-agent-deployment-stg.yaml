@@ -1,4 +1,4 @@
-name: Copilot Agent Staging Deployment
+name: stg-copilot-agent
 
 on:
   push:
@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   build-and-push:
-    name: Build and Push Copilot Agent Image
+    name: build
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     environment: stg
@@ -80,7 +80,7 @@ jobs:
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
 
   deploy:
-    name: Deploy Copilot Agent to Cloud Run
+    name: deploy
     needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
