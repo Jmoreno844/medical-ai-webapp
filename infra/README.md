@@ -41,7 +41,7 @@ infra/
    - En `stg`, `cloud_run_use_secret_manager = false` evita que el primer `apply` falle mientras los secrets existen pero todavía no tienen versiones; vuelve a `true` cuando cargues esas versiones.
    - En `stg`, `cloud_run_allow_unauthenticated = false` evita fallos si la organizacion bloquea `allUsers`; luego defines otra estrategia de acceso publico si la necesitas.
    - Si tu organizacion bloquea `allUsers`, deja `frontend_public_read_enabled = false` y no esperes un bucket web publico hasta definir otra estrategia de hosting/CDN.
-3. **Secret Manager**: cargar versiones de `django-secret-key` y `jwt-secret-key` (y opcionalmente `service-account-json`).
+3. **Secret Manager**: cargar versiones de `jwt-secret-key`, `copilot-service-shared-jwt`, `audit-ip-hmac-secret`, `audit-ip-encryption-key` y un placeholder inicial de `admin-bootstrap-password` (y opcionalmente `service-account-json`).
 4. **GitHub**: variables del environment **`stg`** (o del repo) según `docs/architecture/gcp-infrastructure.md`. Los workflows de deploy usan `environment: stg`. Sin `WIF_PROVIDER` / `GH_DEPLOYER_SA` los workflows no autentican.
 5. **CI**:
    - Ejecutar primero los workflows de `transcription_worker` y `document_generation_worker` para que existan las URLs privadas.
@@ -109,10 +109,18 @@ Ver `environments/prod/README.md` para diferencias específicas.
 Terraform solo crea los recursos de Secret Manager vacíos. Para cargar valores:
 
 ```bash
-echo -n "tu-valor" | gcloud secrets versions add django-secret-key --data-file=- --project=vext-stg
+echo -n "tu-valor" | gcloud secrets versions add jwt-secret-key --data-file=- --project=vext-stg
 ```
 
-Repetir para cada secret necesario: `jwt-secret-key`. `service-account-json` es **opcional** en Cloud Run si el contenedor usa solo ADC del SA `backend-runner` para GCS (comportamiento por defecto del código); en local desarrollo la ruta recomendada es ADC + impersonación (`GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT`) con `config.settings.develop`.
+Repetir para cada secret necesario:
+
+- `jwt-secret-key`
+- `copilot-service-shared-jwt`
+- `audit-ip-hmac-secret`
+- `audit-ip-encryption-key`
+- `admin-bootstrap-password` (deja un placeholder inicial para que el Cloud Run Job pueda desplegar; luego rótalo antes de crear/resetear admins)
+
+`service-account-json` es **opcional** en Cloud Run si el contenedor usa solo ADC del SA `backend-runner` para GCS (comportamiento por defecto del código); en local desarrollo la ruta recomendada es ADC + impersonación (`GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT`) con `config.settings.develop`.
 
 ## Configurar GitHub después de terraform apply
 

@@ -12,6 +12,7 @@ from app.core.service_jwt import (
     require_claim_int,
 )
 from app.db.session import get_db_session
+from app.domains.audit.service import AuditActor, record_audit_event
 from app.domains.documents.content import set_document_content_fields
 from app.domains.documents.schemas import (
     DocumentContentUpdate,
@@ -62,6 +63,18 @@ async def update_document_by_function(
         content_json=payload.content_json,
         preferred_source=preferred_source,
     )
+    await record_audit_event(
+        session,
+        action="service.audio_processed",
+        result="success",
+        request=request,
+        actor=AuditActor(None, "service", None, None),
+        document_id=document.id,
+        encounter_id=document.encounter_id,
+        resource_type="transcription_callback",
+        resource_id=document.id,
+        service_name="backend_fastapi",
+    )
     await session.commit()
     await publish_document_event(document_id, "transcription_complete")
     return SuccessResponse(
@@ -98,6 +111,18 @@ async def transcription_complete_notification(
     await session.refresh(document, attribute_names=["encounter"])
     if not document.encounter.has_been_transcribed:
         document.encounter.has_been_transcribed = True
+    await record_audit_event(
+        session,
+        action="audio.transcription_completed",
+        result="success",
+        request=request,
+        actor=AuditActor(None, "service", None, None),
+        document_id=document.id,
+        encounter_id=document.encounter_id,
+        resource_type="transcription_callback",
+        resource_id=document.id,
+        service_name="backend_fastapi",
+    )
     await session.commit()
     await publish_document_event(payload.document_id, "transcription_complete")
     return SuccessResponse(
@@ -135,6 +160,20 @@ async def receive_generation_chunk(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Documento no encontrado")
 
     if payload.is_error:
+        await record_audit_event(
+            session,
+            action="service.document_processed",
+            result="failure",
+            request=request,
+            actor=AuditActor(None, "service", None, None),
+            document_id=document.id,
+            encounter_id=document.encounter_id,
+            resource_type="document_generation",
+            resource_id=payload.process_id,
+            service_name="backend_fastapi",
+            error_code=payload.error or "generation_error",
+        )
+        await session.commit()
         await publish_document_event(
             payload.document_id,
             "generation_error",
@@ -155,7 +194,31 @@ async def receive_generation_chunk(
                 content_markdown=payload.chunk,
                 preferred_source="markdown",
             )
-            await session.commit()
+        await record_audit_event(
+            session,
+            action="document.ai_regeneration_completed",
+            result="success",
+            request=request,
+            actor=AuditActor(None, "service", None, None),
+            document_id=document.id,
+            encounter_id=document.encounter_id,
+            resource_type="document_generation",
+            resource_id=payload.process_id,
+            service_name="backend_fastapi",
+        )
+        await record_audit_event(
+            session,
+            action="service.document_processed",
+            result="success",
+            request=request,
+            actor=AuditActor(None, "service", None, None),
+            document_id=document.id,
+            encounter_id=document.encounter_id,
+            resource_type="document_generation",
+            resource_id=payload.process_id,
+            service_name="backend_fastapi",
+        )
+        await session.commit()
         await publish_document_event(
             payload.document_id,
             "generation_complete",

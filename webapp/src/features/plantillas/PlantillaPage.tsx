@@ -97,21 +97,21 @@ export default function PlantillasPage() {
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Plantillas</h1>
+    <div className="container mx-auto max-w-5xl px-4 sm:px-6 py-5">
+      <div className="flex justify-between items-center mb-5">
+        <h1 className="text-xl font-bold">Plantillas</h1>
         <Button
           onClick={openCreateModal}
           variant="outline"
-          className="flex items-center gap-2 bg-purple-600 text-white font-medium 
-          text-base hover:bg-purple-500 transition-colors hover:text-white"
+          className="flex items-center gap-2 bg-purple-600 text-white font-medium
+          text-sm hover:bg-purple-500 transition-colors hover:text-white"
         >
           <PlusCircle className="h-4 w-4" />
           Nueva plantilla
         </Button>
       </div>
 
-      <div className="relative mb-6">
+      <div className="relative mb-5">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
         <Input
           className="pl-10"

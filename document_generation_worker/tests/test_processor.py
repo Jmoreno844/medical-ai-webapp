@@ -54,7 +54,7 @@ async def test_processor_streams_chunks_and_completion(
     processor = Processor(
         settings=Settings(ENVIRONMENT="test", DOCUMENT_GENERATION_CHUNK_SIZE=5),
         backend=backend,
-        gemini_semaphore=asyncio.Semaphore(1),
+        llm_semaphore=asyncio.Semaphore(1),
     )
 
     async def fake_stream(**_kwargs):
@@ -77,11 +77,11 @@ async def test_processor_raises_before_first_chunk_for_retry(
     processor = Processor(
         settings=Settings(ENVIRONMENT="test"),
         backend=backend,
-        gemini_semaphore=asyncio.Semaphore(1),
+        llm_semaphore=asyncio.Semaphore(1),
     )
 
     async def failing_stream(**_kwargs):
-        raise RuntimeError("gemini_down")
+        raise RuntimeError("llm_down")
         yield ""
 
     monkeypatch.setattr("app.processor.stream_document_generation", failing_stream)

@@ -28,13 +28,13 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
 
   return (
     <form
-      className={cn("flex flex-col gap-6", props.className)}
+      className={cn("flex flex-col gap-5", props.className)}
       onSubmit={handleSubmit}
       {...props}
     >
       {/* Brand logo - smaller size */}
       <div className="flex justify-center w-full mt-0">
-        <div className="relative w-full max-w-[200px] aspect-square">
+        <div className="relative w-full max-w-[9rem] aspect-square">
           <img
             src="/brand_logo_no_text.png"
             alt="Logotipo"
@@ -44,8 +44,8 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
       </div>
 
       {/* Header Title */}
-      <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-2xl font-bold text-main font-fun tracking-tight">
+      <div className="flex flex-col items-center gap-1.5 text-center">
+        <h1 className="text-xl font-bold text-main font-fun tracking-tight">
           Registro
         </h1>
         <p className="text-balance text-sm text-neutral-600 dark:text-neutral-300">
@@ -53,8 +53,8 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
         </p>
       </div>
 
-      <div className="grid gap-7">
-        <div className="grid gap-2.5">
+      <div className="grid gap-5">
+        <div className="grid gap-2">
           <Label
             htmlFor="email"
             className="font-medium text-neutral-700 dark:text-neutral-200"
@@ -72,7 +72,7 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
           />
         </div>
 
-        <div className="grid gap-2.5">
+        <div className="grid gap-2">
           <Label
             htmlFor="name"
             className="font-medium text-neutral-700 dark:text-neutral-200"
@@ -90,7 +90,7 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
           />
         </div>
 
-        <div className="grid gap-2.5">
+        <div className="grid gap-2">
           <Label
             htmlFor="lastName"
             className="font-medium text-neutral-700 dark:text-neutral-200"
@@ -108,7 +108,7 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
           />
         </div>
 
-        <div className="grid gap-2.5">
+        <div className="grid gap-2">
           <Label
             htmlFor="password"
             className="font-medium text-neutral-700 dark:text-neutral-200"
@@ -130,7 +130,7 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
 
         <Button
           type="submit"
-          className="w-full bg-main hover:bg-main_dark text-white font-medium py-6 mt-2 transition-colors"
+          className="w-full bg-main hover:bg-main_dark text-white font-medium mt-1 transition-colors"
         >
           Registrarse
         </Button>

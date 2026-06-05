@@ -12,12 +12,12 @@ def _is_local_environment(settings: Settings) -> bool:
 def verify_document_generation_worker_request(
     request: Request,
     settings: Settings,
-) -> None:
+) -> dict[str, object] | None:
     authorization = request.headers.get("authorization", "")
     scheme, _, token = authorization.partition(" ")
     if not token.strip():
         if _is_local_environment(settings):
-            return
+            return None
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Worker auth required")
     if scheme.lower() != "bearer":
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid auth scheme")
@@ -40,3 +40,4 @@ def verify_document_generation_worker_request(
     expected_email = (settings.document_generation_worker_service_account or "").strip()
     if expected_email and payload.get("email") != expected_email:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid worker invoker")
+    return payload

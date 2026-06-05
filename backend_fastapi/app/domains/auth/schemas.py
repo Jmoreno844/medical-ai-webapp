@@ -17,12 +17,19 @@ class ForgotPasswordRequest(BaseModel):
     email: str
 
 
+class UserCapabilities(BaseModel):
+    can_access_admin_panel: bool = False
+    can_view_audit: bool = False
+    can_manage_users: bool = False
+
+
 class UserProfile(BaseModel):
     id: int
     email: str
     name: str
     last_name: str
     role: str
+    capabilities: UserCapabilities
 
 
 class AuthResponse(BaseModel):
@@ -37,4 +44,3 @@ class LogoutResponse(BaseModel):
 class MessageResponse(BaseModel):
     success: bool = True
     message: str
-

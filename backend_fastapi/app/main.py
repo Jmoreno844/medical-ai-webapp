@@ -9,13 +9,14 @@ from fastapi.responses import JSONResponse
 from app.api.v1.router import api_v1_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.core.observability import log_event
+from app.core.tracing import configure_tracing
 from app.core.middleware import SecurityHeadersMiddleware
 from app.domains.copilot.internal_tools_api import router as copilot_internal_tools_router
 
-
-configure_logging()
-logger = logging.getLogger(__name__)
 settings = get_settings()
+configure_logging(settings, service_name="vexthealth-backend")
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Medical API FastAPI Migration",
@@ -23,6 +24,8 @@ app = FastAPI(
     docs_url="/api/v1/docs",
     openapi_url="/api/v1/openapi.json",
 )
+app.state.settings = settings
+configure_tracing(app, settings, service_name="vexthealth-backend")
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
@@ -48,10 +51,12 @@ app.include_router(copilot_internal_tools_router, prefix="/api")
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception(
-        "Unhandled API exception path=%s method=%s",
-        request.url.path,
-        request.method,
+    log_event(
+        logger,
+        logging.ERROR,
+        "Unhandled API exception",
+        event="unhandled_api_exception",
+        error_code=type(exc).__name__,
     )
     return JSONResponse(
         status_code=500,

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime, timezone
 
@@ -8,8 +7,10 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
+from app.core.observability import bind_log_context, log_event
 from app.db.models import User
 from app.db.session import AsyncSessionLocal, get_db_session
+from app.domains.audit.service import AuditActor, actor_from_user, record_audit_event
 from app.domains.auth.service import get_current_user
 from app.domains.documents.service import get_document_for_doctor, get_encounter_for_doctor
 from app.domains.transcription.schemas import (
@@ -42,7 +43,7 @@ from app.domains.transcription.service import (
     serialize_section,
 )
 from app.domains.transcription.worker_auth import verify_transcription_worker_request
-from app.integrations.http_json import post_json
+from app.integrations.http_json import post_json_async
 from app.integrations.transcription_tasks import (
     should_use_cloud_tasks,
 )
@@ -67,9 +68,16 @@ async def _post_worker_task_background(path: str, settings: Settings) -> None:
         return
     url = f"{settings.transcription_worker_base_url.rstrip('/')}{path}"
     try:
-        await asyncio.to_thread(post_json, url, {}, timeout=5)
+        with bind_log_context(section_id=path.rsplit("/", 1)[-1]):
+            await post_json_async(url, {}, timeout=5)
     except Exception:
-        logger.exception("Local transcription worker task dispatch failed")
+        log_event(
+            logger,
+            logging.ERROR,
+            "Local transcription worker task dispatch failed",
+            event="transcription_worker_dispatch_failed",
+            section_id=path.rsplit("/", 1)[-1],
+        )
 
 
 @router.post("/transcription/start", response_model=TranscriptionResponse)
@@ -121,6 +129,7 @@ async def start_transcription(
 @router.post("/transcription/sessions", response_model=RecordingSessionResponse)
 async def create_transcription_recording_session(
     payload: RecordingSessionCreate,
+    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> RecordingSessionResponse:
@@ -143,6 +152,18 @@ async def create_transcription_recording_session(
         document=document,
         doctor_id=user.id,
     )
+    await record_audit_event(
+        session,
+        action="audio.transcription_started",
+        result="success",
+        request=request,
+        actor=actor_from_user(user),
+        session_id=getattr(request.state, "auth_session_id", None),
+        encounter_id=encounter.id,
+        document_id=document.id,
+        resource_type="recording_session",
+        resource_id=recording_session.session_id,
+    )
     await session.commit()
     return RecordingSessionResponse(
         success=True,
@@ -158,6 +179,7 @@ async def create_transcription_recording_session(
 async def create_section_upload_url(
     session_id: str,
     payload: SectionUploadUrlRequest,
+    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
@@ -209,6 +231,7 @@ async def register_transcription_section(
     session_id: str,
     payload: AudioSectionRegisterRequest,
     background_tasks: BackgroundTasks,
+    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
@@ -232,6 +255,18 @@ async def register_transcription_section(
         gcs_object_name=payload.gcs_object_name,
         content_type=payload.content_type,
         byte_size=payload.byte_size,
+    )
+    await record_audit_event(
+        session,
+        action="audio.section_registered",
+        result="success",
+        request=request,
+        actor=actor_from_user(user),
+        session_id=getattr(request.state, "auth_session_id", None),
+        encounter_id=recording_session.encounter_id,
+        document_id=recording_session.document_id,
+        resource_type="audio_section",
+        resource_id=section.section_id,
     )
     await session.commit()
 
@@ -393,7 +428,7 @@ async def receive_worker_section_result(
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> dict[str, bool]:
-    verify_transcription_worker_request(request, settings)
+    worker_principal = verify_transcription_worker_request(request, settings)
     section = await apply_section_worker_result(
         session,
         section_id=section_id,
@@ -404,6 +439,39 @@ async def receive_worker_section_result(
     )
     if not section:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Sección no encontrada")
+    await record_audit_event(
+        session,
+        action="service.audio_processed",
+        result="success" if payload.status == "completed" else "failure",
+        request=request,
+        actor=AuditActor(None, "service", None, None),
+        encounter_id=section.recording_session.encounter_id,
+        document_id=section.recording_session.document_id,
+        resource_type="audio_section",
+        resource_id=section.section_id,
+        service_name="transcription_worker",
+        service_account=str(worker_principal.get("email")) if worker_principal else None,
+        error_code=payload.error_code,
+    )
+    await record_audit_event(
+        session,
+        action=(
+            "audio.transcription_completed"
+            if payload.status == "completed"
+            else "audio.transcription_failed"
+        ),
+        result="success" if payload.status == "completed" else "failure",
+        request=request,
+        actor=AuditActor(None, "service", None, None),
+        encounter_id=section.recording_session.encounter_id,
+        document_id=section.recording_session.document_id,
+        resource_type="audio_section",
+        resource_id=section.section_id,
+        service_name="transcription_worker",
+        service_account=str(worker_principal.get("email")) if worker_principal else None,
+        error_code=payload.error_code,
+    )
+    await session.commit()
     logger.info(
         "transcription_worker_section_result section_id=%s status=%s vad_decision=%s",
         section_id,

@@ -225,6 +225,66 @@ class RevokedToken(Base):
     revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class AuditUserSession(Base):
+    __tablename__ = "audit_user_session"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    organization_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users_user.id"), index=True)
+    ip_hmac: Mapped[str] = mapped_column(String(64), index=True)
+    network_prefix: Mapped[str | None] = mapped_column(String(80))
+    ip_encrypted: Mapped[str | None] = mapped_column(Text)
+    user_agent_summary: Mapped[str | None] = mapped_column(String(150))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    user: Mapped[User | None] = relationship()
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_event"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    organization_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users_user.id"), index=True)
+    actor_type: Mapped[str] = mapped_column(String(32))
+    actor_role_snapshot: Mapped[str | None] = mapped_column(String(64))
+    actor_name_snapshot: Mapped[str | None] = mapped_column(String(255))
+    action: Mapped[str] = mapped_column(String(80), index=True)
+    result: Mapped[str] = mapped_column(String(20), index=True)
+    session_id: Mapped[str | None] = mapped_column(
+        ForeignKey("audit_user_session.id"),
+        index=True,
+    )
+    patient_id: Mapped[int | None] = mapped_column(
+        ForeignKey("patients_patient.id"),
+        index=True,
+    )
+    encounter_id: Mapped[int | None] = mapped_column(
+        ForeignKey("encounters_encounter.id"),
+        index=True,
+    )
+    document_id: Mapped[int | None] = mapped_column(
+        ForeignKey("documents_document.id"),
+        index=True,
+    )
+    resource_type: Mapped[str | None] = mapped_column(String(64))
+    resource_id: Mapped[str | None] = mapped_column(String(64))
+    service_name: Mapped[str | None] = mapped_column(String(128))
+    service_account: Mapped[str | None] = mapped_column(String(255))
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    trace_id: Mapped[str | None] = mapped_column(String(32), index=True)
+    request_id: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+    actor: Mapped[User | None] = relationship(foreign_keys=[actor_id])
+    audit_session: Mapped[AuditUserSession | None] = relationship()
+    patient: Mapped[Patient | None] = relationship()
+    encounter: Mapped[Encounter | None] = relationship()
+    document: Mapped[Document | None] = relationship()
+
+
 class CopilotRun(Base):
     __tablename__ = "copilot_copilotrun"
 

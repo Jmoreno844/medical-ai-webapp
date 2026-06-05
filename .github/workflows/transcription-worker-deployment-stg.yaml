@@ -127,6 +127,8 @@ jobs:
             TRANSCRIPTION_WORKER_LOG_LEVEL=INFO
             GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }}
             GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT_ID }}
+            OTEL_SERVICE_NAME=vexthealth-transcription-worker
+            OTEL_TRACES_SAMPLER_ARG=1.0
             GCP_REGION=${{ env.REGION }}
             GCS_BUCKET_NAME=${{ vars.GCS_BUCKET_NAME }}
             BACKEND_INTERNAL_BASE_URL=${{ vars.VITE_API_URL }}

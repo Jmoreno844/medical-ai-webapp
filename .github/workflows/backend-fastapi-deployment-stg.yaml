@@ -34,6 +34,7 @@ jobs:
     env:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       SERVICE_NAME: vexthealth-backend
+      ADMIN_BOOTSTRAP_JOB_NAME: vexthealth-backend-admin-bootstrap
       REGION: us-east1
       REPOSITORY: vexthealth-containers
       IMAGE_NAME: fastapi-backend
@@ -150,6 +151,8 @@ jobs:
             GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }}
             GCP_PROJECT=${{ env.GCP_PROJECT_ID }}
             GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT_ID }}
+            OTEL_SERVICE_NAME=vexthealth-backend
+            OTEL_TRACES_SAMPLER_ARG=1.0
             FASTAPI_COOKIE_SECURE=true
             DB_HOST=127.0.0.1
             DB_PORT=5432
@@ -163,13 +166,29 @@ jobs:
             TRANSCRIPTION_WORKER_SERVICE_ACCOUNT=transcription-worker-runner@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
             DOCUMENT_GENERATION_TASK_TARGET_URL=${{ steps.function_urls.outputs.document_generation_worker_url }}/api/v1/internal/document-generation/tasks
             DOCUMENT_GENERATION_WORKER_SERVICE_ACCOUNT=document-generation-runner@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
-            DOCUMENT_GENERATION_GEMINI_MODEL=${{ vars.GEMINI_MODEL || 'gemini-3.1-flash-lite-preview' }}
+            DOCUMENT_GENERATION_PROVIDER=${{ vars.DOCUMENT_GENERATION_PROVIDER || 'anthropic_api' }}
+            DOCUMENT_GENERATION_MODEL=${{ vars.DOCUMENT_GENERATION_MODEL || 'claude-haiku-4-5-20251001' }}
+            DOCUMENT_GENERATION_GOOGLE_MODEL=${{ vars.DOCUMENT_GENERATION_GOOGLE_MODEL || 'gemini-3.1-flash-lite-preview' }}
             COPILOT_AGENT_BASE_URL=${{ steps.function_urls.outputs.copilot_url }}
             FASTAPI_CORS_ALLOWED_ORIGINS=${{ vars.FASTAPI_CORS_ALLOWED_ORIGINS }}
           secrets: |
             JWT_SECRET_KEY=jwt-secret-key:latest
+            AUDIT_IP_HMAC_SECRET=audit-ip-hmac-secret:latest
+            AUDIT_IP_ENCRYPTION_KEY=audit-ip-encryption-key:latest
             COPILOT_SERVICE_SHARED_JWT=copilot-service-shared-jwt:latest
           project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Sync admin bootstrap job image
+        run: |
+          set -euo pipefail
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          if gcloud run jobs describe "${ADMIN_BOOTSTRAP_JOB_NAME}" --region="${REGION}" >/dev/null 2>&1; then
+            gcloud run jobs update "${ADMIN_BOOTSTRAP_JOB_NAME}" \
+              --region="${REGION}" \
+              --image="${IMAGE}"
+          else
+            echo "Cloud Run Job ${ADMIN_BOOTSTRAP_JOB_NAME} not found; skipping image sync."
+          fi
 
       - name: Show Output
         run: echo ${{ steps.deploy.outputs.url }}

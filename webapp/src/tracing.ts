@@ -1,3 +1,4 @@
+import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch";
 import { registerInstrumentations } from "@opentelemetry/instrumentation";
 import { XMLHttpRequestInstrumentation } from "@opentelemetry/instrumentation-xml-http-request";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
@@ -12,7 +13,7 @@ const serviceName =
   (import.meta.env.VITE_OTEL_SERVICE_NAME as string | undefined) ||
   "vexthealth-webapp";
 
-if (typeof window !== "undefined" && tracesUrl?.trim()) {
+if (typeof window !== "undefined" && import.meta.env.DEV && tracesUrl?.trim()) {
   const provider = new WebTracerProvider({
     resource: new Resource({
       "service.name": serviceName,
@@ -34,6 +35,10 @@ if (typeof window !== "undefined" && tracesUrl?.trim()) {
 
   registerInstrumentations({
     instrumentations: [
+      new FetchInstrumentation({
+        propagateTraceHeaderCorsUrls,
+        clearTimingResources: true,
+      }),
       new XMLHttpRequestInstrumentation({
         propagateTraceHeaderCorsUrls,
         clearTimingResources: true,

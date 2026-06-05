@@ -8,7 +8,7 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------- |
 | `backend_fastapi/`                                                                                                                            | API central, modelos SQLAlchemy, auth, JWT, SSE, orquestación y migraciones Alembic | Sí                                             |
 | `transcription_worker/`                                                                                                                       | Worker Cloud Run para VAD Silero + Gemini de transcripción por secciones            | Sí                                             |
-| `document_generation_worker/`                                                                                                                 | Worker Cloud Run para generación documental con Gemini streaming                    | Sí                                             |
+| `document_generation_worker/`                                                                                                                 | Worker Cloud Run para generación documental con provider LLM configurable           | Sí                                             |
 | `cloud_functions/`                                                                                                                            | Transcripción legacy                                                                | Sí                                             |
 | `webapp/`                                                                                                                                     | SPA del médico                                                                      | Sí                                             |
 | `infra/`                                                                                                                                      | Infra GCP, IAM, budgets, deploy base                                                | Sí                                             |
@@ -38,7 +38,7 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 - `document_generation_worker/`
   - Servicio Cloud Run privado para generación documental:
     recibe Cloud Tasks con IDs, pide el work-item clínico a FastAPI, llama
-    Gemini streaming y devuelve chunks saneados al callback existente.
+    al provider LLM configurado y devuelve chunks saneados al callback existente.
   - No escribe directamente en PostgreSQL ni publica SSE.
 - `backend_fastapi/app/domains/templates/`
   - Dueño de plantillas base y plantillas del médico.

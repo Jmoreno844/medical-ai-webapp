@@ -77,6 +77,10 @@ module "secret_manager" {
     "jwt-secret-key",
     "service-account-json",
     "copilot-service-shared-jwt",
+    "audit-ip-hmac-secret",
+    "audit-ip-encryption-key",
+    "admin-bootstrap-password",
+    "anthropic-api-key",
     "langsmith-api-key",
   ]
 
@@ -258,12 +262,16 @@ module "cloud_run" {
     TRANSCRIPTION_WORKER_SERVICE_ACCOUNT       = module.service_accounts.transcription_worker_runner_email
     DOCUMENT_GENERATION_WORKER_SERVICE_ACCOUNT = module.service_accounts.document_generation_runner_email
     GEMINI_MODEL                               = var.gemini_model
-    DOCUMENT_GENERATION_GEMINI_MODEL           = var.gemini_model
+    DOCUMENT_GENERATION_PROVIDER               = var.document_generation_provider
+    DOCUMENT_GENERATION_MODEL                  = var.document_generation_model
+    DOCUMENT_GENERATION_GOOGLE_MODEL           = var.document_generation_google_model
     VERTEX_AI_LOCATION                         = "global"
   }
 
   secret_env_vars = var.cloud_run_use_secret_manager ? [
     { name = "JWT_SECRET_KEY", secret_id = "jwt-secret-key" },
+    { name = "AUDIT_IP_HMAC_SECRET", secret_id = "audit-ip-hmac-secret" },
+    { name = "AUDIT_IP_ENCRYPTION_KEY", secret_id = "audit-ip-encryption-key" },
     { name = "COPILOT_SERVICE_SHARED_JWT", secret_id = "copilot-service-shared-jwt" },
   ] : []
 
@@ -289,6 +297,85 @@ module "cloud_run" {
 
   allow_unauthenticated = var.cloud_run_allow_unauthenticated
   labels                = local.labels
+
+  depends_on = [
+    module.service_accounts,
+    module.cloud_sql,
+    module.secret_manager,
+  ]
+}
+
+# ---------------------------------------------------------------------------
+# 10a. Cloud Run Job (admin bootstrap)
+# ---------------------------------------------------------------------------
+
+module "admin_bootstrap_cloud_run_job" {
+  source     = "../../modules/cloud_run_job"
+  project_id = var.project_id
+  region     = var.region
+
+  job_name                  = var.admin_bootstrap_job_name
+  image                     = var.cloud_run_image
+  service_account_email     = module.service_accounts.backend_runner_email
+  cloud_sql_connection_name = module.cloud_sql.connection_name
+  cloud_sql_volume_enabled  = false
+
+  command = ["python"]
+  args    = ["scripts/create_admin.py"]
+
+  timeout = "600s"
+  cpu     = "1"
+  memory  = "1Gi"
+
+  env_vars = {
+    ENVIRONMENT                  = var.environment
+    GCP_PROJECT                  = var.project_id
+    GOOGLE_CLOUD_PROJECT         = var.project_id
+    GCP_PROJECT_ID               = var.project_id
+    GCS_BUCKET_NAME              = module.storage_buckets.audio_bucket_name
+    DB_HOST                      = "127.0.0.1"
+    DB_PORT                      = "5432"
+    DB_NAME                      = var.db_name
+    DB_USER                      = trimsuffix(module.service_accounts.backend_runner_email, ".gserviceaccount.com")
+    FASTAPI_CORS_ALLOWED_ORIGINS = var.fastapi_cors_allowed_origins
+    FASTAPI_COOKIE_SECURE        = "true"
+    OTEL_SERVICE_NAME            = "vexthealth-backend-admin-bootstrap"
+  }
+
+  secret_env_vars = var.cloud_run_use_secret_manager ? [
+    { name = "JWT_SECRET_KEY", secret_id = "jwt-secret-key" },
+    { name = "AUDIT_IP_HMAC_SECRET", secret_id = "audit-ip-hmac-secret" },
+    { name = "AUDIT_IP_ENCRYPTION_KEY", secret_id = "audit-ip-encryption-key" },
+    { name = "COPILOT_SERVICE_SHARED_JWT", secret_id = "copilot-service-shared-jwt" },
+    { name = "ADMIN_BOOTSTRAP_PASSWORD", secret_id = "admin-bootstrap-password" },
+  ] : []
+
+  vpc_access = {
+    network    = module.network.network_name
+    subnetwork = module.network.subnetwork_name
+    egress     = "PRIVATE_RANGES_ONLY"
+  }
+
+  sidecars = [
+    {
+      name  = "cloud-sql-proxy"
+      image = var.cloud_run_db_proxy_image
+      args = [
+        "--private-ip",
+        "--auto-iam-authn",
+        "--address=127.0.0.1",
+        "--port=5432",
+        module.cloud_sql.connection_name,
+      ]
+    },
+  ]
+
+  labels = merge(
+    local.labels,
+    {
+      workload = "admin-bootstrap"
+    },
+  )
 
   depends_on = [
     module.service_accounts,
@@ -476,17 +563,25 @@ module "document_generation_worker_cloud_run" {
     GCP_REGION                          = var.region
     BACKEND_INTERNAL_BASE_URL           = module.cloud_run.service_url
     CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT = module.service_accounts.cloud_tasks_invoker_email
-    DOCUMENT_GENERATION_GEMINI_MODEL    = var.gemini_model
-    VERTEX_AI_LOCATION                  = "global"
-    GEMINI_MAX_CONCURRENT               = "4"
+    DOCUMENT_GENERATION_PROVIDER        = var.document_generation_provider
+    DOCUMENT_GENERATION_MODEL           = var.document_generation_model
+    DOCUMENT_GENERATION_GOOGLE_MODEL    = var.document_generation_google_model
+    VERTEX_AI_LOCATION                  = var.document_generation_vertex_ai_location
+    LLM_MAX_CONCURRENT                  = "4"
     LANGSMITH_TRACING                   = "false"
   }
+
+  secret_env_vars = var.cloud_run_use_secret_manager ? [
+    { name = "ANTHROPIC_API_KEY", secret_id = "anthropic-api-key" },
+    { name = "LANGSMITH_API_KEY", secret_id = "langsmith-api-key" },
+  ] : []
 
   allow_unauthenticated = false
   labels                = local.labels
 
   depends_on = [
     module.service_accounts,
+    module.secret_manager,
     module.cloud_run,
   ]
 }

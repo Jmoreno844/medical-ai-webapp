@@ -73,6 +73,12 @@ variable "document_generation_worker_service_name" {
   default     = "vexthealth-document-generation-worker"
 }
 
+variable "admin_bootstrap_job_name" {
+  description = "Cloud Run Job name for admin bootstrap operations"
+  type        = string
+  default     = "vexthealth-backend-admin-bootstrap"
+}
+
 variable "frontend_image" {
   description = "Initial Docker image for the frontend service (CI/CD updates this)"
   type        = string
@@ -170,6 +176,11 @@ variable "cloud_run_allow_unauthenticated" {
   default     = true
 }
 
+variable "fastapi_cors_allowed_origins" {
+  description = "Comma-separated CORS origins for FastAPI deploy-like workloads"
+  type        = string
+}
+
 variable "copilot_agent_allow_unauthenticated" {
   description = "Whether the copilot agent service should allow unauthenticated invocations"
   type        = bool
@@ -204,6 +215,30 @@ variable "gemini_model" {
   description = "Gemini model used by Cloud Functions"
   type        = string
   default     = "gemini-3.1-flash-lite-preview"
+}
+
+variable "document_generation_provider" {
+  description = "Provider used by the document generation worker"
+  type        = string
+  default     = "anthropic_api"
+}
+
+variable "document_generation_model" {
+  description = "Explicit model override used by the document generation worker"
+  type        = string
+  default     = "claude-haiku-4-5-20251001"
+}
+
+variable "document_generation_google_model" {
+  description = "Fallback Google Vertex model used by the document generation worker"
+  type        = string
+  default     = "gemini-3.1-flash-lite-preview"
+}
+
+variable "document_generation_vertex_ai_location" {
+  description = "Vertex AI location used by the document generation worker when the provider runs on Vertex"
+  type        = string
+  default     = "global"
 }
 
 variable "frontend_public_read_enabled" {

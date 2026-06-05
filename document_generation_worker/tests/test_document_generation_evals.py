@@ -125,7 +125,7 @@ def test_select_cases_supports_count_and_case_id() -> None:
 def test_parse_model_specs_maps_anthropic_alias_to_direct_api() -> None:
     specs = parse_model_specs("gemini:gemini-3-flash-preview,anthropic:claude-haiku-4-5@20251001")
 
-    assert specs[0].provider == "google_genai"
+    assert specs[0].provider == "google_vertex"
     assert specs[1].provider == "anthropic_api"
 
 

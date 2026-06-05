@@ -18,6 +18,8 @@
 - Usar `logging.getLogger(__name__)`.
 - No loguear texto clínico completo, payloads enteros, tokens, session keys ni credenciales.
 - Si hace falta trazar una operación sensible, loguear metadatos y no contenido.
+- Los logs/traces **no** son el audit trail clínico; la evidencia persistente de
+  acceso/acción vive aparte en [`audit-trail.md`](audit-trail.md).
 
 ## Relación con otros servicios
 

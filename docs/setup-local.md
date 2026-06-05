@@ -21,6 +21,8 @@ cp backend_fastapi/.env.stg.example backend_fastapi/.env.local
 Variables clave:
 
 - `JWT_SECRET_KEY`
+- `AUDIT_IP_HMAC_SECRET`
+- `AUDIT_IP_ENCRYPTION_KEY`
 - `COPILOT_AGENT_BASE_URL=http://localhost:8090`
 - `COPILOT_SERVICE_SHARED_JWT`
 - `COPILOT_AGENT_AUDIENCE=app-api-service`
@@ -29,6 +31,10 @@ Variables clave:
 - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`
 
 Para local, el backend y el contenedor Docker de PostgreSQL usan `5433` por defecto para evitar choques con una instalación nativa en `5432`.
+
+Las variables `AUDIT_*` son obligatorias para probar el audit trail local. En
+los settings locales del backend existen defaults de desarrollo, pero si quieres
+simular staging conviene usar secretos explícitos.
 
 - `GCS_BUCKET_NAME`
 - `GCP_PROJECT_ID`
@@ -83,13 +89,42 @@ Variables clave:
 
 - `ENVIRONMENT=local`
 - `BACKEND_INTERNAL_BASE_URL=http://localhost:8001`
-- `GCP_PROJECT_ID`
+- `DOCUMENT_GENERATION_PROVIDER=anthropic_api` por defecto
+- `DOCUMENT_GENERATION_MODEL` para override explicito del modelo
+- `DOCUMENT_GENERATION_ANTHROPIC_MODEL=claude-haiku-4-5-20251001` como fallback
+  cuando el provider efectivo es Anthropic
+- `ANTHROPIC_API_KEY` si `DOCUMENT_GENERATION_PROVIDER=anthropic_api`
+- `GCP_PROJECT_ID` si el provider usa Vertex AI
 - `VERTEX_AI_LOCATION=global` para Gemini; para Claude via Vertex AI usa una
   region compatible como `us-east5`
-- `DOCUMENT_GENERATION_PROVIDER=google_genai` por defecto, o
-  `anthropic_vertex` para Claude en Vertex AI
-- `DOCUMENT_GENERATION_MODEL` para override explicito del modelo
-- `DOCUMENT_GENERATION_GEMINI_MODEL` sigue funcionando como fallback legado para Gemini
+- `DOCUMENT_GENERATION_GOOGLE_MODEL` como fallback cuando el provider efectivo
+  es Google Vertex
+- `DOCUMENT_GENERATION_GEMINI_MODEL` sigue funcionando como alias legado del
+  fallback de Google
+
+Providers soportados:
+
+- `anthropic_api`
+- `anthropic_vertex`
+- `google_vertex`
+- OTEL local opcional:
+  - `OTEL_TRACES_EXPORTER=otlp`
+  - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces`
+  - `OTEL_SERVICE_NAME=vexthealth-document-generation-worker`
+  - `OTEL_FORCE_OTLP=1` si tu shell ya tiene `GOOGLE_CLOUD_PROJECT`
+
+Ejemplo por defecto con Anthropic API:
+
+```bash
+cd document_generation_worker
+uv sync --group dev
+ENVIRONMENT=local \
+BACKEND_INTERNAL_BASE_URL=http://localhost:8001 \
+DOCUMENT_GENERATION_PROVIDER=anthropic_api \
+DOCUMENT_GENERATION_MODEL=claude-haiku-4-5-20251001 \
+ANTHROPIC_API_KEY=tu-api-key \
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8092 --reload
+```
 
 Ejemplo con Claude en Vertex AI:
 
@@ -118,6 +153,11 @@ Variables clave:
 - `TRANSCRIPTION_GEMINI_MODEL=gemini-2.5-flash` como fallback legado para Gemini
 - `TRANSCRIPTION_OPENAI_MODEL=gpt-4o-mini-transcribe` como fallback para OpenAI
 - `OPENAI_API_KEY` solo si `TRANSCRIPTION_PROVIDER=openai`
+- OTEL local opcional:
+  - `OTEL_TRACES_EXPORTER=otlp`
+  - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces`
+  - `OTEL_SERVICE_NAME=vexthealth-transcription-worker`
+  - `OTEL_FORCE_OTLP=1` si tu shell ya tiene `GOOGLE_CLOUD_PROJECT`
 
 Ejemplo con OpenAI para pruebas:
 
@@ -221,6 +261,27 @@ En una base **nueva** (vacía) el mínimo es:
 cd backend_fastapi && uv run alembic upgrade head
 ```
 
+Si además quieres entrar al panel `/admin`, crea o promociona un admin con el
+script interno:
+
+```bash
+cd backend_fastapi
+uv run python scripts/create_admin.py \
+  --email admin@example.com \
+  --name Ada \
+  --last-name Lovelace \
+  --password 'testpass123'
+```
+
+Opciones útiles:
+
+- `--update-password`: si el usuario ya existe, también reemplaza su password.
+- `--superuser`: además deja `is_superuser=true`.
+
+En `stg` y `prod`, no se recomienda usar `--password` por CLI. El flujo estándar
+es un Cloud Run Job que lee `ADMIN_BOOTSTRAP_PASSWORD` desde Secret Manager. El
+runbook completo vive en [`backend/admin-bootstrap.md`](backend/admin-bootstrap.md).
+
 O desde la raíz:
 
 ```bash
@@ -243,6 +304,9 @@ ENVIRONMENT=local uv run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reloa
 Health: `http://localhost:8001/api/v1/health`
 
 También puedes usar otro puerto si en `8001` sigue levantado otro proceso.
+
+En `stg` y `prod`, este mismo script debe ejecutarse explícitamente por un
+operador autorizado. No hay endpoint público para crear admins.
 
 `backend_fastapi` carga en orden `backend_fastapi/.env` y
 `backend_fastapi/.env.local`. El archivo `backend_fastapi/.env` contiene

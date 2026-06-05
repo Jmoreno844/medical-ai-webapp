@@ -153,9 +153,10 @@ def parse_model_specs(raw: str) -> list[ModelSpec]:
     specs: list[ModelSpec] = []
     aliases_seen: set[str] = set()
     provider_map = {
-        "gemini": "google_genai",
-        "google": "google_genai",
-        "google_genai": "google_genai",
+        "gemini": "google_vertex",
+        "google": "google_vertex",
+        "google_genai": "google_vertex",
+        "google_vertex": "google_vertex",
         "anthropic": "anthropic_api",
         "claude": "anthropic_api",
         "anthropic_api": "anthropic_api",

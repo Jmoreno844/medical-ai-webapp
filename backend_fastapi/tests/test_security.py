@@ -1,8 +1,9 @@
 from datetime import timedelta
+from http.cookies import SimpleCookie
 
 import pytest
 import jwt
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
 
 from app.core.config import Settings
 from app.core.security import (
@@ -12,6 +13,7 @@ from app.core.security import (
     password_session_fingerprint,
     verify_django_password,
 )
+from app.domains.auth.service import issue_browser_tokens
 from app.core.service_jwt import (
     issue_generation_callback_token,
     issue_transcription_callback_token,
@@ -119,6 +121,45 @@ def test_generation_callback_token_rejects_wrong_purpose_and_audience() -> None:
             purpose="transcription",
             settings=settings,
         )
+
+
+def test_issue_browser_tokens_persists_browser_session_id_in_access_and_refresh() -> None:
+    settings = Settings(JWT_SECRET_KEY="test-secret-at-least-32-bytes-long")
+    response = Response()
+    user = type(
+        "UserStub",
+        (),
+        {"id": 7, "role": "doctor", "password": make_django_password("testpass123")},
+    )()
+
+    session_id = issue_browser_tokens(
+        response,
+        user,
+        settings,
+        session_id="session-123",
+    )
+
+    cookie = SimpleCookie()
+    for key, value in response.raw_headers:
+        if key.decode("latin-1").lower() == "set-cookie":
+            cookie.load(value.decode("latin-1"))
+
+    access_payload = decode_token(
+        cookie[settings.access_cookie_name].value,
+        audience=settings.browser_jwt_audience,
+        purpose="browser_access",
+        settings=settings,
+    )
+    refresh_payload = decode_token(
+        cookie[settings.refresh_cookie_name].value,
+        audience=settings.browser_jwt_audience,
+        purpose="browser_refresh",
+        settings=settings,
+    )
+
+    assert session_id == "session-123"
+    assert access_payload["sid"] == "session-123"
+    assert refresh_payload["sid"] == "session-123"
 
 
 def test_copilot_broker_jwt_uses_shared_secret_and_audience(monkeypatch: pytest.MonkeyPatch) -> None:

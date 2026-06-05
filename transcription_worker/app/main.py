@@ -8,13 +8,14 @@ from pydantic import BaseModel
 
 from app.auth import verify_cloud_tasks_request
 from app.logging_config import configure_logging
+from app.tracing import configure_tracing
 from app.processor import Processor
 from app.settings import Settings
 from app.gemini import transcribe_audio
 from app.text_filters import normalize_transcript
 
 settings = Settings()
-configure_logging(settings)
+configure_logging(settings, service_name="vexthealth-transcription-worker")
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -22,6 +23,11 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/api/v1/docs" if settings.is_local else None,
     openapi_url="/api/v1/openapi.json" if settings.is_local else None,
+)
+configure_tracing(
+    app,
+    settings,
+    service_name="vexthealth-transcription-worker",
 )
 if settings.is_local:
     app.add_middleware(

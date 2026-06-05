@@ -5,7 +5,7 @@ export default function RegistroPage() {
     <div className="grid min-h-svh lg:grid-cols-2 gap-6 p-4 md:p-6">
       <div className="flex flex-col pt-3 pb-6 px-6 md:pt-4 md:pb-8 md:px-8 rounded-xl bg-white dark:bg-neutral-900">
         <div className="flex flex-1 items-center justify-center">
-          <div className="w-full max-w-[340px] mx-auto">
+          <div className="w-full max-w-[21rem] mx-auto">
             <SignupForm />
           </div>
         </div>

@@ -27,6 +27,7 @@ import {
   setPatchReviewDecorations,
 } from "./tiptap/patchReviewDecorations";
 import SegmentedTranscriptionView from "./SegmentedTranscriptionView";
+import { postClientAuditEvent } from "@/api/audit";
 
 type EditorSnapshot = {
   markdown: string;
@@ -164,6 +165,17 @@ const TextArea: React.FC = () => {
     },
     [submitDecision],
   );
+
+  const handleCopy = useCallback(() => {
+    if (!activeDocumentId || !activeDocument) {
+      return;
+    }
+    void postClientAuditEvent({
+      action: "document.copied",
+      encounter_id: Number(activeDocument.encounter_id),
+      document_id: activeDocumentId,
+    });
+  }, [activeDocument, activeDocumentId]);
 
   const editorExtensions = useMemo(
     () => [
@@ -765,6 +777,7 @@ const TextArea: React.FC = () => {
 
       <div
         className="border rounded-md flex-1 bg-white overflow-hidden relative"
+        onCopy={handleCopy}
       >
         {isCopilotRunning && editorMode === "edit" && (
           <div className="absolute top-0 right-0 pointer-events-none z-10">

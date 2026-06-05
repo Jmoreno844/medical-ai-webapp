@@ -9,12 +9,15 @@ def _is_local_environment(settings: Settings) -> bool:
     return settings.environment.strip().lower() in {"local", "dev", "develop", "test"}
 
 
-def verify_transcription_worker_request(request: Request, settings: Settings) -> None:
+def verify_transcription_worker_request(
+    request: Request,
+    settings: Settings,
+) -> dict[str, object] | None:
     authorization = request.headers.get("authorization", "")
     scheme, _, token = authorization.partition(" ")
     if not token.strip():
         if _is_local_environment(settings):
-            return
+            return None
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Worker auth required")
     if scheme.lower() != "bearer":
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid auth scheme")
@@ -37,3 +40,4 @@ def verify_transcription_worker_request(request: Request, settings: Settings) ->
     expected_email = (settings.transcription_worker_service_account or "").strip()
     if expected_email and payload.get("email") != expected_email:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid worker invoker")
+    return payload

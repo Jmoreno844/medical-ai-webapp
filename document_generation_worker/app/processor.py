@@ -7,8 +7,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.backend_client import BackendClient
-from app.gemini import stream_document_generation
 from app.langsmith_tracing import LangSmithRun
+from app.llm import stream_document_generation
+from app.observability import bind_log_context, log_event
 from app.prompts import build_document_prompt
 from app.settings import Settings
 
@@ -19,14 +20,14 @@ logger = logging.getLogger(__name__)
 class Processor:
     settings: Settings
     backend: BackendClient
-    gemini_semaphore: asyncio.Semaphore
+    llm_semaphore: asyncio.Semaphore
 
     @classmethod
     def create(cls, settings: Settings) -> "Processor":
         return cls(
             settings=settings,
             backend=BackendClient(settings),
-            gemini_semaphore=asyncio.Semaphore(settings.gemini_max_concurrent),
+            llm_semaphore=asyncio.Semaphore(settings.llm_max_concurrent),
         )
 
     async def process_task(self, process_id: str, payload: dict[str, Any]) -> None:
@@ -38,98 +39,98 @@ class Processor:
         emitted_chunk = False
         complete_text = ""
         buffer = ""
-        gemini_started_at = time.monotonic()
+        llm_started_at = time.monotonic()
 
-        prompt = build_document_prompt(
-            template_content=work_item["template_content"],
-            context_content=work_item["context_content"],
-            transcription_content=work_item["transcription_content"],
-        )
-        langsmith_inputs = {
-            "process_id": process_id,
-            "document_id": work_item["new_document_id"],
-            "encounter_id": work_item["encounter_id"],
-            "doctor_template_id": work_item["doctor_template_id"],
-            "template_length": len(work_item["template_content"] or ""),
-            "context_length": len(work_item["context_content"] or ""),
-            "transcription_length": len(work_item["transcription_content"] or ""),
-            "provider": self.settings.document_generation_provider_name,
-            "model": self.settings.effective_document_generation_model,
-        }
+        with bind_log_context(
+            process_id=process_id,
+            document_id=work_item["new_document_id"],
+            provider=self.settings.document_generation_provider_name,
+            model=self.settings.effective_document_generation_model,
+        ):
+            prompt = build_document_prompt(
+                template_content=work_item["template_content"],
+                context_content=work_item["context_content"],
+                transcription_content=work_item["transcription_content"],
+            )
+            langsmith_inputs = {
+                "process_id": process_id,
+                "document_id": work_item["new_document_id"],
+                "encounter_id": work_item["encounter_id"],
+                "doctor_template_id": work_item["doctor_template_id"],
+                "template_length": len(work_item["template_content"] or ""),
+                "context_length": len(work_item["context_content"] or ""),
+                "transcription_length": len(work_item["transcription_content"] or ""),
+                "provider": self.settings.document_generation_provider_name,
+                "model": self.settings.effective_document_generation_model,
+            }
 
-        try:
-            with LangSmithRun(
-                self.settings,
-                name="document_generation_worker.generate_document",
-                inputs=langsmith_inputs,
-                tags=["document_generation", "gemini"],
-            ) as run:
-                async with self.gemini_semaphore:
-                    async for chunk in stream_document_generation(
-                        prompt=prompt,
-                        settings=self.settings,
-                    ):
-                        complete_text += chunk
-                        buffer += chunk
-                        if len(buffer) >= self.settings.chunk_size:
-                            await self._post_chunk(work_item, chunk=buffer)
-                            emitted_chunk = True
-                            buffer = ""
+            try:
+                with LangSmithRun(
+                    self.settings,
+                    name="document_generation_worker.generate_document",
+                    inputs=langsmith_inputs,
+                    tags=["document_generation", "llm", self.settings.document_generation_provider_name],
+                ) as run:
+                    async with self.llm_semaphore:
+                        async for chunk in stream_document_generation(
+                            prompt=prompt,
+                            settings=self.settings,
+                        ):
+                            complete_text += chunk
+                            buffer += chunk
+                            if len(buffer) >= self.settings.chunk_size:
+                                await self._post_chunk(work_item, chunk=buffer)
+                                emitted_chunk = True
+                                buffer = ""
 
-                if buffer:
-                    await self._post_chunk(work_item, chunk=buffer)
-                    emitted_chunk = True
+                    if buffer:
+                        await self._post_chunk(work_item, chunk=buffer)
+                        emitted_chunk = True
 
-                await self._post_chunk(
+                    await self._post_chunk(
+                        work_item,
+                        chunk=complete_text,
+                        is_complete=True,
+                    )
+                    run.end(
+                        {
+                            "success": True,
+                            "provider": self.settings.document_generation_provider_name,
+                            "model": self.settings.effective_document_generation_model,
+                            "text_length": len(complete_text),
+                            "llm_latency_ms": self._elapsed_ms(llm_started_at),
+                        }
+                    )
+            except Exception as exc:
+                if not emitted_chunk:
+                    log_event(
+                        logger,
+                        logging.ERROR,
+                        "Document generation retryable error",
+                        event="document_generation_retryable_error",
+                        error_code=exc.__class__.__name__,
+                    )
+                    raise
+                await self._try_post_error(
                     work_item,
-                    chunk=complete_text,
-                    is_complete=True,
+                    error="Error durante la generacion del documento",
                 )
-                run.end(
-                    {
-                        "success": True,
-                        "provider": self.settings.document_generation_provider_name,
-                        "model": self.settings.effective_document_generation_model,
-                        "text_length": len(complete_text),
-                        "llm_latency_ms": self._elapsed_ms(gemini_started_at),
-                    }
+                log_event(
+                    logger,
+                    logging.ERROR,
+                    "Document generation stream error",
+                    event="document_generation_stream_error",
+                    error_code=exc.__class__.__name__,
                 )
-        except Exception as exc:
-            if not emitted_chunk:
-                logger.exception(
-                    "document_generation_retryable_error process_id=%s "
-                    "document_id=%s error_code=%s",
-                    process_id,
-                    work_item["new_document_id"],
-                    exc.__class__.__name__,
-                )
-                raise
-            await self._try_post_error(
-                work_item,
-                error="Error durante la generación del documento",
-            )
-            logger.exception(
-                "document_generation_stream_error process_id=%s document_id=%s "
-                "error_code=%s",
-                process_id,
-                work_item["new_document_id"],
-                exc.__class__.__name__,
-            )
-            return
+                return
 
-        logger.info(
-            "document_generated process_id=%s document_id=%s encounter_id=%s "
-            "doctor_template_id=%s provider=%s model=%s llm_latency_ms=%s "
-            "worker_latency_ms=%s",
-            process_id,
-            work_item["new_document_id"],
-            work_item["encounter_id"],
-            work_item["doctor_template_id"],
-            self.settings.document_generation_provider_name,
-            self.settings.effective_document_generation_model,
-            self._elapsed_ms(gemini_started_at),
-            self._elapsed_ms(started_at),
-        )
+            log_event(
+                logger,
+                logging.INFO,
+                "Document generation completed",
+                event="document_generated",
+                duration_ms=self._elapsed_ms(started_at),
+            )
 
     async def _post_chunk(
         self,
@@ -164,10 +165,13 @@ class Processor:
                 },
             )
         except Exception:
-            logger.exception(
-                "document_generation_callback_error process_id=%s document_id=%s",
-                work_item["process_id"],
-                work_item["new_document_id"],
+            log_event(
+                logger,
+                logging.ERROR,
+                "Document generation callback failed",
+                event="document_generation_callback_error",
+                process_id=work_item["process_id"],
+                document_id=work_item["new_document_id"],
             )
 
     @staticmethod

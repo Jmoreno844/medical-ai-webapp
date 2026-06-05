@@ -17,11 +17,11 @@ graph LR
         subgraph backend_run ["Cloud Run"]
             Backend["FastAPI API"]
             Worker["transcription-worker\n(Silero VAD + Gemini STT)"]
-            DocWorker["document-generation-worker\n(Gemini streaming)"]
+            DocWorker["document-generation-worker\n(Configurable LLM streaming)"]
             Copilot["copilot-agent-service\n(LangGraph)"]
         end
         GCS["Cloud Storage\n(audio clínico)"]
-        Vertex["Vertex AI · Gemini"]
+        LLMProviders["Vertex AI / Anthropic API"]
         PG["Cloud SQL · PostgreSQL"]
         SM["Secret Manager"]
     end
@@ -37,14 +37,14 @@ graph LR
     Backend -->|"secrets"| SM
 
     Copilot -->|"checkpoints + memory"| PG
-    Copilot -->|"Gemini / tools orchestration"| Vertex
+    Copilot -->|"Gemini / tools orchestration"| LLMProviders
 
     Backend -->|"Cloud Tasks OIDC"| Worker
     Worker -->|"read sections"| GCS
-    Worker -->|"Silero VAD local\n+ Gemini async"| Vertex
+    Worker -->|"Silero VAD local\n+ Gemini async"| LLMProviders
     Worker -->|"OIDC result callbacks"| Backend
 
-    DocWorker -->|"Gemini streaming"| Vertex
+    DocWorker -->|"LLM streaming"| LLMProviders
     DocWorker -->|"chunks Bearer JWT"| Backend
 ```
 
@@ -66,7 +66,7 @@ sequenceDiagram
     participant Backend as API Backend
     participant GCS as Cloud Storage
     participant Worker as transcription-worker Cloud Run
-    participant Gemini as Vertex AI · Gemini
+    participant LLM as Provider LLM
 
     rect rgb(240, 248, 255)
         note over Browser,GCS: Paso 1 — Grabacion por secciones
@@ -143,14 +143,14 @@ sequenceDiagram
     end
 
     rect rgb(240, 255, 248)
-        note over Backend,Gemini: Paso 3 — Generación con streaming
+        note over Backend,LLM: Paso 3 — Generación con streaming
         Backend->>DocWorker: POST /internal/document-generation/tasks/:process_id via OIDC
         DocWorker->>Backend: POST /internal/document-generation/work-items/:process_id
         Backend-->>DocWorker: Contenido clínico + JWT callback
-        DocWorker->>Gemini: generate_content(prompt, stream=True)
+        DocWorker->>LLM: provider-specific streaming API
 
         loop Cada chunk de texto
-            Gemini-->>DocWorker: chunk
+            LLM-->>DocWorker: chunk
             DocWorker->>Backend: POST /api/v1/documents/generation-chunk
             Backend-->>Browser: SSE "generation_chunk" { chunk }
         end
@@ -173,10 +173,10 @@ sequenceDiagram
 | **Frontend** `webapp/`               | React 18, Vite, TypeScript, Tailwind    | SPA del médico. Maneja grabación por secciones, IndexedDB, UI del editor y conexión SSE.                                   |
 | **API principal** `backend_fastapi/` | FastAPI, SQLAlchemy async, PostgreSQL   | API bajo `/api/v1`, orquestación, JWTs, hub SSE, callbacks y migraciones Alembic.                                          |
 | **Worker transcripción** `transcription_worker/` | FastAPI, ONNX Runtime, Google Gen AI SDK | Recibe Cloud Tasks por sección, corre Silero VAD, transcribe con Gemini si hay habla y devuelve callbacks saneados a FastAPI. |
-| **Worker generación** `document_generation_worker/` | FastAPI, Google Gen AI SDK | Recibe Cloud Tasks con IDs, pide work-items a FastAPI, genera documentos con Gemini streaming y devuelve chunks saneados. |
+| **Worker generación** `document_generation_worker/` | FastAPI, Google Gen AI SDK, Anthropic SDK | Recibe Cloud Tasks con IDs, pide work-items a FastAPI, genera documentos con el provider LLM configurado y devuelve chunks saneados. |
 | **Copilot Agent** `copilot_agent/`   | Python, FastAPI, LangGraph              | Runtime del copiloto; broker hacia el API principal.                                                                       |
 | **Cloud Storage**                    | GCS                                     | Almacena los audios clínicos. El frontend sube directo vía signed URL.                                                     |
-| **Vertex AI · Gemini**               | Managed (GCP)                           | Modelo de IA para transcripción y generación de documentos clínicos.                                                       |
+| **Vertex AI / Anthropic API**        | Managed                                 | Providers de IA para transcripción y generación de documentos clínicos.                                                     |
 | **PostgreSQL**                       | Cloud SQL                               | Base de datos principal: encuentros, documentos, pacientes, plantillas.                                                    |
 
 ---
@@ -198,3 +198,19 @@ sequenceDiagram
 OpenTelemetry enlaza peticiones entre el API, workers y callbacks cuando el export está configurado (OTLP/Jaeger en local, Cloud Trace en GCP con `GOOGLE_CLOUD_PROJECT`). Los logs del backend incluyen `trace_id` / `span_id` para correlación. Detalle y variables: [`../backend/tracing.md`](../backend/tracing.md). Limitaciones: SSE (`EventSource` sin cabeceras W3C), subida directa a GCS con signed URL y ejecuciones posteriores de Cloud Tasks no continúan el mismo trace de extremo a extremo.
 
 El baseline operativo todavía no está cerrado para launch: ver deuda canónica en [`../debt/observability-baseline.md`](../debt/observability-baseline.md).
+
+## 7. Auditoría clínica
+
+La plataforma mantiene una capa separada de auditoría clínica en PostgreSQL:
+
+- `audit_user_session` guarda `sid`, `ip_hmac`, prefijo de red, user agent
+  resumido y, solo para eventos de alto valor de seguridad, IP completa cifrada.
+- `audit_event` guarda metadata de acceso/acción sobre encuentros, documentos,
+  audio y operaciones automáticas, sin contenido clínico.
+- El backend registra eventos tanto de usuario como de workers/callbacks.
+- La lectura interna del audit log también se audita.
+- La misma SPA incluye un panel `/admin` para roles administrativos con vistas
+  `Audit Trail` y `Usuarios`; consume solo metadata operacional y nunca muestra
+  contenido clínico, IP desencriptada ni tokens.
+
+Detalle y política de datos: [`../backend/audit-trail.md`](../backend/audit-trail.md).

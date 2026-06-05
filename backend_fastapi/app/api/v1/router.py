@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 
+from app.domains.admin_users import api as admin_users_api
+from app.domains.audit import api as audit_api
 from app.domains.auth import api as auth_api
 from app.domains.copilot import api as copilot_api
 from app.domains.copilot import internal_tools_api as copilot_internal_tools_api
@@ -18,6 +20,8 @@ api_v1_router = APIRouter()
 api_v1_router.include_router(health_api.router, tags=["health"])
 api_v1_router.include_router(csrf_api.router, tags=["csrf"])
 api_v1_router.include_router(auth_api.router, prefix="/auth", tags=["auth"])
+api_v1_router.include_router(audit_api.router, tags=["audit"])
+api_v1_router.include_router(admin_users_api.router, tags=["admin-users"])
 api_v1_router.include_router(encounters_api.router, tags=["encounters"])
 api_v1_router.include_router(documents_api.router, tags=["documents"])
 api_v1_router.include_router(document_generation_api.router, tags=["documents"])

@@ -10,6 +10,9 @@ import PlantillasPage from "./features/plantillas/PlantillaPage";
 import EncuentroPage from "./features/encuentro/EncuentroPage";
 import EncuentroDetailPage from "./features/encuentro/EncuentroDetailPage";
 import DebugTranscriptionPage from "./features/debugTranscription/DebugTranscriptionPage";
+import AdminRoute from "./features/admin/AdminRoute";
+import AdminAuditPage from "./features/admin/AdminAuditPage";
+import AdminUsersPage from "./features/admin/AdminUsersPage";
 
 const routes: RouteObject[] = [
   {
@@ -18,7 +21,7 @@ const routes: RouteObject[] = [
     children: [
       {
         index: true, // This handles the root path
-        element: <Navigate to="/home" replace />, // Redirect root to home page
+        element: <Navigate to="/encuentro" replace />, // Land on the encounters dashboard
       },
       {
         path: "about",
@@ -71,6 +74,30 @@ const routes: RouteObject[] = [
         element: (
           <SpecialLayout>
             <DebugTranscriptionPage />
+          </SpecialLayout>
+        ),
+      },
+      {
+        path: "admin",
+        element: <Navigate to="/admin/audit" replace />,
+      },
+      {
+        path: "admin/audit",
+        element: (
+          <SpecialLayout>
+            <AdminRoute requiredCapability="can_view_audit">
+              <AdminAuditPage />
+            </AdminRoute>
+          </SpecialLayout>
+        ),
+      },
+      {
+        path: "admin/users",
+        element: (
+          <SpecialLayout>
+            <AdminRoute requiredCapability="can_manage_users">
+              <AdminUsersPage />
+            </AdminRoute>
           </SpecialLayout>
         ),
       },

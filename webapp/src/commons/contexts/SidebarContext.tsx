@@ -13,7 +13,13 @@ export const SidebarProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Open by default on desktop (>=lg / 1024px), collapsed on smaller screens
+  // so it doesn't cover the content on mobile.
+  const [isExpanded, setIsExpanded] = useState<boolean>(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(min-width: 1024px)").matches
+  );
 
   return (
     <SidebarContext.Provider value={{ isExpanded, setIsExpanded }}>

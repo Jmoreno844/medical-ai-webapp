@@ -13,6 +13,19 @@
 - Browser tokens also include a password-state fingerprint claim derived from
   the current password hash. If the password changes, existing FastAPI
   access and refresh tokens become invalid without waiting for normal expiry.
+- Browser access y refresh ahora incluyen además `sid`, un identificador estable
+  de sesión de auditoría usado para correlacionar eventos clínicos sin depender
+  de guardar la IP en cada fila.
+- `GET /api/v1/auth/me` devuelve capacidades explícitas derivadas del backend:
+  `can_access_admin_panel`, `can_view_audit`, `can_manage_users`. La SPA usa
+  esas capacidades para abrir o bloquear `/admin/audit` y `/admin/users`, pero
+  la autorización canónica sigue estando en FastAPI.
+- El signup público crea solo usuarios `doctor`. Los admins se crean o
+  promocionan con `backend_fastapi/scripts/create_admin.py`, no mediante un
+  endpoint abierto al navegador.
+- En `stg` y `prod`, el password de bootstrap debe entrar por
+  `ADMIN_BOOTSTRAP_PASSWORD` desde Secret Manager, no por args de CLI ni por
+  GitHub Secrets.
 - Settings are environment-variable driven through `backend_fastapi/app/core/config.py`;
   `backend_fastapi/.env.local` may override local values.
 
@@ -89,6 +102,8 @@ Payload mínimo:
 | Variable | Uso |
 |----------|-----|
 | `JWT_SECRET_KEY` | Firma de todos los JWT anteriores cuando está definida y no es el placeholder `not-loaded` |
+| `AUDIT_IP_HMAC_SECRET` | Secreto HMAC para pseudonimizar IPs de sesiones de auditoría |
+| `AUDIT_IP_ENCRYPTION_KEY` | Clave Fernet para cifrar IP completa solo en eventos de alto valor de seguridad |
 | `COPILOT_AGENT_BASE_URL` | Base URL del `copilot-agent-service` que consume el broker FastAPI |
 | `COPILOT_SERVICE_SHARED_JWT` | Secreto compartido temporal entre FastAPI y `copilot_agent` |
 | `COPILOT_AGENT_AUDIENCE` | Audiencia esperada por el agent runtime |

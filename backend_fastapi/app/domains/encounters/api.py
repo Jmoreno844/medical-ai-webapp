@@ -3,11 +3,12 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
+from app.domains.audit.service import actor_from_user, record_audit_event
 from app.db.models import (
     CopilotPatch,
     CopilotPatchSet,
@@ -184,6 +185,7 @@ async def list_encounters(
 @router.get("/encounters/{encounter_id}", response_model=EncounterDetail)
 async def get_encounter(
     encounter_id: int,
+    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> EncounterDetail:
@@ -192,6 +194,19 @@ async def get_encounter(
         encounter_id=encounter_id,
         doctor_id=user.id,
     )
+    await record_audit_event(
+        session,
+        action="clinical.encounter_opened",
+        result="success",
+        request=request,
+        actor=actor_from_user(user),
+        session_id=getattr(request.state, "auth_session_id", None),
+        patient_id=encounter.patient_id,
+        encounter_id=encounter.id,
+        resource_type="encounter",
+        resource_id=encounter.id,
+    )
+    await session.commit()
     return _serialize_encounter(encounter)
 
 
@@ -293,6 +308,7 @@ async def delete_encounter(
 async def generate_upload_url(
     encounter_id: int,
     payload: AudioUploadRequest,
+    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
@@ -321,6 +337,18 @@ async def generate_upload_url(
     encounter.audio_duration_seconds = payload.audio_duration_seconds
     encounter.audio_uploaded_at = now
     encounter.audio_expires_at = now + timedelta(hours=24)
+    await record_audit_event(
+        session,
+        action="audio.upload_url_created",
+        result="success",
+        request=request,
+        actor=actor_from_user(user),
+        session_id=getattr(request.state, "auth_session_id", None),
+        patient_id=encounter.patient_id,
+        encounter_id=encounter.id,
+        resource_type="audio_upload",
+        resource_id=encounter.id,
+    )
     await session.commit()
     return AudioUploadResponse(success=True, upload_url=upload_url, filename=filename)
 
@@ -365,6 +393,7 @@ async def check_audio_exists(
 @router.delete("/encounters/{encounter_id}/audio", response_model=SuccessResponse)
 async def delete_audio(
     encounter_id: int,
+    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
@@ -461,5 +490,18 @@ async def delete_audio(
             content_markdown="",
             preferred_source="markdown",
         )
+    await record_audit_event(
+        session,
+        action="audio.deleted",
+        result="success",
+        request=request,
+        actor=actor_from_user(user),
+        session_id=getattr(request.state, "auth_session_id", None),
+        patient_id=encounter.patient_id,
+        encounter_id=encounter.id,
+        document_id=transcription_document.id if transcription_document else None,
+        resource_type="audio",
+        resource_id=encounter.id,
+    )
     await session.commit()
     return SuccessResponse(success=True)

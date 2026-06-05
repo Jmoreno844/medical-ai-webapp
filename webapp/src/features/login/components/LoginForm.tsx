@@ -36,13 +36,13 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
 
   return (
     <form
-      className={cn("flex flex-col gap-6", props.className)}
+      className={cn("flex flex-col gap-5", props.className)}
       onSubmit={handleSubmit}
       {...props}
     >
       {/* Brand logo - with less top margin */}
       <div className="flex justify-center w-full mt-0">
-        <div className="relative w-full max-w-[280px] aspect-square">
+        <div className="relative w-full max-w-[9rem] aspect-square">
           <img
             src="/brand_logo_no_text.png"
             alt="Logotipo"
@@ -50,21 +50,21 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
           />
         </div>
       </div>
-      <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-2xl font-bold text-main font-fun tracking-tight">
+      <div className="flex flex-col items-center gap-1.5 text-center">
+        <h1 className="text-xl font-bold text-main font-fun tracking-tight">
           Bienvenido/a
         </h1>
         <p className="text-balance text-sm text-neutral-600 dark:text-neutral-300">
           Introduzca sus credenciales para acceder
         </p>
       </div>
-      <div className="grid gap-7">
+      <div className="grid gap-5">
         {error && (
-          <div className="p-4 text-sm font-medium text-red-500 bg-red-50 border border-red-100 rounded-md dark:bg-red-900/20 dark:border-red-900/30">
+          <div className="p-3 text-sm font-medium text-red-500 bg-red-50 border border-red-100 rounded-md dark:bg-red-900/20 dark:border-red-900/30">
             {error}
           </div>
         )}
-        <div className="grid gap-2.5">
+        <div className="grid gap-2">
           <Label
             htmlFor="email"
             className="font-medium text-neutral-700 dark:text-neutral-200"
@@ -81,7 +81,7 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
             className="py-2.5"
           />
         </div>
-        <div className="grid gap-2.5">
+        <div className="grid gap-2">
           <div className="flex items-center">
             <Label
               htmlFor="password"
@@ -107,7 +107,7 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
         </div>
         <Button
           type="submit"
-          className="w-full bg-blue-500 hover:bg-main_dark text-white font-medium py-6 mt-2 transition-colors"
+          className="w-full bg-blue-500 hover:bg-main_dark text-white font-medium mt-1 transition-colors"
           disabled={loading}
         >
           {loading ? "Entrando…" : "Iniciar sesión"}

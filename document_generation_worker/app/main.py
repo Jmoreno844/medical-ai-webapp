@@ -12,9 +12,7 @@ from app.settings import Settings
 from app.tracing import configure_tracing
 
 settings = Settings()
-configure_logging(settings)
-configure_tracing(settings)
-configure_langsmith(settings)
+configure_logging(settings, service_name="vexthealth-document-generation-worker")
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -23,6 +21,12 @@ app = FastAPI(
     docs_url="/api/v1/docs" if settings.is_local else None,
     openapi_url="/api/v1/openapi.json" if settings.is_local else None,
 )
+configure_tracing(
+    app,
+    settings,
+    service_name="vexthealth-document-generation-worker",
+)
+configure_langsmith(settings)
 processor = Processor.create(settings)
 
 

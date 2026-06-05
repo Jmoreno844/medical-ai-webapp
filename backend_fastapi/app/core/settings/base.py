@@ -55,6 +55,14 @@ class Settings(BaseSettings):
     service_account_json: str | None = Field(default=None, alias="SERVICE_ACCOUNT_JSON")
 
     jwt_secret_key: str = Field(default="not-loaded", alias="JWT_SECRET_KEY")
+    audit_ip_hmac_secret: str = Field(
+        default="not-loaded",
+        alias="AUDIT_IP_HMAC_SECRET",
+    )
+    audit_ip_encryption_key: str = Field(
+        default="not-loaded",
+        alias="AUDIT_IP_ENCRYPTION_KEY",
+    )
     jwt_issuer: str = "medical-web-app-fastapi"
     browser_jwt_audience: str = "medical-api-browser"
     sse_jwt_audience: str = "medical-api-sse"
@@ -86,9 +94,20 @@ class Settings(BaseSettings):
         default=None,
         alias="DOCUMENT_GENERATION_WORKER_BASE_URL",
     )
-    document_generation_gemini_model: str = Field(
+    document_generation_provider: str = Field(
+        default="anthropic_api",
+        alias="DOCUMENT_GENERATION_PROVIDER",
+    )
+    document_generation_model: str | None = Field(
+        default=None,
+        alias="DOCUMENT_GENERATION_MODEL",
+    )
+    document_generation_google_model: str = Field(
         default="gemini-3.1-flash-lite-preview",
-        alias="DOCUMENT_GENERATION_GEMINI_MODEL",
+        validation_alias=AliasChoices(
+            "DOCUMENT_GENERATION_GOOGLE_MODEL",
+            "DOCUMENT_GENERATION_GEMINI_MODEL",
+        ),
     )
     copilot_agent_base_url: str = Field(
         default="http://localhost:8010",
@@ -192,6 +211,16 @@ class StrictDeploymentSettings(Settings):
         missing: list[str] = []
         if not self.jwt_secret_key or self.jwt_secret_key == "not-loaded":
             missing.append("JWT_SECRET_KEY")
+        if (
+            not self.audit_ip_hmac_secret
+            or self.audit_ip_hmac_secret == "not-loaded"
+        ):
+            missing.append("AUDIT_IP_HMAC_SECRET")
+        if (
+            not self.audit_ip_encryption_key
+            or self.audit_ip_encryption_key == "not-loaded"
+        ):
+            missing.append("AUDIT_IP_ENCRYPTION_KEY")
         if not self.database_url and not (
             self.db_name and self.db_user and self.db_host
         ):

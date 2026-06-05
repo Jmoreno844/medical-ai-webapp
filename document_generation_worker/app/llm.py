@@ -22,18 +22,29 @@ def _get_anthropic_client(project_id: str, region: str):
     return AnthropicVertex(project_id=project_id, region=region)
 
 
+@lru_cache(maxsize=1)
+def _get_anthropic_api_client(api_key: str):
+    from anthropic import AsyncAnthropic
+
+    return AsyncAnthropic(api_key=api_key)
+
+
 async def stream_document_generation(
     *,
     prompt: str,
     settings: Settings,
 ) -> AsyncIterator[str]:
     provider = settings.document_generation_provider_name
-    if provider in {"google", "google_genai", "gemini"}:
+    if provider == "google_vertex":
         async for text in _stream_with_google(prompt=prompt, settings=settings):
             yield text
         return
-    if provider in {"anthropic", "anthropic_vertex", "claude"}:
+    if provider == "anthropic_vertex":
         async for text in _stream_with_anthropic(prompt=prompt, settings=settings):
+            yield text
+        return
+    if provider == "anthropic_api":
+        async for text in _stream_with_anthropic_api(prompt=prompt, settings=settings):
             yield text
         return
     raise ValueError(f"Unsupported document generation provider: {provider}")
@@ -105,3 +116,24 @@ async def _stream_with_anthropic(
             raise item
         yield item
     await task
+
+
+async def _stream_with_anthropic_api(
+    *,
+    prompt: str,
+    settings: Settings,
+) -> AsyncIterator[str]:
+    api_key = (settings.anthropic_api_key or "").strip()
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY is required")
+
+    client = _get_anthropic_api_client(api_key)
+    async with client.messages.stream(
+        model=settings.effective_document_generation_model,
+        max_tokens=settings.max_output_tokens,
+        temperature=0.4,
+        messages=[{"role": "user", "content": prompt}],
+    ) as stream:
+        async for text in stream.text_stream:
+            if text:
+                yield text

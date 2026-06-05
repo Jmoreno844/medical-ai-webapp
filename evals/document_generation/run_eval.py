@@ -20,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 if str(WORKER_ROOT) not in sys.path:
     sys.path.insert(0, str(WORKER_ROOT))
 
-from app.gemini import stream_document_generation  # noqa: E402
+from app.llm import stream_document_generation  # noqa: E402
 from app.settings import Settings  # noqa: E402
 from evals.document_generation.lib import (  # noqa: E402
     EVALS_ROOT,

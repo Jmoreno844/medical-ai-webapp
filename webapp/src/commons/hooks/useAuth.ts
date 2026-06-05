@@ -30,6 +30,11 @@ export const useAuth = () => {
     userData,
     isAuthenticated,
   } = useContext(AuthContext);
+  const capabilities = userData?.capabilities ?? {
+    can_access_admin_panel: false,
+    can_view_audit: false,
+    can_manage_users: false,
+  };
 
   const login = async (email: string, password: string) => {
     setLoading(true);
@@ -134,6 +139,7 @@ export const useAuth = () => {
     loading: loading || isAuthLoading,
     error,
     userData,
+    capabilities,
     isAuthenticated,
   };
 };

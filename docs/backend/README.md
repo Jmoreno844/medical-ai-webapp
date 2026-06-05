@@ -6,6 +6,7 @@
 
 - [`database.md`](database.md) — modelo de datos, ERD y notas sobre PostgreSQL / SQLite.
 - [`auth-and-jwt.md`](auth-and-jwt.md) — JWT de usuario, JWT de callbacks y SSE.
+- [`audit-trail.md`](audit-trail.md) — auditoría clínica persistente, sesiones y política de IP.
 - [`logging.md`](logging.md) — política de logging del backend por entorno.
 - [`tracing.md`](tracing.md) — OpenTelemetry, Jaeger local y Cloud Trace en GCP.
 - [`secrets-and-environments.md`](secrets-and-environments.md) — variables de entorno y settings modules.

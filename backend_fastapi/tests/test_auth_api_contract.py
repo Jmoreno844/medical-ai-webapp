@@ -10,6 +10,12 @@ from app.main import app
 
 
 class FakeSession:
+    def add(self, _instance: object) -> None:
+        pass
+
+    async def flush(self) -> None:
+        pass
+
     async def commit(self) -> None:
         pass
 
@@ -49,6 +55,11 @@ def test_register_contract_returns_created_user_profile(monkeypatch) -> None:
         "name": "Test",
         "last_name": "Doctor",
         "role": "doctor",
+        "capabilities": {
+            "can_access_admin_panel": False,
+            "can_view_audit": False,
+            "can_manage_users": False,
+        },
     }
 
 
@@ -76,11 +87,38 @@ def test_register_contract_maps_duplicate_email_to_400(monkeypatch) -> None:
 
 
 def test_forgot_password_contract_is_generic() -> None:
-    response = TestClient(app).post(
-        "/api/v1/auth/forgot-password",
-        json={"email": "unknown@example.com"},
-    )
+    app.dependency_overrides[get_db_session] = lambda: FakeSession()
+    try:
+        response = TestClient(app).post(
+            "/api/v1/auth/forgot-password",
+            json={"email": "unknown@example.com"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db_session, None)
 
     assert response.status_code == 200
     assert response.json()["success"] is True
     assert "correo existe" in response.json()["message"]
+
+
+def test_me_contract_includes_admin_capabilities() -> None:
+    app.dependency_overrides[auth_api.get_current_user] = lambda: SimpleNamespace(
+        id=9,
+        email="admin@example.com",
+        name="Ada",
+        last_name="Admin",
+        role="admin",
+        is_staff=True,
+        is_superuser=False,
+    )
+    try:
+        response = TestClient(app).get("/api/v1/auth/me")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["capabilities"] == {
+        "can_access_admin_panel": True,
+        "can_view_audit": True,
+        "can_manage_users": True,
+    }

@@ -20,6 +20,8 @@ from app.core.security import (
 )
 from app.db.models import BaseTemplate, DoctorTemplate, TemplateUsage, User
 from app.db.session import get_db_session
+from app.domains.audit.service import touch_audit_user_session
+from app.domains.auth.roles import normalize_user_role, DOCTOR_ROLE
 from app.domains.auth.revocation import (
     is_token_id_revoked,
     revoke_token_id,
@@ -66,7 +68,7 @@ async def register_doctor_user(
         password=make_django_password(password),
         name=name,
         last_name=last_name,
-        role="doctor",
+        role=DOCTOR_ROLE,
         is_active=True,
         is_staff=False,
         is_superuser=False,
@@ -102,8 +104,15 @@ async def register_doctor_user(
     return user
 
 
-def issue_browser_tokens(response: Response, user: User, settings: Settings) -> None:
+def issue_browser_tokens(
+    response: Response,
+    user: User,
+    settings: Settings,
+    *,
+    session_id: str | None = None,
+) -> str:
     password_fingerprint = password_session_fingerprint(user.password, settings=settings)
+    browser_session_id = session_id or str(user.id)
     access_token, _ = create_token(
         subject=str(user.id),
         purpose="browser_access",
@@ -111,8 +120,9 @@ def issue_browser_tokens(response: Response, user: User, settings: Settings) -> 
         expires_delta=timedelta(minutes=settings.access_token_minutes),
         extra_claims={
             "user_id": user.id,
-            "role": user.role,
+            "role": normalize_user_role(user.role),
             "pwdv": password_fingerprint,
+            "sid": browser_session_id,
         },
         settings=settings,
     )
@@ -123,8 +133,9 @@ def issue_browser_tokens(response: Response, user: User, settings: Settings) -> 
         expires_delta=timedelta(days=settings.refresh_token_days),
         extra_claims={
             "user_id": user.id,
-            "role": user.role,
+            "role": normalize_user_role(user.role),
             "pwdv": password_fingerprint,
+            "sid": browser_session_id,
         },
         settings=settings,
     )
@@ -135,6 +146,7 @@ def issue_browser_tokens(response: Response, user: User, settings: Settings) -> 
         csrf_token=generate_csrf_token(),
         settings=settings,
     )
+    return browser_session_id
 
 
 async def get_current_user(
@@ -163,6 +175,8 @@ async def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
     if payload.get("pwdv") != password_session_fingerprint(user.password, settings=settings):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired")
+    request.state.browser_token_payload = payload
+    request.state.auth_session_id = payload.get("sid")
     return user
 
 
@@ -202,6 +216,8 @@ async def refresh_browser_session(
         clear_auth_cookies(response, settings)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Session expired")
 
-    issue_browser_tokens(response, user, settings)
+    session_id = payload.get("sid")
+    issue_browser_tokens(response, user, settings, session_id=session_id)
+    await touch_audit_user_session(session, session_id=session_id)
     await session.commit()
     return user

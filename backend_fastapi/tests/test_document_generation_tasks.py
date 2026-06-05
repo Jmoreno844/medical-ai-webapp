@@ -67,7 +67,7 @@ async def test_local_generation_dispatch_failure_publishes_sse_error(monkeypatch
 
     published: list[tuple[int, str, dict]] = []
 
-    def fake_post_json(*args, **kwargs) -> None:
+    async def fake_post_json(*args, **kwargs) -> None:
         raise RuntimeError("worker down")
 
     async def fake_publish_document_event(
@@ -78,7 +78,7 @@ async def test_local_generation_dispatch_failure_publishes_sse_error(monkeypatch
         published.append((document_id, event, payload or {}))
 
     monkeypatch.setattr(
-        "app.domains.documents.generation_api.post_json",
+        "app.domains.documents.generation_api.post_json_async",
         fake_post_json,
     )
     monkeypatch.setattr(

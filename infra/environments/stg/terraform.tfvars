@@ -22,6 +22,7 @@ copilot_agent_service_name              = "vexthealth-copilot-agent"
 frontend_service_name                   = "vexthealth-frontend"
 transcription_worker_service_name       = "vexthealth-transcription-worker"
 document_generation_worker_service_name = "vexthealth-document-generation-worker"
+admin_bootstrap_job_name                = "vexthealth-backend-admin-bootstrap"
 # Bootstrap with a public image; CI later replaces it with the app image.
 cloud_run_image                            = "us-docker.pkg.dev/cloudrun/container/hello"
 copilot_agent_image                        = "us-docker.pkg.dev/cloudrun/container/hello"
@@ -52,6 +53,7 @@ frontend_bucket_name         = "vext-stg-frontend-spa"
 frontend_public_read_enabled = false
 frontend_domain_name         = "app-stg.notiahealth.com"
 backend_domain_name          = "api-stg.notiahealth.com"
+fastapi_cors_allowed_origins = "https://app-stg.notiahealth.com"
 gemini_model                 = "gemini-3.1-flash-lite-preview"
 
 # Artifact Registry

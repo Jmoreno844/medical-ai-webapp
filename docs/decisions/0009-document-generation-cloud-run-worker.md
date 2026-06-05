@@ -15,7 +15,7 @@ flujo clínico nuevo basado en FastAPI, Cloud Tasks y workers privados.
 Mover la generación documental a `document_generation_worker/`, un servicio
 Cloud Run privado. FastAPI conserva permisos, DB, callbacks, SSE y estado
 canónico. El worker recibe Cloud Tasks con IDs, pide el work-item clínico a
-FastAPI mediante OIDC, llama Gemini streaming y envía chunks al callback
+FastAPI mediante OIDC, llama al provider LLM configurado y envía chunks al callback
 existente `/api/v1/documents/generation-chunk`.
 
 La task no debe contener prompts, transcripciones, documentos, callback tokens

@@ -127,16 +127,21 @@ jobs:
             DOCUMENT_GENERATION_LOG_LEVEL=INFO
             GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }}
             GOOGLE_CLOUD_PROJECT=${{ env.GCP_PROJECT_ID }}
+            OTEL_SERVICE_NAME=vexthealth-document-generation-worker
+            OTEL_TRACES_SAMPLER_ARG=1.0
             GCP_REGION=${{ env.REGION }}
             BACKEND_INTERNAL_BASE_URL=${{ vars.VITE_API_URL }}
             CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT=cloud-tasks-invoker@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com
-            DOCUMENT_GENERATION_GEMINI_MODEL=${{ vars.GEMINI_MODEL || 'gemini-3.1-flash-lite-preview' }}
-            VERTEX_AI_LOCATION=global
-            GEMINI_MAX_CONCURRENT=4
+            DOCUMENT_GENERATION_PROVIDER=${{ vars.DOCUMENT_GENERATION_PROVIDER || 'anthropic_api' }}
+            DOCUMENT_GENERATION_MODEL=${{ vars.DOCUMENT_GENERATION_MODEL || 'claude-haiku-4-5-20251001' }}
+            DOCUMENT_GENERATION_GOOGLE_MODEL=${{ vars.DOCUMENT_GENERATION_GOOGLE_MODEL || 'gemini-3.1-flash-lite-preview' }}
+            VERTEX_AI_LOCATION=${{ vars.DOCUMENT_GENERATION_VERTEX_AI_LOCATION || 'global' }}
+            LLM_MAX_CONCURRENT=4
             LANGSMITH_TRACING=${{ vars.DOCUMENT_GENERATION_LANGSMITH_TRACING || 'false' }}
             LANGSMITH_PROJECT=${{ vars.LANGSMITH_PROJECT || '' }}
             LANGSMITH_ENDPOINT=${{ vars.LANGSMITH_ENDPOINT || '' }}
           secrets: |
+            ANTHROPIC_API_KEY=anthropic-api-key:latest
             LANGSMITH_API_KEY=langsmith-api-key:latest
           project_id: ${{ env.GCP_PROJECT_ID }}
 

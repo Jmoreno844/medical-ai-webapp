@@ -31,7 +31,7 @@ resource "google_cloudfunctions2_function" "functions" {
 
     environment_variables = each.value.env_vars
 
-    ingress_settings             = "ALLOW_ALL"
+    ingress_settings               = "ALLOW_ALL"
     all_traffic_on_latest_revision = true
   }
 

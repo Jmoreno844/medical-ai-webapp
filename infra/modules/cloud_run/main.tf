@@ -1,9 +1,9 @@
 resource "google_cloud_run_v2_service" "backend" {
-  project              = var.project_id
-  name                 = var.service_name
-  location             = var.region
-  deletion_protection  = false
-  ingress              = "INGRESS_TRAFFIC_ALL"
+  project             = var.project_id
+  name                = var.service_name
+  location            = var.region
+  deletion_protection = false
+  ingress             = "INGRESS_TRAFFIC_ALL"
 
   template {
     service_account = var.service_account_email

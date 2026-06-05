@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import timedelta
 
@@ -8,10 +7,12 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
+from app.core.observability import bind_log_context, log_event
 from app.core.security import create_token
 from app.core.service_jwt import issue_generation_callback_token
 from app.db.models import User
 from app.db.session import get_db_session
+from app.domains.audit.service import actor_from_user, record_audit_event, record_security_event
 from app.domains.auth.service import get_current_user
 from app.domains.documents.schemas import (
     DocumentGenerationTaskPayload,
@@ -31,7 +32,7 @@ from app.integrations.document_generation_tasks import (
     enqueue_document_generation_task,
     should_use_document_generation_cloud_tasks,
 )
-from app.integrations.http_json import post_json
+from app.integrations.http_json import post_json_async
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -46,11 +47,19 @@ async def _post_document_worker_task_background(
         return
     url = f"{settings.document_generation_worker_base_url.rstrip('/')}{path}"
     try:
-        await asyncio.to_thread(post_json, url, payload, timeout=15)
+        with bind_log_context(
+            process_id=payload.get("process_id"),
+            document_id=payload.get("new_document_id"),
+        ):
+            await post_json_async(url, payload, timeout=15)
     except Exception:
-        logger.exception(
-            "Local document generation worker dispatch failed process_id=%s",
-            payload.get("process_id"),
+        log_event(
+            logger,
+            logging.ERROR,
+            "Local document generation worker dispatch failed",
+            event="document_generation_worker_dispatch_failed",
+            process_id=payload.get("process_id"),
+            document_id=payload.get("new_document_id"),
         )
         document_id = payload.get("new_document_id")
         process_id = payload.get("process_id")
@@ -75,6 +84,7 @@ async def _post_document_worker_task_background(
 async def generate_document_endpoint(
     payload: DocumentGenerationWorkflowRequest,
     background_tasks: BackgroundTasks,
+    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
@@ -95,6 +105,18 @@ async def generate_document_endpoint(
         doctor_id=user.id,
     )
     if not doc_context or not doc_transcription or not doc_new:
+        await record_security_event(
+            session,
+            action="clinical.access_denied",
+            result="denied",
+            request=request,
+            settings=settings,
+            actor=actor_from_user(user),
+            session_id=getattr(request.state, "auth_session_id", None),
+            resource_type="document_generation",
+            resource_id=payload.new_document_id,
+        )
+        await session.commit()
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
             "No tienes permiso para acceder a uno o más documentos requeridos",
@@ -159,6 +181,18 @@ async def generate_document_endpoint(
         doctor_template_id=doctor_template.id,
     )
     task_payload_dict = task_payload.model_dump()
+    await record_audit_event(
+        session,
+        action="document.ai_regeneration_started",
+        result="success",
+        request=request,
+        actor=actor_from_user(user),
+        session_id=getattr(request.state, "auth_session_id", None),
+        encounter_id=doc_new.encounter_id,
+        document_id=doc_new.id,
+        resource_type="document_generation",
+        resource_id=process_id,
+    )
 
     await session.commit()
 

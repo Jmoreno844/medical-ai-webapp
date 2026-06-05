@@ -11,7 +11,7 @@ La documentación está organizada para responder dos preguntas:
 |---------|-------------|
 | [Mapa del repositorio](architecture/repo-map.md) | Qué vive en cada carpeta, qué es sensible y dónde editar según el tipo de cambio. |
 | [Guía de inicio local](setup-local.md) | Levantar backend, frontend, base de datos y Cloud Functions en local. |
-| [Arquitectura global](architecture/system-overview.md) | Big picture del sistema: audio, FastAPI, GCS, Gemini, SSE y callbacks. |
+| [Arquitectura global](architecture/system-overview.md) | Big picture del sistema: audio, FastAPI, GCS, providers LLM, SSE y callbacks. |
 | [Backend](backend/README.md) | Auth/JWT, DB, entornos, logging, tracing y límites del backend. |
 | [Frontend](frontend/README.md) | Rutas, contextos, features principales y logging del `webapp/`. |
 | [Cloud Functions](cloud-functions/README.md) | Entry points, servicios internos, callbacks al backend y variables clave. |
@@ -26,6 +26,8 @@ La documentación está organizada para responder dos preguntas:
 
 - Auth, JWT, SSE o callbacks entre servicios:
   [`backend/auth-and-jwt.md`](backend/auth-and-jwt.md)
+- Auditoría clínica, sesiones y límites de evidencia:
+  [`backend/audit-trail.md`](backend/audit-trail.md)
 - Modelos, migraciones o naming de datos:
   [`backend/database.md`](backend/database.md)
 - Deploy, IAM, secrets o service accounts:

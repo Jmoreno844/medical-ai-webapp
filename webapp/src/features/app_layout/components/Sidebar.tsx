@@ -1,12 +1,17 @@
 import Icon from "@/commons/components/Icon";
 import IconButton from "@/commons/components/IconButton";
 import { useSidebar } from "@/commons/contexts/SidebarContext";
-import { useEncountersSidebar } from "../hooks/Encuentros/useEncountersSidebar";
 import { useNavigationItems } from "../hooks/useNavigationItems";
 import { EncountersSidebar } from "./EncountersSidebar";
 import { Link } from "react-router-dom";
 import SidebarUser from "./SidebarUser";
 import { useAuth } from "@/commons/hooks/useAuth";
+
+interface SidebarProps {
+  showRightSidebar: boolean;
+  toggleSidebar: () => void;
+  closeSidebar: () => void;
+}
 
 /**
  * Sidebar component that displays the navigation sidebar with toggle functionality.
@@ -14,12 +19,14 @@ import { useAuth } from "@/commons/hooks/useAuth";
  *
  * Security note: Ensure that any dynamic data passed into navigation items is properly validated and sanitized.
  */
-const Sidebar = () => {
+const Sidebar = ({
+  showRightSidebar,
+  toggleSidebar,
+  closeSidebar,
+}: SidebarProps) => {
   const { isExpanded, setIsExpanded } = useSidebar();
-  const { showRightSidebar, toggleSidebar, closeSidebar } =
-    useEncountersSidebar();
   const navigationItems = useNavigationItems(toggleSidebar, showRightSidebar);
-  const { logout } = useAuth();
+  const { logout, capabilities } = useAuth();
 
   /**
    * Handles sidebar click to expand it if currently collapsed.
@@ -183,7 +190,23 @@ const Sidebar = () => {
 
         {/* Bottom section with settings and logout */}
         <div className="mt-auto border-t border-gray-200">
-          {/* Settings button */}
+          {capabilities.can_access_admin_panel && (
+            <div className="w-10/12 mx-auto mt-2">
+              <Link
+                to="/admin"
+                className="flex items-center w-full py-2 hover:bg-gray-100 rounded-md"
+              >
+                <div className="w-10 md:w-12 lg:w-14 flex items-center justify-center">
+                  <Icon
+                    src="/settings.svg"
+                    className="h-4 w-4 md:h-5 md:w-5 text-black"
+                    alt="Admin"
+                  />
+                </div>
+                {isExpanded && <span className="text-xs md:text-sm">Admin</span>}
+              </Link>
+            </div>
+          )}
 
           {/* Logout button - FIXED */}
           <div className="w-10/12 mx-auto my-1 mb-2">

@@ -23,6 +23,11 @@ def test_settings_selects_class_from_environment(monkeypatch: pytest.MonkeyPatch
         monkeypatch.setenv("ENVIRONMENT", environment)
         if expected_class in {ProductionSettings, StagingSettings}:
             monkeypatch.setenv("JWT_SECRET_KEY", "prod-secret-at-least-32-bytes-long")
+            monkeypatch.setenv("AUDIT_IP_HMAC_SECRET", "prod-audit-ip-hmac-secret")
+            monkeypatch.setenv(
+                "AUDIT_IP_ENCRYPTION_KEY",
+                "Zb5QQ8mVdPPKZkhq0dQECjSlxMdkh2c8WqY2d9I4I1o=",
+            )
             monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@db:5432/app")
             monkeypatch.setenv("FASTAPI_CORS_ALLOWED_ORIGINS", "https://app.example")
             monkeypatch.setenv("GCP_PROJECT_ID", "medical-prod")
@@ -49,6 +54,7 @@ def test_local_and_test_settings_have_safe_defaults(
     assert local_settings.cookie_secure is False
     assert "http://localhost:5173" in local_settings.cors_allowed_origins
     assert local_settings.vertex_ai_location == "global"
+    assert local_settings.audit_ip_hmac_secret == "local-audit-ip-hmac-secret"
     assert test_settings.debug is False
     assert test_settings.cookie_secure is False
     assert test_settings.token_signing_key == "test-secret-at-least-32-bytes-long"
@@ -65,6 +71,8 @@ def test_production_requires_deployment_settings(
 ) -> None:
     for key in [
         "JWT_SECRET_KEY",
+        "AUDIT_IP_HMAC_SECRET",
+        "AUDIT_IP_ENCRYPTION_KEY",
         "DATABASE_URL",
         "DB_NAME",
         "DB_USER",
@@ -85,6 +93,11 @@ def test_production_accepts_explicit_deployment_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("JWT_SECRET_KEY", "prod-secret-at-least-32-bytes-long")
+    monkeypatch.setenv("AUDIT_IP_HMAC_SECRET", "prod-audit-ip-hmac-secret")
+    monkeypatch.setenv(
+        "AUDIT_IP_ENCRYPTION_KEY",
+        "Zb5QQ8mVdPPKZkhq0dQECjSlxMdkh2c8WqY2d9I4I1o=",
+    )
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@db:5432/app")
     monkeypatch.setenv("FASTAPI_CORS_ALLOWED_ORIGINS", "https://app.example")
     monkeypatch.setenv("GCP_PROJECT_ID", "medical-prod")
@@ -107,6 +120,11 @@ def test_production_accepts_cloud_sql_iam_user_without_db_password(
     ):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("JWT_SECRET_KEY", "prod-secret-at-least-32-bytes-long")
+    monkeypatch.setenv("AUDIT_IP_HMAC_SECRET", "prod-audit-ip-hmac-secret")
+    monkeypatch.setenv(
+        "AUDIT_IP_ENCRYPTION_KEY",
+        "Zb5QQ8mVdPPKZkhq0dQECjSlxMdkh2c8WqY2d9I4I1o=",
+    )
     monkeypatch.setenv("DB_NAME", "appdb")
     monkeypatch.setenv("DB_USER", "backend-runner@p.iam.gserviceaccount.com")
     monkeypatch.setenv("DB_HOST", "127.0.0.1")

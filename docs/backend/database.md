@@ -38,6 +38,8 @@ En entornos Cloud (`stg`, `production`), el backend ya **no utiliza contraseñas
 erDiagram
     User ||--o{ Encuentro : "id_medico"
     User ||--o{ Documento : "id_medico"
+    User ||--o{ AuditUserSession : "user_id"
+    User ||--o{ AuditEvent : "actor_id"
     User ||--o{ PlantillaDoctor : "id_medico"
     User ||--o{ UsoPlantilla : "id_medico"
     User ||--o{ PacienteMedico : "id_medico"
@@ -46,6 +48,7 @@ erDiagram
     Encuentro ||--o{ Documento : "id_encuentro"
     Encuentro ||--o{ TranscriptionRecordingSession : "id_encuentro"
     Documento ||--o{ TranscriptionRecordingSession : "id_documento"
+    AuditUserSession ||--o{ AuditEvent : "session_id"
     TranscriptionRecordingSession ||--o{ TranscriptionAudioSection : "recording_session_id"
     PlantillaBase ||--o{ PlantillaDoctor : "id_plantilla_base (nullable)"
     PlantillaDoctor ||--o{ Documento : "id_plantilla_doctor (nullable)"
@@ -116,6 +119,41 @@ erDiagram
         varchar error_code
     }
 
+    AuditUserSession {
+        varchar id PK
+        bigint user_id FK
+        varchar organization_id
+        varchar ip_hmac
+        varchar network_prefix
+        text ip_encrypted
+        varchar user_agent_summary
+        datetime started_at
+        datetime last_seen_at
+        datetime ended_at
+    }
+
+    AuditEvent {
+        bigint id PK
+        bigint actor_id FK
+        varchar actor_type
+        varchar actor_role_snapshot
+        varchar actor_name_snapshot
+        varchar action
+        varchar result
+        varchar session_id FK
+        bigint patient_id FK
+        bigint encounter_id FK
+        bigint document_id FK
+        varchar resource_type
+        varchar resource_id
+        varchar service_name
+        varchar service_account
+        varchar error_code
+        varchar trace_id
+        varchar request_id
+        datetime created_at
+    }
+
     TranscriptionAudioSection {
         bigint id PK
         varchar section_id UK
@@ -179,7 +217,7 @@ Modelo personalizado que extiende `AbstractBaseUser` + `PermissionsMixin`.
 | `password`    | varchar(128) | not null                                             | Hash de password       |
 | `name`        | varchar(50)  | not null                                             | Nombre del médico      |
 | `lastName`    | varchar(50)  | not null                                             | Apellido               |
-| `role`        | varchar(20)  | choices: `medico`, `administrador`; default `medico` | Rol del usuario        |
+| `role`        | varchar(20)  | choices canónicos: `doctor`, `admin`; default `doctor` | Rol del usuario        |
 | `is_active`   | bool         | default True                                         | Soft-delete            |
 | `is_staff`    | bool         | default False                                        | Acceso admin           |
 | `date_joined` | datetime     | default `now()`                                      | —                      |
@@ -193,6 +231,15 @@ Relaciones M2M:
 Índices:
 
 - `email` (unique implícito).
+
+Notas operativas:
+
+- La migración `0006_normalize_user_roles` normaliza valores legacy
+  `medico -> doctor` y `administrador -> admin`.
+- El signup público crea solo usuarios `doctor`.
+- Los admins se bootstrapean o promocionan con
+  `backend_fastapi/scripts/create_admin.py`; no existe signup público para
+  admins.
 
 ---
 

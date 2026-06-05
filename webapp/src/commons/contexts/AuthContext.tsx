@@ -18,6 +18,11 @@ export interface UserProfile {
   name: string;
   last_name: string;
   role: string;
+  capabilities: {
+    can_access_admin_panel: boolean;
+    can_view_audit: boolean;
+    can_manage_users: boolean;
+  };
 }
 
 // Define the shape of our authentication context
