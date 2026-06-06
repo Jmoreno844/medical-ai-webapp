@@ -4,7 +4,7 @@ import difflib
 import logging
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -42,6 +42,71 @@ SECTION_COMPLETE_STATUSES = {
     SECTION_STATUS_TRANSCRIBED,
     SECTION_STATUS_DISCARDED_NO_SPEECH,
 }
+SECTION_STUCK_STATUSES = {
+    SECTION_STATUS_REGISTERED,
+    SECTION_STATUS_TRANSCRIBING,
+}
+SECTION_RETRYABLE_STATUSES = {
+    SECTION_STATUS_REGISTERED,
+    SECTION_STATUS_TRANSCRIBING,
+    SECTION_STATUS_FAILED_RETRYABLE,
+    SECTION_STATUS_FAILED_FINAL,
+}
+
+STUCK_SECTION_THRESHOLD_SECONDS = 300
+STUCK_SECTION_MANUAL_RETRY_THRESHOLD_SECONDS = 90
+MAX_MANUAL_SECTION_RETRIES = 3
+
+TRANSCRIPTION_ERROR_MESSAGES: dict[str, str] = {
+    "section_dispatch_failed": (
+        "No se pudo iniciar la transcripción del audio. "
+        "El audio de la consulta se conservó."
+    ),
+    "section_failed_final": (
+        "No se pudo completar la transcripción. "
+        "El audio de la consulta se conservó."
+    ),
+    "task_dispatch_exhausted": (
+        "No se pudo completar la transcripción tras varios intentos automáticos. "
+        "El audio de la consulta se conservó."
+    ),
+    "worker_failed_final": (
+        "No se pudo procesar una sección de audio. "
+        "El audio de la consulta se conservó."
+    ),
+    "manual_retry_exhausted": (
+        "No se pudo transcribir tras varios intentos. "
+        "Grabe la consulta nuevamente o contacte soporte."
+    ),
+    "audio_expired": "El audio expiró. Grabe la consulta nuevamente.",
+    "session_not_retryable": "Esta sesión de transcripción no admite reintento.",
+    "no_retryable_sections": "No hay secciones de audio disponibles para reintentar.",
+}
+
+
+def transcription_user_message(error_code: str | None) -> str:
+    if not error_code:
+        return TRANSCRIPTION_ERROR_MESSAGES["section_failed_final"]
+    return TRANSCRIPTION_ERROR_MESSAGES.get(
+        error_code,
+        "No se pudo completar la transcripción. El audio de la consulta se conservó.",
+    )
+
+
+async def publish_transcription_error(
+    document_id: int,
+    error_code: str,
+    *,
+    error: str | None = None,
+) -> None:
+    await publish_document_event(
+        document_id,
+        "transcription_error",
+        {
+            "error": error or transcription_user_message(error_code),
+            "error_code": error_code,
+        },
+    )
 
 REMOVABLE_INLINE_TAGS = {
     "tos",
@@ -458,7 +523,14 @@ async def apply_section_worker_result(
     elif status == SECTION_STATUS_FAILED_FINAL:
         section.status = SECTION_STATUS_FAILED_FINAL
         section.error_code = error_code or "worker_failed_final"
+        recording_session = section.recording_session
+        recording_session.status = SESSION_STATUS_NEEDS_REVIEW
+        recording_session.error_code = "section_failed_final"
         await db_session.commit()
+        await publish_transcription_error(
+            recording_session.document_id,
+            section.error_code,
+        )
         return section
     else:
         section.status = SECTION_STATUS_FAILED_RETRYABLE
@@ -539,6 +611,10 @@ async def consolidate_recording_session(
         recording_session.status = SESSION_STATUS_NEEDS_REVIEW
         recording_session.error_code = "section_failed_final"
         await db_session.commit()
+        await publish_transcription_error(
+            recording_session.document_id,
+            recording_session.error_code,
+        )
         return recording_session
 
     if any(section.status not in SECTION_COMPLETE_STATUSES for section in sections):
@@ -580,3 +656,107 @@ async def consolidate_recording_session(
     await db_session.commit()
     await publish_document_event(recording_session.document_id, "transcription_complete")
     return recording_session
+
+
+async def reconcile_stuck_transcription_sections(
+    db_session: AsyncSession,
+    recording_session: TranscriptionRecordingSession,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    if recording_session.status in {
+        SESSION_STATUS_CONSOLIDATED,
+        SESSION_STATUS_NEEDS_REVIEW,
+    }:
+        return False
+    if recording_session.status != SESSION_STATUS_FINISHING:
+        return False
+    if not recording_session.finished_at:
+        return False
+
+    current_time = now or datetime.now(timezone.utc)
+    reference_time = recording_session.finished_at
+    changed = False
+
+    for section in recording_session.sections:
+        if section.status not in SECTION_STUCK_STATUSES:
+            continue
+        retry_count = getattr(section, "retry_count", 0) or 0
+        threshold_seconds = (
+            STUCK_SECTION_MANUAL_RETRY_THRESHOLD_SECONDS
+            if retry_count > 0
+            else STUCK_SECTION_THRESHOLD_SECONDS
+        )
+        age_base = max(section.updated_at, reference_time)
+        if current_time - age_base < timedelta(seconds=threshold_seconds):
+            continue
+        section.status = SECTION_STATUS_FAILED_FINAL
+        section.error_code = "task_dispatch_exhausted"
+        section.updated_at = current_time
+        changed = True
+
+    if not changed:
+        return False
+
+    recording_session.status = SESSION_STATUS_NEEDS_REVIEW
+    recording_session.error_code = "section_failed_final"
+    await db_session.commit()
+    await publish_transcription_error(
+        recording_session.document_id,
+        "task_dispatch_exhausted",
+    )
+    return True
+
+
+def _is_encounter_audio_expired(encounter: Encounter, *, now: datetime | None = None) -> bool:
+    if not encounter.audio_expires_at:
+        return False
+    current_time = now or datetime.now(timezone.utc)
+    return encounter.audio_expires_at <= current_time
+
+
+async def retry_failed_transcription_session(
+    db_session: AsyncSession,
+    recording_session: TranscriptionRecordingSession,
+    *,
+    settings: Settings,
+) -> tuple[bool, str | None]:
+    if recording_session.status not in {
+        SESSION_STATUS_NEEDS_REVIEW,
+        SESSION_STATUS_FINISHING,
+    }:
+        return False, "session_not_retryable"
+
+    encounter_result = await db_session.execute(
+        select(Encounter).where(Encounter.id == recording_session.encounter_id)
+    )
+    encounter = encounter_result.scalar_one_or_none()
+    if encounter and _is_encounter_audio_expired(encounter):
+        return False, "audio_expired"
+
+    eligible_sections = [
+        section
+        for section in recording_session.sections
+        if section.status in SECTION_RETRYABLE_STATUSES and section.gcs_object_name
+    ]
+    if not eligible_sections:
+        return False, "no_retryable_sections"
+
+    if any(
+        section.retry_count >= MAX_MANUAL_SECTION_RETRIES
+        for section in eligible_sections
+    ):
+        return False, "manual_retry_exhausted"
+
+    now = datetime.now(timezone.utc)
+    for section in eligible_sections:
+        section.status = SECTION_STATUS_REGISTERED
+        section.error_code = None
+        section.retry_count += 1
+        section.updated_at = now
+        enqueue_section_task(section, settings)
+
+    recording_session.status = SESSION_STATUS_FINISHING
+    recording_session.error_code = None
+    await db_session.commit()
+    return True, None

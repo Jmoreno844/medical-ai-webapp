@@ -7,6 +7,26 @@ locals {
     environment = var.environment
     managed_by  = "terraform"
   }
+
+  audio_cors_origins = distinct(
+    concat(
+      [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+      ],
+      [
+        for origin in split(",", var.fastapi_cors_allowed_origins) :
+        trimspace(origin)
+        if trimspace(origin) != ""
+      ],
+    )
+  )
+
+  # Workers call the backend by custom domain to avoid a Terraform cycle between
+  # backend task-target URLs and worker BACKEND_INTERNAL_BASE_URL.
+  backend_internal_base_url = var.backend_domain_name != null ? "https://${var.backend_domain_name}" : ""
 }
 
 # ---------------------------------------------------------------------------
@@ -114,6 +134,7 @@ module "storage_buckets" {
   audio_bucket_name            = var.audio_bucket_name
   frontend_bucket_name         = var.frontend_bucket_name
   frontend_public_read_enabled = var.frontend_public_read_enabled
+  audio_cors_origins           = local.audio_cors_origins
   audio_retention_days         = 7
   force_destroy                = true
   labels                       = local.labels
@@ -258,7 +279,10 @@ module "cloud_run" {
     DOCUMENT_GENERATION_QUEUE_NAME             = module.document_generation_cloud_tasks.queue_name
     CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT        = module.service_accounts.cloud_tasks_invoker_email
     TRANSCRIPTION_WORKER_SERVICE_ACCOUNT       = module.service_accounts.transcription_worker_runner_email
+    TRANSCRIPTION_TASK_TARGET_URL              = "${module.transcription_worker_cloud_run.service_url}/api/v1/internal/transcription/tasks"
     DOCUMENT_GENERATION_WORKER_SERVICE_ACCOUNT = module.service_accounts.document_generation_runner_email
+    DOCUMENT_GENERATION_TASK_TARGET_URL        = "${module.document_generation_worker_cloud_run.service_url}/api/v1/internal/document-generation/tasks"
+    COPILOT_AGENT_BASE_URL                     = module.copilot_agent_cloud_run.service_url
     GEMINI_MODEL                               = var.gemini_model
     DOCUMENT_GENERATION_PROVIDER               = var.document_generation_provider
     DOCUMENT_GENERATION_MODEL                  = var.document_generation_model
@@ -485,7 +509,7 @@ module "copilot_agent_cloud_run" {
     GOOGLE_CLOUD_PROJECT           = var.project_id
     GCP_REGION                     = var.region
     VERTEX_MODEL                   = "gemini-2.5-flash"
-    BACKEND_INTERNAL_BASE_URL      = module.cloud_run.service_url
+    BACKEND_INTERNAL_BASE_URL      = local.backend_internal_base_url
     COPILOT_ALLOWED_AUDIENCE       = "app-api-service"
     COPILOT_AGENT_DATABASE_URL     = "postgresql://127.0.0.1:5432/${var.copilot_agent_db_name}"
     COPILOT_LONG_TERM_DATABASE_URL = "postgresql://127.0.0.1:5432/${var.copilot_agent_db_name}"
@@ -584,7 +608,7 @@ module "transcription_worker_cloud_run" {
     GOOGLE_CLOUD_PROJECT                = var.project_id
     GCP_REGION                          = var.region
     GCS_BUCKET_NAME                     = module.storage_buckets.audio_bucket_name
-    BACKEND_INTERNAL_BASE_URL           = module.cloud_run.service_url
+    BACKEND_INTERNAL_BASE_URL           = local.backend_internal_base_url
     CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT = module.service_accounts.cloud_tasks_invoker_email
     TRANSCRIPTION_GEMINI_MODEL          = "gemini-2.5-flash"
     VERTEX_AI_LOCATION                  = "global"
@@ -598,7 +622,6 @@ module "transcription_worker_cloud_run" {
 
   depends_on = [
     module.service_accounts,
-    module.cloud_run,
   ]
 }
 
@@ -631,7 +654,7 @@ module "document_generation_worker_cloud_run" {
     GCP_PROJECT_ID                      = var.project_id
     GOOGLE_CLOUD_PROJECT                = var.project_id
     GCP_REGION                          = var.region
-    BACKEND_INTERNAL_BASE_URL           = module.cloud_run.service_url
+    BACKEND_INTERNAL_BASE_URL           = local.backend_internal_base_url
     CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT = module.service_accounts.cloud_tasks_invoker_email
     DOCUMENT_GENERATION_PROVIDER        = var.document_generation_provider
     DOCUMENT_GENERATION_MODEL           = var.document_generation_model
@@ -650,7 +673,6 @@ module "document_generation_worker_cloud_run" {
   depends_on = [
     module.service_accounts,
     module.secret_manager,
-    module.cloud_run,
   ]
 }
 

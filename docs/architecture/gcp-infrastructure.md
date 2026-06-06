@@ -156,7 +156,7 @@ secretos por nombre/versión.
 | `*-audio`        | Delete after 7 days | Audio `.webm`/`.mp4` se elimina automáticamente |
 | `*-frontend-spa` | Ninguna             | Los archivos se sobreescriben en cada deploy    |
 
-El bucket `*-audio` también necesita CORS para subida directa desde el navegador vía signed URL. En local se permiten `http://localhost:3000`, `http://127.0.0.1:3000`, `http://localhost:5173` y `http://127.0.0.1:5173` con métodos `PUT`, `GET`, `HEAD`, `OPTIONS` y `DELETE`.
+El bucket `*-audio` también necesita CORS para subida directa desde el navegador vía signed URL. En `stg`, Terraform deriva `audio_cors_origins` desde `fastapi_cors_allowed_origins` más los orígenes locales de desarrollo (`localhost:3000`, `localhost:5173`, etc.) con métodos `PUT`, `GET`, `HEAD`, `OPTIONS` y `DELETE`.
 
 ## Cloud Tasks
 
@@ -264,6 +264,9 @@ Después de `terraform apply`, configurar las mismas claves como **variables del
 | `DOCUMENT_GENERATION_WORKER_SERVICE_ACCOUNT` | `document-generation-runner@vext-stg.iam.gserviceaccount.com`                                                                    |
 | `COPILOT_AGENT_DB_NAME`         | `vext-stg-copilot`                                                                                                                              |
 | `GCS_BUCKET_NAME`               | `vext-stg-audio`                                                                                                                                |
+| `TRANSCRIPTION_TASK_TARGET_URL` | URL del `transcription-worker` + `/api/v1/internal/transcription/tasks`                                                                       |
+| `DOCUMENT_GENERATION_TASK_TARGET_URL` | URL del `document-generation-worker` + `/api/v1/internal/document-generation/tasks`                                                       |
+| `COPILOT_AGENT_BASE_URL`        | URL del servicio `vexthealth-copilot-agent`                                                                                                     |
 | `FRONTEND_BUCKET_NAME`          | `vext-stg-frontend-spa`                                                                                                                         |
 | `VITE_API_URL`                  | Para `stg`, usar el subdominio del backend, por ejemplo `https://api-stg.notiahealth.com`.                                                   |
 | `COPILOT_AGENT_URL`             | URL del copilot agent service (output)                                                                                                          |

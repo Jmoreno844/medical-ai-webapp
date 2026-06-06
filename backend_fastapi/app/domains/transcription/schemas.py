@@ -96,6 +96,13 @@ class RecordingSessionFinishResponse(BaseModel):
     error: str | None = None
 
 
+class RecordingSessionRetryResponse(BaseModel):
+    success: bool
+    status: str | None = None
+    error: str | None = None
+    error_code: str | None = None
+
+
 class SectionWorkItemResponse(BaseModel):
     section_id: str
     session_id: str

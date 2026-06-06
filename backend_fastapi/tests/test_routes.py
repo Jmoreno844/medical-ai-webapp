@@ -44,6 +44,7 @@ def test_app_usable_routes_are_registered() -> None:
         "/api/v1/transcription/sessions/{session_id}/sections/upload-url",
         "/api/v1/transcription/sessions/{session_id}/sections",
         "/api/v1/transcription/sessions/{session_id}/finish",
+        "/api/v1/transcription/sessions/{session_id}/retry",
         "/api/v1/internal/transcription/work-items/sections/{section_id}",
         "/api/v1/internal/transcription/results/sections/{section_id}",
         "/api/v1/transcription/notify-complete",

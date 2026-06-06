@@ -14,6 +14,8 @@ from app.core.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
+_GCS_IAM_SIGNING_SCOPES = ("https://www.googleapis.com/auth/cloud-platform",)
+
 
 def _gcs_client_from_adc(settings: Settings) -> storage.Client:
     project = settings.gcp_project_id or None
@@ -78,6 +80,45 @@ def get_storage_client(settings: Settings | None = None) -> storage.Client:
     )
 
 
+def _uses_adc_iam_signing(credentials: object | None) -> bool:
+    return credentials is not None and not callable(
+        getattr(credentials, "sign_bytes", None)
+    )
+
+
+def _credentials_for_iam_signing(credentials: object) -> object:
+    if hasattr(credentials, "with_scopes"):
+        return credentials.with_scopes(_GCS_IAM_SIGNING_SCOPES)
+    return credentials
+
+
+def _bind_adc_iam_signing_kwargs(
+    credentials: object,
+    signed_url_kwargs: dict[str, object],
+    request: google_requests.Request,
+) -> None:
+    # Cloud Run ADC may already expose a token for GCS, but signBlob needs
+    # cloud-platform scope. Always refresh scoped credentials for IAM signing.
+    signing_credentials = _credentials_for_iam_signing(credentials)
+    signing_credentials.refresh(request)
+    service_account_email = getattr(signing_credentials, "service_account_email", None)
+    token = getattr(signing_credentials, "token", None)
+    if service_account_email and service_account_email != "default" and token:
+        signed_url_kwargs["service_account_email"] = service_account_email
+        signed_url_kwargs["access_token"] = token
+
+
+def _gcs_signed_url_error_detail(exc: BaseException, *, max_length: int = 500) -> str:
+    message = str(exc).strip()
+    if not message:
+        return type(exc).__name__
+    return message[:max_length]
+
+
+def upload_url_user_error_message(exc: BaseException) -> str:
+    return f"No se pudo preparar la subida de audio: {type(exc).__name__}"
+
+
 def generate_v4_upload_signed_url(
     *,
     settings: Settings,
@@ -100,12 +141,18 @@ def generate_v4_upload_signed_url(
     # Cloud Run ADC often exposes a service-account identity without a local
     # private key. In that case, signed URLs must use the IAMCredentials flow
     # via service_account_email + access_token instead of local signing bytes.
-    if credentials is not None and not callable(getattr(credentials, "sign_bytes", None)):
-        if not getattr(credentials, "token", None):
-            credentials.refresh(google_requests.Request())
-        service_account_email = getattr(credentials, "service_account_email", None)
-        if service_account_email and getattr(credentials, "token", None):
-            signed_url_kwargs["service_account_email"] = service_account_email
-            signed_url_kwargs["access_token"] = credentials.token
+    if _uses_adc_iam_signing(credentials):
+        _bind_adc_iam_signing_kwargs(
+            credentials,
+            signed_url_kwargs,
+            google_requests.Request(),
+        )
 
-    return blob.generate_signed_url(**signed_url_kwargs)
+    try:
+        return blob.generate_signed_url(**signed_url_kwargs)
+    except Exception as exc:
+        logger.error(
+            "GCS signed URL generation failed: %s",
+            _gcs_signed_url_error_detail(exc),
+        )
+        raise

@@ -106,7 +106,12 @@ const TextArea: React.FC = () => {
   } = useContentContext();
   const { generationStatus, retryGeneration, isGenerating } =
     useGenerationContext();
-  const { transcriptionCompleteTimestamp } = useTranscriptionContext();
+  const {
+    transcriptionCompleteTimestamp,
+    canRetryTranscription,
+    retryTranscription,
+    errorMessage: transcriptionErrorMessage,
+  } = useTranscriptionContext();
   const setDraftContent = useDocumentDraftStore((state) => state.setDraftContent);
   const derivedByDocumentId = useDocumentDerivedStore(
     (state) => state.derivedByDocumentId,
@@ -632,6 +637,14 @@ const TextArea: React.FC = () => {
         !activeDerivedState?.inProgress) ||
         isStalledGeneratedDocument),
   );
+  const showTranscriptionRetryBanner = Boolean(
+    activeDocument &&
+      activeDocument.kind === "transcription" &&
+      activeDerivedState?.source === "transcription" &&
+      activeDerivedState?.transcriptionStatus === "error" &&
+      !activeDerivedState?.inProgress &&
+      canRetryTranscription,
+  );
   const unresolvedPatchCount = patchReviewResolutions.filter(
     (resolution) =>
       resolution.status === "missing" || resolution.status === "unsupported",
@@ -717,6 +730,32 @@ const TextArea: React.FC = () => {
               }}
             >
               Reintentar generación
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showTranscriptionRetryBanner && activeDocument && (
+        <div className="border-b border-rose-200 bg-rose-50 px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="font-medium text-rose-900">
+                No se pudo completar la transcripción
+              </p>
+              <p className="text-sm text-rose-700">
+                {activeDerivedState?.error ??
+                  transcriptionErrorMessage ??
+                  "El audio de la consulta se conservó. Puede reintentar la transcripción."}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="shrink-0 rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-rose-700"
+              onClick={() => {
+                void retryTranscription(activeDocument.id);
+              }}
+            >
+              Reintentar transcripción
             </button>
           </div>
         </div>

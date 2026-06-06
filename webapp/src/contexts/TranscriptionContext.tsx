@@ -11,6 +11,7 @@ import axiosInstance from "@/commons/utils/axiosInstance";
 import {
   getRecordingSessionStatus,
   getRecordingSessionStatusForDocument,
+  retryTranscriptionSession,
   type RecordingSessionStatus,
 } from "../features/encuentroHeader/hooks/audio/uploadService";
 import { useVoiceRecorder } from "../features/encuentroHeader/hooks/audio/useVoiceRecorder";
@@ -23,9 +24,40 @@ import { buildTranscriptionBlocks } from "@/workspace/utils/transcriptionBlocks"
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-const getTranscriptionErrorMessage = (error?: string | null) => {
+const TRANSCRIPTION_ERROR_MESSAGES: Record<string, string> = {
+  section_dispatch_failed:
+    "No se pudo iniciar la transcripción del audio. El audio de la consulta se conservó.",
+  section_failed_final:
+    "No se pudo completar la transcripción. El audio de la consulta se conservó.",
+  task_dispatch_exhausted:
+    "No se pudo completar la transcripción tras varios intentos automáticos. El audio de la consulta se conservó.",
+  worker_failed_final:
+    "No se pudo procesar una sección de audio. El audio de la consulta se conservó.",
+  manual_retry_exhausted:
+    "No se pudo transcribir tras varios intentos. Grabe la consulta nuevamente o contacte soporte.",
+  audio_expired: "El audio expiró. Grabe la consulta nuevamente.",
+  session_not_retryable: "Esta sesión de transcripción no admite reintento.",
+  no_retryable_sections:
+    "No hay secciones de audio disponibles para reintentar.",
+};
+
+const NON_RETRYABLE_TRANSCRIPTION_ERROR_CODES = new Set([
+  "manual_retry_exhausted",
+  "audio_expired",
+  "no_retryable_sections",
+  "session_not_retryable",
+]);
+
+const getTranscriptionErrorMessage = (
+  error?: string | null,
+  errorCode?: string | null,
+) => {
+  if (errorCode && TRANSCRIPTION_ERROR_MESSAGES[errorCode]) {
+    return TRANSCRIPTION_ERROR_MESSAGES[errorCode];
+  }
+
   if (error === "Audio file has expired") {
-    return "El audio expiró. Grabe uno nuevo o elimine el audio vencido.";
+    return TRANSCRIPTION_ERROR_MESSAGES.audio_expired;
   }
 
   if (
@@ -56,6 +88,8 @@ type TranscriptionContextType = {
   isTranscribing: boolean;
   transcriptionStatus: "idle" | "pending" | "success" | "error";
   errorMessage: string | null;
+  canRetryTranscription: boolean;
+  retryTranscription: (documentId?: number) => Promise<boolean>;
   startRecording: () => void;
   stopRecording: () => void;
   pauseResumeRecording: () => void;
@@ -104,6 +138,9 @@ export function TranscriptionProvider({
   const [localHasBeenTranscribed, setLocalHasBeenTranscribed] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [knownRecordingSessionId, setKnownRecordingSessionId] = useState<
+    string | null
+  >(null);
+  const [transcriptionErrorCode, setTranscriptionErrorCode] = useState<
     string | null
   >(null);
 
@@ -169,6 +206,12 @@ export function TranscriptionProvider({
     encounterId,
     transcriptionDocId ?? undefined,
   );
+  const canRetryTranscription =
+    transcriptionStatus === "error" &&
+    Boolean(knownRecordingSessionId) &&
+    !voiceRecorder.isAudioExpired &&
+    (transcriptionErrorCode === null ||
+      !NON_RETRYABLE_TRANSCRIPTION_ERROR_CODES.has(transcriptionErrorCode));
 
   useEffect(() => {
     if (voiceRecorder.recordingSessionId) {
@@ -205,6 +248,22 @@ export function TranscriptionProvider({
         return true;
       }
 
+      const failedSection = sessionStatus.sections.find(
+        (section) => section.status === "failed_final",
+      );
+      if (sessionStatus.status === "needs_review" || failedSection) {
+        const errorCode =
+          sessionStatus.error_code ??
+          failedSection?.error_code ??
+          "section_failed_final";
+        setTranscriptionErrorCode(errorCode);
+        failTranscription(
+          String(documentId),
+          getTranscriptionErrorMessage(sessionStatus.error_code, errorCode),
+        );
+        return true;
+      }
+
       if (
         sessionStatus.status === "recording" ||
         sessionStatus.status === "finishing" ||
@@ -214,12 +273,6 @@ export function TranscriptionProvider({
         return true;
       }
 
-      if (sessionStatus.status === "needs_review") {
-        failTranscription(
-          String(documentId),
-          getTranscriptionErrorMessage(sessionStatus.error_code),
-        );
-      }
       return true;
     },
     [completeTranscription, failTranscription, updateTranscriptionContent],
@@ -324,6 +377,7 @@ export function TranscriptionProvider({
 
   const resetTranscriptionState = useCallback(() => {
     setErrorMessage(null);
+    setTranscriptionErrorCode(null);
     activeRecordingSessionIdRef.current = null;
     setKnownRecordingSessionId(null);
     if (transcriptionDocId) {
@@ -538,6 +592,22 @@ export function TranscriptionProvider({
               return;
             }
 
+            if (data.event === "transcription_error") {
+              const errorCode =
+                typeof data?.error_code === "string"
+                  ? data.error_code
+                  : "section_failed_final";
+              const message = getTranscriptionErrorMessage(
+                typeof data?.error === "string" ? data.error : null,
+                errorCode,
+              );
+              setTranscriptionErrorCode(errorCode);
+              setErrorMessage(message);
+              failTranscription(String(documentId), message);
+              closeEventSource();
+              return;
+            }
+
             if (data.event === "transcription_update" && data.content) {
               void refreshTranscriptionBlocks(
                 documentId,
@@ -725,6 +795,96 @@ export function TranscriptionProvider({
     voiceRecorder.pendingAudioSections,
   ]);
 
+  useEffect(() => {
+    if (
+      transcriptionStatus !== "pending" ||
+      !knownRecordingSessionId ||
+      !transcriptionDocId
+    ) {
+      return;
+    }
+
+    const pollSessionStatus = async () => {
+      const sessionStatus = await getRecordingSessionStatus(
+        knownRecordingSessionId,
+      );
+      if (!sessionStatus || sessionStatus.status !== "needs_review") {
+        return;
+      }
+
+      applyRecordingSessionState(
+        transcriptionDocId,
+        sessionStatus,
+        contentContext.documentContentCache.get(transcriptionDocId) ?? "",
+      );
+      closeEventSource();
+    };
+
+    const intervalId = window.setInterval(() => {
+      void pollSessionStatus();
+    }, 30000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [
+    applyRecordingSessionState,
+    closeEventSource,
+    contentContext.documentContentCache,
+    knownRecordingSessionId,
+    transcriptionDocId,
+    transcriptionStatus,
+  ]);
+
+  const retryTranscription = useCallback(
+    async (documentId?: number): Promise<boolean> => {
+      const targetDocumentId = documentId ?? transcriptionDocId;
+      const sessionId =
+        knownRecordingSessionId ?? activeRecordingSessionIdRef.current;
+      if (!targetDocumentId || !sessionId) {
+        const message =
+          "No se encontró la sesión de transcripción para reintentar.";
+        setErrorMessage(message);
+        failTranscription(String(targetDocumentId ?? ""), message);
+        return false;
+      }
+
+      const result = await retryTranscriptionSession(sessionId);
+      if (!result.success) {
+        const errorCode = result.error_code ?? null;
+        const message = getTranscriptionErrorMessage(result.error, errorCode);
+        setTranscriptionErrorCode(errorCode);
+        setErrorMessage(message);
+        failTranscription(String(targetDocumentId), message);
+        return false;
+      }
+
+      setErrorMessage(null);
+      setTranscriptionErrorCode(null);
+      await subscribeToTranscriptionUpdates(targetDocumentId, {
+        markPendingOnConnect: true,
+      });
+
+      const sessionStatus = await getRecordingSessionStatus(sessionId);
+      if (sessionStatus) {
+        applyRecordingSessionState(
+          targetDocumentId,
+          sessionStatus,
+          contentContext.documentContentCache.get(targetDocumentId) ?? "",
+        );
+      }
+      return true;
+    },
+    [
+      applyRecordingSessionState,
+      contentContext.documentContentCache,
+      failTranscription,
+      knownRecordingSessionId,
+      subscribeToTranscriptionUpdates,
+      transcriptionDocId,
+    ],
+  );
+
   /**
    * Generation depends on this lookup to avoid using stale empty transcription
    * state, so the fallback stays here with the transcription owner.
@@ -811,6 +971,8 @@ export function TranscriptionProvider({
     isTranscribing,
     transcriptionStatus,
     errorMessage: effectiveErrorMessage,
+    canRetryTranscription,
+    retryTranscription,
     startRecording,
     stopRecording,
     pauseResumeRecording: voiceRecorder.pauseResumeRecording,

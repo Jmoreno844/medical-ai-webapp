@@ -225,6 +225,36 @@ export const registerAudioSection = async (
   }
 };
 
+export const retryTranscriptionSession = async (
+  recordingSessionId: string,
+): Promise<{
+  success: boolean;
+  status?: string;
+  error?: string;
+  error_code?: string;
+}> => {
+  try {
+    const response = await axiosInstance.post(
+      `/api/v1/transcription/sessions/${recordingSessionId}/retry`,
+    );
+    return {
+      success: response.data?.success === true,
+      status: response.data?.status,
+      error: response.data?.error,
+      error_code: response.data?.error_code,
+    };
+  } catch (error) {
+    logger.error(
+      "[VOICE_RECORDER] Failed to retry transcription session:",
+      error,
+    );
+    return {
+      success: false,
+      error: getApiErrorMessage(error),
+    };
+  }
+};
+
 export const finishRecordingSession = async (
   recordingSessionId: string
 ): Promise<boolean> => {

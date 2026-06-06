@@ -32,6 +32,8 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
     isTranscribing,
     transcriptionStatus,
     errorMessage,
+    canRetryTranscription,
+    retryTranscription,
     resetTranscriptionState,
     transcribeAudio,
   } = useTranscriptionContext();
@@ -55,12 +57,14 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
   const hasAudioToTranscribe = Boolean(
     audioBlob || audioExists || hasRealtimeSession,
   );
+  const shouldOfferRetry =
+    transcriptionStatus === "error" && canRetryTranscription;
   const isDisabled =
     !transcriptionDocId ||
     isRecording ||
-    isTranscribing ||
-    isAudioExpired ||
-    !hasAudioToTranscribe;
+    (isTranscribing && !shouldOfferRetry) ||
+    (isAudioExpired && !shouldOfferRetry) ||
+    (!hasAudioToTranscribe && !shouldOfferRetry);
 
   const disabledTooltip = isAudioExpired
     ? "El audio expiró. Grabe uno nuevo o elimine el audio vencido."
@@ -86,11 +90,18 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
         throw new Error("Falta el ID del documento de transcripción");
       }
 
+      if (shouldOfferRetry) {
+        logger.debug(
+          `[TRANSCRIBE_BUTTON] Retrying transcription for document ${transcriptionDocId}`,
+        );
+        await retryTranscription(transcriptionDocId);
+        return;
+      }
+
       logger.debug(
         `[TRANSCRIBE_BUTTON] Initiating transcription for document ${transcriptionDocId} and encounter ${encounterId}`,
       );
 
-      // Call the transcribeAudio function from the context
       await transcribeAudio(transcriptionDocId, encounterId);
     } catch (error) {
       logger.error("[TRANSCRIBE_BUTTON] Error in transcribe handler:", error);
@@ -186,7 +197,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
               clipRule="evenodd"
             ></path>
           </svg>
-          <span>Error</span>
+          <span>{shouldOfferRetry ? "Reintentar" : "Error"}</span>
         </>
       );
     }

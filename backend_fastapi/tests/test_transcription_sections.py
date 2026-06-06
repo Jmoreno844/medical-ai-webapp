@@ -1,19 +1,29 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
 
 from app.domains.transcription import service as transcription_service
 from app.domains.transcription.service import (
+    SECTION_STATUS_FAILED_FINAL,
+    SECTION_STATUS_REGISTERED,
+    SECTION_STATUS_TRANSCRIBING,
+    SESSION_STATUS_FINISHING,
+    SESSION_STATUS_NEEDS_REVIEW,
+    STUCK_SECTION_MANUAL_RETRY_THRESHOLD_SECONDS,
+    STUCK_SECTION_THRESHOLD_SECONDS,
     _merge_session_with_existing_document,
     _merge_with_light_dedup,
     _normalize_transcript_for_document,
     create_recording_session,
     is_recording_session_ready_for_consolidation,
+    reconcile_stuck_transcription_sections,
     register_audio_section,
     reset_recording_session,
+    retry_failed_transcription_session,
+    transcription_user_message,
 )
 
 
@@ -87,16 +97,21 @@ class FakeSession:
     def __init__(self) -> None:
         self.statements: list[object] = []
         self.flushed = False
+        self.committed = False
         self.added: list[object] = []
 
-    async def execute(self, statement: object) -> None:
+    async def execute(self, statement: object) -> FakeResult | None:
         self.statements.append(statement)
+        return None
 
     def add(self, value: object) -> None:
         self.added.append(value)
 
     async def flush(self) -> None:
         self.flushed = True
+
+    async def commit(self) -> None:
+        self.committed = True
 
 
 class FakeResult:
@@ -254,3 +269,197 @@ async def test_register_audio_section_returns_existing_section_on_index_race(
     )
 
     assert section is existing_section
+
+
+def test_transcription_user_message_maps_known_codes() -> None:
+    assert "conservó" in transcription_user_message("section_dispatch_failed")
+    assert "expiró" in transcription_user_message("audio_expired")
+
+
+@pytest.mark.asyncio
+async def test_reconcile_stuck_sections_marks_needs_review(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    published: list[tuple[int, str]] = []
+
+    async def fake_publish(document_id: int, error_code: str, **kwargs) -> None:
+        published.append((document_id, error_code))
+
+    monkeypatch.setattr(
+        transcription_service,
+        "publish_transcription_error",
+        fake_publish,
+    )
+
+    stale_time = datetime.now(timezone.utc) - timedelta(
+        seconds=STUCK_SECTION_THRESHOLD_SECONDS + 30,
+    )
+    recording_session = SimpleNamespace(
+        status=SESSION_STATUS_FINISHING,
+        finished_at=stale_time,
+        document_id=42,
+        error_code=None,
+        sections=[
+            SimpleNamespace(
+                status=SECTION_STATUS_REGISTERED,
+                updated_at=stale_time,
+                error_code=None,
+                retry_count=0,
+            ),
+        ],
+    )
+    session = FakeSession()
+
+    changed = await reconcile_stuck_transcription_sections(
+        session,  # type: ignore[arg-type]
+        recording_session,  # type: ignore[arg-type]
+    )
+
+    assert changed is True
+    assert recording_session.status == SESSION_STATUS_NEEDS_REVIEW
+    assert recording_session.sections[0].status == SECTION_STATUS_FAILED_FINAL
+    assert recording_session.sections[0].error_code == "task_dispatch_exhausted"
+    assert session.committed is True
+    assert published == [(42, "task_dispatch_exhausted")]
+
+
+@pytest.mark.asyncio
+async def test_reconcile_stuck_sections_ignores_recent_sections(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_publish(document_id: int, error_code: str, **kwargs) -> None:
+        raise AssertionError("publish should not be called")
+
+    monkeypatch.setattr(
+        transcription_service,
+        "publish_transcription_error",
+        fake_publish,
+    )
+
+    now = datetime.now(timezone.utc)
+    recording_session = SimpleNamespace(
+        status=SESSION_STATUS_FINISHING,
+        finished_at=now,
+        document_id=42,
+        error_code=None,
+        sections=[
+            SimpleNamespace(
+                status=SECTION_STATUS_TRANSCRIBING,
+                updated_at=now,
+                error_code=None,
+                retry_count=0,
+            ),
+        ],
+    )
+    session = FakeSession()
+
+    changed = await reconcile_stuck_transcription_sections(
+        session,  # type: ignore[arg-type]
+        recording_session,  # type: ignore[arg-type]
+        now=now,
+    )
+
+    assert changed is False
+    assert recording_session.status == SESSION_STATUS_FINISHING
+
+
+@pytest.mark.asyncio
+async def test_reconcile_stuck_sections_uses_shorter_threshold_after_manual_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    published: list[tuple[int, str]] = []
+
+    async def fake_publish(document_id: int, error_code: str, **kwargs) -> None:
+        published.append((document_id, error_code))
+
+    monkeypatch.setattr(
+        transcription_service,
+        "publish_transcription_error",
+        fake_publish,
+    )
+
+    now = datetime.now(timezone.utc)
+    stale_time = now - timedelta(
+        seconds=STUCK_SECTION_MANUAL_RETRY_THRESHOLD_SECONDS + 15,
+    )
+    recording_session = SimpleNamespace(
+        status=SESSION_STATUS_FINISHING,
+        finished_at=stale_time,
+        document_id=42,
+        error_code=None,
+        sections=[
+            SimpleNamespace(
+                status=SECTION_STATUS_REGISTERED,
+                updated_at=stale_time,
+                error_code=None,
+                retry_count=1,
+            ),
+        ],
+    )
+    session = FakeSession()
+
+    changed = await reconcile_stuck_transcription_sections(
+        session,  # type: ignore[arg-type]
+        recording_session,  # type: ignore[arg-type]
+        now=now,
+    )
+
+    assert changed is True
+    assert recording_session.status == SESSION_STATUS_NEEDS_REVIEW
+    assert published == [(42, "task_dispatch_exhausted")]
+
+
+@pytest.mark.asyncio
+async def test_retry_failed_transcription_session_reenqueues_sections(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    enqueued: list[str] = []
+
+    def fake_enqueue(section: object, settings: object) -> str:
+        enqueued.append(section.section_id)  # type: ignore[attr-defined]
+        return "task-name"
+
+    monkeypatch.setattr(
+        transcription_service,
+        "enqueue_section_task",
+        fake_enqueue,
+    )
+
+    encounter = SimpleNamespace(audio_expires_at=None)
+    recording_session = SimpleNamespace(
+        status=SESSION_STATUS_NEEDS_REVIEW,
+        encounter_id=7,
+        error_code="section_failed_final",
+        sections=[
+            SimpleNamespace(
+                section_id="section-a",
+                status=SECTION_STATUS_FAILED_FINAL,
+                gcs_object_name="audio/a.webm",
+                retry_count=0,
+                error_code="task_dispatch_exhausted",
+            ),
+        ],
+    )
+
+    class RetrySession(FakeSession):
+        async def execute(self, statement: object) -> FakeResult:
+            self.statements.append(statement)
+            return FakeResult(encounter)
+
+    session = RetrySession()
+    settings = SimpleNamespace()
+
+    success, error_code = await retry_failed_transcription_session(
+        session,  # type: ignore[arg-type]
+        recording_session,  # type: ignore[arg-type]
+        settings=settings,  # type: ignore[arg-type]
+    )
+
+    assert success is True
+    assert error_code is None
+    assert recording_session.status == SESSION_STATUS_FINISHING
+    assert recording_session.error_code is None
+    assert recording_session.sections[0].status == SECTION_STATUS_REGISTERED
+    assert recording_session.sections[0].retry_count == 1
+    assert enqueued == ["section-a"]
+    assert session.committed is True

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,7 +31,11 @@ from app.domains.transcription.service import (
     get_canonical_recording_session_for_document,
     reset_recording_session,
 )
-from app.integrations.storage import generate_v4_upload_signed_url, get_storage_client
+from app.integrations.storage import (
+    generate_v4_upload_signed_url,
+    get_storage_client,
+    upload_url_user_error_message,
+)
 from app.core.schemas import SuccessResponse
 from app.domains.encounters.schemas import (
     AudioExistsResponse,
@@ -43,6 +49,7 @@ from app.domains.encounters.schemas import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _serialize_encounter(encounter: Encounter) -> EncounterDetail:
@@ -322,11 +329,24 @@ async def generate_upload_url(
         return AudioUploadResponse(success=False, error="GCS_BUCKET_NAME no configurado")
 
     filename = f"encounter_audio/{encounter_id}/{uuid.uuid4()}.webm"
-    upload_url = generate_v4_upload_signed_url(
-        settings=settings,
-        gcs_object_name=filename,
-        content_type="audio/webm;codecs=opus",
-    )
+    try:
+        upload_url = generate_v4_upload_signed_url(
+            settings=settings,
+            gcs_object_name=filename,
+            content_type="audio/webm;codecs=opus",
+        )
+    except Exception as exc:
+        logger.exception(
+            "Failed to generate encounter upload URL for encounter_id=%s",
+            encounter_id,
+        )
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=AudioUploadResponse(
+                success=False,
+                error=upload_url_user_error_message(exc),
+            ).model_dump(),
+        )
 
     now = datetime.now(timezone.utc)
     encounter.audio_file_name = filename

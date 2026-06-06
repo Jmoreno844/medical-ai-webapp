@@ -200,9 +200,21 @@ El audio local no debe borrarse hasta que FastAPI confirme el registro durable
 de la seccion. Si el usuario cierra la pagina, al volver al encuentro la SPA
 debe leer IndexedDB, detectar secciones pendientes y reanudar la subida.
 
-Una vez registrada la seccion, el frontend deja de reintentar transcripcion.
-Desde ese punto, Cloud Tasks y el backend manejan retries, estados y
+Una vez registrada la seccion, el frontend deja de reintentar subida/registro.
+Desde ese punto, Cloud Tasks y el backend manejan retries automaticos, estados y
 finalizacion.
+
+Si el pipeline falla despues del registro (enqueue, worker o agotamiento de
+reintentos de Cloud Tasks), FastAPI:
+
+- publica `transcription_error` por SSE al documento de transcripcion;
+- reconcilia secciones atascadas en `registered`/`transcribing` hacia
+  `failed_final` + sesion `needs_review` al consultar estado;
+- expone `POST /transcription/sessions/{session_id}/retry` para re-encolar
+  secciones desde el audio ya persistido en GCS (sin pedir re-grabar al medico).
+
+El frontend muestra el error, hace polling de respaldo mientras `pending` y
+ofrece **Reintentar transcripcion** mientras el audio siga disponible.
 
 ## Alternativas consideradas
 

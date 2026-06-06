@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -20,6 +21,7 @@ from app.domains.transcription.schemas import (
     RecordingSessionCreate,
     RecordingSessionFinishResponse,
     RecordingSessionResponse,
+    RecordingSessionRetryResponse,
     RecordingSessionStatusResponse,
     SectionResultRequest,
     SectionUploadUrlRequest,
@@ -40,11 +42,16 @@ from app.domains.transcription.service import (
     get_recording_session_for_doctor,
     get_section_work_item,
     is_recording_session_ready_for_consolidation,
+    publish_transcription_error,
+    reconcile_stuck_transcription_sections,
     register_audio_section,
+    retry_failed_transcription_session,
     serialize_section,
+    transcription_user_message,
 )
 from app.domains.transcription.worker_auth import verify_transcription_worker_request
 from app.integrations.http_json import post_json_async
+from app.integrations.storage import upload_url_user_error_message
 from app.integrations.transcription_tasks import (
     should_use_cloud_tasks,
 )
@@ -215,9 +222,12 @@ async def create_section_upload_url(
             session_id,
             payload.section_index,
         )
-        return SectionUploadUrlResponse(
-            success=False,
-            error=f"No se pudo preparar la subida de audio: {type(exc).__name__}",
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=SectionUploadUrlResponse(
+                success=False,
+                error=upload_url_user_error_message(exc),
+            ).model_dump(),
         )
     return SectionUploadUrlResponse(
         success=True,
@@ -279,10 +289,16 @@ async def register_transcription_section(
             enqueue_section_task(section, settings)
         except Exception as exc:
             logger.error("Failed to enqueue section transcription: %s", exc)
+            error_code = "section_dispatch_failed"
+            await publish_transcription_error(
+                recording_session.document_id,
+                error_code,
+                error=transcription_user_message(error_code),
+            )
             return AudioSectionRegisterResponse(
                 success=False,
                 section=serialize_section(section),
-                error=str(exc),
+                error=transcription_user_message(error_code),
             )
     elif settings.transcription_worker_base_url:
         background_tasks.add_task(
@@ -349,6 +365,7 @@ async def get_transcription_recording_session_status(
     )
     if not recording_session:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Sesión no encontrada")
+    await reconcile_stuck_transcription_sections(session, recording_session)
     return RecordingSessionStatusResponse(
         success=True,
         session_id=recording_session.session_id,
@@ -389,6 +406,7 @@ async def get_transcription_document_recording_session_status(
     if not recording_session:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Sesión no encontrada")
 
+    await reconcile_stuck_transcription_sections(session, recording_session)
     return RecordingSessionStatusResponse(
         success=True,
         session_id=recording_session.session_id,
@@ -401,6 +419,44 @@ async def get_transcription_document_recording_session_status(
         consolidated_transcript=recording_session.consolidated_transcript,
         error_code=recording_session.error_code,
         sections=[serialize_section(section) for section in recording_session.sections],
+    )
+
+
+@router.post(
+    "/transcription/sessions/{session_id}/retry",
+    response_model=RecordingSessionRetryResponse,
+)
+async def retry_transcription_recording_session(
+    session_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> RecordingSessionRetryResponse:
+    require_clinical_access(user)
+    recording_session = await get_recording_session_for_doctor(
+        session,
+        session_id=session_id,
+        doctor_id=user.id,
+    )
+    if not recording_session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Sesión no encontrada")
+
+    success, error_code = await retry_failed_transcription_session(
+        session,
+        recording_session,
+        settings=settings,
+    )
+    if not success:
+        return RecordingSessionRetryResponse(
+            success=False,
+            status=recording_session.status,
+            error=transcription_user_message(error_code),
+            error_code=error_code,
+        )
+
+    return RecordingSessionRetryResponse(
+        success=True,
+        status=recording_session.status,
     )
 
 
