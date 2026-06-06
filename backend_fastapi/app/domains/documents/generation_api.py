@@ -13,6 +13,7 @@ from app.core.service_jwt import issue_generation_callback_token
 from app.db.models import User
 from app.db.session import get_db_session
 from app.domains.audit.service import actor_from_user, record_audit_event, record_security_event
+from app.domains.auth.access import require_clinical_access
 from app.domains.auth.service import get_current_user
 from app.domains.documents.schemas import (
     DocumentGenerationTaskPayload,
@@ -89,6 +90,7 @@ async def generate_document_endpoint(
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> DocumentGenerationWorkflowResponse:
+    require_clinical_access(user)
     doc_context = await get_document_for_doctor(
         session,
         document_id=payload.context_document_id,

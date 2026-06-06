@@ -53,6 +53,7 @@ def test_internal_users_returns_list(monkeypatch) -> None:
         "last_name": "Lovelace",
         "role": "doctor",
         "is_active": True,
+        "clinical_access_enabled": True,
         "last_login": datetime.now(timezone.utc),
         "date_joined": datetime.now(timezone.utc),
         "active_session_count": 1,
@@ -90,7 +91,11 @@ def test_internal_user_status_update_prevents_self_deactivate(monkeypatch) -> No
 
     class SessionWithUser(FakeSession):
         async def get(self, _model, _user_id: int):
-            return SimpleNamespace(id=1, is_active=True)
+            return SimpleNamespace(
+                id=1,
+                is_active=True,
+                clinical_access_enabled=True,
+            )
 
     app.dependency_overrides[get_current_user] = _admin_user
     app.dependency_overrides[get_db_session] = lambda: SessionWithUser()

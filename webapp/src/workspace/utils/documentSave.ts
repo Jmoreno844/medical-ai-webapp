@@ -1,4 +1,4 @@
-import { getCookie } from "@/commons/utils/cookieUtils";
+import { getCsrfToken } from "@/commons/utils/csrfTokenStore";
 
 const API_URL = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
 
@@ -66,7 +66,7 @@ export function sendKeepaliveDocumentSave(
     return false;
   }
 
-  const csrfToken = getCookie("_xsrf") || getCookie("csrftoken");
+  const csrfToken = getCsrfToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json",

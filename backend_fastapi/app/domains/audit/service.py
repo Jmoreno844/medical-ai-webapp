@@ -143,10 +143,12 @@ def user_has_admin_access(user: User) -> bool:
 
 def user_capabilities(user: User) -> dict[str, bool]:
     can_access_admin_panel = user_has_admin_access(user)
+    clinical_access_enabled = bool(getattr(user, "clinical_access_enabled", False))
     return {
         "can_access_admin_panel": can_access_admin_panel,
         "can_view_audit": can_access_admin_panel,
         "can_manage_users": can_access_admin_panel,
+        "can_use_clinical_features": clinical_access_enabled,
     }
 
 

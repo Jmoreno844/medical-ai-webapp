@@ -77,8 +77,10 @@ Razón operativa y de compliance:
 - `user.created`
 
 Algunos eventos del plan original siguen pendientes de que exista el flujo de
-producto correspondiente, por ejemplo `user.deactivated`, `user.role_changed`,
-`document.exported` o `support.customer_data_accessed`.
+producto correspondiente, por ejemplo `document.exported` o
+`support.customer_data_accessed`. Eventos de cuenta ya emitidos:
+`user.activated`, `user.deactivated`, `clinical_access.enabled`,
+`clinical_access.disabled`.
 
 ## Acceso y retención
 

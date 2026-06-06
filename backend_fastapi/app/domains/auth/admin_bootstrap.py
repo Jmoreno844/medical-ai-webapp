@@ -57,6 +57,7 @@ async def create_or_promote_admin_user(
             name=name,
             last_name=last_name,
         )
+        user.clinical_access_enabled = True
         created = True
         await record_audit_event(
             session,
@@ -70,6 +71,7 @@ async def create_or_promote_admin_user(
         user = existing
         user.name = name.strip()
         user.last_name = last_name.strip()
+        user.clinical_access_enabled = True
         if not user.is_active:
             user.is_active = True
             reactivated = True
@@ -80,6 +82,7 @@ async def create_or_promote_admin_user(
     if user.role != ADMIN_ROLE or not user.is_staff or (make_superuser and not user.is_superuser):
         user.role = ADMIN_ROLE
         user.is_staff = True
+        user.clinical_access_enabled = True
         if make_superuser:
             user.is_superuser = True
         promoted = True

@@ -70,6 +70,7 @@ async def register_doctor_user(
         last_name=last_name,
         role=DOCTOR_ROLE,
         is_active=True,
+        clinical_access_enabled=False,
         is_staff=False,
         is_superuser=False,
         last_login=None,

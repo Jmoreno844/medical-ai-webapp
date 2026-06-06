@@ -34,6 +34,7 @@ class User(Base):
     last_name: Mapped[str] = mapped_column(String(50))
     role: Mapped[str] = mapped_column(String(20))
     is_active: Mapped[bool] = mapped_column(Boolean)
+    clinical_access_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     is_staff: Mapped[bool] = mapped_column(Boolean)
     date_joined: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 

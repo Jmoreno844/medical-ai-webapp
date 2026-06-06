@@ -25,6 +25,7 @@ export const useAuth = () => {
   const [error, setError] = useState<string | null>(null);
   const {
     login: contextLogin,
+    completeAuthenticatedSession,
     logout: contextLogout,
     isAuthLoading,
     userData,
@@ -34,6 +35,7 @@ export const useAuth = () => {
     can_access_admin_panel: false,
     can_view_audit: false,
     can_manage_users: false,
+    can_use_clinical_features: false,
   };
 
   const login = async (email: string, password: string) => {
@@ -116,6 +118,10 @@ export const useAuth = () => {
         last_name: lastName,
         password,
       });
+      if (!response.data?.user) {
+        throw new Error("Signup response missing user profile");
+      }
+      await completeAuthenticatedSession(response.data.user);
       logAuth("info", "Signup successful");
       return response.data;
     } catch (err: any) {

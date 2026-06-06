@@ -56,6 +56,7 @@ export type AdminUserListItem = {
   last_name: string;
   role: string;
   is_active: boolean;
+  clinical_access_enabled: boolean;
   last_login: string | null;
   date_joined: string;
   active_session_count: number;
@@ -91,6 +92,7 @@ export type AdminUserDetailResponse = {
 export type AdminUsersFilters = {
   q?: string;
   is_active?: string;
+  clinical_access_enabled?: string;
   role?: string;
   limit?: number;
   offset?: number;
@@ -128,6 +130,12 @@ export async function getInternalUsers(
   if (params.is_active === "true" || params.is_active === "false") {
     normalized.is_active = params.is_active;
   }
+  if (
+    params.clinical_access_enabled === "true" ||
+    params.clinical_access_enabled === "false"
+  ) {
+    normalized.clinical_access_enabled = params.clinical_access_enabled;
+  }
   const response = await axiosInstance.get<AdminUserListResponse>(
     "/api/v1/internal/users",
     {
@@ -146,11 +154,14 @@ export async function getInternalUserDetail(
   return response.data;
 }
 
+export type AdminUserStatusUpdate = {
+  is_active?: boolean;
+  clinical_access_enabled?: boolean;
+};
+
 export async function updateInternalUserStatus(
   userId: number,
-  isActive: boolean,
+  payload: AdminUserStatusUpdate,
 ): Promise<void> {
-  await axiosInstance.patch(`/api/v1/internal/users/${userId}/status`, {
-    is_active: isActive,
-  });
+  await axiosInstance.patch(`/api/v1/internal/users/${userId}/status`, payload);
 }

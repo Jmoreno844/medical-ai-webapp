@@ -74,3 +74,4 @@ app = CORSMiddleware(
 # the FastAPI route table and state, so mirror the underlying app attributes.
 app.routes = fastapi_app.routes
 app.state = fastapi_app.state
+app.dependency_overrides = fastapi_app.dependency_overrides

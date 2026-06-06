@@ -50,7 +50,7 @@ const Sidebar = ({
     <div className="flex h-screen">
       <div
         onClick={handleSidebarClick}
-        className={`bg-white text-black shadow-md z-50 transition-all duration-300 flex flex-col
+        className={`bg-white text-black shadow-md z-50 transition-all duration-300 flex flex-col overflow-hidden
                     ${
                       isExpanded
                         ? "w-[160px] md:w-[180px] lg:w-[200px]"
@@ -92,7 +92,11 @@ const Sidebar = ({
                     item.action();
                   }
                 }}
-                className={`flex items-center cursor-pointer h-8 md:h-10 w-10/12 mx-auto rounded-lg  ${
+                className={`flex cursor-pointer w-10/12 mx-auto rounded-lg min-w-0 ${
+                  item.isToggle
+                    ? "items-center min-h-8 md:min-h-10 h-auto py-1"
+                    : "items-center h-8 md:h-10"
+                } ${
                   item.icon === "/plus.svg"
                     ? "bg-purple-600 hover:!bg-purple-700"
                     : "hover:bg-gray-100 "
@@ -107,9 +111,9 @@ const Sidebar = ({
                         e.stopPropagation();
                         item.action?.();
                       }}
-                      className="flex items-center w-full focus:outline-none"
+                      className="flex items-center w-full min-w-0 focus:outline-none"
                     >
-                      <div className="w-10 md:w-12 lg:w-14 flex items-center justify-center">
+                      <div className="w-10 md:w-12 lg:w-14 shrink-0 flex items-center justify-center">
                         <Icon
                           src={item.icon}
                           className={`h-8 w-4 md:h-5 md:w-5 ${
@@ -122,7 +126,8 @@ const Sidebar = ({
                       </div>
                       {isExpanded && (
                         <span
-                          className={`pr-4 text-xs md:text-sm whitespace-nowrap ${
+                          title={item.label}
+                          className={`min-w-0 flex-1 truncate pr-2 text-xs md:text-sm ${
                             item.icon === "/plus.svg"
                               ? "text-white font-medium" // Keep white text for purple button
                               : "text-black"
@@ -136,9 +141,9 @@ const Sidebar = ({
                     // If there's a path but no action, use a Link
                     <Link
                       to={item.path || "#"} // Adding fallback to prevent undefined href
-                      className="flex items-center w-full"
+                      className="flex items-center w-full min-w-0"
                     >
-                      <div className="w-10 md:w-12 lg:w-14 flex items-center justify-center">
+                      <div className="w-10 md:w-12 lg:w-14 shrink-0 flex items-center justify-center">
                         <Icon
                           src={item.icon}
                           className={`h-8 w-4 md:h-5 md:w-5 ${"text-black"}`}
@@ -147,7 +152,8 @@ const Sidebar = ({
                       </div>
                       {isExpanded && (
                         <span
-                          className={`pr-4 text-xs md:text-sm whitespace-nowrap ${"text-black"}`}
+                          title={item.label}
+                          className="min-w-0 flex-1 truncate pr-2 text-xs md:text-sm text-black"
                         >
                           {item.label}
                         </span>
@@ -155,9 +161,9 @@ const Sidebar = ({
                     </Link>
                   )
                 ) : (
-                  <div className="flex items-center w-full justify-between">
-                    <div className="flex items-center">
-                      <div className="w-10 md:w-12 lg:w-14 flex items-center justify-center">
+                  <div className="flex items-center w-full min-w-0 justify-between gap-1">
+                    <div className="flex items-center min-w-0 flex-1">
+                      <div className="w-10 md:w-12 lg:w-14 shrink-0 self-center flex items-center justify-center">
                         <Icon
                           src={item.icon}
                           className={`h-8 w-4 md:h-5 md:w-5 ${"text-black"}`}
@@ -165,15 +171,13 @@ const Sidebar = ({
                         />
                       </div>
                       {isExpanded && (
-                        <span
-                          className={`pr-4 text-xs md:text-sm whitespace-nowrap text-black`}
-                        >
+                        <span className="min-w-0 flex-1 pr-1 text-xs md:text-sm leading-tight text-black">
                           {item.label}
                         </span>
                       )}
                     </div>
                     {isExpanded && item.pointerIcon && (
-                      <div className="flex items-center pr-2">
+                      <div className="flex shrink-0 self-center items-center pr-1">
                         <Icon
                           src={item.pointerIcon}
                           alt="Indicador"
@@ -194,16 +198,20 @@ const Sidebar = ({
             <div className="w-10/12 mx-auto mt-2">
               <Link
                 to="/admin"
-                className="flex items-center w-full py-2 hover:bg-gray-100 rounded-md"
+                className="flex items-center w-full min-w-0 py-2 hover:bg-gray-100 rounded-md"
               >
-                <div className="w-10 md:w-12 lg:w-14 flex items-center justify-center">
+                <div className="w-10 md:w-12 lg:w-14 shrink-0 flex items-center justify-center">
                   <Icon
                     src="/settings.svg"
                     className="h-4 w-4 md:h-5 md:w-5 text-black"
                     alt="Admin"
                   />
                 </div>
-                {isExpanded && <span className="text-xs md:text-sm">Admin</span>}
+                {isExpanded && (
+                  <span className="min-w-0 flex-1 truncate text-xs md:text-sm">
+                    Admin
+                  </span>
+                )}
               </Link>
             </div>
           )}
@@ -212,9 +220,9 @@ const Sidebar = ({
           <div className="w-10/12 mx-auto my-1 mb-2">
             <button
               onClick={handleLogout}
-              className="flex items-center w-full py-2 hover:bg-gray-100"
+              className="flex items-center w-full min-w-0 py-2 hover:bg-gray-100"
             >
-              <div className="w-10 md:w-12 lg:w-14 flex items-center justify-center">
+              <div className="w-10 md:w-12 lg:w-14 shrink-0 flex items-center justify-center">
                 <Icon
                   src="/logout.svg"
                   className="h-4 w-4 md:h-5 md:w-5 text-black"
@@ -222,7 +230,12 @@ const Sidebar = ({
                 />
               </div>
               {isExpanded && (
-                <span className="text-xs md:text-sm">Cerrar sesión</span>
+                <span
+                  title="Cerrar sesión"
+                  className="min-w-0 flex-1 truncate text-xs md:text-sm"
+                >
+                  Cerrar sesión
+                </span>
               )}
             </button>
           </div>

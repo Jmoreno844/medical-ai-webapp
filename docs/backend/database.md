@@ -220,7 +220,8 @@ Modelo personalizado que extiende `AbstractBaseUser` + `PermissionsMixin`.
 | `name`        | varchar(50)  | not null                                             | Nombre del médico      |
 | `lastName`    | varchar(50)  | not null                                             | Apellido               |
 | `role`        | varchar(20)  | choices canónicos: `doctor`, `admin`; default `doctor` | Rol del usuario        |
-| `is_active`   | bool         | default True                                         | Soft-delete            |
+| `is_active`   | bool         | default True                                         | Login habilitado; si es `false`, no puede autenticarse |
+| `clinical_access_enabled` | bool | default `true` en usuarios existentes; `false` en signup nuevo | Acceso a transcripción y generación documental |
 | `is_staff`    | bool         | default False                                        | Acceso admin           |
 | `date_joined` | datetime     | default `now()`                                      | —                      |
 | `last_login`  | datetime     | nullable                                             | Último login           |

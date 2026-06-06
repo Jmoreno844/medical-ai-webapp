@@ -6,10 +6,15 @@ import React, {
   useCallback,
 } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import axiosInstance from "../utils/axiosInstance";
+import axiosInstance, {
+  clearCsrfToken,
+  fetchCsrfToken,
+  getCsrfToken,
+} from "../utils/axiosInstance";
 import LoadingCircle from "../components/LoadingCircle";
-import { getCookie } from "../utils/cookieUtils";
 import { logger } from "@/lib/logger";
+
+const API_URL = import.meta.env.VITE_API_URL || "";
 
 // Define the shape of our user data
 export interface UserProfile {
@@ -18,10 +23,13 @@ export interface UserProfile {
   name: string;
   last_name: string;
   role: string;
+  login_enabled: boolean;
+  clinical_access_enabled: boolean;
   capabilities: {
     can_access_admin_panel: boolean;
     can_view_audit: boolean;
     can_manage_users: boolean;
+    can_use_clinical_features: boolean;
   };
 }
 
@@ -32,6 +40,7 @@ export interface AuthContextType {
   userData: UserProfile | null;
   csrfToken: string | null;
   login: (email: string, password: string) => Promise<void>;
+  completeAuthenticatedSession: (user: UserProfile) => Promise<void>;
   logout: () => Promise<void>;
   refreshUserData: () => Promise<void>;
 }
@@ -43,6 +52,7 @@ export const AuthContext = createContext<AuthContextType>({
   userData: null,
   csrfToken: null,
   login: async () => {},
+  completeAuthenticatedSession: async () => {},
   logout: async () => {},
   refreshUserData: async () => {},
 });
@@ -72,12 +82,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     []
   );
 
-  // Function to update CSRF token
   const updateCsrfToken = useCallback(() => {
-    const token = getCookie("_xsrf") || getCookie("csrftoken");
-    if (token) {
-      setCsrfToken(token);
-    }
+    const token = getCsrfToken();
+    setCsrfToken(token);
   }, []);
 
   // Function to refresh user data
@@ -97,33 +104,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [isAuthenticated]);
 
+  const completeAuthenticatedSession = useCallback(
+    async (user: UserProfile) => {
+      setIsAuthenticated(true);
+      setUserData(user);
+      await fetchCsrfToken(API_URL);
+      updateCsrfToken();
+      logAuth("info", "Redirecting to home page");
+      navigate("/home");
+    },
+    [navigate, updateCsrfToken]
+  );
+
   // Login function
   const login = useCallback(
     async (email: string, password: string) => {
-      // Add immediate synchronous log to confirm function entry
       logger.debug("🔐 AUTH-CONTEXT LOGIN FUNCTION CALLED with email:", email);
       try {
         logAuth("info", "Attempting login with email", { email });
-        logger.debug("🔐 AUTH-CONTEXT: Before API call");
         const response = await axiosInstance.post("/api/v1/auth/login", {
           email,
           password,
         });
-        logger.debug(
-          "🔐 AUTH-CONTEXT: API call completed with status:",
-          response.status
-        );
         logAuth("info", "Login successful", {
           status: response.status,
         });
-        setIsAuthenticated(true);
-        if (response.data?.user) {
-          setUserData(response.data.user);
+        if (!response.data?.user) {
+          throw new Error("Login response missing user profile");
         }
-        updateCsrfToken();
-        await refreshUserData();
-        logAuth("info", "Redirecting to home page");
-        navigate("/home"); // Using navigate instead of router.push
+        await completeAuthenticatedSession(response.data.user);
       } catch (error: any) {
         logger.error("🔴 AUTH-CONTEXT LOGIN ERROR:", error);
         logAuth("error", "Login failed", {
@@ -133,7 +142,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw error;
       }
     },
-    [navigate, refreshUserData, updateCsrfToken]
+    [completeAuthenticatedSession]
   );
 
   // Logout function
@@ -148,9 +157,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         message: error.message,
       });
     } finally {
+      clearCsrfToken();
       setIsAuthenticated(false);
       setUserData(null);
-      navigate("/login"); // Using navigate instead of router.push
+      setCsrfToken(null);
+      navigate("/login");
     }
   }, [navigate]);
 
@@ -173,8 +184,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       .then((response) => {
         logAuth("info", "User is authenticated", response.data);
         setIsAuthenticated(true);
+        setUserData(response.data);
         updateCsrfToken();
-        refreshUserData();
       })
       .catch((error) => {
         logAuth("error", "Auth check failed", {
@@ -187,7 +198,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       .finally(() => {
         setIsAuthLoading(false);
       });
-  }, [updateCsrfToken, refreshUserData]);
+  }, [updateCsrfToken]);
 
   // Handle 401 unauthorized responses globally
   useEffect(() => {
@@ -240,6 +251,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         userData,
         csrfToken,
         login,
+        completeAuthenticatedSession,
         logout,
         refreshUserData,
       }}

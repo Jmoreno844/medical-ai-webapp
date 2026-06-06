@@ -34,6 +34,7 @@ router = APIRouter()
 async def get_internal_users(
     q: str | None = Query(default=None),
     is_active: bool | None = Query(default=None),
+    clinical_access_enabled: bool | None = Query(default=None),
     role: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -45,6 +46,7 @@ async def get_internal_users(
         session,
         q=q,
         is_active=is_active,
+        clinical_access_enabled=clinical_access_enabled,
         role=role,
         limit=limit,
         offset=offset,
@@ -81,6 +83,12 @@ async def update_internal_user_status(
     session: AsyncSession = Depends(get_db_session),
 ) -> SuccessResponse:
     require_user_manager(acting_user)
+    if payload.is_active is None and payload.clinical_access_enabled is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Debe enviar al menos un campo de estado para actualizar",
+        )
+
     target_user = await session.get(User, user_id)
     if target_user is None:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -90,16 +98,38 @@ async def update_internal_user_status(
             detail="No puedes desactivar tu propia cuenta",
         )
 
-    target_user.is_active = payload.is_active
-    await record_audit_event(
-        session,
-        action="user.activated" if payload.is_active else "user.deactivated",
-        result="success",
-        request=request,
-        actor=actor_from_user(acting_user),
-        session_id=session_id_from_request(request),
-        resource_type="user",
-        resource_id=target_user.id,
-    )
+    if payload.is_active is not None and target_user.is_active != payload.is_active:
+        target_user.is_active = payload.is_active
+        await record_audit_event(
+            session,
+            action="user.activated" if payload.is_active else "user.deactivated",
+            result="success",
+            request=request,
+            actor=actor_from_user(acting_user),
+            session_id=session_id_from_request(request),
+            resource_type="user",
+            resource_id=target_user.id,
+        )
+
+    if (
+        payload.clinical_access_enabled is not None
+        and target_user.clinical_access_enabled != payload.clinical_access_enabled
+    ):
+        target_user.clinical_access_enabled = payload.clinical_access_enabled
+        await record_audit_event(
+            session,
+            action=(
+                "clinical_access.enabled"
+                if payload.clinical_access_enabled
+                else "clinical_access.disabled"
+            ),
+            result="success",
+            request=request,
+            actor=actor_from_user(acting_user),
+            session_id=session_id_from_request(request),
+            resource_type="user",
+            resource_id=target_user.id,
+        )
+
     await session.commit()
     return SuccessResponse(success=True)

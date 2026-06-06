@@ -12,6 +12,7 @@ import { DocumentoOut } from "@/types/documento";
 import { useDocumentContext } from "./DocumentContext";
 import { useContentContext } from "./ContentContext";
 import { useTranscriptionContext } from "./TranscriptionContext";
+import { useAuth } from "@/commons/hooks/useAuth";
 import { logger } from "@/lib/logger";
 import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
 import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
@@ -72,6 +73,7 @@ export function GenerationProvider({
   const { documents, createDocument } = useDocumentContext();
   const { fetchDocumentContent, updateDocumentContent } = useContentContext();
   const { hasBeenTranscribed } = useTranscriptionContext();
+  const { capabilities } = useAuth();
 
   const activeGenerationDocumentId = useDocumentDerivedStore(
     (state) => state.activeGenerationDocumentId
@@ -180,9 +182,13 @@ export function GenerationProvider({
   }, [fetchPlantillas, isModalOpen]);
 
   const openGenerationModal = useCallback(() => {
+    if (!capabilities.can_use_clinical_features) {
+      setError("Tu cuenta no tiene acceso clínico activo.");
+      return;
+    }
     setIsModalOpen(true);
     setError(null);
-  }, []);
+  }, [capabilities.can_use_clinical_features]);
 
   const closeGenerationModal = useCallback(() => {
     setIsModalOpen(false);

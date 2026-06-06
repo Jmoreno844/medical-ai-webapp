@@ -4,6 +4,7 @@ import TimerDisplay from "./TimerDisplay";
 import PauseResumeButton from "./PauseResumeButton";
 import SettingsIcon from "./SettingsIcon";
 import { useTranscriptionContext } from "../../../contexts/TranscriptionContext";
+import { useAuth } from "@/commons/hooks/useAuth";
 
 /**
  * Voice recorder component with controls
@@ -29,6 +30,8 @@ const VoiceRecorder: React.FC = () => {
     stopRecording,
     pauseResumeRecording,
   } = useTranscriptionContext();
+  const { capabilities } = useAuth();
+  const canUseClinicalFeatures = capabilities.can_use_clinical_features;
 
   /**
    * Handle the single primary audio action.
@@ -38,6 +41,9 @@ const VoiceRecorder: React.FC = () => {
    * idle state becomes "Reanudar" for the next session on the same encounter.
    */
   const handlePrimaryAudioAction = () => {
+    if (!canUseClinicalFeatures) {
+      return;
+    }
     if (isRecording) {
       stopRecording();
     } else {
@@ -60,7 +66,7 @@ const VoiceRecorder: React.FC = () => {
       : "Grabar";
 
   const primaryAudioButtonClasses = `inline-flex items-center gap-1.5 px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 ${
-    !transcriptionDocId && !isRecording
+    !canUseClinicalFeatures || (!transcriptionDocId && !isRecording)
       ? "bg-gray-100 text-gray-400 cursor-not-allowed"
       : isRecording
         ? "bg-red-500 text-white hover:bg-red-600"
@@ -99,7 +105,7 @@ const VoiceRecorder: React.FC = () => {
         className={primaryAudioButtonClasses}
         aria-label={isRecording ? "Detener transcripción" : primaryAudioLabel}
         title={isRecording ? "Detener transcripción" : undefined}
-        disabled={!transcriptionDocId && !isRecording}
+        disabled={!canUseClinicalFeatures || (!transcriptionDocId && !isRecording)}
       >
         {isRecording && (
           <Square size={14} strokeWidth={2.5} fill="currentColor" />

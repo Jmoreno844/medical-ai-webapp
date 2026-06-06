@@ -60,6 +60,7 @@ async def list_admin_users(
     *,
     q: str | None = None,
     is_active: bool | None = None,
+    clinical_access_enabled: bool | None = None,
     role: str | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -78,6 +79,7 @@ async def list_admin_users(
         User.last_name,
         User.role,
         User.is_active,
+        User.clinical_access_enabled,
         User.last_login,
         User.date_joined,
         active_session_count.label("active_session_count"),
@@ -96,6 +98,8 @@ async def list_admin_users(
         )
     if is_active is not None:
         stmt = stmt.where(User.is_active.is_(is_active))
+    if clinical_access_enabled is not None:
+        stmt = stmt.where(User.clinical_access_enabled.is_(clinical_access_enabled))
     if role:
         stmt = stmt.where(User.role == normalize_user_role(role))
 
@@ -126,6 +130,7 @@ async def get_admin_user_summary(
         User.last_name,
         User.role,
         User.is_active,
+        User.clinical_access_enabled,
         User.last_login,
         User.date_joined,
         active_session_count.label("active_session_count"),

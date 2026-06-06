@@ -363,6 +363,12 @@ resource "google_service_account_iam_member" "backend_cloud_tasks_invoker_token_
   member             = "serviceAccount:${google_service_account.backend_runner.email}"
 }
 
+resource "google_service_account_iam_member" "backend_runner_self_token_creator" {
+  service_account_id = google_service_account.backend_runner.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.backend_runner.email}"
+}
+
 # ---------------------------------------------------------------------------
 # Local Dev SA for GCS Signing
 # ---------------------------------------------------------------------------

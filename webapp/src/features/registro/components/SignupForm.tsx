@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/commons/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/commons/components/ui/button";
@@ -11,18 +11,35 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
   const [name, setName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
-  const { signUp } = useAuth();
-  const navigate = useNavigate();
+  const { signUp, loading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+
+    if (password.length < 8) {
+      setError("La contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Las contraseñas no coinciden");
+      return;
+    }
+
     try {
       await signUp({ email, name, lastName, password });
-      navigate("/home"); // redirect to home page after successful registration
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Error al registrarse");
+    } catch (err: unknown) {
+      const axiosErr = err as {
+        response?: { data?: { detail?: string; message?: string } };
+      };
+      setError(
+        axiosErr?.response?.data?.detail ||
+          axiosErr?.response?.data?.message ||
+          "Error al registrarse"
+      );
     }
   };
 
@@ -118,10 +135,30 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
           <Input
             id="password"
             type="password"
-            placeholder="Su contraseña"
+            placeholder="Mínimo 8 caracteres"
             required
+            minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            className="py-2.5"
+          />
+        </div>
+
+        <div className="grid gap-2">
+          <Label
+            htmlFor="confirmPassword"
+            className="font-medium text-neutral-700 dark:text-neutral-200"
+          >
+            Confirmar contraseña
+          </Label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            placeholder="Repita su contraseña"
+            required
+            minLength={8}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
             className="py-2.5"
           />
         </div>
@@ -131,8 +168,9 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
         <Button
           type="submit"
           className="w-full bg-main hover:bg-main_dark text-white font-medium mt-1 transition-colors"
+          disabled={loading}
         >
-          Registrarse
+          {loading ? "Registrando…" : "Registrarse"}
         </Button>
       </div>
 

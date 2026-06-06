@@ -4,7 +4,7 @@ import difflib
 import logging
 import re
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError

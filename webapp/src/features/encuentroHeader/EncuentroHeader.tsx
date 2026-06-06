@@ -7,6 +7,7 @@ import GenerateDocumentationButton from "./subcomponents/GenerateDocumentationBu
 
 import { useEncuentroContext } from "../../contexts/EncuentroContext";
 import { useTranscriptionContext } from "../../contexts/TranscriptionContext";
+import { useAuth } from "@/commons/hooks/useAuth";
 
 /**
  * EncuentroHeader component for the encounter page
@@ -65,6 +66,10 @@ const EncuentroHeaderContent: React.FC = () => {
     pendingAudioSections,
     transcriptionStatus,
   } = useTranscriptionContext();
+  const { capabilities, userData } = useAuth();
+  const canUseClinicalFeatures = capabilities.can_use_clinical_features;
+  const showClinicalAccessWarning =
+    userData !== null && !canUseClinicalFeatures;
 
   const showTranscriptionStatus =
     isRecording ||
@@ -131,6 +136,13 @@ const EncuentroHeaderContent: React.FC = () => {
             <VoiceRecorder key={encounterId} /> {/* <<< Add key prop */}
           </div>
         </div>
+        {showClinicalAccessWarning ? (
+          <div className="border-t border-amber-200 bg-amber-50 px-6 py-2 text-sm text-amber-900">
+            Tu cuenta no tiene acceso clínico activo. Puedes revisar el
+            encuentro, pero la transcripción y la generación de documentos están
+            deshabilitadas. Contacta al administrador.
+          </div>
+        ) : null}
       </nav>
 
       {/* Patient Edit Modal */}

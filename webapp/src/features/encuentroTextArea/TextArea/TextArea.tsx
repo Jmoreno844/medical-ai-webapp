@@ -16,7 +16,9 @@ import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
 import { useWorkspaceStore } from "@/workspace/stores/workspaceStore";
 import { usePatchDecision } from "@/workspace/hooks/usePatchDecision";
 import { logger } from "@/lib/logger";
+import { Placeholder } from "@tiptap/extensions/placeholder";
 import {
+  getEditorPlaceholder,
   getEmptyTiptapDoc,
   isTiptapJsonContent,
   medicalEditorExtensions,
@@ -132,6 +134,7 @@ const TextArea: React.FC = () => {
   const hasHydratedDocumentRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
   const saveInFlightRef = useRef(false);
+  const editorPlaceholderRef = useRef(getEditorPlaceholder());
 
   const handlePatchApprove = useCallback(
     (patchId: string) => {
@@ -181,6 +184,10 @@ const TextArea: React.FC = () => {
   const editorExtensions = useMemo(
     () => [
       ...medicalEditorExtensions,
+      Placeholder.configure({
+        placeholder: () => editorPlaceholderRef.current,
+        showOnlyWhenEditable: true,
+      }),
       PatchReviewDecorationExtension.configure({
         onSelectPatch: (patchId) => {
           usePatchSetStore.getState().setSelectedPatch(patchId);
@@ -206,6 +213,14 @@ const TextArea: React.FC = () => {
       },
     },
   });
+
+  useEffect(() => {
+    editorPlaceholderRef.current = getEditorPlaceholder(activeDocument?.kind);
+    if (!editor) {
+      return;
+    }
+    editor.view.dispatch(editor.state.tr);
+  }, [activeDocument?.kind, editor]);
 
   const triggerEditorSave = useCallback(
     async (): Promise<void> => {
@@ -796,13 +811,6 @@ const TextArea: React.FC = () => {
             <>
               <EditorContent editor={editor} className="medical-document-editor h-full" />
               <SelectionBubbleMenu editor={editor} onCopy={handleCopy} />
-              {!documentContent.trim() &&
-                !derivedContent &&
-                editorMode === "edit" && (
-                  <div className="text-gray-400 absolute top-3 left-4 pointer-events-none">
-                    Start typing...
-                  </div>
-                )}
             </>
           )}
         </div>

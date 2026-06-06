@@ -17,6 +17,7 @@ class AdminUserListItem(BaseModel):
     last_name: str
     role: str
     is_active: bool
+    clinical_access_enabled: bool
     last_login: datetime | None
     date_joined: datetime
     active_session_count: int = 0
@@ -57,4 +58,5 @@ class AdminUserDetailOut(BaseModel):
 
 
 class AdminUserStatusUpdate(BaseModel):
-    is_active: bool
+    is_active: bool | None = None
+    clinical_access_enabled: bool | None = None

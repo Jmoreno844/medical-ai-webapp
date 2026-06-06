@@ -2,6 +2,7 @@ import React from "react"; // Removed useState, useEffect
 import Tooltip from "@/commons/components/Tooltip";
 import { useTranscriptionContext } from "@/contexts/TranscriptionContext";
 import { useGenerationContext } from "@/contexts/GenerationContext";
+import { useAuth } from "@/commons/hooks/useAuth";
 
 /**
  * Button to generate documentation based on transcription
@@ -24,20 +25,12 @@ const GenerateDocumentationButton: React.FC = () => {
     transcriptionStatus,
   } = useTranscriptionContext();
 
-  const { openGenerationModal, isGenerating } = useGenerationContext(); // Added isGenerating
+  const { openGenerationModal, isGenerating } = useGenerationContext();
+  const { capabilities } = useAuth();
+  const canUseClinicalFeatures = capabilities.can_use_clinical_features;
 
-  // Local state to track content checking - Removed
-  // const [isCheckingContent, setIsCheckingContent] = useState(false); // Removed
-  // const [hasContent, setHasContent] = useState(false); // Removed
-
-  // Dedicated effect for freshly completed transcriptions - Removed
-  // useEffect(() => { ... }, []);
-
-  // Check content when transcription status changes or on mount - Removed
-  // useEffect(() => { ... }, []);
-
-  // Simplified enabled state logic
-  const isEnabled = hasBeenTranscribed && !isRecording && !isGenerating;
+  const isEnabled =
+    canUseClinicalFeatures && hasBeenTranscribed && !isRecording && !isGenerating;
 
   // Dynamic tooltip based on state
   const getTooltipContent = () => {
@@ -46,6 +39,9 @@ const GenerateDocumentationButton: React.FC = () => {
     // }
     if (isGenerating) {
       return "Generación en curso…";
+    }
+    if (!canUseClinicalFeatures) {
+      return "Tu cuenta no tiene acceso clínico activo";
     }
     if (isRecording) {
       return "Detén la grabación para terminar la transcripción automática";
@@ -73,7 +69,7 @@ const GenerateDocumentationButton: React.FC = () => {
                   ${
                     !isEnabled
                       ? "border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed"
-                      : "bg-purple-500 text-white hover:bg-purple-700 rounded-md"
+                      : "bg-purple-500 text-white hover:bg-purple-600 rounded-md"
                   }`}
           aria-label="Generar documentación clínica"
         >

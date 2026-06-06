@@ -12,6 +12,20 @@ export const EMPTY_TIPTAP_DOC: JSONContent = {
   content: [{ type: "paragraph" }],
 };
 
+const EDITOR_PLACEHOLDERS: Record<string, string> = {
+  context:
+    "Añade contexto clínico, antecedentes o notas relevantes del paciente…",
+  note: "Escribe la nota clínica…",
+  template: "Escribe el contenido del documento…",
+};
+
+export function getEditorPlaceholder(kind?: string): string {
+  if (kind && kind in EDITOR_PLACEHOLDERS) {
+    return EDITOR_PLACEHOLDERS[kind];
+  }
+  return "Escribe aquí…";
+}
+
 export const medicalEditorExtensions = [
   StarterKit.configure({
     link: false,

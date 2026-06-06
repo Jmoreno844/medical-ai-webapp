@@ -47,6 +47,8 @@ def _profile(user: User) -> UserProfile:
         name=user.name,
         last_name=user.last_name,
         role=normalize_user_role(user.role),
+        login_enabled=user.is_active,
+        clinical_access_enabled=user.clinical_access_enabled,
         capabilities=UserCapabilities(**user_capabilities(user)),
     )
 
@@ -96,12 +98,14 @@ async def login(
     return AuthResponse(user=_profile(user))
 
 
-@router.post("/register", response_model=UserProfile, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     payload: RegisterRequest,
     request: Request,
+    response: Response,
     session: AsyncSession = Depends(get_db_session),
-) -> UserProfile:
+    settings: Settings = Depends(get_settings),
+) -> AuthResponse:
     try:
         user = await register_doctor_user(
             session,
@@ -124,8 +128,26 @@ async def register(
         resource_type="user",
         resource_id=user.id,
     )
+    audit_session = await create_audit_user_session(
+        session,
+        user=user,
+        request=request,
+        settings=settings,
+    )
+    issue_browser_tokens(response, user, settings, session_id=audit_session.id)
+    await record_security_event(
+        session,
+        action="auth.login_success",
+        result="success",
+        request=request,
+        settings=settings,
+        actor=actor_from_user(user),
+        session_id=audit_session.id,
+        resource_type="auth_session",
+        resource_id=audit_session.id,
+    )
     await session.commit()
-    return _profile(user)
+    return AuthResponse(user=_profile(user))
 
 
 @router.post("/forgot-password", response_model=MessageResponse)

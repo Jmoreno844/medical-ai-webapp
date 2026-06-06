@@ -17,12 +17,17 @@
   de sesión de auditoría usado para correlacionar eventos clínicos sin depender
   de guardar la IP en cada fila.
 - `GET /api/v1/auth/me` devuelve capacidades explícitas derivadas del backend:
-  `can_access_admin_panel`, `can_view_audit`, `can_manage_users`. La SPA usa
-  esas capacidades para abrir o bloquear `/admin/audit` y `/admin/users`, pero
-  la autorización canónica sigue estando en FastAPI.
-- El signup público crea solo usuarios `doctor`. Los admins se crean o
-  promocionan con `backend_fastapi/scripts/create_admin.py`, no mediante un
-  endpoint abierto al navegador.
+  `can_access_admin_panel`, `can_view_audit`, `can_manage_users`,
+  `can_use_clinical_features`. También expone `login_enabled` (`is_active`) y
+  `clinical_access_enabled`. La SPA usa esas capacidades para abrir o bloquear
+  `/admin/audit`, `/admin/users` y las funciones clínicas de IA, pero la
+  autorización canónica sigue estando en FastAPI.
+- El signup público crea usuarios `doctor` con `clinical_access_enabled=false`.
+  Un admin debe activar el acceso clínico manualmente (futuro: suscripción).
+- Endpoints de transcripción segmentada y `POST /api/v1/documents/generate`
+  responden `403` si `clinical_access_enabled=false`.
+- Los admins se crean o promocionan con `backend_fastapi/scripts/create_admin.py`,
+  no mediante un endpoint abierto al navegador.
 - En `stg` y `prod`, el password de bootstrap debe entrar por
   `ADMIN_BOOTSTRAP_PASSWORD` desde Secret Manager, no por args de CLI ni por
   GitHub Secrets.

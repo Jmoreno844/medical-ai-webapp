@@ -31,9 +31,27 @@ def test_register_contract_returns_created_user_profile(monkeypatch) -> None:
             name="Test",
             last_name="Doctor",
             role="doctor",
+            is_active=True,
+            clinical_access_enabled=False,
         )
 
+    async def fake_create_audit_user_session(*_args, **_kwargs):
+        return SimpleNamespace(id="audit-session-42")
+
+    async def fake_record_audit_event(*_args, **_kwargs):
+        return None
+
+    async def fake_record_security_event(*_args, **_kwargs):
+        return None
+
+    def fake_issue_browser_tokens(*_args, **_kwargs) -> str:
+        return "audit-session-42"
+
     monkeypatch.setattr(auth_api, "register_doctor_user", fake_register_doctor_user)
+    monkeypatch.setattr(auth_api, "create_audit_user_session", fake_create_audit_user_session)
+    monkeypatch.setattr(auth_api, "record_audit_event", fake_record_audit_event)
+    monkeypatch.setattr(auth_api, "record_security_event", fake_record_security_event)
+    monkeypatch.setattr(auth_api, "issue_browser_tokens", fake_issue_browser_tokens)
     app.dependency_overrides[get_db_session] = lambda: FakeSession()
     try:
         response = TestClient(app).post(
@@ -50,15 +68,21 @@ def test_register_contract_returns_created_user_profile(monkeypatch) -> None:
 
     assert response.status_code == 201
     assert response.json() == {
-        "id": 42,
-        "email": "doctor@example.com",
-        "name": "Test",
-        "last_name": "Doctor",
-        "role": "doctor",
-        "capabilities": {
-            "can_access_admin_panel": False,
-            "can_view_audit": False,
-            "can_manage_users": False,
+        "success": True,
+        "user": {
+            "id": 42,
+            "email": "doctor@example.com",
+            "name": "Test",
+            "last_name": "Doctor",
+            "role": "doctor",
+            "login_enabled": True,
+            "clinical_access_enabled": False,
+            "capabilities": {
+                "can_access_admin_panel": False,
+                "can_view_audit": False,
+                "can_manage_users": False,
+                "can_use_clinical_features": False,
+            },
         },
     }
 
@@ -108,6 +132,8 @@ def test_me_contract_includes_admin_capabilities() -> None:
         name="Ada",
         last_name="Admin",
         role="admin",
+        is_active=True,
+        clinical_access_enabled=True,
         is_staff=True,
         is_superuser=False,
     )
@@ -121,4 +147,7 @@ def test_me_contract_includes_admin_capabilities() -> None:
         "can_access_admin_panel": True,
         "can_view_audit": True,
         "can_manage_users": True,
+        "can_use_clinical_features": True,
     }
+    assert response.json()["login_enabled"] is True
+    assert response.json()["clinical_access_enabled"] is True

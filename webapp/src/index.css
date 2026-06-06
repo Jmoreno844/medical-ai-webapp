@@ -74,6 +74,14 @@ button:focus-visible {
   margin: 0.5rem 0;
 }
 
+.medical-document-editor .ProseMirror p.is-empty::before {
+  color: #9ca3af;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
 .medical-document-editor .ProseMirror ul,
 .medical-document-editor .ProseMirror ol {
   margin: 0.5rem 0 0.75rem 1.5rem;

@@ -11,6 +11,7 @@ from app.core.observability import bind_log_context, log_event
 from app.db.models import User
 from app.db.session import AsyncSessionLocal, get_db_session
 from app.domains.audit.service import AuditActor, actor_from_user, record_audit_event
+from app.domains.auth.access import require_clinical_access
 from app.domains.auth.service import get_current_user
 from app.domains.documents.service import get_document_for_doctor, get_encounter_for_doctor
 from app.domains.transcription.schemas import (
@@ -133,6 +134,7 @@ async def create_transcription_recording_session(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> RecordingSessionResponse:
+    require_clinical_access(user)
     encounter = await get_encounter_for_doctor(
         session,
         encounter_id=payload.encounter_id,
@@ -184,6 +186,7 @@ async def create_section_upload_url(
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> SectionUploadUrlResponse:
+    require_clinical_access(user)
     if not settings.gcs_bucket_name:
         return SectionUploadUrlResponse(success=False, error="GCS_BUCKET_NAME no configurado")
     recording_session = await get_recording_session_for_doctor(
@@ -236,6 +239,7 @@ async def register_transcription_section(
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
 ) -> AudioSectionRegisterResponse:
+    require_clinical_access(user)
     recording_session = await get_recording_session_for_doctor(
         session,
         session_id=session_id,
@@ -306,6 +310,7 @@ async def finish_transcription_recording_session(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> RecordingSessionFinishResponse:
+    require_clinical_access(user)
     recording_session = await get_recording_session_for_doctor(
         session,
         session_id=session_id,

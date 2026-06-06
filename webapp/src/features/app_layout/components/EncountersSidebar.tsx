@@ -4,6 +4,17 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 
+const PLACEHOLDER_ENCOUNTER_NAMES = new Set([
+  "Encuentro Nuevo",
+  "New Encounter",
+  "",
+]);
+
+const displayEncounterName = (name: string) =>
+  PLACEHOLDER_ENCOUNTER_NAMES.has(name?.trim())
+    ? "Nuevo encuentro"
+    : name;
+
 /**
  * Props for EncountersSidebar component
  * @property {Function} onClose - Callback to handle the sidebar close action
@@ -78,9 +89,7 @@ export const EncountersSidebar = ({ onClose }: EncountersSidebarProps) => {
               onClick={() => handleEncuentroClick(encuentro.id)}
             >
               <div className="font-medium">
-                {encuentro.encounter_name === "Encuentro Nuevo"
-                  ? "New Encounter"
-                  : encuentro.encounter_name}
+                {displayEncounterName(encuentro.encounter_name)}
               </div>
               <div className="text-sm text-gray-500">
                 {formatDateTime(encuentro.occurred_at)}

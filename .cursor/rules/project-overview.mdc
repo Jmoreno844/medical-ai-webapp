@@ -7,11 +7,20 @@ alwaysApply: true
 
 ## Arquitectura
 
-Este es un sistema fullstack de documentación médica asistida por IA con tres partes:
+Plataforma fullstack de documentación médica asistida por IA. Componentes principales:
 
-- `backend_fastapi/` — API REST principal (FastAPI + PostgreSQL; dependencias con **uv**)
-- `cloud_functions/` — Funciones Google Cloud para generación de documentos con IA y transcripción de audio
-- `webapp/` — Frontend React + TypeScript (Vite)
+| Carpeta | Rol |
+|---|---|
+| `backend_fastapi/` | API REST central (FastAPI + PostgreSQL; dependencias con **uv**) |
+| `transcription_worker/` | Worker Cloud Run privado: VAD Silero + Gemini STT por secciones |
+| `document_generation_worker/` | Worker Cloud Run privado: generación documental con LLM configurable |
+| `copilot_agent/` | Runtime LangGraph del copiloto clínico (servicio separado, brokered por FastAPI) |
+| `webapp/` | SPA React + TypeScript (Vite) del médico |
+| `infra/` | Terraform: GCP, IAM, budgets, deploy |
+| `landing-page/` | Sitio marketing separado; no forma parte del flujo clínico |
+| `docs/` | Contratos operativos y arquitectura |
+
+Orden de lectura para agentes: `AGENTS.md` → `docs/architecture/repo-map.md` → `docs/architecture/system-overview.md`.
 
 ## Dominio y terminología
 
@@ -27,17 +36,37 @@ Este es un sistema fullstack de documentación médica asistida por IA con tres 
 
 ## Flujo principal
 
-1. El médico crea un `Encuentro` y graba el audio
-2. El audio se transcribe via Cloud Function → crea `Documento` tipo transcripción
-3. El médico solicita generación de documentación → Cloud Function con IA genera el contenido
-4. Los documentos generados se envían al frontend via SSE (Server-Sent Events)
+1. El médico crea un `Encuentro` y graba audio **por secciones** (VAD en navegador, cola local en IndexedDB)
+2. El navegador sube cada sección **directo a GCS** vía signed URL; FastAPI registra metadatos y encola Cloud Tasks
+3. `transcription_worker` transcribe cada sección (Silero VAD + Gemini) y devuelve callbacks a FastAPI; avances vía SSE
+4. Al detener la grabación, FastAPI consolida secciones y crea el `Documento` de transcripción
+5. El médico solicita generación documental → FastAPI encola `document_generation_worker` → chunks vía callbacks + SSE
+6. El copiloto (futuro slice activo) propone patches vía `copilot_agent`; FastAPI conserva la autoridad clínica y el apply
 
 ## Comunicación entre servicios
 
-- FastAPI → Cloud Functions: JWT de servicio desde `backend_fastapi/app/core/security.py`
-- Cloud Functions → FastAPI API: token auth en headers
-- Frontend → FastAPI: cookies JWT + CSRF y token corto para SSE
-- SSE hub en FastAPI: `backend_fastapi/app/domains/documents/sse_hub.py`
+- **Frontend → FastAPI**: cookies JWT + CSRF; token corto aparte para SSE
+- **Frontend → GCS**: subida directa de audio con signed URLs generadas por FastAPI
+- **FastAPI → workers**: Cloud Tasks con OIDC; payload con IDs, sin PHI
+- **Workers → FastAPI**: callbacks con Bearer JWT de vida corta
+- **FastAPI → copilot_agent**: contrato de broker interno (auth temporal compartida; ver deuda en `docs/debt/copilot-agent-runtime.md`)
+- **SSE hub**: `backend_fastapi/app/domains/documents/sse_hub.py` — en memoria de proceso; no es multi-instancia hoy
+
+## Límites de ownership
+
+### Backend (`backend_fastapi/app/domains/`)
+
+- `encounters/` — ciclo de vida del encuentro y metadatos de audio
+- `documents/` — CRUD, kickoff de generación, callbacks, SSE
+- `transcription/` — sesiones por secciones, dispatch Cloud Tasks, finalización
+- `templates/` — plantillas base y del médico
+- `auth/` — login/JWT/CSRF de usuario
+
+### Frontend (`webapp/src/`)
+
+- `workspace/` — estado durable del editor: `snapshot`, `draft`, `derived`, patch-review
+- `contexts/` — orquestación: SSE lifecycle, side effects API; no duplicar ownership de estado compartido
+- `features/` — UI y composición; no debe ser segunda capa de SSE ni estado del encuentro
 
 ## Documentación técnica de referencia
 
@@ -45,16 +74,23 @@ Antes de proponer cambios en auth, flujos o arquitectura, consultar:
 
 | Documento | Contenido |
 |---|---|
-| `docs/backend/auth-and-jwt.md` | Contratos de JWT browser, callbacks, SSE y sus claims |
-| `docs/architecture/system-overview.md` | Mapa de servicios, endpoints, variables de entorno y diagramas de secuencia |
+| `AGENTS.md` | Instrucciones del repo, límites sensibles, verificación |
+| `docs/architecture/repo-map.md` | Mapa corto del repo y "si quieres cambiar X" |
+| `docs/architecture/system-overview.md` | Diagramas, flujos, componentes y restricciones |
+| `docs/setup-local.md` | Entorno local, puertos y variables |
+| `docs/backend/auth-and-jwt.md` | JWT browser, callbacks, SSE y claims |
 | `docs/backend/database.md` | Modelo de datos y ERD |
+| `docs/backend/audit-trail.md` | Auditoría clínica (metadata, sin contenido clínico) |
+| `docs/architecture/gcp-infrastructure.md` | Infra GCP e IAM |
+| `docs/agent/RUNTIME.md` | Runtime del copiloto (graph, tools, writer) |
 
 ## Deployment
 
-- **Backend**: Google Cloud Run + PostgreSQL (Cloud SQL)
-- **Cloud Functions**: Google Cloud Functions (HTTP trigger)
-- **Frontend**: Vite build, estático
-- Diseñar para escalabilidad horizontal en Cloud Run — sin estado en memoria entre requests
+- **Backend, workers y copilot**: Google Cloud Run (+ PostgreSQL en Cloud SQL)
+- **Workers**: desplegados privados (`--no-allow-unauthenticated`); Cloud Tasks invoca con OIDC
+- **Frontend**: build Vite, estático
+- **SSE en memoria**: limita escalado horizontal hasta resolver con Redis/Pub/Sub
+- Diseñar workers sin estado; FastAPI conserva autoridad transaccional y clínica
 
 ## Git — Conventional Commits
 
@@ -73,8 +109,16 @@ Ejemplos: `feat: add SSE token endpoint`, `fix: patch encounter ownership check`
 
 ## Reglas generales
 
-- No agregar comentarios que solo narren el código, solo los que explican intención no obvia
+- No agregar comentarios que solo narren el código; solo los que explican intención no obvia
 - Código en inglés (variables, funciones); terminología médica del dominio puede quedar en español
 - Nunca usar `print()` — siempre `logger = logging.getLogger(__name__)` en Python
 - Funciones pequeñas y enfocadas — más fáciles de auditar en contexto médico
 - Validar **todos** los inputs del usuario; los datos médicos son sensibles
+- Nunca loguear transcripciones completas, documentos generados, secretos ni tokens
+- Si cambias claims, TTL o propósito de un JWT, actualiza FastAPI, workers y docs en el mismo cambio
+
+## Verificación rápida
+
+- Backend: `uv --project backend_fastapi run ruff check . && ENVIRONMENT=test uv --project backend_fastapi run pytest -q`
+- Frontend: `npm --prefix webapp run lint && npm --prefix webapp run build`
+- Workers: `python -m pytest transcription_worker/tests && python -m pytest document_generation_worker/tests`

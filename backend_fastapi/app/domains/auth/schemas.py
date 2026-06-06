@@ -21,6 +21,7 @@ class UserCapabilities(BaseModel):
     can_access_admin_panel: bool = False
     can_view_audit: bool = False
     can_manage_users: bool = False
+    can_use_clinical_features: bool = False
 
 
 class UserProfile(BaseModel):
@@ -29,6 +30,8 @@ class UserProfile(BaseModel):
     name: str
     last_name: str
     role: str
+    login_enabled: bool
+    clinical_access_enabled: bool
     capabilities: UserCapabilities
 
 

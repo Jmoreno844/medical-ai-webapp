@@ -1,0 +1,159 @@
+---
+description: Convenciones frontend React + TypeScript (Vite, Tailwind, workspace, API, SSE, seguridad)
+globs: webapp/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+Convenciones del frontend (`webapp/`): React + TypeScript estricto, Tailwind, Radix/Shadcn.
+Escribe código correcto, DRY y completo; si algo es ambiguo, dilo en vez de adivinar.
+
+## Stack
+
+React + TypeScript (Vite), Tailwind CSS, React Router, Axios, Zustand (workspace stores).
+
+## Directory structure
+
+```
+webapp/src/
+  features/       ← UI por dominio (encuentro, plantillas, login, admin, etc.)
+    encuentro/
+      EncuentroPage.tsx
+      hooks/      ← hooks específicos de la feature
+  workspace/      ← estado durable del editor/documentos (snapshot, draft, derived, patch)
+    stores/       ← Zustand stores
+  contexts/       ← orquestación y side effects (SSE, API, compat layer)
+  commons/        ← componentes, hooks, utils y contextos compartidos (Auth, Sidebar)
+    components/ui/
+    utils/
+      axiosInstance.ts
+  api/            ← llamadas API por dominio
+  services/       ← lógica de servicio cuando no encaja en api/
+  types/          ← tipos TypeScript compartidos
+  pages/          ← páginas top-level (About, NotFound)
+  lib/            ← utilidades transversales (cn, logger)
+  router.tsx
+```
+
+### Ownership boundaries
+
+- `features/` renderiza y compone UI — no debe ser segundo owner de SSE ni estado compartido del encuentro.
+- `contexts/` orquesta side effects (SSE lifecycle, API) y delega estado durable al workspace.
+- `workspace/` es dueño de `snapshot`, `draft`, `derived` y `patch` (Zustand en `workspace/stores/`) — no colapsar en un solo estado opaco del editor.
+
+## Code quality
+
+- TypeScript strict — nunca `any`; preferir tipos explícitos o `unknown`.
+- Funciones pequeñas; extraer lógica a hooks o utils antes de que un componente crezca.
+- Nombres descriptivos: `useEncounterDocuments`, `handleTranscriptionComplete` — sin abreviaciones.
+- JSDoc en hooks y funciones de servicio no triviales.
+
+## Components
+
+- Siempre funcionales, nunca clases.
+- Un componente principal por archivo; nombre PascalCase = nombre del archivo.
+- Props tipadas con `interface` (objetos) o `type` (unions/aliases).
+- Preferir `const Component = () =>` sobre funciones sueltas; definir tipos cuando aplique.
+
+```tsx
+interface EncuentroCardProps {
+  encounter: EncuentroOut;
+  onSelect: (id: number) => void;
+}
+
+const EncuentroCard = ({ encounter, onSelect }: EncuentroCardProps) => { ... };
+
+export default EncuentroCard;
+```
+
+## Styling
+
+- Tailwind CSS para estilos — no CSS modules ni styled-components.
+- Usar `cn()` de `@/lib/utils` para clases condicionales.
+- Early returns para legibilidad.
+
+## Event handlers and accessibility
+
+- Handlers con prefijo `handle`: `handleClick`, `handleKeyDown`.
+- Elementos interactivos: `aria-label`, `tabIndex={0}`, soporte de teclado cuando corresponda.
+
+## Custom hooks
+
+- Extraer estado y API calls a `hooks/` dentro de cada feature.
+- Prefijo `use`; retornar objeto con estado + acciones claramente nombrados.
+- Manejar `isLoading` y `error` siempre que haya async.
+
+## API calls
+
+- Usar `axiosInstance` de `@/commons/utils/axiosInstance` — no `fetch` crudo. Ya gestiona
+  `withCredentials`, CSRF (`X-CSRFToken`) y refresh de sesión en 401.
+- Validar input en cliente para UX, pero el trust boundary es el backend: no asumir datos validados.
+- Manejar errores con `AxiosError`; nunca swallow silencioso.
+
+```typescript
+import { AxiosError } from "axios";
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof AxiosError) {
+    return (
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      error.message
+    );
+  }
+  return "An unexpected error occurred";
+};
+```
+
+## SSE (streaming)
+
+- El lifecycle de SSE vive en `contexts/` (p. ej. `GenerationContext`, `TranscriptionContext`), no en `features/`.
+- Cerrar/abortar el stream en el cleanup del efecto (`EventSource.close()` / `AbortController.abort()`); nunca dejar streams colgando.
+- No duplicar el manejo del stream: `features/` consume el estado expuesto por el contexto, no abre su propio canal.
+
+## Contexts
+
+- Contextos de orquestación en `src/contexts/`; contextos globales compartidos en `src/commons/contexts/`.
+- Siempre exponer hook de acceso que valide el provider.
+
+```typescript
+const DocumentContext = createContext<DocumentContextType | undefined>(
+  undefined,
+);
+
+export const useDocument = () => {
+  const context = useContext(DocumentContext);
+  if (!context)
+    throw new Error("useDocument must be used within DocumentProvider");
+  return context;
+};
+```
+
+## Security (app médica — datos sensibles de paciente)
+
+- **XSS**: nunca `dangerouslySetInnerHTML` con contenido no sanitizado. Markdown/HTML del backend
+  o del modelo se renderiza vía `react-markdown`/TipTap con sanitización; no inyectar HTML crudo.
+- **CSRF / auth**: la sesión va por cookie httpOnly + token CSRF (ver `axiosInstance`). Nunca guardar
+  tokens de auth en `localStorage`/`sessionStorage` ni exponerlos en el cliente.
+- **PHI/PII**: no loguear datos de paciente; no meter PHI en URLs/query params, `localStorage`,
+  ni en spans de telemetría (OpenTelemetry). Mantener identificadores de paciente fuera de logs y trazas.
+
+## Logging
+
+- Usar `logger` de `@/lib/logger` — `console.*` está prohibido por ESLint (`no-console: error`) salvo en `logger.ts`.
+
+## Path aliases
+
+```typescript
+// ✅ Alias @ configurado en Vite
+import axiosInstance from "@/commons/utils/axiosInstance";
+import { DocumentoOut } from "@/types/documento";
+
+// ❌ Evitar paths relativos largos
+import axiosInstance from "../../../commons/utils/axiosInstance";
+```
+
+## Style conventions
+
+- El formato (punto y coma, comillas, indentación) lo maneja ESLint/Prettier — no pelear con el tooling.
+  El código existente usa punto y coma al final de línea; mantener esa convención.
+- Código en inglés (variables, funciones); terminología médica del dominio puede quedar en español en UI.

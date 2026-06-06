@@ -35,12 +35,14 @@ type UserFilterState = {
   q: string;
   role: string;
   is_active: string;
+  clinical_access_enabled: string;
 };
 
 const emptyFilters: UserFilterState = {
   q: "",
   role: "",
   is_active: "",
+  clinical_access_enabled: "",
 };
 
 function formatDateTime(value: string | null | undefined): string {
@@ -84,6 +86,7 @@ export default function AdminUsersPage() {
           q: appliedFilters.q || undefined,
           role: appliedFilters.role || undefined,
           is_active: appliedFilters.is_active || undefined,
+          clinical_access_enabled: appliedFilters.clinical_access_enabled || undefined,
           limit: PAGE_SIZE,
           offset,
         });
@@ -182,6 +185,7 @@ export default function AdminUsersPage() {
       q: appliedFilters.q || undefined,
       role: appliedFilters.role || undefined,
       is_active: appliedFilters.is_active || undefined,
+      clinical_access_enabled: appliedFilters.clinical_access_enabled || undefined,
       limit: PAGE_SIZE,
       offset,
     });
@@ -189,7 +193,7 @@ export default function AdminUsersPage() {
     setTotal(response.total);
   };
 
-  const handleToggleStatus = async () => {
+  const handleToggleClinicalAccess = async () => {
     if (!selectedUserDetail) {
       return;
     }
@@ -197,15 +201,35 @@ export default function AdminUsersPage() {
     setStatusSaving(true);
     setDetailError(null);
     try {
-      await updateInternalUserStatus(
-        selectedUserDetail.user.id,
-        !selectedUserDetail.user.is_active,
-      );
+      await updateInternalUserStatus(selectedUserDetail.user.id, {
+        clinical_access_enabled: !selectedUserDetail.user.clinical_access_enabled,
+      });
       const updatedDetail = await getInternalUserDetail(selectedUserDetail.user.id);
       setSelectedUserDetail(updatedDetail);
       await refreshCurrentPage();
     } catch {
-      setDetailError("No pudimos actualizar el estado del usuario.");
+      setDetailError("No pudimos actualizar el acceso clínico del usuario.");
+    } finally {
+      setStatusSaving(false);
+    }
+  };
+
+  const handleToggleLoginAccess = async () => {
+    if (!selectedUserDetail) {
+      return;
+    }
+
+    setStatusSaving(true);
+    setDetailError(null);
+    try {
+      await updateInternalUserStatus(selectedUserDetail.user.id, {
+        is_active: !selectedUserDetail.user.is_active,
+      });
+      const updatedDetail = await getInternalUserDetail(selectedUserDetail.user.id);
+      setSelectedUserDetail(updatedDetail);
+      await refreshCurrentPage();
+    } catch {
+      setDetailError("No pudimos actualizar el acceso de login del usuario.");
     } finally {
       setStatusSaving(false);
     }
@@ -229,10 +253,20 @@ export default function AdminUsersPage() {
             onChange={(event) => handleFilterChange("role", event.target.value)}
           />
           <Input
-            placeholder="Estado: true / false"
+            placeholder="Login: true / false"
             value={filters.is_active}
             onChange={(event) =>
               handleFilterChange("is_active", event.target.value.trim().toLowerCase())
+            }
+          />
+          <Input
+            placeholder="Acceso clínico: true / false"
+            value={filters.clinical_access_enabled}
+            onChange={(event) =>
+              handleFilterChange(
+                "clinical_access_enabled",
+                event.target.value.trim().toLowerCase(),
+              )
             }
           />
           <div className="flex items-center gap-2 xl:justify-end">
@@ -271,7 +305,8 @@ export default function AdminUsersPage() {
                 <TableRow>
                   <TableHead>Usuario</TableHead>
                   <TableHead>Rol</TableHead>
-                  <TableHead>Estado</TableHead>
+                  <TableHead>Login</TableHead>
+                  <TableHead>Acceso clínico</TableHead>
                   <TableHead>Ultimo login</TableHead>
                   <TableHead>Sesiones activas</TableHead>
                   <TableHead>Logins 24h</TableHead>
@@ -281,7 +316,7 @@ export default function AdminUsersPage() {
               <TableBody>
                 {!loading && items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-sm text-slate-500">
+                    <TableCell colSpan={8} className="py-10 text-center text-sm text-slate-500">
                       No hay usuarios para los filtros actuales.
                     </TableCell>
                   </TableRow>
@@ -297,7 +332,14 @@ export default function AdminUsersPage() {
                     <TableCell className="text-sm text-slate-700">{item.role}</TableCell>
                     <TableCell>
                       <Badge variant={item.is_active ? "default" : "secondary"}>
-                        {item.is_active ? "Activa" : "Inactiva"}
+                        {item.is_active ? "Habilitado" : "Suspendido"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={item.clinical_access_enabled ? "default" : "secondary"}
+                      >
+                        {item.clinical_access_enabled ? "Activo" : "Inactivo"}
                       </Badge>
                     </TableCell>
                     <TableCell className="min-w-[180px] text-sm text-slate-700">
@@ -323,7 +365,7 @@ export default function AdminUsersPage() {
                 ))}
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-sm text-slate-500">
+                    <TableCell colSpan={8} className="py-10 text-center text-sm text-slate-500">
                       Cargando usuarios...
                     </TableCell>
                   </TableRow>
@@ -403,12 +445,32 @@ export default function AdminUsersPage() {
                   </div>
                 </div>
                 <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-xs uppercase tracking-wide text-slate-500">Estado</div>
+                  <div className="text-xs uppercase tracking-wide text-slate-500">
+                    Login habilitado
+                  </div>
                   <div className="mt-1">
                     <Badge
                       variant={selectedUserDetail.user.is_active ? "default" : "secondary"}
                     >
-                      {selectedUserDetail.user.is_active ? "Activa" : "Inactiva"}
+                      {selectedUserDetail.user.is_active ? "Habilitado" : "Suspendido"}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="text-xs uppercase tracking-wide text-slate-500">
+                    Acceso clínico (IA)
+                  </div>
+                  <div className="mt-1">
+                    <Badge
+                      variant={
+                        selectedUserDetail.user.clinical_access_enabled
+                          ? "default"
+                          : "secondary"
+                      }
+                    >
+                      {selectedUserDetail.user.clinical_access_enabled
+                        ? "Activo"
+                        : "Inactivo"}
                     </Badge>
                   </div>
                 </div>
@@ -561,11 +623,11 @@ export default function AdminUsersPage() {
             </div>
           ) : null}
 
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:justify-between">
             <Button
               type="button"
               variant="outline"
-              onClick={handleToggleStatus}
+              onClick={handleToggleLoginAccess}
               disabled={
                 !capabilities.can_manage_users ||
                 !selectedUserDetail ||
@@ -576,8 +638,23 @@ export default function AdminUsersPage() {
               {statusSaving
                 ? "Guardando..."
                 : selectedUserDetail?.user.is_active
-                  ? "Desactivar cuenta"
-                  : "Activar cuenta"}
+                  ? "Suspender login"
+                  : "Rehabilitar login"}
+            </Button>
+            <Button
+              type="button"
+              onClick={handleToggleClinicalAccess}
+              disabled={
+                !capabilities.can_manage_users ||
+                !selectedUserDetail ||
+                statusSaving
+              }
+            >
+              {statusSaving
+                ? "Guardando..."
+                : selectedUserDetail?.user.clinical_access_enabled
+                  ? "Desactivar acceso clínico"
+                  : "Activar acceso clínico"}
             </Button>
           </DialogFooter>
         </DialogContent>
