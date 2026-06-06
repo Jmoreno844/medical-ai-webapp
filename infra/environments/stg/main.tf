@@ -79,6 +79,7 @@ module "secret_manager" {
     "audit-ip-hmac-secret",
     "audit-ip-encryption-key",
     "admin-bootstrap-password",
+    "cloudsql-postgres-password",
     "anthropic-api-key",
     "langsmith-api-key",
   ]
@@ -371,6 +372,80 @@ module "admin_bootstrap_cloud_run_job" {
     local.labels,
     {
       workload = "admin-bootstrap"
+    },
+  )
+
+  depends_on = [
+    module.service_accounts,
+    module.cloud_sql,
+    module.secret_manager,
+  ]
+}
+
+# ---------------------------------------------------------------------------
+# 10aa. Cloud Run Job (Cloud SQL IAM grants bootstrap)
+# ---------------------------------------------------------------------------
+
+module "cloudsql_iam_grants_cloud_run_job" {
+  source     = "../../modules/cloud_run_job"
+  project_id = var.project_id
+  region     = var.region
+
+  job_name                  = var.cloudsql_iam_grants_job_name
+  image                     = var.cloud_run_image
+  service_account_email     = module.service_accounts.backend_runner_email
+  cloud_sql_connection_name = module.cloud_sql.connection_name
+  cloud_sql_volume_enabled  = false
+
+  command = ["python"]
+  args    = ["scripts/grant_cloudsql_iam_privileges.py"]
+
+  timeout = "600s"
+  cpu     = "1"
+  memory  = "1Gi"
+
+  env_vars = {
+    ENVIRONMENT           = var.environment
+    GCP_PROJECT           = var.project_id
+    GOOGLE_CLOUD_PROJECT  = var.project_id
+    GCP_PROJECT_ID        = var.project_id
+    DB_HOST               = "127.0.0.1"
+    DB_PORT               = "5432"
+    DB_NAME               = var.db_name
+    DB_USER               = trimsuffix(module.service_accounts.backend_runner_email, ".gserviceaccount.com")
+    COPILOT_AGENT_DB_NAME = var.copilot_agent_db_name
+    COPILOT_AGENT_DB_USER = trimsuffix(module.service_accounts.copilot_agent_runner_email, ".gserviceaccount.com")
+    OTEL_SERVICE_NAME     = "vexthealth-cloudsql-iam-grants"
+  }
+
+  secret_env_vars = var.cloud_run_use_secret_manager ? [
+    { name = "CLOUDSQL_POSTGRES_PASSWORD", secret_id = "cloudsql-postgres-password" },
+  ] : []
+
+  vpc_access = {
+    network    = module.network.network_name
+    subnetwork = module.network.subnetwork_name
+    egress     = "PRIVATE_RANGES_ONLY"
+  }
+
+  sidecars = [
+    {
+      name  = "cloud-sql-proxy"
+      image = var.cloud_run_db_proxy_image
+      args = [
+        "--private-ip",
+        "--auto-iam-authn",
+        "--address=127.0.0.1",
+        "--port=5432",
+        module.cloud_sql.connection_name,
+      ]
+    },
+  ]
+
+  labels = merge(
+    local.labels,
+    {
+      workload = "cloudsql-iam-grants"
     },
   )
 

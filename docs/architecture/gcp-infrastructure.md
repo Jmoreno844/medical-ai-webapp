@@ -16,6 +16,7 @@ IaC: `infra/` en la raíz del repo.
 | ------------------ | ------------------------------- | ------------------------------------------------- |
 | Cloud Run service  | `vexthealth-backend`            | `vexthealth-backend`                              |
 | Cloud Run job      | `vexthealth-backend-admin-bootstrap` | `vexthealth-backend-admin-bootstrap`        |
+| Cloud Run job      | `vexthealth-cloudsql-iam-grants` | `vexthealth-cloudsql-iam-grants`        |
 | Cloud Run service  | `vexthealth-frontend`           | `vexthealth-frontend`                             |
 | Cloud Run copilot  | `vexthealth-copilot-agent`      | `vexthealth-copilot-agent`                        |
 | Cloud Run worker   | `vexthealth-transcription-worker` | `vexthealth-transcription-worker`               |
@@ -108,6 +109,7 @@ echo -n "VALOR" | gcloud secrets versions add SECRET_ID --data-file=-
 | `service-account-json`       | Cloud Run               | Opcional; solo si se fuerza una SA key en lugar de ADC      |
 | `copilot-service-shared-jwt` | Backend + Copilot Agent | JWT compartido para broker interno FastAPI -> agent runtime |
 | `admin-bootstrap-password`   | Admin bootstrap job     | Password temporal leído por `ADMIN_BOOTSTRAP_PASSWORD`      |
+| `cloudsql-postgres-password` | Cloud SQL IAM grants job | Password del usuario `postgres` para aplicar `GRANT` de base y esquema tras crear o recrear la instancia |
 | `anthropic-api-key`          | Document Worker         | Opcional; requerido si el worker usa `DOCUMENT_GENERATION_PROVIDER=anthropic_api` |
 
 Ni Terraform ni GitHub Actions cargan valores dentro de Secret Manager. Terraform
@@ -187,6 +189,19 @@ sesión hasta que exista un broker compartido.
 - Ejecuta `python scripts/create_admin.py`
 - El password de creación/reset viaja por `ADMIN_BOOTSTRAP_PASSWORD` montado
   desde Secret Manager, nunca por GitHub vars ni args de CLI
+
+### Cloud SQL IAM Grants Cloud Run Job
+
+- Job: `vexthealth-cloudsql-iam-grants`
+- Usa la misma imagen base del backend FastAPI
+- Usa `backend-runner` + Cloud SQL Auth Proxy sidecar
+- Ejecuta `python scripts/grant_cloudsql_iam_privileges.py`
+- Lee `cloudsql-postgres-password` desde Secret Manager para conectarse como
+  `postgres` y otorgar:
+  - `GRANT ALL ON DATABASE ...`
+  - `GRANT USAGE, CREATE ON SCHEMA public ...`
+- Está pensado para bootstrap o recreación de la instancia, no para el path
+  normal del runtime del backend
 
 ### Copilot Agent Cloud Run — configuración inicial
 

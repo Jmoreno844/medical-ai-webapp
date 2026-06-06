@@ -27,6 +27,8 @@ Requeridos para que el backend y el job funcionen:
 - `audit-ip-hmac-secret`
 - `audit-ip-encryption-key`
 - `admin-bootstrap-password`
+- `cloudsql-postgres-password` si también vas a ejecutar el job de grants de
+  Cloud SQL tras recrear la instancia
 
 Recomendación para `admin-bootstrap-password`:
 

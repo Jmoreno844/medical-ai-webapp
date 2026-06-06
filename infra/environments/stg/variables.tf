@@ -79,6 +79,12 @@ variable "admin_bootstrap_job_name" {
   default     = "vexthealth-backend-admin-bootstrap"
 }
 
+variable "cloudsql_iam_grants_job_name" {
+  description = "Cloud Run Job name for granting Cloud SQL schema/database privileges to IAM DB users"
+  type        = string
+  default     = "vexthealth-cloudsql-iam-grants"
+}
+
 variable "frontend_image" {
   description = "Initial Docker image for the frontend service (CI/CD updates this)"
   type        = string

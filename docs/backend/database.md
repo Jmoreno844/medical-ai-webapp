@@ -24,11 +24,13 @@ En entornos Cloud (`stg`, `production`), el backend ya **no utiliza contraseñas
 > Al crear el entorno por primera vez con Terraform, el nuevo _IAM User_ no tendrá permisos implícitos en el esquema `public`. El administrador del proyecto debe habilitar temporalmente la IP Pública y conectarse como el usuario maestro `postgres` para conceder permisos explícitos:
 >
 > ```sql
-> GRANT ALL ON SCHEMA public TO "backend-runner@<proyecto>.iam";
 > GRANT ALL ON DATABASE "<tu-base-de-datos>" TO "backend-runner@<proyecto>.iam";
+> GRANT USAGE, CREATE ON SCHEMA public TO "backend-runner@<proyecto>.iam";
 > ```
 >
-> _(Este paso ya fue realizado en el entorno `stg`)_.
+> En `stg`, este paso puede ejecutarse mediante el Cloud Run Job
+> `vexthealth-cloudsql-iam-grants` una vez exista una versión válida del secret
+> `cloudsql-postgres-password`.
 
 ---
 

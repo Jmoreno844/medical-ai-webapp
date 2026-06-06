@@ -8,6 +8,11 @@ output "admin_bootstrap_cloud_run_job_name" {
   value       = module.admin_bootstrap_cloud_run_job.job_name
 }
 
+output "cloudsql_iam_grants_cloud_run_job_name" {
+  description = "Cloud Run Job name for Cloud SQL IAM grants bootstrap operations"
+  value       = module.cloudsql_iam_grants_cloud_run_job.job_name
+}
+
 output "copilot_agent_cloud_run_url" {
   description = "Copilot agent Cloud Run service URL"
   value       = module.copilot_agent_cloud_run.service_url

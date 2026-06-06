@@ -23,6 +23,7 @@ frontend_service_name                   = "vexthealth-frontend"
 transcription_worker_service_name       = "vexthealth-transcription-worker"
 document_generation_worker_service_name = "vexthealth-document-generation-worker"
 admin_bootstrap_job_name                = "vexthealth-backend-admin-bootstrap"
+cloudsql_iam_grants_job_name            = "vexthealth-cloudsql-iam-grants"
 # Bootstrap with a public image; CI later replaces it with the app image.
 cloud_run_image                            = "us-docker.pkg.dev/cloudrun/container/hello"
 copilot_agent_image                        = "us-docker.pkg.dev/cloudrun/container/hello"
@@ -53,7 +54,7 @@ fastapi_cors_allowed_origins = "https://app-stg.notiahealth.com"
 gemini_model                 = "gemini-3.1-flash-lite-preview"
 
 #Document Generation Worker 
-document_generation_provider    ="google_vertex"
+document_generation_provider = "google_vertex"
 
 # Artifact Registry
 artifact_registry_repo = "vexthealth-containers"

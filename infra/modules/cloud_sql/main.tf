@@ -45,6 +45,12 @@ resource "google_sql_database_instance" "main" {
       }
     }
   }
+
+  timeouts {
+    create = "30m"
+    update = "30m"
+    delete = "30m"
+  }
 }
 
 resource "google_sql_database" "app" {
