@@ -29,7 +29,7 @@ from app.domains.transcription.service import (
     get_canonical_recording_session_for_document,
     reset_recording_session,
 )
-from app.integrations.storage import get_storage_client
+from app.integrations.storage import generate_v4_upload_signed_url, get_storage_client
 from app.core.schemas import SuccessResponse
 from app.domains.encounters.schemas import (
     AudioExistsResponse,
@@ -321,14 +321,10 @@ async def generate_upload_url(
     if not settings.gcs_bucket_name:
         return AudioUploadResponse(success=False, error="GCS_BUCKET_NAME no configurado")
 
-    storage_client = get_storage_client(settings)
-    bucket = storage_client.bucket(settings.gcs_bucket_name)
     filename = f"encounter_audio/{encounter_id}/{uuid.uuid4()}.webm"
-    blob = bucket.blob(filename)
-    upload_url = blob.generate_signed_url(
-        version="v4",
-        expiration=timedelta(minutes=10),
-        method="PUT",
+    upload_url = generate_v4_upload_signed_url(
+        settings=settings,
+        gcs_object_name=filename,
         content_type="audio/webm;codecs=opus",
     )
 

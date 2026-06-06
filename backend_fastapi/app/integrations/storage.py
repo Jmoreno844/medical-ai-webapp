@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import timedelta
 
 import google.auth
 from google.auth import impersonated_credentials
+from google.auth.transport import requests as google_requests
 from google.cloud import storage
 from google.oauth2 import service_account
 
@@ -75,3 +77,35 @@ def get_storage_client(settings: Settings | None = None) -> storage.Client:
         project=service_account_info.get("project_id") or settings.gcp_project_id,
     )
 
+
+def generate_v4_upload_signed_url(
+    *,
+    settings: Settings,
+    gcs_object_name: str,
+    content_type: str,
+    expiration: timedelta = timedelta(minutes=10),
+) -> str:
+    storage_client = get_storage_client(settings)
+    bucket = storage_client.bucket(settings.gcs_bucket_name)
+    blob = bucket.blob(gcs_object_name)
+
+    credentials = getattr(storage_client, "_credentials", None)
+    signed_url_kwargs: dict[str, object] = {
+        "version": "v4",
+        "expiration": expiration,
+        "method": "PUT",
+        "content_type": content_type,
+    }
+
+    # Cloud Run ADC often exposes a service-account identity without a local
+    # private key. In that case, signed URLs must use the IAMCredentials flow
+    # via service_account_email + access_token instead of local signing bytes.
+    if credentials is not None and not callable(getattr(credentials, "sign_bytes", None)):
+        if not getattr(credentials, "token", None):
+            credentials.refresh(google_requests.Request())
+        service_account_email = getattr(credentials, "service_account_email", None)
+        if service_account_email and getattr(credentials, "token", None):
+            signed_url_kwargs["service_account_email"] = service_account_email
+            signed_url_kwargs["access_token"] = credentials.token
+
+    return blob.generate_signed_url(**signed_url_kwargs)

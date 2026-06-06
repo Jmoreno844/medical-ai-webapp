@@ -107,7 +107,7 @@ GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT=backend-local-gcs-signer@vext-stg.iam.g
 - With `ENVIRONMENT=local`, the backend first checks `GCP_STORAGE_SERVICE_ACCOUNT_KEY_PATH`.
 - If that path is not set, it tries to impersonate `GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT` using your local ADC.
 - If neither is configured, it falls back to plain ADC, but local `blob.generate_signed_url(...)` may fail because plain user ADC does not provide a private signing key.
-- In Cloud Run, ADC comes from the service account attached to the service (e.g. `backend-runner@...`), so you typically **do not** need `SERVICE_ACCOUNT_JSON`.
+- In Cloud Run, ADC comes from the service account attached to the service (e.g. `backend-runner@...`). The backend now uses that identity plus an access token to sign GCS upload URLs through IAMCredentials, so you typically **do not** need `SERVICE_ACCOUNT_JSON`.
 
 ### Optional: explicit creds file (only if you must)
 

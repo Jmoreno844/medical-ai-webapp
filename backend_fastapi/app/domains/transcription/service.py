@@ -216,15 +216,11 @@ def generate_section_upload_url(
     gcs_object_name: str,
     content_type: str,
 ) -> str:
-    from app.integrations.storage import get_storage_client
+    from app.integrations.storage import generate_v4_upload_signed_url
 
-    storage_client = get_storage_client(settings)
-    bucket = storage_client.bucket(settings.gcs_bucket_name)
-    blob = bucket.blob(gcs_object_name)
-    return blob.generate_signed_url(
-        version="v4",
-        expiration=timedelta(minutes=10),
-        method="PUT",
+    return generate_v4_upload_signed_url(
+        settings=settings,
+        gcs_object_name=gcs_object_name,
         content_type=content_type,
     )
 
