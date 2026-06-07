@@ -65,7 +65,7 @@ const GenerateDocumentationButton: React.FC = () => {
         <button
           onClick={openGenerationModal}
           disabled={!isEnabled}
-          className={`flex items-center px-3 py-1.5 rounded text-base font-medium transition-colors
+          className={`flex items-center px-3 py-1.5 rounded text-base font-medium transition-colors outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-0
                   ${
                     !isEnabled
                       ? "border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed"

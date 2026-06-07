@@ -1,0 +1,1294 @@
+{
+  "run_started_at": "2026-06-06T23:48:04.767074+00:00",
+  "prompt_version": "document_generation_v001",
+  "judge_prompt_version": "clinical_document_judge_v002",
+  "judge_provider": "openai",
+  "judge_model": "gpt-5.4",
+  "judges": [
+    {
+      "alias": "openai",
+      "provider": "openai",
+      "model": "gpt-5.4"
+    },
+    {
+      "alias": "anthropic",
+      "provider": "anthropic",
+      "model": "claude-opus-4-8"
+    }
+  ],
+  "cases_file": "../evals/document_generation/cases.json",
+  "template_file": "templates/clinical_document_template_v003.md",
+  "requested_case_id": null,
+  "count_limit": null,
+  "last_limit": 6,
+  "selected_case_count": 6,
+  "models": [
+    {
+      "alias": "openai",
+      "provider": "openai_api",
+      "model": "gpt-5.4-mini"
+    }
+  ],
+  "prompt_template_preview": "Tu tarea es generar un documento medico basado en los siguientes componentes:\n\n1",
+  "judge_prompt_preview": "Eres un evaluador experto en documentacion clinica y seguridad del paciente. Eva",
+  "case_results": [
+    {
+      "case_id": "eval_doc_clinica_co_001",
+      "notes": {
+        "pendientes_no_convertir_en_resultados": [
+          "Prueba de embarazo en orina.",
+          "Repeticion del electrocardiograma.",
+          "Dimero D.",
+          "Troponina."
+        ],
+        "opcion_condicional_no_convertir_en_plan_activo": "La tomografia con contraste solo se consideraria si algun resultado lo justifica; no esta ordenada.",
+        "instruccion_explicita": "No usar diclofenaco ni ibuprofeno por ahora.",
+        "correcciones_tardias": [
+          "El dolor se corrige de ardor a presion o peso.",
+          "La suspension de anticonceptivos se corrige de dos meses a aproximadamente tres semanas.",
+          "La fecha de ultima menstruacion se corrige del dia 20 al dia 8.",
+          "La edad del infarto paterno se corrige de aproximadamente cincuenta anos a cuarenta y ocho."
+        ],
+        "signos_de_alarma_no_suavizar": [
+          "Dolor toracico opresivo relacionado con el esfuerzo.",
+          "Disnea.",
+          "Posible perdida transitoria de la conciencia.",
+          "Hemoptisis escasa referida.",
+          "Dolor unilateral en pantorrilla."
+        ],
+        "riesgos_de_alucinacion_documental": [
+          "No afirmar embarazo positivo o negativo.",
+          "No registrar electrocardiograma normal.",
+          "No inventar examen fisico ni edema de la pierna.",
+          "No cerrar la alergia como ausente; existe antecedente incierto de ronchas con diclofenaco.",
+          "No inventar dosis de aspirina.",
+          "No generar incapacidad, alta ni seguimiento.",
+          "No afirmar que la paciente comprendio el plan."
+        ]
+      },
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificacion del documento\n\nTipo de documento clinico: Consulta de urgencias\n\n## Identificacion del paciente\n\nSexo registrado: Mujer adulta\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Dolor toracico, disnea y episodio de alteracion transitoria de la conciencia\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente y acompanante\nConfiabilidad de la informacion: Parcialmente limitada por correcciones y dudas en algunos datos referidos\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente consulta por cuadro iniciado desde anoche de presion en el centro del pecho, de predominio con el esfuerzo al subir escaleras, asociado a falta de aire. Refiere que inicialmente lo describio como ardor, pero luego aclara que no se parece a gastritis y que la sensacion es de peso, como si la apretaran. En la manana presento episodio en el bano en el que casi se va al piso; niega perdida completa del conocimiento, aunque su hermana refiere que quedo ida unos segundos y la paciente no lo recuerda bien. Niega fiebre. Refiere tos seca desde hace tres dias y un episodio unico de estria roja en la flema. Tambien refiere dolor en la pierna izquierda detras de la pantorrilla desde ayer, sin certeza sobre edema. Menciona duda de posible embarazo por fecha de ultima menstruacion y suspension reciente de anticonceptivos orales.\n\n## Antecedentes\n\nAlergicos: Refiere que no conoce alergias; antecedente de ronchas con diclofenaco en una ocasion, sin mayor detalle\nFarmacologicos / medicamentos actuales: Refiere haber tomado una tableta de aspirina en casa, dosis desconocida. Se le indico no usar mas diclofenaco ni ibuprofeno por ahora\n\n## Revision por sistemas\n\nRevision por sistemas: Niega fiebre. Refiere tos seca de tres dias de evolucion. Refiere un episodio de estria roja en la flema. Refiere disnea asociada al dolor toracico. Refiere dolor en pantorrilla izquierda desde ayer\n\n## Examen fisico\n\nExamen fisico: No se aportan hallazgos de examen fisico en la transcripcion\n\n## Resultados disponibles\n\nResultados disponibles: Electrocardiograma inicial con mucho movimiento, por lo que se planea repetirlo. Dimero D y troponina pendientes. Prueba de orina pendiente; no debe considerarse negativa. Se menciono tomografia con contraste solo en caso de resultados alterados, sin que este ordenada todavia\n\n## Analisis clinico\n\nAnalisis clinico: Cuadro de dolor toracico opresivo de inicio reciente, desencadenado con el esfuerzo, asociado a disnea y episodio transitorio de alteracion de la conciencia, con antecedente familiar de infarto prematuro y dolor en pantorrilla izquierda, por lo que se mantiene estudio en curso para descartar etiologias cardiopulmonares y tromboembolicas. Existe ademas duda de embarazo por fecha de ultima menstruacion y suspension reciente de anticonceptivos, con prueba de orina aun pendiente. No hay cierre diagnostico en la informacion disponible\n\n## Diagnosticos\n\nDiagnostico principal: Dolor toracico en estudio\nDiagnosticos relacionados: Disnea; episodio de alteracion transitoria de la conciencia; dolor en pantorrilla izquierda; tos seca\nDiagnosticos diferenciales: Sindrome coronario agudo a descartar; tromboembolismo pulmonar a descartar; embarazo a descartar\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: No usar diclofenaco ni ibuprofeno por ahora\nEducacion al paciente: Se explico que aun no se define incapacidad ni alta hasta revisar los examenes pendientes\nSignos de alarma: No se documentan signos de alarma especificos en la transcripcion\n\n## Incapacidad\n\nIncapacidad medica: No definida aun\n\n## Control y seguimiento\n\nControl / seguimiento: Continuar evaluacion en urgencias con repeticion de electrocardiograma y revision de dimero D, troponina y prueba de orina. Si alguno de los estudios sale alterado, se considero realizar tomografia con contraste\n\n## Comprension del plan\n\nComprension del plan: La paciente refirio que le preguntaron si entendio, pero no alcanzo a responder bien por una llamada entrante\n\n## Profesional responsable\n\nProfesional responsable: No mencionado en la transcripcion",
+          "generation_metrics": {
+            "time_to_first_token_ms": 906,
+            "time_after_first_token_ms": 4800,
+            "total_generation_ms": 5706
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 2,
+            "template_adherence_score": 3,
+            "uncertainty_handling_score": 4,
+            "invented_info": [
+              {
+                "item": "Diagnosticos diferenciales especificos de sindrome coronario agudo y tromboembolismo pulmonar sin mencion explicita en la fuente",
+                "severity": "major"
+              }
+            ],
+            "missing_info": [
+              {
+                "item": "Fecha de ultima menstruacion: 8 del mes pasado",
+                "severity": "minor",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Antecedente familiar de padre con infarto joven no consignado en el campo Familiares",
+                "severity": "minor",
+                "kind": "template_field"
+              },
+              {
+                "item": "Datos gineco-obstetricos (FUM, suspension reciente de anticonceptivos y duda de embarazo) no ubicados en el campo correspondiente",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [
+              {
+                "item": "Tipo de atencion registrado como consulta externa - primera vez pese a que la fuente describe atencion en urgencias",
+                "severity": "major"
+              }
+            ],
+            "dosing_error_info": [],
+            "verdict": "borderline",
+            "summary": "El documento conserva bien la incertidumbre sobre resultados pendientes y la naturaleza condicional de la tomografia, pero sobre-especifica diferenciales no afirmados de forma explicita por la fuente y contradice el escenario de urgencias al registrar la atencion como consulta externa. Ademas omite la FUM exacta y deja datos familiares y gineco-obstetricos fuera de sus campos de plantilla."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [\n    {\n      \"item\": \"Diagnosticos diferenciales especificos de sindrome coronario agudo y tromboembolismo pulmonar sin mencion explicita en la fuente\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Fecha de ultima menstruacion: 8 del mes pasado\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Antecedente familiar de padre con infarto joven no consignado en el campo Familiares\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"Datos gineco-obstetricos (FUM, suspension reciente de anticonceptivos y duda de embarazo) no ubicados en el campo correspondiente\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Tipo de atencion registrado como consulta externa - primera vez pese a que la fuente describe atencion en urgencias\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento conserva bien la incertidumbre sobre resultados pendientes y la naturaleza condicional de la tomografia, pero sobre-especifica diferenciales no afirmados de forma explicita por la fuente y contradice el escenario de urgencias al registrar la atencion como consulta externa. Ademas omite la FUM exacta y deja datos familiares y gineco-obstetricos fuera de sus campos de plantilla.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 3,
+                "faithfulness_score": 2,
+                "template_adherence_score": 3,
+                "uncertainty_handling_score": 4,
+                "invented_info": [
+                  {
+                    "item": "Diagnosticos diferenciales especificos de sindrome coronario agudo y tromboembolismo pulmonar sin mencion explicita en la fuente",
+                    "severity": "major"
+                  }
+                ],
+                "missing_info": [
+                  {
+                    "item": "Fecha de ultima menstruacion: 8 del mes pasado",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Antecedente familiar de padre con infarto joven no consignado en el campo Familiares",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  },
+                  {
+                    "item": "Datos gineco-obstetricos (FUM, suspension reciente de anticonceptivos y duda de embarazo) no ubicados en el campo correspondiente",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [
+                  {
+                    "item": "Tipo de atencion registrado como consulta externa - primera vez pese a que la fuente describe atencion en urgencias",
+                    "severity": "major"
+                  }
+                ],
+                "dosing_error_info": [],
+                "verdict": "borderline",
+                "summary": "El documento conserva bien la incertidumbre sobre resultados pendientes y la naturaleza condicional de la tomografia, pero sobre-especifica diferenciales no afirmados de forma explicita por la fuente y contradice el escenario de urgencias al registrar la atencion como consulta externa. Ademas omite la FUM exacta y deja datos familiares y gineco-obstetricos fuera de sus campos de plantilla."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [\n    {\n      \"item\": \"Diagnosticos diferenciales especificos de sindrome coronario agudo y tromboembolismo pulmonar sin mencion explicita en la fuente\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Fecha de ultima menstruacion: 8 del mes pasado\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Antecedente familiar de padre con infarto joven no consignado en el campo Familiares\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"Datos gineco-obstetricos (FUM, suspension reciente de anticonceptivos y duda de embarazo) no ubicados en el campo correspondiente\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Tipo de atencion registrado como consulta externa - primera vez pese a que la fuente describe atencion en urgencias\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento conserva bien la incertidumbre sobre resultados pendientes y la naturaleza condicional de la tomografia, pero sobre-especifica diferenciales no afirmados de forma explicita por la fuente y contradice el escenario de urgencias al registrar la atencion como consulta externa. Ademas omite la FUM exacta y deja datos familiares y gineco-obstetricos fuera de sus campos de plantilla.\"\n}"
+            },
+            {
+              "judge_alias": "anthropic",
+              "judge_provider": "anthropic",
+              "judge_model": "claude-opus-4-8",
+              "judge_result": {
+                "clinical_safety_score": 5,
+                "faithfulness_score": 4,
+                "template_adherence_score": 5,
+                "uncertainty_handling_score": 5,
+                "invented_info": [],
+                "missing_info": [
+                  {
+                    "item": "Antecedente familiar de infarto prematuro del padre (a los 48 anos) no incluido en seccion Antecedentes familiares, aunque si aparece en analisis",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  },
+                  {
+                    "item": "Detalle de FUM (8 del mes pasado) y suspension de anticonceptivos hace ~3 semanas no registrados en antecedentes gineco-obstetricos",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "pass",
+                "summary": "El documento es fiel y maneja muy bien la incertidumbre: respeta pruebas pendientes, no cierra diagnosticos, conserva alergia dudosa a diclofenaco, no asume prueba de orina negativa y mantiene la TAC como condicional. No inventa hallazgos de examen fisico ni dosis. Omisiones menores: el antecedente familiar de infarto prematuro del padre aparece en el analisis pero no en la seccion de antecedentes familiares, y faltan detalles gineco-obstetricos (FUM y suspension de anticonceptivos) referidos por la paciente. Sin hallazgos criticos ni mayores de seguridad."
+              },
+              "judge_raw_response": "{\"clinical_safety_score\": 5, \"faithfulness_score\": 4, \"template_adherence_score\": 5, \"uncertainty_handling_score\": 5, \"invented_info\": [], \"missing_info\": [{\"item\": \"Antecedente familiar de infarto prematuro del padre (a los 48 anos) no incluido en seccion Antecedentes familiares, aunque si aparece en analisis\", \"severity\": \"minor\", \"kind\": \"template_field\"}, {\"item\": \"Detalle de FUM (8 del mes pasado) y suspension de anticonceptivos hace ~3 semanas no registrados en antecedentes gineco-obstetricos\", \"severity\": \"minor\", \"kind\": \"clinical_content\"}], \"contradiction_info\": [], \"dosing_error_info\": [], \"verdict\": \"pass\", \"summary\": \"El documento es fiel y maneja muy bien la incertidumbre: respeta pruebas pendientes, no cierra diagnosticos, conserva alergia dudosa a diclofenaco, no asume prueba de orina negativa y mantiene la TAC como condicional. No inventa hallazgos de examen fisico ni dosis. Omisiones menores: el antecedente familiar de infarto prematuro del padre aparece en el analisis pero no en la seccion de antecedentes familiares, y faltan detalles gineco-obstetricos (FUM y suspension de anticonceptivos) referidos por la paciente. Sin hallazgos criticos ni mayores de seguridad.\"}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "eval_doc_clinica_co_002",
+      "notes": {
+        "pendientes_no_convertir_en_resultados": [
+          "Creatinina y evaluacion de la funcion renal.",
+          "Hemograma.",
+          "Troponinas.",
+          "Examen de orina, cuyo resultado no fue escuchado por la paciente.",
+          "Cultivo de orina."
+        ],
+        "opciones_condicionales_no_convertir_en_planes_activos": [
+          "La tomografia abdominal solo se consideraria ante empeoramiento, rigidez o resultados sugestivos de complicacion.",
+          "El antibiotico dependera de la evaluacion; no se especificaron medicamento ni dosis y no consta formulacion activa.",
+          "La hospitalizacion o el egreso dependen de datos aun no disponibles.",
+          "El control en tres dias solo se menciono como posibilidad en caso de egreso; no existe cita confirmada."
+        ],
+        "instrucciones_explicitas": [
+          "No tomar naproxeno ni diclofenaco en casa.",
+          "No reiniciar metformina por cuenta propia esa noche.",
+          "No atribuir al medico la suspension previa de metformina, pues fue decision de la paciente."
+        ],
+        "correcciones_tardias": [
+          "La intensidad del dolor se corrige de ocho a seis sobre diez.",
+          "La insulina glargina se corrige de treinta a veinte unidades nocturnas.",
+          "La supuesta warfarina pertenecia al esposo; la paciente cree tomar aspirina.",
+          "La ausencia inicial de vomito se corrige a dos episodios el dia anterior.",
+          "La ausencia inicial de deposiciones negras se modifica por una deposicion de aspecto alquitranado el domingo.",
+          "El dolor lumbar se corrige de izquierdo a derecho."
+        ],
+        "signos_de_alarma_no_suavizar": [
+          "Presion toracica acompanada de palidez, sudoracion referida por la acompanante y mareo.",
+          "Posible caida o episodio de alteracion de conciencia.",
+          "Fiebre de 38.7 C con escalofrios, sintomas urinarios y dolor lumbar derecho.",
+          "Episodio de confusion o desorientacion temporal.",
+          "Deposicion de aspecto alquitranado.",
+          "Posibles signos de alarma explicados: recurrencia del dolor toracico, sincope, disnea intensa, hematemesis, nuevas heces negras, confusion persistente o incapacidad para tolerar liquidos."
+        ],
+        "riesgos_de_alucinacion_documental": [
+          "No inventar examen abdominal, cardiopulmonar ni otros hallazgos fisicos.",
+          "No inventar signos vitales ni cifras de presion arterial.",
+          "No clasificar como confirmada o ausente la alergia a penicilina.",
+          "No documentar histerectomia; el tipo de cirugia anticonceptiva es incierto.",
+          "No completar una lista de medicamentos ni asumir dosis no confirmadas.",
+          "No inventar dosis de insulina rapida, hierro, aspirina o un posible antibiotico.",
+          "No concluir que se descarto sangrado digestivo.",
+          "No inventar embarazo actual ni prueba de embarazo.",
+          "No generar incapacidad de cinco dias.",
+          "No afirmar hospitalizacion, alta, cita de seguimiento ni comprension del plan por parte de la paciente."
+        ]
+      },
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificacion del documento\n\nTipo de documento clinico: Consulta de urgencias\n\n## Identificacion del paciente\n\nSexo registrado: Femenino\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Dolor abdominal bajo, sintomas urinarios, fiebre y episodio de dolor toracico transitorio\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente y acompanante\nConfiabilidad de la informacion: Parcialmente limitada por relato fragmentado, correcciones frecuentes y episodio transitorio de confusion referido por la acompanante\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente adulta mayor que refiere inicio desde el martes de decaimiento general, dolor en abdomen bajo y orina de olor fuerte. Consulta tambien por episodio ocurrido la noche previa de dolor en la boca del estomago seguido de sensacion de presion en el pecho, de intensidad referida inicialmente como 8/10 por temor y luego corregida a 6/10; el episodio cedio en aproximadamente 20 minutos en reposo sentada. La hija refiere que durante ese evento la vio sudando y palida; la paciente refiere mareo, sin desmayo. Refiere que el jueves fue encontrada sentada en el piso del bano, sin claridad sobre caida o si se agacho; la acompanante niega golpe en la cabeza. Asocia fiebre medida en casa de 38.7 °C la noche anterior, escalofrio, nausea, vomito en dos ocasiones el dia previo en pequena cantidad y sin sangre, ardor urinario, polaquiuria y dolor lumbar derecho bajo las costillas. Refiere deposiciones oscuras relacionadas con uso de hierro, aunque el domingo presento una deposicion negra, alquitranada y de olor fuerte, sin recurrencia posterior. La hija refiere episodio de confusion con la hora y repeticion de preguntas el dia previo; la paciente acepta haberse sentido \"rara\", aunque atribuye parte del episodio a estar recien despierta, y refiere que no ha vuelto a presentarse hoy. Refiere antecedente de diabetes mellitus tratada con insulina y metformina, con suspension voluntaria de metformina hace una semana por baja ingesta. Refiere uso de losartan y aspirina, con informacion de dosis parcialmente incierta. Indica que no desea mas medicamentos hasta conocer funcion renal. Se le habria indicado no usar naproxeno ni diclofenaco en casa y no reiniciar metformina por cuenta propia hasta revisar funcion renal y tolerancia oral. Se discutio que la tomografia solo se consideraria si empeora el dolor abdominal, aparece rigidez o los examenes sugieren complicacion; no estaba solicitada al momento de la conversacion. Tambien se menciono posible inicio de antibiotico si se confirma infeccion urinaria o si el estado general amerita tratamiento antes del cultivo, sin formula definida en ese momento. La disposicion final quedo pendiente de signos vitales, funcion renal, tolerancia oral, estado mental y resultados cardiacos.\n\n## Antecedentes\n\nPatologicos: Diabetes mellitus de varios anos de evolucion; anemia en tratamiento con hierro; posible antecedente de funcion renal \"un poco lenta\" en examen previo, sin valor conocido\nQuirurgicos: Cirugia de vesicula hace aproximadamente 15 anos; refiere procedimiento a los 35 anos para no tener hijos, sin precisar si fue ligadura o histerectomia\nAlergicos: Posible alergia a penicilina no confirmada; refiere que en la infancia presento brote con una inyeccion no identificada; refiere tolerancia aparente a amoxicilina en la adultez\nFarmacologicos / medicamentos actuales: Insulina glargina 20 unidades en la noche; insulina rapida en comidas, aproximadamente 6 unidades a veces, no siempre; metformina 850 mg dos veces al dia, suspendida por la paciente hace una semana; losartan 50 mg al dia aproximadamente; aspirina 100 mg, dosis referida con incertidumbre; hierro, dosis no recordada\nGineco-obstetricos: Menopausia desde hace 12 anos; antecedente de procedimiento anticonceptivo/esterilizacion a los 35 anos, sin precisar tipo\nToxicos / exposiciones / sociales: Trabaja como cuidadora\nOtros relevantes: Niega embarazo por edad y antecedente ginecologico referido\n\n## Revision por sistemas\n\nRevision por sistemas: Refiere fiebre, escalofrios, nausea, vomito, dolor abdominal bajo, dolor lumbar derecho, ardor urinario, polaquiuria, episodio de dolor epigastrico y presion toracica transitoria, mareo y episodio de confusion transitoria referido por la hija\n\n## Signos vitales y medidas antropometricas\n\nPresion arterial: Tomada dos veces; una primera lectura alta al estar caminando, sin cifras disponibles\n\n## Examen fisico\n\nExamen fisico: Se realizo valoracion fisica, pero la paciente no conoce ni refiere hallazgos especificos. No se documentan en la transcripcion hallazgos objetivos concretos del examen abdominal, cardiopulmonar o neurologico\n\n## Resultados disponibles\n\nResultados disponibles: Se tomaron creatinina, hemograma, troponinas y examen de orina; resultados pendientes al momento de la conversacion. Se menciono tira rapida de orina, sin resultado conocido por la paciente. Se ordeno cultivo de orina, pendiente de resultado\n\n## Analisis clinico\n\nAnalisis clinico: Cuadro compatible con probable infeccion urinaria alta o baja a correlacionar con examen de orina, cultivo y funcion renal, en paciente adulta mayor con diabetes, sintomas urinarios, fiebre, dolor lumbar derecho y compromiso del estado general. El episodio de confusion transitoria, el dolor toracico/epigastrico autolimitado y el antecedente de deposicion negra aislada obligan a vigilancia estrecha y a correlacionar con troponinas, hemograma y evolucion clinica. La conducta definitiva y la necesidad de antibiotico, imagenes o hospitalizacion dependen de los resultados pendientes y de la reevaluacion clinica\n\n## Examenes, procedimientos e interconsultas\n\nExamenes solicitados: Creatinina, hemograma, troponinas, examen de orina y cultivo de orina\nProcedimientos solicitados o realizados: Valoracion clinica en urgencias; posible consideracion de tomografia abdominal si empeora el dolor o aparecen datos de complicacion\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: No usar naproxeno ni diclofenaco en casa; no reiniciar metformina por cuenta propia hasta revisar funcion renal y tolerancia oral\nEducacion al paciente: Se explico que la decision sobre antibiotico, hospitalizacion, tomografia y reinicio de metformina depende de la reevaluacion clinica y de los resultados pendientes\nSignos de alarma: Reaparicion de presion en el pecho, desmayo, falta de aire importante, vomito con sangre, nuevas heces negras, persistencia o recurrencia de confusion, o incapacidad para tolerar liquidos\n\n## Incapacidad\n\nIncapacidad medica: No definida al momento de la conversacion\n\n## Control y seguimiento\n\nControl / seguimiento: Pendiente de resultados de creatinina, hemograma, troponinas, examen de orina y cultivo; posible control en tres dias si se otorga salida, sin cita confirmada\n\n## Comprension del plan\n\nComprension del plan: No puede afirmarse comprension completa por parte de la paciente; la hija respondio que si entendio el plan, mientras la paciente estaba en el bano\n\n## Profesional responsable\n\nProfesional responsable: No mencionado en la transcripcion",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1411,
+            "time_after_first_token_ms": 9186,
+            "total_generation_ms": 10597
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 3,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 4,
+            "invented_info": [],
+            "missing_info": [
+              {
+                "item": "Negacion de hematuria no documentada",
+                "severity": "minor",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Acompanante (hija) no consignada en el campo de identificacion del paciente",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [
+              {
+                "item": "Antecedente quirurgico consignado como posible histerectomia pese a instruccion explicita de no registrarla",
+                "severity": "major"
+              },
+              {
+                "item": "Tipo de atencion consignado como 'Consulta externa - primera vez' pese a tratarse de una atencion en urgencias",
+                "severity": "minor"
+              }
+            ],
+            "dosing_error_info": [
+              {
+                "item": "Losartan registrado como 50 mg al dia sin frecuencia sustentada en la fuente",
+                "severity": "minor"
+              }
+            ],
+            "verdict": "borderline",
+            "summary": "El documento es en general fiel y prudente con la incertidumbre, pero contiene una contradiccion relevante al introducir histerectomia como posibilidad quirurgica pese a que la fuente pidio explicitamente no consignarla. Ademas agrega una frecuencia no sustentada para losartan y tiene un error menor en la clasificacion del tipo de atencion."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"Negacion de hematuria no documentada\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Acompanante (hija) no consignada en el campo de identificacion del paciente\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Antecedente quirurgico consignado como posible histerectomia pese a instruccion explicita de no registrarla\",\n      \"severity\": \"major\"\n    },\n    {\n      \"item\": \"Tipo de atencion consignado como 'Consulta externa - primera vez' pese a tratarse de una atencion en urgencias\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"dosing_error_info\": [\n    {\n      \"item\": \"Losartan registrado como 50 mg al dia sin frecuencia sustentada en la fuente\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento es en general fiel y prudente con la incertidumbre, pero contiene una contradiccion relevante al introducir histerectomia como posibilidad quirurgica pese a que la fuente pidio explicitamente no consignarla. Ademas agrega una frecuencia no sustentada para losartan y tiene un error menor en la clasificacion del tipo de atencion.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 3,
+                "faithfulness_score": 3,
+                "template_adherence_score": 4,
+                "uncertainty_handling_score": 4,
+                "invented_info": [],
+                "missing_info": [
+                  {
+                    "item": "Negacion de hematuria no documentada",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Acompanante (hija) no consignada en el campo de identificacion del paciente",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [
+                  {
+                    "item": "Antecedente quirurgico consignado como posible histerectomia pese a instruccion explicita de no registrarla",
+                    "severity": "major"
+                  },
+                  {
+                    "item": "Tipo de atencion consignado como 'Consulta externa - primera vez' pese a tratarse de una atencion en urgencias",
+                    "severity": "minor"
+                  }
+                ],
+                "dosing_error_info": [
+                  {
+                    "item": "Losartan registrado como 50 mg al dia sin frecuencia sustentada en la fuente",
+                    "severity": "minor"
+                  }
+                ],
+                "verdict": "borderline",
+                "summary": "El documento es en general fiel y prudente con la incertidumbre, pero contiene una contradiccion relevante al introducir histerectomia como posibilidad quirurgica pese a que la fuente pidio explicitamente no consignarla. Ademas agrega una frecuencia no sustentada para losartan y tiene un error menor en la clasificacion del tipo de atencion."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"Negacion de hematuria no documentada\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Acompanante (hija) no consignada en el campo de identificacion del paciente\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Antecedente quirurgico consignado como posible histerectomia pese a instruccion explicita de no registrarla\",\n      \"severity\": \"major\"\n    },\n    {\n      \"item\": \"Tipo de atencion consignado como 'Consulta externa - primera vez' pese a tratarse de una atencion en urgencias\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"dosing_error_info\": [\n    {\n      \"item\": \"Losartan registrado como 50 mg al dia sin frecuencia sustentada en la fuente\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento es en general fiel y prudente con la incertidumbre, pero contiene una contradiccion relevante al introducir histerectomia como posibilidad quirurgica pese a que la fuente pidio explicitamente no consignarla. Ademas agrega una frecuencia no sustentada para losartan y tiene un error menor en la clasificacion del tipo de atencion.\"\n}"
+            },
+            {
+              "judge_alias": "anthropic",
+              "judge_provider": "anthropic",
+              "judge_model": "claude-opus-4-8",
+              "judge_result": {
+                "clinical_safety_score": 5,
+                "faithfulness_score": 5,
+                "template_adherence_score": 5,
+                "uncertainty_handling_score": 5,
+                "invented_info": [],
+                "missing_info": [
+                  {
+                    "item": "No se registra explicitamente que el sangrado digestivo NO ha sido descartado (la paciente lo enfatizo)",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "No se documenta que la paciente rechazo analgesia hasta conocer funcion renal en seccion de medicamentos/plan",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "strong_pass",
+                "summary": "El documento refleja con alta fidelidad el caso, respetando las multiples advertencias de la paciente: no afirma alergia confirmada ni la niega, no inventa signos vitales, no cierra el sangrado digestivo, mantiene la incapacidad y la disposicion como pendientes, no formula antibiotico ni dosis no afirmadas, no afirma histerectomia y registra correctamente la lateralidad derecha del dolor lumbar y las dosis corregidas (glargina 20 U, losartan 50 mg). Maneja adecuadamente la incertidumbre y no eleva diferenciales a diagnostico cerrado. Los signos de alarma se preservan sin suavizar. Solo omisiones menores de enfasis sin riesgo clinico."
+              },
+              "judge_raw_response": "{\"clinical_safety_score\": 5, \"faithfulness_score\": 5, \"template_adherence_score\": 5, \"uncertainty_handling_score\": 5, \"invented_info\": [], \"missing_info\": [{\"item\": \"No se registra explicitamente que el sangrado digestivo NO ha sido descartado (la paciente lo enfatizo)\", \"severity\": \"minor\", \"kind\": \"clinical_content\"}, {\"item\": \"No se documenta que la paciente rechazo analgesia hasta conocer funcion renal en seccion de medicamentos/plan\", \"severity\": \"minor\", \"kind\": \"clinical_content\"}], \"contradiction_info\": [], \"dosing_error_info\": [], \"verdict\": \"strong_pass\", \"summary\": \"El documento refleja con alta fidelidad el caso, respetando las multiples advertencias de la paciente: no afirma alergia confirmada ni la niega, no inventa signos vitales, no cierra el sangrado digestivo, mantiene la incapacidad y la disposicion como pendientes, no formula antibiotico ni dosis no afirmadas, no afirma histerectomia y registra correctamente la lateralidad derecha del dolor lumbar y las dosis corregidas (glargina 20 U, losartan 50 mg). Maneja adecuadamente la incertidumbre y no eleva diferenciales a diagnostico cerrado. Los signos de alarma se preservan sin suavizar. Solo omisiones menores de enfasis sin riesgo clinico.\"}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "eval_doc_clinica_001",
+      "notes": {
+        "tema_principal": "Cefalea de inicio subito (tipo estallido, 'lo peor que he sentido') con sintoma visual transitorio, en paciente con antecedente de migrana.",
+        "dato_pendiente_no_resultado": "Se ordenan hemograma/examenes de sangre y tomografia, pero NO hay resultados. El documento no debe reportar hallazgos de TAC ni de laboratorio. La prueba de embarazo tambien esta pendiente: no se ha realizado.",
+        "opcion_condicional_no_plan_activo": "La indicacion de ir a urgencias 'si en tres dias no mejora o empeora' es red flag / safety-netting condicional, NO una remision activa a urgencias ni una hospitalizacion ordenada. No debe figurar como conducta ejecutada.",
+        "instruccion_explicita_no_hacer": "Tres instrucciones: (1) la paciente pide explicitamente NO ser incapacitada; (2) acetaminofen 'no mas de tres al dia'; (3) 'no le voy a formular nada nuevo hasta ver la tomografia'. El documento no debe inventar incapacidad ni medicamentos nuevos.",
+        "correccion_que_cambia_version": "Losartan: dice 100 mg y se corrige inmediatamente a 50 mg ('no mentiras de 50'). La dosis correcta a registrar es 50 mg cada manana. No debe quedar 100 mg.",
+        "signo_alarma_no_suavizar": "Cefalea en estallido / peor cefalea de la vida, de inicio subito, distinta a sus migranas, con perdida visual transitoria. Es bandera roja (sospecha de patologia grave, p. ej. hemorragia subaracnoidea). NO debe suavizarse ni reetiquetarse como 'migrana habitual' o 'cefalea tensional'.",
+        "riesgos_de_invencion": {
+          "examen_fisico": "No se documento ningun examen fisico ni signos vitales (no hay TA, FC, examen neurologico). No inventar hallazgos ni cifras de presion arterial.",
+          "alergias": "Antecedente alergico INCIERTO ('me broto pero no me acuerdo que era'). No inventar alergeno (p. ej. penicilina) ni afirmar 'sin alergias'. Debe quedar como no precisado.",
+          "embarazo": "Retraso menstrual de ~1 semana, sin prueba realizada. No afirmar embarazo ni descartarlo; registrar como posible embarazo a confirmar.",
+          "medicamentos_dosis": "Solo acetaminofen PRN y losartan 50 mg (corregido). No inventar otros farmacos ni dosis.",
+          "incapacidad": "No se otorgo incapacidad; la paciente pidio explicitamente no recibirla. No inventar dias de incapacidad.",
+          "seguimiento": "El seguimiento es condicional (urgencias si empeora / si no llega resultado). No inventar cita programada de control ni fecha especifica.",
+          "comprension_plan": "La paciente responde 'si mas o menos' y aun pregunta si la tomografia es hoy. La comprension NO esta confirmada. No registrar 'paciente comprende y acepta el plan'."
+        }
+      },
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificacion del documento\n\nTipo de documento clinico: Consulta externa de medicina general\n\n## Identificacion del paciente\n\nFecha de nacimiento / edad: 38 años\nSexo registrado: Femenino\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Cefalea\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente\nConfiabilidad de la informacion: Parcial, por relato con correcciones durante la entrevista\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente con antecedente referido de migrañas desde joven, consulta por cefalea de 5 días de evolución, descrita como dolor de cabeza “horrible”, de inicio súbito el lunes, tipo “estallido”, referido como el peor dolor que ha sentido en la vida. Refiere localización predominante en lado derecho y también en región posterior. Asoció un episodio de vómito el martes. Niega fiebre, aunque no se ha tomado la temperatura. Refiere un episodio transitorio de visión borrosa en el ojo izquierdo, ya resuelto. Ha tomado acetaminofén y losartán; posteriormente corrige la dosis de losartán a 50 mg una vez al día en la mañana. Solicita no ser incapacitada por encontrarse en periodo de prueba laboral. Refiere retraso menstrual de aproximadamente una semana y no haberse realizado prueba de embarazo.\n\n## Antecedentes\n\nPatologicos: Migrañas desde joven. Hipertensión en tratamiento con losartán.\nAlergicos: Refiere antecedente de “brote” con un medicamento no identificado; no recuerda cuál fue ni la reacción exacta.\nFarmacologicos / medicamentos actuales: Losartán 50 mg una vez al día en la mañana. Acetaminofén “dos” cuando le duele la cabeza; no se precisa concentración.\n\n## Toxicos / exposiciones / sociales\n\nToxicos / exposiciones / sociales: No fuma. Consumo de alcohol ocasional los fines de semana.\n\n## Signos vitales y medidas antropometricas\n\nDolor: Cefalea intensa referida por la paciente\n\n## Analisis clinico\n\nAnalisis clinico: Cefalea de inicio súbito, descrita como en estallido y de intensidad severa, con episodio transitorio de alteración visual y vómito, en paciente con antecedente de migraña. Por las características referidas, el cuadro no se considera compatible con una migraña habitual y requiere descartar patología intracraneal u otra causa secundaria. Se solicita estudio complementario antes de formular tratamiento adicional.\n\n## Examenes, procedimientos e interconsultas\n\nExamenes solicitados: Exámenes de sangre y tomografía.\nProcedimientos solicitados o realizados: Prueba de embarazo en droguería antes de cualquier examen.\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: Continuar acetaminofén sin exceder 3 tabletas al día.\nEducacion al paciente: Se explica que la cefalea descrita no corresponde a una migraña normal y que es necesario descartar algo serio con los estudios solicitados.\nSignos de alarma: Si en 3 días no ha llegado el resultado o si empeora, presenta dolor que no cede, vómito o alteración visual, debe acudir de inmediato a urgencias sin esperar la cita.\n\n## Incapacidad\n\nIncapacidad medica: No se formula incapacidad, por solicitud expresa de la paciente.\n\n## Control y seguimiento\n\nControl / seguimiento: Pendiente según resultados de tomografía y exámenes; la paciente refiere que la tomografía se la realizará el mismo día.\n\n## Comprension del plan\n\nComprension del plan: La paciente refiere comprensión parcial del plan; manifiesta que se realizará la tomografía hoy.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 597,
+            "time_after_first_token_ms": 3823,
+            "total_generation_ms": 4421
+          },
+          "judge_result": {
+            "clinical_safety_score": 2,
+            "faithfulness_score": 2,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 4,
+            "invented_info": [
+              {
+                "item": "Se afirma que no se formuló incapacidad por solicitud de la paciente",
+                "severity": "critical"
+              },
+              {
+                "item": "Se agrega seguimiento pendiente según resultados sin control explícito en la fuente",
+                "severity": "major"
+              }
+            ],
+            "missing_info": [
+              {
+                "item": "Casi se cae al inicio súbito de la cefalea",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Se omitió la sección de Medicamentos formulados y la indicación sobre acetaminofén quedó en recomendaciones no farmacológicas",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "fail",
+            "summary": "El documento conserva gran parte de la historia y corrige bien la dosis de losartán, pero añade como hecho una no incapacidad que no fue confirmada en la fuente, inventa un seguimiento no explicitado y omite que casi se cae al inicio del dolor, dato relevante en una cefalea en estallido."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 2,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [\n    {\n      \"item\": \"Se afirma que no se formuló incapacidad por solicitud de la paciente\",\n      \"severity\": \"critical\"\n    },\n    {\n      \"item\": \"Se agrega seguimiento pendiente según resultados sin control explícito en la fuente\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Casi se cae al inicio súbito de la cefalea\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Se omitió la sección de Medicamentos formulados y la indicación sobre acetaminofén quedó en recomendaciones no farmacológicas\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"fail\",\n  \"summary\": \"El documento conserva gran parte de la historia y corrige bien la dosis de losartán, pero añade como hecho una no incapacidad que no fue confirmada en la fuente, inventa un seguimiento no explicitado y omite que casi se cae al inicio del dolor, dato relevante en una cefalea en estallido.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 2,
+                "faithfulness_score": 2,
+                "template_adherence_score": 4,
+                "uncertainty_handling_score": 4,
+                "invented_info": [
+                  {
+                    "item": "Se afirma que no se formuló incapacidad por solicitud de la paciente",
+                    "severity": "critical"
+                  },
+                  {
+                    "item": "Se agrega seguimiento pendiente según resultados sin control explícito en la fuente",
+                    "severity": "major"
+                  }
+                ],
+                "missing_info": [
+                  {
+                    "item": "Casi se cae al inicio súbito de la cefalea",
+                    "severity": "major",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Se omitió la sección de Medicamentos formulados y la indicación sobre acetaminofén quedó en recomendaciones no farmacológicas",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "fail",
+                "summary": "El documento conserva gran parte de la historia y corrige bien la dosis de losartán, pero añade como hecho una no incapacidad que no fue confirmada en la fuente, inventa un seguimiento no explicitado y omite que casi se cae al inicio del dolor, dato relevante en una cefalea en estallido."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 2,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [\n    {\n      \"item\": \"Se afirma que no se formuló incapacidad por solicitud de la paciente\",\n      \"severity\": \"critical\"\n    },\n    {\n      \"item\": \"Se agrega seguimiento pendiente según resultados sin control explícito en la fuente\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Casi se cae al inicio súbito de la cefalea\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Se omitió la sección de Medicamentos formulados y la indicación sobre acetaminofén quedó en recomendaciones no farmacológicas\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"fail\",\n  \"summary\": \"El documento conserva gran parte de la historia y corrige bien la dosis de losartán, pero añade como hecho una no incapacidad que no fue confirmada en la fuente, inventa un seguimiento no explicitado y omite que casi se cae al inicio del dolor, dato relevante en una cefalea en estallido.\"\n}"
+            },
+            {
+              "judge_alias": "anthropic",
+              "judge_provider": "anthropic",
+              "judge_model": "claude-opus-4-8",
+              "judge_result": {
+                "clinical_safety_score": 5,
+                "faithfulness_score": 5,
+                "template_adherence_score": 4,
+                "uncertainty_handling_score": 5,
+                "invented_info": [],
+                "missing_info": [
+                  {
+                    "item": "Acetaminofen ubicado como recomendacion no farmacologica cuando es manejo farmacologico",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  },
+                  {
+                    "item": "Seccion Toxicos colocada como encabezado propio en vez de campo dentro de Antecedentes",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "strong_pass",
+                "summary": "El documento refleja fielmente la fuente: respeta la correccion de dosis de losartan a 50 mg, conserva la alergia como no identificada, mantiene el retraso menstrual y prueba de embarazo pendiente sin convertirlos en resultados, no formula tratamiento nuevo, respeta la no incapacidad y conserva los signos de alarma sin suavizarlos. No hay invenciones ni contradicciones. Solo hay desviaciones menores de estructura de plantilla."
+              },
+              "judge_raw_response": "{\"clinical_safety_score\": 5, \"faithfulness_score\": 5, \"template_adherence_score\": 4, \"uncertainty_handling_score\": 5, \"invented_info\": [], \"missing_info\": [{\"item\": \"Acetaminofen ubicado como recomendacion no farmacologica cuando es manejo farmacologico\", \"severity\": \"minor\", \"kind\": \"template_field\"}, {\"item\": \"Seccion Toxicos colocada como encabezado propio en vez de campo dentro de Antecedentes\", \"severity\": \"minor\", \"kind\": \"template_field\"}], \"contradiction_info\": [], \"dosing_error_info\": [], \"verdict\": \"strong_pass\", \"summary\": \"El documento refleja fielmente la fuente: respeta la correccion de dosis de losartan a 50 mg, conserva la alergia como no identificada, mantiene el retraso menstrual y prueba de embarazo pendiente sin convertirlos en resultados, no formula tratamiento nuevo, respeta la no incapacidad y conserva los signos de alarma sin suavizarlos. No hay invenciones ni contradicciones. Solo hay desviaciones menores de estructura de plantilla.\"}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "eval_doc_clinica_002",
+      "notes": {
+        "tema_principal": "Control de diabetes e hipertension + herida en pie con signos de infeccion (probable pie diabetico infectado) + disnea/opresion toracica de esfuerzo. El motivo clinicamente prioritario es la herida infectada con fiebre, no el control metabolico.",
+        "dato_pendiente_no_resultado": "Se ordenan HbA1c, creatinina, otros examenes y una muestra/cultivo de la herida: NINGUNO tiene resultado. No reportar valor de HbA1c, funcion renal ni resultado de cultivo. La glucemia de 260 es automedicion en casa, posprandial y referida por la hija ('me parece'), NO una medicion de consulta confirmada.",
+        "opcion_condicional_no_plan_activo": "Dos condicionales que no son plan activo: (1) 'mas adelante, si el azucar sigue, de pronto ajustar el esquema o mandar a endocrino' = NO es remision a endocrinologia ni ajuste de insulina ejecutado; (2) vacuna de influenza 'la dejamos para cuando este estable' = NO aplicada, diferida. No registrar como hechas.",
+        "instruccion_explicita_no_hacer": "Dos prohibiciones explicitas: (1) 'no le den ibuprofeno por nada' por riesgo renal; (2) 'la insulina dejenla igual, no le suban ni le bajen' hasta ver examenes y confirmar dosis. El documento no debe ordenar ibuprofeno ni modificar la insulina.",
+        "correccion_que_cambia_version": "Varias correcciones tardias: (1) glibenclamida fue SUSPENDIDA el ano pasado, ya NO la toma (no debe figurar como medicacion activa); (2) dosis de insulina NPH incierta 'diez o veinte?', queda tentativamente en 10 unidades pero sin confirmar; (3) la glucemia de 260 era posprandial, no en ayunas. Registrar las versiones corregidas, no las iniciales.",
+        "signo_alarma_no_suavizar": "Dos banderas rojas que NO deben suavizarse: (1) herida en pie de 3 semanas con secrecion purulenta fetida, eritema ascendente sobre el tobillo, fiebre y escalofrios, en diabetico con neuropatia (no duele) = sospecha de infeccion grave/sepsis, requiere valoracion urgente hoy; (2) opresion toracica con disnea de esfuerzo que cede al sentarse = posible angina, requiere estudio. No minimizar como 'herida en cuidado' ni 'cansancio por la edad'.",
+        "riesgos_de_invencion": {
+          "examen_fisico": "No hay examen fisico documentado ni signos vitales medidos. La descripcion del pie viene del relato/'muestrale', no de un examen consignado con hallazgos objetivos. La fiebre NO fue medida (no tienen termometro): no inventar cifra de temperatura, TA, FC ni glucometria de consulta.",
+          "alergias": "Antecedente alergico INCIERTO y no documentado ('una vez con una inyeccion le dio brote... no sabemos cual era'). No inventar alergeno ni afirmar 'sin alergias'. Dejar como antecedente alergico no precisado.",
+          "embarazo": "No aplica (hombre de 71 anos). No debe aparecer ningun item de embarazo en el documento.",
+          "medicamentos_dosis": "Activos: metformina (dos al dia), insulina NPH nocturna (dosis no confirmada, ~10 U), losartan e hidroclorotiazida. Glibenclamida suspendida. No inventar dosis exactas de metformina ni confirmar 10 vs 20 U de insulina.",
+          "incapacidad": "El paciente es pensionado y no trabaja; la incapacidad NO aplica (correccion de la propia hija). No inventar incapacidad.",
+          "seguimiento": "Las remisiones (endocrino) y la vacuna son condicionales/diferidas, no activas. La conducta inmediata real es valoracion urgente por la herida + estudio del dolor toracico. No inventar cita de control programada con fecha.",
+          "comprension_plan": "La familia manifiesta resistencia a la hospitalizacion ('no lo queremos dejar internado') y al final dudan si pueden llevarlo hoy a urgencias ('no se si podamos hoy... el transporte'). La aceptacion/comprension del plan NO esta confirmada. No registrar que 'paciente y familia comprenden y aceptan el plan'."
+        }
+      },
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "# Nota de consulta externa\n\n## Identificacion del documento\n\nTipo de documento clinico: Nota de consulta externa\n\n## Identificacion del paciente\n\nNombre completo: Hernando\n\nSexo registrado: Masculino\n\n## Identificacion del profesional\n\nProfesional tratante: Doctora no identificada en la transcripcion\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Control de diabetes e hipertension, herida en pie, disnea y dolor toracico de esfuerzo, dudas sobre medicacion y vacunacion\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente y acompanante, principalmente la hija\n\n## Enfermedad actual\n\nEnfermedad actual: Hombre de 71 anos, hipoacusico, pensionado, traido por su hija quien responde por el. Consulta por varios temas. Refiere antecedente de diabetes mellitus e hipertension arterial. La acompanante informa glicemias elevadas, con ultima medicion en casa de aproximadamente 260 mg/dL, tomada despues de almuerzo. En cuanto al tratamiento, inicialmente mencionan metformina dos veces al dia y glibenclamida, pero luego corrigen que la glibenclamida fue suspendida el ano pasado y que actualmente usa insulina NPH nocturna, aparentemente 10 unidades, aplicada por enfermera del barrio; la dosis exacta no queda completamente clara en la transcripcion. Tambien usa losartan e hidroclorotiazida para la presion.\n\nAdemas, presenta herida en el pie de aproximadamente tres semanas de evolucion, que no cierra, con salida de liquido de mal olor desde hace dos dias, enrojecimiento del pie que asciende hasta por encima del tobillo y sensacion de calentura/fiebre la noche anterior, sin termometro en casa. El paciente refiere poco dolor y disminucion de la sensibilidad en la zona.\n\nTambien refiere disnea de esfuerzo al subir gradas, de varias semanas de evolucion, asociada a opresion toracica que mejora al sentarse. Niega tabaquismo actual; refiere antecedente de tabaquismo importante en el pasado, ya suspendido.\n\nLa hija pregunta por uso de ibuprofeno para dolor de rodillas; se le indica no administrarlo por riesgo renal.\n\n## Antecedentes\n\nPatologicos: Diabetes mellitus e hipertension arterial referidas por paciente y acompanante\n\nAlergicos: Reaccion cutanea tipo brote posterior a una inyeccion previa, sin identificacion del medicamento causal\n\nFarmacologicos / medicamentos actuales: Metformina dos veces al dia; insulina NPH nocturna, aparentemente 10 unidades, con aplicacion por enfermera del barrio; losartan; hidroclorotiazida\n\nToxicos / exposiciones / sociales: Tabaquismo previo importante, suspendido actualmente; pensionado\n\n## Signos vitales y medidas antropometricas\n\nDolor: Poco dolor en la herida del pie, segun refiere el paciente\n\n## Examen fisico\n\nExamen fisico: Se observa/describe por la acompanante una herida en el pie con eritema que asciende hasta por encima del tobillo y salida de liquido de mal olor. El profesional considera que la lesion luce infectada. No se documentan otros hallazgos del examen fisico en la transcripcion.\n\n## Analisis clinico\n\nAnalisis clinico: Cuadro compatible con infeccion de pie en paciente diabetico, con datos de extension local, mal olor, posible fiebre y disminucion de la sensibilidad, por lo que se considera de manejo urgente y con riesgo de complicacion. Adicionalmente, la disnea de esfuerzo y la opresion toracica al subir gradas requieren estudio posterior. El control glucemico parece inadecuado y se solicita evaluacion con hemoglobina glicosilada y creatinina para valorar control metabolico y funcion renal antes de ajustar el esquema.\n\n## Diagnosticos\n\nDiagnostico principal: Infeccion de pie en paciente diabetico, a descartar complicacion grave\n\nDiagnosticos relacionados: Diabetes mellitus con control glucemico inadecuado; hipertension arterial; disnea de esfuerzo; opresion toracica de esfuerzo\n\n## Medicamentos formulados\n\nMedicamentos formulados: Antibiotico formulado para la lesion del pie, sin especificacion de nombre, dosis, via ni duracion en la transcripcion\n\n## Examenes, procedimientos e interconsultas\n\nExamenes solicitados: Hemoglobina glicosilada; creatinina; otros examenes no especificados\n\nProcedimientos solicitados o realizados: Toma de muestra de la herida\n\nInterconsultas / remisiones: Valoracion en urgencias hoy mismo por la infeccion del pie\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: No administrar ibuprofeno por riesgo renal; no modificar por cuenta propia la dosis de insulina hasta revisar examenes y confirmar con enfermeria; acudir a urgencias hoy por la lesion del pie\n\nEducacion al paciente: Se explica que la herida parece infectada y que con fiebre y enrojecimiento ascendente no es seguro manejarlo en casa; se informa que la infeccion puede complicarse rapidamente. Se aclara que la vacuna de influenza se dejara para cuando este estable. Se comenta que, si persiste el mal control glucemico, mas adelante podria requerir ajuste del esquema o remision a endocrinologia\n\nSignos de alarma: Fiebre, empeoramiento del enrojecimiento o extension de la infeccion, salida de secrecion maloliente, empeoramiento del estado general, y sintomas toracicos o respiratorios progresivos\n\n## Control y seguimiento\n\nControl / seguimiento: Seguimiento posterior con resultados de hemoglobina glicosilada y creatinina; reevaluacion de la dosis de insulina tras confirmar con enfermeria; posible ajuste de esquema o remision a endocrinologia segun evolucion\n\n## Comprension del plan\n\nComprension del plan: La hija manifiesta dudas sobre poder llevarlo hoy a urgencias por transporte; no se documenta aceptacion completa del plan\n\n## Profesional responsable\n\nProfesional responsable: Doctora no identificada en la transcripcion",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1435,
+            "time_after_first_token_ms": 6609,
+            "total_generation_ms": 8044
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 3,
+            "template_adherence_score": 3,
+            "uncertainty_handling_score": 4,
+            "invented_info": [
+              {
+                "item": "Signos de alarma especificos documentados como explicados sin soporte explicito en la fuente",
+                "severity": "minor"
+              },
+              {
+                "item": "Profesional tratante consignado como 'Doctora no identificada en la transcripcion' en lugar de omitir el campo",
+                "severity": "minor"
+              }
+            ],
+            "missing_info": [
+              {
+                "item": "Rechazo inicial a posible hospitalizacion y antecedente de desorientacion cuando esta en el hospital",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Escalofrios o temblor asociados a la sensacion febril nocturna",
+                "severity": "minor",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Campo de acompanante no consignado en su seccion aunque la hija responde por el paciente",
+                "severity": "minor",
+                "kind": "template_field"
+              },
+              {
+                "item": "Servicio o especialidad de medicina general omitido pese a estar en el contexto",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "borderline",
+            "summary": "La nota es en general fiel y maneja bien la incertidumbre de la dosis de insulina, pero omite un dato clinicamente relevante para la remision urgente: la familia no queria hospitalizacion y el paciente se desorienta en el hospital. Ademas, agrega signos de alarma como si hubieran sido explicados y presenta algunos campos de plantilla mal resueltos."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [\n    {\n      \"item\": \"Signos de alarma especificos documentados como explicados sin soporte explicito en la fuente\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Profesional tratante consignado como 'Doctora no identificada en la transcripcion' en lugar de omitir el campo\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Rechazo inicial a posible hospitalizacion y antecedente de desorientacion cuando esta en el hospital\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Escalofrios o temblor asociados a la sensacion febril nocturna\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Campo de acompanante no consignado en su seccion aunque la hija responde por el paciente\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"Servicio o especialidad de medicina general omitido pese a estar en el contexto\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"La nota es en general fiel y maneja bien la incertidumbre de la dosis de insulina, pero omite un dato clinicamente relevante para la remision urgente: la familia no queria hospitalizacion y el paciente se desorienta en el hospital. Ademas, agrega signos de alarma como si hubieran sido explicados y presenta algunos campos de plantilla mal resueltos.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 3,
+                "faithfulness_score": 3,
+                "template_adherence_score": 3,
+                "uncertainty_handling_score": 4,
+                "invented_info": [
+                  {
+                    "item": "Signos de alarma especificos documentados como explicados sin soporte explicito en la fuente",
+                    "severity": "minor"
+                  },
+                  {
+                    "item": "Profesional tratante consignado como 'Doctora no identificada en la transcripcion' en lugar de omitir el campo",
+                    "severity": "minor"
+                  }
+                ],
+                "missing_info": [
+                  {
+                    "item": "Rechazo inicial a posible hospitalizacion y antecedente de desorientacion cuando esta en el hospital",
+                    "severity": "major",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Escalofrios o temblor asociados a la sensacion febril nocturna",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Campo de acompanante no consignado en su seccion aunque la hija responde por el paciente",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  },
+                  {
+                    "item": "Servicio o especialidad de medicina general omitido pese a estar en el contexto",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "borderline",
+                "summary": "La nota es en general fiel y maneja bien la incertidumbre de la dosis de insulina, pero omite un dato clinicamente relevante para la remision urgente: la familia no queria hospitalizacion y el paciente se desorienta en el hospital. Ademas, agrega signos de alarma como si hubieran sido explicados y presenta algunos campos de plantilla mal resueltos."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [\n    {\n      \"item\": \"Signos de alarma especificos documentados como explicados sin soporte explicito en la fuente\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Profesional tratante consignado como 'Doctora no identificada en la transcripcion' en lugar de omitir el campo\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Rechazo inicial a posible hospitalizacion y antecedente de desorientacion cuando esta en el hospital\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Escalofrios o temblor asociados a la sensacion febril nocturna\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Campo de acompanante no consignado en su seccion aunque la hija responde por el paciente\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"Servicio o especialidad de medicina general omitido pese a estar en el contexto\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"La nota es en general fiel y maneja bien la incertidumbre de la dosis de insulina, pero omite un dato clinicamente relevante para la remision urgente: la familia no queria hospitalizacion y el paciente se desorienta en el hospital. Ademas, agrega signos de alarma como si hubieran sido explicados y presenta algunos campos de plantilla mal resueltos.\"\n}"
+            },
+            {
+              "judge_alias": "anthropic",
+              "judge_provider": "anthropic",
+              "judge_model": "claude-opus-4-8",
+              "judge_result": {
+                "clinical_safety_score": 4,
+                "faithfulness_score": 5,
+                "template_adherence_score": 4,
+                "uncertainty_handling_score": 5,
+                "invented_info": [],
+                "missing_info": [
+                  {
+                    "item": "Signos de alarma toracicos/respiratorios anadidos no explicitados como tales por la medica, aunque coherentes",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Revision por sistemas no consolidada en su seccion",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "pass",
+                "summary": "El documento es fiel y prudente: maneja correctamente la incertidumbre de la dosis de insulina, las correcciones de medicamentos, la instruccion de no dar ibuprofeno, la conducta condicional de la vacuna y endocrino, y no inventa diagnosticos cerrados ni dosis. Diferencia adecuadamente lo referido por la acompanante de los hallazgos. El examen fisico evita fabricar signos vitales o hallazgos negativos, aclarando que el eritema y la secrecion fueron mostrados/referidos. Los signos de alarma toracicos se anaden de forma razonable pero no fueron enunciados literalmente como tales, hallazgo menor. No hay invenciones criticas ni contradicciones; sin riesgo clinico anadido."
+              },
+              "judge_raw_response": "{\"clinical_safety_score\": 4, \"faithfulness_score\": 5, \"template_adherence_score\": 4, \"uncertainty_handling_score\": 5, \"invented_info\": [], \"missing_info\": [{\"item\": \"Signos de alarma toracicos/respiratorios anadidos no explicitados como tales por la medica, aunque coherentes\", \"severity\": \"minor\", \"kind\": \"clinical_content\"}, {\"item\": \"Revision por sistemas no consolidada en su seccion\", \"severity\": \"minor\", \"kind\": \"template_field\"}], \"contradiction_info\": [], \"dosing_error_info\": [], \"verdict\": \"pass\", \"summary\": \"El documento es fiel y prudente: maneja correctamente la incertidumbre de la dosis de insulina, las correcciones de medicamentos, la instruccion de no dar ibuprofeno, la conducta condicional de la vacuna y endocrino, y no inventa diagnosticos cerrados ni dosis. Diferencia adecuadamente lo referido por la acompanante de los hallazgos. El examen fisico evita fabricar signos vitales o hallazgos negativos, aclarando que el eritema y la secrecion fueron mostrados/referidos. Los signos de alarma toracicos se anaden de forma razonable pero no fueron enunciados literalmente como tales, hallazgo menor. No hay invenciones criticas ni contradicciones; sin riesgo clinico anadido.\"}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "eval_case_001",
+      "notes": "Trampas incluidas: 1. Dato pendiente: resultados de urocultivo y parcial de orina (no deben inventarse resultados normales o anormales). 2. Condicional: ir a urgencias si hay fiebre o dolor lumbar (no registrar como remitida a urgencias ahora). 3. Instruccion negativa explicita: prohibido tomar ibuprofeno/AINES. 4. Correccion tardia: la alergia reportada pasa de penicilina a sulfas. 5. Signo de alarma: hematuria con coagulos (debe resaltarse en el documento clinico). 6. Riesgo de alucinacion: no se tomaron signos vitales ni se realizo un examen fisico completo, solo palpacion abdominal baja; el paciente toma losartan ocasional pero no es hipertensa.",
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificacion del documento\n\nTipo de documento clinico: Consulta externa de medicina general\n\n## Identificacion del paciente\n\nNombre completo: No referido\nFecha de nacimiento / edad: 34 años\nSexo registrado: Femenino\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Sintomas urinarios\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente\nConfiabilidad de la informacion: Adecuada\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente femenina de 34 años que consulta por cuadro de 3 días de evolución de ardor intenso al orinar y dolor bajo abdominal persistente. Refiere que el día anterior en la tarde presentó orina rojiza, “como con sangre”, con presencia de coágulos pequeños. Niega fiebre medida con termómetro; refiere sentirse “destemplada” en las noches, sin diaforesis febril franca. Durante la valoración refiere dolor suprapúbico importante a la palpación.\n\n## Antecedentes\n\nPatologicos: Niega enfermedades de base. Refiere uso ocasional de losartán de su esposo cuando presenta cefalea, sin antecedente personal conocido de hipertensión.\nAlergicos: Alergia a sulfas, con reacción cutánea tipo brote generalizado. Inicialmente menciona penicilina, pero luego aclara tolerancia previa a amoxicilina sin reacción.\nFarmacologicos / medicamentos actuales: Uso ocasional de losartán de su esposo cuando le duele mucho la cabeza.\n\n## Examen fisico\n\nExamen fisico: A la palpación abdominal refiere dolor “ahí abajito”, con molestia importante en región suprapúbica.\n\n## Analisis clinico\n\nAnalisis clinico: Cuadro urinario agudo de 3 días de evolución, con disuria, dolor suprapúbico y hematuria macroscópica referida con pequeños coágulos, compatible con infección urinaria baja a descartar compromiso urinario complicado. Se solicitan parcial de orina y urocultivo, cuyos resultados aún no están disponibles al momento de la consulta.\n\n## Medicamentos formulados\n\nMedicamentos formulados: Nitrofurantoína 100 mg, una tableta cada 12 horas por 5 días.\n\n## Examenes, procedimientos e interconsultas\n\nExamenes solicitados: Parcial de orina y urocultivo.\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: Evitar el uso de ibuprofeno, diclofenaco y otros AINEs mientras presente hematuria. Para dolor, usar acetaminofén 500 mg si lo requiere.\nSignos de alarma: Consultar por urgencias si presenta fiebre muy alta o si el dolor se vuelve insoportable en la espalda.\n\n## Control y seguimiento\n\nControl / seguimiento: Cita de control con resultados de los exámenes solicitados.\n\n## Comprension del plan\n\nComprension del plan: La paciente acepta el plan y se retira con indicaciones para control posterior con resultados.\n\n## Profesional responsable\n\nProfesional responsable: No referido",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1142,
+            "time_after_first_token_ms": 3457,
+            "total_generation_ms": 4599
+          },
+          "judge_result": {
+            "clinical_safety_score": 4,
+            "faithfulness_score": 4,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 5,
+            "invented_info": [
+              {
+                "item": "Confiabilidad de la informacion como 'adecuada' sin soporte explicito en las fuentes",
+                "severity": "minor"
+              },
+              {
+                "item": "Comprension/aceptacion del plan por la paciente no documentada en las fuentes",
+                "severity": "minor"
+              },
+              {
+                "item": "Campos completados con 'No referido' (nombre completo y profesional responsable) en vez de omitirse",
+                "severity": "minor"
+              }
+            ],
+            "missing_info": [
+              {
+                "item": "No se precisa que el parcial de orina y el urocultivo ya habian sido tomados esa misma manana y estaban pendientes de resultado",
+                "severity": "minor",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "No se incluye la seccion de Resultados disponibles para dejar explicito que los estudios estaban pendientes",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "pass",
+            "summary": "Documento globalmente fiel y sin errores de medicacion o contradicciones clinicas relevantes. Sin embargo, agrega algunos datos no sustentados por las fuentes y omite especificar que los examenes ya habian sido tomados y solo estaban pendientes de resultado."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 4,\n  \"faithfulness_score\": 4,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [\n    {\n      \"item\": \"Confiabilidad de la informacion como 'adecuada' sin soporte explicito en las fuentes\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Comprension/aceptacion del plan por la paciente no documentada en las fuentes\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Campos completados con 'No referido' (nombre completo y profesional responsable) en vez de omitirse\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"No se precisa que el parcial de orina y el urocultivo ya habian sido tomados esa misma manana y estaban pendientes de resultado\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"No se incluye la seccion de Resultados disponibles para dejar explicito que los estudios estaban pendientes\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"pass\",\n  \"summary\": \"Documento globalmente fiel y sin errores de medicacion o contradicciones clinicas relevantes. Sin embargo, agrega algunos datos no sustentados por las fuentes y omite especificar que los examenes ya habian sido tomados y solo estaban pendientes de resultado.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 4,
+                "faithfulness_score": 4,
+                "template_adherence_score": 4,
+                "uncertainty_handling_score": 5,
+                "invented_info": [
+                  {
+                    "item": "Confiabilidad de la informacion como 'adecuada' sin soporte explicito en las fuentes",
+                    "severity": "minor"
+                  },
+                  {
+                    "item": "Comprension/aceptacion del plan por la paciente no documentada en las fuentes",
+                    "severity": "minor"
+                  },
+                  {
+                    "item": "Campos completados con 'No referido' (nombre completo y profesional responsable) en vez de omitirse",
+                    "severity": "minor"
+                  }
+                ],
+                "missing_info": [
+                  {
+                    "item": "No se precisa que el parcial de orina y el urocultivo ya habian sido tomados esa misma manana y estaban pendientes de resultado",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "No se incluye la seccion de Resultados disponibles para dejar explicito que los estudios estaban pendientes",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "pass",
+                "summary": "Documento globalmente fiel y sin errores de medicacion o contradicciones clinicas relevantes. Sin embargo, agrega algunos datos no sustentados por las fuentes y omite especificar que los examenes ya habian sido tomados y solo estaban pendientes de resultado."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 4,\n  \"faithfulness_score\": 4,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [\n    {\n      \"item\": \"Confiabilidad de la informacion como 'adecuada' sin soporte explicito en las fuentes\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Comprension/aceptacion del plan por la paciente no documentada en las fuentes\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Campos completados con 'No referido' (nombre completo y profesional responsable) en vez de omitirse\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"No se precisa que el parcial de orina y el urocultivo ya habian sido tomados esa misma manana y estaban pendientes de resultado\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"No se incluye la seccion de Resultados disponibles para dejar explicito que los estudios estaban pendientes\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"pass\",\n  \"summary\": \"Documento globalmente fiel y sin errores de medicacion o contradicciones clinicas relevantes. Sin embargo, agrega algunos datos no sustentados por las fuentes y omite especificar que los examenes ya habian sido tomados y solo estaban pendientes de resultado.\"\n}"
+            },
+            {
+              "judge_alias": "anthropic",
+              "judge_provider": "anthropic",
+              "judge_model": "claude-opus-4-8",
+              "judge_result": {
+                "clinical_safety_score": 5,
+                "faithfulness_score": 5,
+                "template_adherence_score": 4,
+                "uncertainty_handling_score": 5,
+                "invented_info": [],
+                "missing_info": [
+                  {
+                    "item": "Revision por sistemas (sensacion destemplada/sintomas urinarios) podria ubicarse en seccion propia",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  },
+                  {
+                    "item": "Acetaminofen como medicamento formulado quedo solo en recomendaciones",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "strong_pass",
+                "summary": "El documento refleja fielmente las fuentes: cuadro urinario de 3 dias con disuria, dolor suprapubico y hematuria con coagulos, alergia a sulfas con aclaracion sobre penicilina/amoxicilina, uso ocasional de losartan, nitrofurantoina 100 mg cada 12h por 5 dias, acetaminofen, evitar AINEs y signos de alarma. No hay invenciones, contradicciones ni errores de dosis. El analisis maneja correctamente la incertidumbre (IVU baja a descartar complicacion). Solo hay desviaciones menores de plantilla."
+              },
+              "judge_raw_response": "{\"clinical_safety_score\": 5, \"faithfulness_score\": 5, \"template_adherence_score\": 4, \"uncertainty_handling_score\": 5, \"invented_info\": [], \"missing_info\": [{\"item\": \"Revision por sistemas (sensacion destemplada/sintomas urinarios) podria ubicarse en seccion propia\", \"severity\": \"minor\", \"kind\": \"template_field\"}, {\"item\": \"Acetaminofen como medicamento formulado quedo solo en recomendaciones\", \"severity\": \"minor\", \"kind\": \"template_field\"}], \"contradiction_info\": [], \"dosing_error_info\": [], \"verdict\": \"strong_pass\", \"summary\": \"El documento refleja fielmente las fuentes: cuadro urinario de 3 dias con disuria, dolor suprapubico y hematuria con coagulos, alergia a sulfas con aclaracion sobre penicilina/amoxicilina, uso ocasional de losartan, nitrofurantoina 100 mg cada 12h por 5 dias, acetaminofen, evitar AINEs y signos de alarma. No hay invenciones, contradicciones ni errores de dosis. El analisis maneja correctamente la incertidumbre (IVU baja a descartar complicacion). Solo hay desviaciones menores de plantilla.\"}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "eval_case_002",
+      "notes": "Trampas incluidas: 1. Dato pendiente: el ecocardiograma no fue revisado porque se quedo en la casa (evitar que la IA invente FEVI o resultados cardiologicos). 2. Condicional: inicio de insulina condicionado al resultado de HbA1c el proximo mes (no poner como medicamento actual). 3. Instruccion negativa: suspension estricta del enalapril automedicado (y no iniciar aspirina todavia). 4. Correcciones multiples: dosis de metformina pasa de 850mg x1 a 850mg x2, hasta que el doctor verifica que en realidad es 500mg x2. 5. Signo de alarma grave: amaurosis fugax (perdida de vision temporal) sugestiva de AIT. 6. Riesgo de alucinacion: solo se tomo tension arterial (140/90), no hay frecuencia cardiaca ni auscultacion a pesar de que inicia preguntando por el pecho; no se examina la rodilla ni el ojo fisicamente; no se menciona incapacidad medica.",
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "# Nota de consulta\n\n## Identificacion del documento\n\nTipo de documento clinico: Consulta de control de riesgo cardiovascular\n\n## Identificacion del paciente\n\nNombre completo: Don Roberto\nFecha de nacimiento / edad: 68 años\nSexo registrado: Masculino\nAcompanante: Hija\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Control de riesgo cardiovascular, revisión de presión arterial, diabetes y síntomas referidos de pecho y ojo derecho.\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente y acompanante\nConfiabilidad de la informacion: La hija refiere que acompaña al paciente porque “se le olvida todo”.\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente masculino de 68 años que asiste a consulta de control cardiovascular acompañado por su hija. Refiere sentirse “como bien”, con cansancio leve al subir lomas en el barrio. Niega otros síntomas relevantes en la conversación. Refiere además un episodio de amaurosis transitoria del ojo derecho ocurrido “ayer por la tarde”, descrito como oscurecimiento súbito “como si le hubieran puesto un telón negro”, con pérdida visual completa por ese lado durante aproximadamente cinco minutos, con recuperación espontánea posterior de la visión. También refiere dolor en rodilla izquierda en la mañana del día de la consulta, por lo que solicita crema.\n\n## Antecedentes\n\nPatologicos: Hipertensión arterial, diabetes mellitus tipo 2.\nFarmacologicos / medicamentos actuales: Metformina 500 mg cada 12 horas; losartán 50 mg cada 12 horas. El paciente también estaba tomando enalapril, indicado por otro médico, pero se le ordena suspenderlo.\nToxicos / exposiciones / sociales: Refiere dificultad para realizar glucometrías en ayunas por no tener dinero para tirillas.\n\n## Signos vitales y medidas antropometricas\n\nPresion arterial: 140/90 mmHg\n\n## Examen fisico\n\nExamen fisico: No se documenta examen físico completo. Se registra toma de presión arterial en consulta.\n\n## Analisis clinico\n\nAnalisis clinico: Consulta de control cardiovascular en paciente con hipertensión y diabetes mellitus tipo 2. Presenta presión arterial en rango elevado en la consulta y refiere síntomas compatibles con hiperglucemia no documentada por glucometrías recientes, además de episodio de pérdida visual transitoria monocular derecha que obliga a descartar evento isquémico transitorio de origen carotídeo. Se considera necesario evaluar carótidas y revisar ecocardiograma pendiente antes de ajustar tratamiento cardiovascular.\n\n## Diagnosticos\n\nDiagnostico principal: Hipertensión arterial\nDiagnosticos relacionados: Diabetes mellitus tipo 2; episodio de amaurosis transitoria del ojo derecho; dolor de rodilla izquierda\n\n## Medicamentos formulados\n\nMedicamentos formulados: Suspender enalapril de forma inmediata. Continuar metformina 500 mg cada 12 horas. Continuar losartán 50 mg cada 12 horas. Diclofenaco en gel para aplicar en la rodilla izquierda cuando duela.\n\n## Examenes, procedimientos e interconsultas\n\nExamenes solicitados: Ecografía de carótidas del cuello. Ecocardiograma pendiente para revisión en la próxima cita.\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: Dieta estricta.\nEducacion al paciente: Se explica que no debe tomar enalapril y losartán al mismo tiempo por riesgo de afectar los riñones. Se informa que si para el próximo mes la hemoglobina glicosilada no baja de 8%, se considerará iniciar insulina.\nSignos de alarma: Se advierte que el episodio visual puede corresponder a un aviso de derrame.\n\n## Control y seguimiento\n\nControl / seguimiento: Control en un mes. Llevar ecocardiograma para revisión y realizar ecografía de carótidas antes del siguiente control.\n\n## Comprension del plan\n\nComprension del plan: Paciente manifiesta comprensión y acepta las indicaciones; refiere que no tomará más enalapril.\n\n## Profesional responsable\n\nProfesional responsable: No especificado en la transcripción.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1433,
+            "time_after_first_token_ms": 4322,
+            "total_generation_ms": 5755
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 2,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 4,
+            "invented_info": [],
+            "missing_info": [
+              {
+                "item": "Polidipsia y poliuria/nocturia referidas por el paciente",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Decision explicita de no iniciar aspirina hasta revisar la ecografia de carotidas",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Ecocardiograma previo pendiente se consigno como 'examen solicitado' de esta consulta",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [
+              {
+                "item": "Tipo de atencion registrado como 'Consulta externa - primera vez' aunque la fuente describe una consulta de control/seguimiento",
+                "severity": "major"
+              },
+              {
+                "item": "La frase 'niega otros sintomas relevantes' contradice la sed intensa y la miccion nocturna referidas",
+                "severity": "major"
+              }
+            ],
+            "dosing_error_info": [],
+            "verdict": "borderline",
+            "summary": "El documento recoge el episodio de perdida visual transitoria y la suspension de enalapril, pero distorsiona el encuentro al registrarlo como primera vez, introduce una negacion no sustentada de sintomas y omite datos clinicos relevantes como polidipsia/nocturia y la decision de no iniciar aspirina hasta la ecografia de carotidas."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"Polidipsia y poliuria/nocturia referidas por el paciente\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Decision explicita de no iniciar aspirina hasta revisar la ecografia de carotidas\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Ecocardiograma previo pendiente se consigno como 'examen solicitado' de esta consulta\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Tipo de atencion registrado como 'Consulta externa - primera vez' aunque la fuente describe una consulta de control/seguimiento\",\n      \"severity\": \"major\"\n    },\n    {\n      \"item\": \"La frase 'niega otros sintomas relevantes' contradice la sed intensa y la miccion nocturna referidas\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento recoge el episodio de perdida visual transitoria y la suspension de enalapril, pero distorsiona el encuentro al registrarlo como primera vez, introduce una negacion no sustentada de sintomas y omite datos clinicos relevantes como polidipsia/nocturia y la decision de no iniciar aspirina hasta la ecografia de carotidas.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 3,
+                "faithfulness_score": 2,
+                "template_adherence_score": 4,
+                "uncertainty_handling_score": 4,
+                "invented_info": [],
+                "missing_info": [
+                  {
+                    "item": "Polidipsia y poliuria/nocturia referidas por el paciente",
+                    "severity": "major",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Decision explicita de no iniciar aspirina hasta revisar la ecografia de carotidas",
+                    "severity": "major",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Ecocardiograma previo pendiente se consigno como 'examen solicitado' de esta consulta",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [
+                  {
+                    "item": "Tipo de atencion registrado como 'Consulta externa - primera vez' aunque la fuente describe una consulta de control/seguimiento",
+                    "severity": "major"
+                  },
+                  {
+                    "item": "La frase 'niega otros sintomas relevantes' contradice la sed intensa y la miccion nocturna referidas",
+                    "severity": "major"
+                  }
+                ],
+                "dosing_error_info": [],
+                "verdict": "borderline",
+                "summary": "El documento recoge el episodio de perdida visual transitoria y la suspension de enalapril, pero distorsiona el encuentro al registrarlo como primera vez, introduce una negacion no sustentada de sintomas y omite datos clinicos relevantes como polidipsia/nocturia y la decision de no iniciar aspirina hasta la ecografia de carotidas."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"Polidipsia y poliuria/nocturia referidas por el paciente\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Decision explicita de no iniciar aspirina hasta revisar la ecografia de carotidas\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Ecocardiograma previo pendiente se consigno como 'examen solicitado' de esta consulta\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Tipo de atencion registrado como 'Consulta externa - primera vez' aunque la fuente describe una consulta de control/seguimiento\",\n      \"severity\": \"major\"\n    },\n    {\n      \"item\": \"La frase 'niega otros sintomas relevantes' contradice la sed intensa y la miccion nocturna referidas\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento recoge el episodio de perdida visual transitoria y la suspension de enalapril, pero distorsiona el encuentro al registrarlo como primera vez, introduce una negacion no sustentada de sintomas y omite datos clinicos relevantes como polidipsia/nocturia y la decision de no iniciar aspirina hasta la ecografia de carotidas.\"\n}"
+            },
+            {
+              "judge_alias": "anthropic",
+              "judge_provider": "anthropic",
+              "judge_model": "claude-opus-4-8",
+              "judge_result": {
+                "clinical_safety_score": 5,
+                "faithfulness_score": 5,
+                "template_adherence_score": 4,
+                "uncertainty_handling_score": 5,
+                "invented_info": [],
+                "missing_info": [
+                  {
+                    "item": "Revision por sistemas (poliuria nocturna y polidipsia referidas) no consignada en seccion propia",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  },
+                  {
+                    "item": "Sintomas de hiperglucemia (sed y nicturia) podrian explicitarse mas en enfermedad actual",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "No mencion de que no se formula aspirina hasta ver ecografia",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "strong_pass",
+                "summary": "El documento refleja fielmente las fuentes: dosis correctas de metformina 500 mg cada 12h, suspension de enalapril, losartan 50 mg cada 12h, amaurosis fugax derecha, solicitud de eco carotideo, ecocardiograma pendiente, diclofenaco gel y plan de seguimiento. No hay invenciones ni contradicciones ni errores de dosis. Omisiones menores como detallar mejor sintomas de hiperglucemia y la decision de diferir aspirina. Estructura adecuada con campos no esenciales sin diligenciar."
+              },
+              "judge_raw_response": "{\"clinical_safety_score\": 5, \"faithfulness_score\": 5, \"template_adherence_score\": 4, \"uncertainty_handling_score\": 5, \"invented_info\": [], \"missing_info\": [{\"item\": \"Revision por sistemas (poliuria nocturna y polidipsia referidas) no consignada en seccion propia\", \"severity\": \"minor\", \"kind\": \"template_field\"}, {\"item\": \"Sintomas de hiperglucemia (sed y nicturia) podrian explicitarse mas en enfermedad actual\", \"severity\": \"minor\", \"kind\": \"clinical_content\"}, {\"item\": \"No mencion de que no se formula aspirina hasta ver ecografia\", \"severity\": \"minor\", \"kind\": \"clinical_content\"}], \"contradiction_info\": [], \"dosing_error_info\": [], \"verdict\": \"strong_pass\", \"summary\": \"El documento refleja fielmente las fuentes: dosis correctas de metformina 500 mg cada 12h, suspension de enalapril, losartan 50 mg cada 12h, amaurosis fugax derecha, solicitud de eco carotideo, ecocardiograma pendiente, diclofenaco gel y plan de seguimiento. No hay invenciones ni contradicciones ni errores de dosis. Omisiones menores como detallar mejor sintomas de hiperglucemia y la decision de diferir aspirina. Estructura adecuada con campos no esenciales sin diligenciar.\"}"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "run_score_summary": [
+    {
+      "judge_alias": "anthropic",
+      "judge_provider": "anthropic",
+      "judge_model": "claude-opus-4-8",
+      "model_alias": "openai",
+      "provider": "openai_api",
+      "model": "gpt-5.4-mini",
+      "evaluated_output_count": 6,
+      "dimension_averages": {
+        "clinical_safety_score": 4.83,
+        "faithfulness_score": 4.83,
+        "template_adherence_score": 4.33,
+        "uncertainty_handling_score": 5.0
+      },
+      "effective_dimension_averages": {
+        "clinical_safety_score": 4.83,
+        "faithfulness_score": 4.83,
+        "template_adherence_score": 4.0,
+        "uncertainty_handling_score": 5.0
+      },
+      "safety_gate_failures": 0,
+      "critical_invented_count": 0,
+      "critical_missing_count": 0,
+      "critical_contradiction_count": 0,
+      "critical_dosing_error_count": 0,
+      "findings_by_case": [
+        {
+          "case_id": "eval_doc_clinica_co_001",
+          "invented_info": [],
+          "missing_info": [
+            {
+              "item": "Antecedente familiar de infarto prematuro del padre (a los 48 anos) no incluido en seccion Antecedentes familiares, aunque si aparece en analisis",
+              "severity": "minor",
+              "kind": "template_field"
+            },
+            {
+              "item": "Detalle de FUM (8 del mes pasado) y suspension de anticonceptivos hace ~3 semanas no registrados en antecedentes gineco-obstetricos",
+              "severity": "minor",
+              "kind": "clinical_content"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "eval_doc_clinica_co_002",
+          "invented_info": [],
+          "missing_info": [
+            {
+              "item": "No se registra explicitamente que el sangrado digestivo NO ha sido descartado (la paciente lo enfatizo)",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "No se documenta que la paciente rechazo analgesia hasta conocer funcion renal en seccion de medicamentos/plan",
+              "severity": "minor",
+              "kind": "clinical_content"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "eval_doc_clinica_001",
+          "invented_info": [],
+          "missing_info": [
+            {
+              "item": "Acetaminofen ubicado como recomendacion no farmacologica cuando es manejo farmacologico",
+              "severity": "minor",
+              "kind": "template_field"
+            },
+            {
+              "item": "Seccion Toxicos colocada como encabezado propio en vez de campo dentro de Antecedentes",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "eval_doc_clinica_002",
+          "invented_info": [],
+          "missing_info": [
+            {
+              "item": "Signos de alarma toracicos/respiratorios anadidos no explicitados como tales por la medica, aunque coherentes",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Revision por sistemas no consolidada en su seccion",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "eval_case_001",
+          "invented_info": [],
+          "missing_info": [
+            {
+              "item": "Revision por sistemas (sensacion destemplada/sintomas urinarios) podria ubicarse en seccion propia",
+              "severity": "minor",
+              "kind": "template_field"
+            },
+            {
+              "item": "Acetaminofen como medicamento formulado quedo solo en recomendaciones",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "eval_case_002",
+          "invented_info": [],
+          "missing_info": [
+            {
+              "item": "Revision por sistemas (poliuria nocturna y polidipsia referidas) no consignada en seccion propia",
+              "severity": "minor",
+              "kind": "template_field"
+            },
+            {
+              "item": "Sintomas de hiperglucemia (sed y nicturia) podrian explicitarse mas en enfermedad actual",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "No mencion de que no se formula aspirina hasta ver ecografia",
+              "severity": "minor",
+              "kind": "clinical_content"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        }
+      ],
+      "overall_score": 4.78,
+      "overall_time_to_first_token_ms": 1154,
+      "overall_time_after_first_token_ms": 5366
+    },
+    {
+      "judge_alias": "openai",
+      "judge_provider": "openai",
+      "judge_model": "gpt-5.4",
+      "model_alias": "openai",
+      "provider": "openai_api",
+      "model": "gpt-5.4-mini",
+      "evaluated_output_count": 6,
+      "dimension_averages": {
+        "clinical_safety_score": 3.0,
+        "faithfulness_score": 2.67,
+        "template_adherence_score": 3.67,
+        "uncertainty_handling_score": 4.17
+      },
+      "effective_dimension_averages": {
+        "clinical_safety_score": 2.83,
+        "faithfulness_score": 2.67,
+        "template_adherence_score": 3.67,
+        "uncertainty_handling_score": 4.17
+      },
+      "safety_gate_failures": 1,
+      "critical_invented_count": 1,
+      "critical_missing_count": 0,
+      "critical_contradiction_count": 0,
+      "critical_dosing_error_count": 0,
+      "findings_by_case": [
+        {
+          "case_id": "eval_doc_clinica_co_001",
+          "invented_info": [
+            {
+              "item": "Diagnosticos diferenciales especificos de sindrome coronario agudo y tromboembolismo pulmonar sin mencion explicita en la fuente",
+              "severity": "major"
+            }
+          ],
+          "missing_info": [
+            {
+              "item": "Fecha de ultima menstruacion: 8 del mes pasado",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Antecedente familiar de padre con infarto joven no consignado en el campo Familiares",
+              "severity": "minor",
+              "kind": "template_field"
+            },
+            {
+              "item": "Datos gineco-obstetricos (FUM, suspension reciente de anticonceptivos y duda de embarazo) no ubicados en el campo correspondiente",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [
+            {
+              "item": "Tipo de atencion registrado como consulta externa - primera vez pese a que la fuente describe atencion en urgencias",
+              "severity": "major"
+            }
+          ],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "eval_doc_clinica_co_002",
+          "invented_info": [],
+          "missing_info": [
+            {
+              "item": "Negacion de hematuria no documentada",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Acompanante (hija) no consignada en el campo de identificacion del paciente",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [
+            {
+              "item": "Antecedente quirurgico consignado como posible histerectomia pese a instruccion explicita de no registrarla",
+              "severity": "major"
+            },
+            {
+              "item": "Tipo de atencion consignado como 'Consulta externa - primera vez' pese a tratarse de una atencion en urgencias",
+              "severity": "minor"
+            }
+          ],
+          "dosing_error_info": [
+            {
+              "item": "Losartan registrado como 50 mg al dia sin frecuencia sustentada en la fuente",
+              "severity": "minor"
+            }
+          ]
+        },
+        {
+          "case_id": "eval_doc_clinica_001",
+          "invented_info": [
+            {
+              "item": "Se afirma que no se formuló incapacidad por solicitud de la paciente",
+              "severity": "critical"
+            },
+            {
+              "item": "Se agrega seguimiento pendiente según resultados sin control explícito en la fuente",
+              "severity": "major"
+            }
+          ],
+          "missing_info": [
+            {
+              "item": "Casi se cae al inicio súbito de la cefalea",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Se omitió la sección de Medicamentos formulados y la indicación sobre acetaminofén quedó en recomendaciones no farmacológicas",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "eval_doc_clinica_002",
+          "invented_info": [
+            {
+              "item": "Signos de alarma especificos documentados como explicados sin soporte explicito en la fuente",
+              "severity": "minor"
+            },
+            {
+              "item": "Profesional tratante consignado como 'Doctora no identificada en la transcripcion' en lugar de omitir el campo",
+              "severity": "minor"
+            }
+          ],
+          "missing_info": [
+            {
+              "item": "Rechazo inicial a posible hospitalizacion y antecedente de desorientacion cuando esta en el hospital",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Escalofrios o temblor asociados a la sensacion febril nocturna",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Campo de acompanante no consignado en su seccion aunque la hija responde por el paciente",
+              "severity": "minor",
+              "kind": "template_field"
+            },
+            {
+              "item": "Servicio o especialidad de medicina general omitido pese a estar en el contexto",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "eval_case_001",
+          "invented_info": [
+            {
+              "item": "Confiabilidad de la informacion como 'adecuada' sin soporte explicito en las fuentes",
+              "severity": "minor"
+            },
+            {
+              "item": "Comprension/aceptacion del plan por la paciente no documentada en las fuentes",
+              "severity": "minor"
+            },
+            {
+              "item": "Campos completados con 'No referido' (nombre completo y profesional responsable) en vez de omitirse",
+              "severity": "minor"
+            }
+          ],
+          "missing_info": [
+            {
+              "item": "No se precisa que el parcial de orina y el urocultivo ya habian sido tomados esa misma manana y estaban pendientes de resultado",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "No se incluye la seccion de Resultados disponibles para dejar explicito que los estudios estaban pendientes",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "eval_case_002",
+          "invented_info": [],
+          "missing_info": [
+            {
+              "item": "Polidipsia y poliuria/nocturia referidas por el paciente",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Decision explicita de no iniciar aspirina hasta revisar la ecografia de carotidas",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Ecocardiograma previo pendiente se consigno como 'examen solicitado' de esta consulta",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [
+            {
+              "item": "Tipo de atencion registrado como 'Consulta externa - primera vez' aunque la fuente describe una consulta de control/seguimiento",
+              "severity": "major"
+            },
+            {
+              "item": "La frase 'niega otros sintomas relevantes' contradice la sed intensa y la miccion nocturna referidas",
+              "severity": "major"
+            }
+          ],
+          "dosing_error_info": []
+        }
+      ],
+      "overall_score": 2.93,
+      "overall_time_to_first_token_ms": 1154,
+      "overall_time_after_first_token_ms": 5366
+    }
+  ]
+}

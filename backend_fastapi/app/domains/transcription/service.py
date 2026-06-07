@@ -22,7 +22,10 @@ from app.domains.documents.content import set_document_content_fields
 from app.domains.documents.sse_hub import publish_document_event
 from app.domains.transcription.schemas import AudioSectionResponse
 from app.domains.transcription.schemas import SectionWorkItemResponse
-from app.integrations.transcription_tasks import enqueue_transcription_task
+from app.integrations.transcription_tasks import (
+    enqueue_transcription_task,
+    should_use_cloud_tasks,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +56,7 @@ SECTION_RETRYABLE_STATUSES = {
     SECTION_STATUS_FAILED_FINAL,
 }
 
-STUCK_SECTION_THRESHOLD_SECONDS = 300
+STUCK_SECTION_THRESHOLD_SECONDS = 120
 STUCK_SECTION_MANUAL_RETRY_THRESHOLD_SECONDS = 90
 MAX_MANUAL_SECTION_RETRIES = 3
 
@@ -720,19 +723,19 @@ async def retry_failed_transcription_session(
     recording_session: TranscriptionRecordingSession,
     *,
     settings: Settings,
-) -> tuple[bool, str | None]:
+) -> tuple[bool, str | None, list[TranscriptionAudioSection]]:
     if recording_session.status not in {
         SESSION_STATUS_NEEDS_REVIEW,
         SESSION_STATUS_FINISHING,
     }:
-        return False, "session_not_retryable"
+        return False, "session_not_retryable", []
 
     encounter_result = await db_session.execute(
         select(Encounter).where(Encounter.id == recording_session.encounter_id)
     )
     encounter = encounter_result.scalar_one_or_none()
     if encounter and _is_encounter_audio_expired(encounter):
-        return False, "audio_expired"
+        return False, "audio_expired", []
 
     eligible_sections = [
         section
@@ -740,23 +743,37 @@ async def retry_failed_transcription_session(
         if section.status in SECTION_RETRYABLE_STATUSES and section.gcs_object_name
     ]
     if not eligible_sections:
-        return False, "no_retryable_sections"
+        return False, "no_retryable_sections", []
 
     if any(
         section.retry_count >= MAX_MANUAL_SECTION_RETRIES
         for section in eligible_sections
     ):
-        return False, "manual_retry_exhausted"
+        return False, "manual_retry_exhausted", []
+
+    if not should_use_cloud_tasks(settings) and not settings.transcription_worker_base_url:
+        return False, "section_dispatch_failed", []
 
     now = datetime.now(timezone.utc)
+    local_sections: list[TranscriptionAudioSection] = []
     for section in eligible_sections:
         section.status = SECTION_STATUS_REGISTERED
         section.error_code = None
         section.retry_count += 1
         section.updated_at = now
-        enqueue_section_task(section, settings)
+        if should_use_cloud_tasks(settings):
+            try:
+                enqueue_section_task(section, settings)
+            except Exception:
+                logger.exception(
+                    "Failed to enqueue retried section transcription: %s",
+                    section.section_id,
+                )
+                return False, "section_dispatch_failed", []
+        else:
+            local_sections.append(section)
 
     recording_session.status = SESSION_STATUS_FINISHING
     recording_session.error_code = None
     await db_session.commit()
-    return True, None
+    return True, None, local_sections

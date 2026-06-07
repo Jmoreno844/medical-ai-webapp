@@ -155,7 +155,7 @@ export function DateTimePicker({
     "bg-purple-500 text-white font-bold hover:bg-purple-500 hover:text-white focus:bg-purple-500 focus:text-white active:bg-purple-500 active:text-white ring-purple-900 shadow-md";
 
   const timeButtonStyle =
-    "h-9 w-9 p-0 font-normal text-sm rounded-md flex items-center justify-center m-1";
+    "h-9 w-9 p-0 font-normal text-sm rounded-md flex items-center justify-center m-1 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-0";
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -164,6 +164,8 @@ export function DateTimePicker({
           variant="outline"
           className={cn(
             "w-[12.5rem] justify-start text-left font-normal",
+            "outline-none focus:outline-none focus-visible:outline-none",
+            "focus-visible:border-purple-500 focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-0",
             !currentDate && "text-muted-foreground"
           )}
         >
@@ -192,10 +194,11 @@ export function DateTimePicker({
             locale={es}
             className="bg-white"
             classNames={{
-              day: "h-9 w-9 p-0 font-normal text-slate-900 rounded-md hover:bg-purple-50 hover:text-purple-700 focus:bg-purple-100 focus:text-purple-800 active:bg-purple-100 active:text-purple-800 aria-selected:opacity-100",
+              day: "h-9 w-9 p-0 rounded-md text-slate-900 font-normal aria-selected:font-bold hover:bg-purple-50 hover:text-purple-700 focus:bg-purple-100 focus:text-purple-800 active:bg-purple-100 active:text-purple-800 aria-selected:opacity-100 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-0",
               day_selected:
-                "bg-purple-500 text-white font-bold hover:bg-purple-500 hover:text-white focus:bg-purple-500 focus:text-white active:bg-purple-500 active:text-white ring-purple-300",
-              day_today: "bg-accent text-accent-foreground",
+                "bg-purple-500 text-white hover:bg-purple-500 hover:text-white focus:bg-purple-500 focus:text-white active:bg-purple-500 active:text-white ring-purple-300",
+              day_today:
+                "[&:not([aria-selected=true])]:font-normal [&:not([aria-selected=true])]:text-slate-900",
             }}
           />
           <div className="flex flex-col sm:flex-row sm:h-[300px] divide-y sm:divide-y-0 sm:divide-x bg-white">

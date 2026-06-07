@@ -312,7 +312,7 @@ const PatientInfo: React.FC<ExtendedPatientInfoProps> = ({
 
       <div className="mt-2">
         {onUpdateDate ? (
-          <div className="flex w-fit shrink-0 items-center rounded-lg border-2 border-gray-400">
+          <div className="flex w-fit shrink-0 items-center rounded-lg border-2 border-gray-400 focus-within:border-purple-500">
             <DateTimePicker
               value={datePickerValue}
               onChange={handleDateChange}

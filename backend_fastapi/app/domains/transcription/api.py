@@ -428,6 +428,7 @@ async def get_transcription_document_recording_session_status(
 )
 async def retry_transcription_recording_session(
     session_id: str,
+    background_tasks: BackgroundTasks,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
     settings: Settings = Depends(get_settings),
@@ -441,7 +442,7 @@ async def retry_transcription_recording_session(
     if not recording_session:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Sesión no encontrada")
 
-    success, error_code = await retry_failed_transcription_session(
+    success, error_code, local_sections = await retry_failed_transcription_session(
         session,
         recording_session,
         settings=settings,
@@ -452,6 +453,13 @@ async def retry_transcription_recording_session(
             status=recording_session.status,
             error=transcription_user_message(error_code),
             error_code=error_code,
+        )
+
+    for section in local_sections:
+        background_tasks.add_task(
+            _post_worker_task_background,
+            f"{settings.api_v1_prefix}/internal/transcription/tasks/sections/{section.section_id}",
+            settings,
         )
 
     return RecordingSessionRetryResponse(

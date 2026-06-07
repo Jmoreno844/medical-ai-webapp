@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/commons/components/ui/button";
 import { Input } from "@/commons/components/ui/input";
 import { Label } from "@/commons/components/ui/label";
+import appLogo from "@/assets/icon.svg";
 
 export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
   const [email, setEmail] = useState("");
@@ -38,7 +39,7 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
       setError(
         axiosErr?.response?.data?.detail ||
           axiosErr?.response?.data?.message ||
-          "Error al registrarse"
+          "Error al registrarse",
       );
     }
   };
@@ -53,7 +54,7 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
       <div className="flex justify-center w-full mt-0">
         <div className="relative w-full max-w-[9rem] aspect-square">
           <img
-            src="/brand_logo_no_text.png"
+            src={appLogo}
             alt="Logotipo"
             className="object-contain w-full h-full"
           />
@@ -62,7 +63,7 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
 
       {/* Header Title */}
       <div className="flex flex-col items-center gap-1.5 text-center">
-        <h1 className="text-xl font-bold text-main font-fun tracking-tight">
+        <h1 className="font-poppins text-2xl font-bold text-brand-navy tracking-wide">
           Registro
         </h1>
         <p className="text-balance text-sm text-neutral-600 dark:text-neutral-300">
@@ -167,7 +168,7 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
 
         <Button
           type="submit"
-          className="w-full bg-main hover:bg-main_dark text-white font-medium mt-1 transition-colors"
+          className="w-full bg-brand-purple hover:bg-brand-purple-dark text-white font-medium mt-1 transition-colors"
           disabled={loading}
         >
           {loading ? "Registrando…" : "Registrarse"}
@@ -178,7 +179,7 @@ export function SignupForm(props: React.ComponentPropsWithoutRef<"form">) {
         ¿Ya tiene cuenta?{" "}
         <Link
           to="/login"
-          className="font-medium text-main hover:text-main_dark underline underline-offset-4 transition-colors"
+          className="font-medium text-brand-navy hover:opacity-80 underline underline-offset-4 transition-colors"
         >
           Iniciar sesión
         </Link>

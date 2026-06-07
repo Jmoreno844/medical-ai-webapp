@@ -42,7 +42,8 @@ const TabBar: React.FC = () => {
     [documentOrder, documentsById],
   );
   const { openGenerationModal } = useGenerationContext();
-  const { hasBeenTranscribed } = useTranscriptionContext();
+  const { hasBeenTranscribed, transcriptionStatus } =
+    useTranscriptionContext();
 
   const [documentToDelete, setDocumentToDelete] =
     useState<WorkspaceDocument | null>(null);
@@ -108,25 +109,42 @@ const TabBar: React.FC = () => {
     <>
       <div className="flex justify-between items-center bg-gray-100 border-b">
         <div className="flex overflow-x-auto flex-grow">
-          {documents.map((doc) => (
-            <button
-              key={doc.id}
-              onClick={() => setActiveDocument(doc.id)}
-              onContextMenu={(e) => handleContextMenu(e, doc)}
-              className={`px-4 py-2 min-w-[120px] text-sm font-medium whitespace-nowrap transition-colors
-                ${
-                  activeDocumentId === doc.id
-                    ? "bg-white text-blue-600 border-t-2 border-blue-600"
-                    : "text-gray-600 hover:bg-gray-200"
+          {documents.map((doc) => {
+            const showTranscriptionError =
+              doc.type.toLowerCase() === "transcription" &&
+              transcriptionStatus === "error";
+            const isActiveTab = activeDocumentId === doc.id;
+            return (
+              <button
+                key={doc.id}
+                onClick={() => setActiveDocument(doc.id)}
+                onContextMenu={(e) => handleContextMenu(e, doc)}
+                className={`px-4 py-2 min-w-[120px] text-sm font-medium whitespace-nowrap transition-colors outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-0
+                  ${
+                    isActiveTab
+                      ? showTranscriptionError
+                        ? "bg-white text-rose-700 border-t-2 border-rose-500 hover:text-rose-700 hover:border-rose-500 hover:bg-white"
+                        : "bg-white text-brand-navy border-t-2 border-brand-purple hover:border-brand-purple hover:bg-white"
+                      : "text-gray-500 border-t-2 border-transparent hover:text-brand-navy hover:bg-gray-50 hover:border-gray-300"
+                  }`}
+                aria-label={`Seleccionar ${getTabLabel(doc)}${
+                  showTranscriptionError ? " (la transcripción falló)" : ""
                 }`}
-              aria-label={`Seleccionar ${getTabLabel(doc)}`}
-              data-document-type={doc.type}
-            >
-              {doc.title ||
-                DOCUMENT_TYPE_LABELS[doc.type.toLowerCase()] ||
-                doc.type}
-            </button>
-          ))}
+                data-document-type={doc.type}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  {getTabLabel(doc)}
+                  {showTranscriptionError && !isActiveTab && (
+                    <span
+                      className="inline-block h-2 w-2 shrink-0 rounded-full bg-rose-500"
+                      title="La transcripción falló. Reintenta desde esta pestaña."
+                      aria-hidden="true"
+                    />
+                  )}
+                </span>
+              </button>
+            );
+          })}
 
           {/* Add document generation button */}
           <button
@@ -134,7 +152,7 @@ const TabBar: React.FC = () => {
             disabled={!hasBeenTranscribed}
             className={`p-2 ${
               hasBeenTranscribed
-                ? "text-blue-600 hover:bg-blue-100"
+                ? "text-brand-purple hover:bg-brand-purple/10"
                 : "text-gray-400 cursor-not-allowed"
             } rounded-full transition-colors self-center mx-2`}
             title={

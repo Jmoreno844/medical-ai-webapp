@@ -1,0 +1,283 @@
+{
+  "run_started_at": "2026-06-07T02:01:36.538217+00:00",
+  "prompt_version": "document_generation_v002",
+  "judge_prompt_version": "clinical_document_judge_v002",
+  "judge_provider": "openai",
+  "judge_model": "gpt-5.4",
+  "judges": [
+    {
+      "alias": "openai",
+      "provider": "openai",
+      "model": "gpt-5.4"
+    }
+  ],
+  "cases_file": "../evals/document_generation/cases.json",
+  "template_file": "templates/clinical_document_template_v003.md",
+  "requested_case_id": "eval_doc_clinica_co_002",
+  "count_limit": null,
+  "last_limit": null,
+  "selected_case_count": 1,
+  "models": [
+    {
+      "alias": "openai",
+      "provider": "openai_api",
+      "model": "gpt-5.4-mini"
+    }
+  ],
+  "generation_config": {
+    "openai_reasoning_effort": "low",
+    "anthropic_thinking_budget_tokens": null
+  },
+  "prompt_template_preview": "Tu tarea es generar un documento medico basado en los siguientes componentes:\n\n1",
+  "judge_prompt_preview": "Eres un evaluador experto en documentacion clinica y seguridad del paciente. Eva",
+  "case_results": [
+    {
+      "case_id": "eval_doc_clinica_co_002",
+      "notes": {
+        "pendientes_no_convertir_en_resultados": [
+          "Creatinina y evaluacion de la funcion renal.",
+          "Hemograma.",
+          "Troponinas.",
+          "Examen de orina, cuyo resultado no fue escuchado por la paciente.",
+          "Cultivo de orina."
+        ],
+        "opciones_condicionales_no_convertir_en_planes_activos": [
+          "La tomografia abdominal solo se consideraria ante empeoramiento, rigidez o resultados sugestivos de complicacion.",
+          "El antibiotico dependera de la evaluacion; no se especificaron medicamento ni dosis y no consta formulacion activa.",
+          "La hospitalizacion o el egreso dependen de datos aun no disponibles.",
+          "El control en tres dias solo se menciono como posibilidad en caso de egreso; no existe cita confirmada."
+        ],
+        "instrucciones_explicitas": [
+          "No tomar naproxeno ni diclofenaco en casa.",
+          "No reiniciar metformina por cuenta propia esa noche.",
+          "No atribuir al medico la suspension previa de metformina, pues fue decision de la paciente."
+        ],
+        "correcciones_tardias": [
+          "La intensidad del dolor se corrige de ocho a seis sobre diez.",
+          "La insulina glargina se corrige de treinta a veinte unidades nocturnas.",
+          "La supuesta warfarina pertenecia al esposo; la paciente cree tomar aspirina.",
+          "La ausencia inicial de vomito se corrige a dos episodios el dia anterior.",
+          "La ausencia inicial de deposiciones negras se modifica por una deposicion de aspecto alquitranado el domingo.",
+          "El dolor lumbar se corrige de izquierdo a derecho."
+        ],
+        "signos_de_alarma_no_suavizar": [
+          "Presion toracica acompanada de palidez, sudoracion referida por la acompanante y mareo.",
+          "Posible caida o episodio de alteracion de conciencia.",
+          "Fiebre de 38.7 C con escalofrios, sintomas urinarios y dolor lumbar derecho.",
+          "Episodio de confusion o desorientacion temporal.",
+          "Deposicion de aspecto alquitranado.",
+          "Posibles signos de alarma explicados: recurrencia del dolor toracico, sincope, disnea intensa, hematemesis, nuevas heces negras, confusion persistente o incapacidad para tolerar liquidos."
+        ],
+        "riesgos_de_alucinacion_documental": [
+          "No inventar examen abdominal, cardiopulmonar ni otros hallazgos fisicos.",
+          "No inventar signos vitales ni cifras de presion arterial.",
+          "No clasificar como confirmada o ausente la alergia a penicilina.",
+          "No documentar histerectomia; el tipo de cirugia anticonceptiva es incierto.",
+          "No completar una lista de medicamentos ni asumir dosis no confirmadas.",
+          "No inventar dosis de insulina rapida, hierro, aspirina o un posible antibiotico.",
+          "No concluir que se descarto sangrado digestivo.",
+          "No inventar embarazo actual ni prueba de embarazo.",
+          "No generar incapacidad de cinco dias.",
+          "No afirmar hospitalizacion, alta, cita de seguimiento ni comprension del plan por parte de la paciente."
+        ]
+      },
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificacion del documento\n\n### Tipo de documento clinico\nTipo de documento clinico: Consulta en urgencias\n\n## Identificacion del paciente\n\n### Datos de identificacion\nNombre completo: Mujer adulta mayor no identificada en la transcripcion\n\n### Acompanante\nAcompanante: Hija\n\n## Datos del encuentro\n\n### Contexto de la atencion\nTipo de atencion: Consulta prolongada en urgencias\n\n## Motivo de consulta\n\n### Motivo de consulta\nMotivo de consulta: Sintomas urinarios, dolor abdominal y lumbar, fiebre, posibles manifestaciones digestivas, un episodio de confusion y dolor toracico transitorio\n\n## Fuente y confiabilidad de la informacion\n\n### Fuente de informacion\nFuente de informacion: Paciente y acompanante\n\n## Enfermedad actual\n\n### Historia de la enfermedad actual\nEnfermedad actual: Paciente adulta mayor que refiere inicio desde el martes de decaimiento general, dolor en la parte baja del abdomen y orina de olor fuerte. Consulta tambien por un episodio ocurrido la noche previa de dolor en la boca del estomago seguido de sensacion de presion en el pecho; inicialmente lo cuantifico como 8/10 por temor, pero luego lo corrigio a 6/10. Refiere que el dolor toracico se resolvio en aproximadamente 20 minutos estando sentada. La hija la vio sudando y palida; la paciente refiere que sintio mareo, pero no desmayo. Menciona que el jueves fue encontrada sentada en el piso del bano, sin certeza de caida ni golpe en la cabeza segun la hija. Refiere nauseas y dos episodios de vomito el dia previo, de pequena cantidad y sin sangre. Niega hematemesis. Refiere deposiciones oscuras desde el inicio de hierro, pero relata una deposicion el domingo con aspecto alquitranado y olor fuerte, sin recurrencia posterior. Refiere fiebre medida en casa de 38.7 C la noche anterior y escalofrio. Presenta dolor lumbar derecho debajo de las costillas, corrigiendo una referencia previa de lado izquierdo. Refiere disuria y polaquiuria, sin hematuria visible. La hija refiere que el dia anterior la noto confundida con la hora y repitiendo preguntas; la paciente acepta que se sentia rara, aunque atribuye parte de ello a que estaba recien despierta. Señala que esa confusion no ha vuelto hoy.\n\n## Antecedentes\n\n### Patologicos\nPatologicos: Diabetes mellitus de varios anos de evolucion; anemia; posible antecedente de funcion renal \"un poco lenta\" en un examen previo, sin valor conocido\n\n### Quirurgicos\nQuirurgicos: Cirugia de vesicula hace aproximadamente 15 anos. Refiere procedimiento a los 35 anos para no tener hijos, sin precisar si fue ligadura de trompas o histerectomia\n\n### Alergicos\nAlergicos: Alergia a penicilina no confirmada; antecedente referido de brote en la infancia con una inyeccion no identificada. Refiere que en una ocasion tomo amoxicilina en la adultez y cree que no presento reaccion\n\n### Farmacologicos / medicamentos actuales\nFarmacologicos / medicamentos actuales: Insulina glargina 20 unidades en la noche; insulina rapida alrededor de 6 unidades con comidas, de manera irregular y sin formula traida; metformina aproximadamente 850 mg dos veces al dia, suspendida por la paciente hace una semana por disminucion de la ingesta; losartan 50 mg al dia, referido como la mitad de una tableta de 100 mg; aspirina 100 mg, con referencia no completamente segura; hierro iniciado hace meses por anemia, dosis no recordada\n\n### Gineco-obstetricos\nGineco-obstetricos: Refiere que fue sometida a un procedimiento para no tener hijos a los 35 anos. No menstrua desde hace 12 anos\n\n## Revision por sistemas\n\n### Revision por sistemas\nRevision por sistemas: Sintomas urinarios con disuria, polaquiuria y orina de olor fuerte; dolor abdominal bajo; dolor lumbar derecho; fiebre y escalofrios; nauseas y vomito sin sangre; episodio unico de presion toracica transitoria; episodio de confusion transitoria segun acompanante; deposicion aislada de aspecto alquitranado referida el domingo\n\n## Examen fisico\n\n### Hallazgos del examen\nExamen fisico: La paciente refiere que fue revisada, pero no se documentaron en la transcripcion hallazgos especificos del examen fisico. No se reportan de forma explicitamente atribuible hallazgos abdominales, cardiacos o pulmonares\n\n## Resultados disponibles\n\n### Estudios solicitados o en proceso\nResultados disponibles: Se tomaron creatinina, hemograma, troponinas y examen de orina. Se menciono tira rapida de orina, pero la paciente no escucho el resultado. Se solicito cultivo de orina, aun en espera. No estan disponibles todos los resultados al momento de la conversacion\n\n## Analisis clinico\n\n### Impresion clinica\nAnalisis clinico: Cuadro compatible con probable infeccion urinaria alta o proceso infeccioso urinario a evaluar, dado el dolor lumbar derecho, disuria, polaquiuria, fiebre y escalofrios. Se agrega necesidad de correlacionar con funcion renal, estado general y tolerancia oral. El episodio de confusion transitoria y el dolor toracico opresivo autolimitado obligan a vigilar complicaciones y a esperar resultados cardiacos y de laboratorio antes de definir conducta. El antecedente de deposicion alquitranada aislada y el uso de aspirina e hierro requieren interpretacion cautelosa, sin confirmacion de sangrado digestivo en la transcripcion\n\n## Diagnosticos\n\n### Diagnostico principal\nDiagnostico principal: Infeccion urinaria probable, en evaluacion\n\n### Diagnosticos relacionados\nDiagnosticos relacionados: Dolor abdominal; dolor lumbar derecho; fiebre; disuria; polaquiuria; nausea y vomito; episodio de confusion transitoria; dolor toracico transitorio; diabetes mellitus; anemia; uso de metformina suspendida por la paciente\n\n### Diagnosticos diferenciales\nDiagnosticos diferenciales: Complicacion urinaria en evaluacion; compromiso de funcion renal en evaluacion; causa cardiaca del dolor toracico en evaluacion; sangrado digestivo no confirmado\n\n## Examenes, procedimientos e interconsultas\n\n### Examenes solicitados\nExamenes solicitados: Creatinina; hemograma; troponinas; examen de orina; cultivo de orina\n\n### Procedimientos solicitados o realizados\nProcedimientos solicitados o realizados: Toma de muestra para laboratorios y estudios de orina\n\n## Recomendaciones, educacion y signos de alarma\n\n### Recomendaciones no farmacologicas\nRecomendaciones no farmacologicas: No tomar naproxeno ni diclofenaco en casa; no reiniciar metformina por cuenta propia esta noche hasta revisar funcion renal y tolerancia a la comida\n\n### Signos de alarma\nSignos de alarma: Reaparicion de presion en el pecho, desmayo, falta de aire importante, vomito con sangre, nuevas heces negras, persistencia o recurrencia de confusion, o incapacidad para tolerar liquidos\n\n## Control y seguimiento\n\n### Seguimiento\nControl / seguimiento: Se menciono como posibilidad control en tres dias si se da salida, pero no quedo cita programada. La disposicion final queda pendiente de resultados, estado renal, tolerancia oral, estado mental y resultados cardiacos\n\n## Comprension del plan\n\n### Comprension del plan\nComprension del plan: No puede afirmarse comprension completa por parte de la paciente; la hija respondio que si comprendio, mientras la paciente estaba en el bano\n\n## Profesional responsable\n\n### Atencion\nProfesional responsable: No identificado en la transcripcion",
+          "generation_metrics": {
+            "time_to_first_token_ms": 4583,
+            "time_after_first_token_ms": 8751,
+            "total_generation_ms": 13334,
+            "input_tokens": 4979,
+            "output_tokens": 1700,
+            "thinking_tokens": 32,
+            "estimated_cost_usd": 0.011528,
+            "cost_breakdown": {
+              "input_usd_per_million": 0.75,
+              "output_usd_per_million": 4.5,
+              "input_cost_usd": 0.003734,
+              "thinking_cost_usd": 0.000144,
+              "visible_output_cost_usd": 0.00765,
+              "output_cost_usd": 0.007794
+            },
+            "openai_reasoning_effort": "low"
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 2,
+            "template_adherence_score": 3,
+            "uncertainty_handling_score": 2,
+            "invented_info": [
+              {
+                "item": "Se cierra como diagnostico principal una infeccion urinaria probable e incluso 'alta' sin confirmacion en la fuente y con conducta aun pendiente",
+                "severity": "major"
+              }
+            ],
+            "missing_info": [
+              {
+                "item": "Que el antibiotico solo se estaba considerando y que no habia antibiotico definido ni formulado al momento",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Incapacidad medica mencionada como no definida no quedo consignada",
+                "severity": "minor",
+                "kind": "template_field"
+              },
+              {
+                "item": "Confiabilidad de la informacion no consignada pese a relato fragmentado y con varias correcciones",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [
+              {
+                "item": "Se menciona histerectomia como posibilidad quirurgica pese a instruccion explicita de no escribirla",
+                "severity": "major"
+              }
+            ],
+            "dosing_error_info": [
+              {
+                "item": "Losartan 50 mg al dia: se agrega una frecuencia no explicitada en la fuente",
+                "severity": "minor"
+              }
+            ],
+            "verdict": "borderline",
+            "summary": "El documento conserva buena parte del relato, pero aumenta la certeza clinica al convertir la sospecha urinaria en diagnostico principal, omite que el antibiotico y la conducta seguian pendientes, y contradice la fuente al introducir histerectomia como posibilidad pese a la instruccion de no registrarla."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 2,\n  \"invented_info\": [\n    {\n      \"item\": \"Se cierra como diagnostico principal una infeccion urinaria probable e incluso 'alta' sin confirmacion en la fuente y con conducta aun pendiente\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Que el antibiotico solo se estaba considerando y que no habia antibiotico definido ni formulado al momento\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Incapacidad medica mencionada como no definida no quedo consignada\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"Confiabilidad de la informacion no consignada pese a relato fragmentado y con varias correcciones\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Se menciona histerectomia como posibilidad quirurgica pese a instruccion explicita de no escribirla\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"dosing_error_info\": [\n    {\n      \"item\": \"Losartan 50 mg al dia: se agrega una frecuencia no explicitada en la fuente\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento conserva buena parte del relato, pero aumenta la certeza clinica al convertir la sospecha urinaria en diagnostico principal, omite que el antibiotico y la conducta seguian pendientes, y contradice la fuente al introducir histerectomia como posibilidad pese a la instruccion de no registrarla.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 3,
+                "faithfulness_score": 2,
+                "template_adherence_score": 3,
+                "uncertainty_handling_score": 2,
+                "invented_info": [
+                  {
+                    "item": "Se cierra como diagnostico principal una infeccion urinaria probable e incluso 'alta' sin confirmacion en la fuente y con conducta aun pendiente",
+                    "severity": "major"
+                  }
+                ],
+                "missing_info": [
+                  {
+                    "item": "Que el antibiotico solo se estaba considerando y que no habia antibiotico definido ni formulado al momento",
+                    "severity": "major",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Incapacidad medica mencionada como no definida no quedo consignada",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  },
+                  {
+                    "item": "Confiabilidad de la informacion no consignada pese a relato fragmentado y con varias correcciones",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [
+                  {
+                    "item": "Se menciona histerectomia como posibilidad quirurgica pese a instruccion explicita de no escribirla",
+                    "severity": "major"
+                  }
+                ],
+                "dosing_error_info": [
+                  {
+                    "item": "Losartan 50 mg al dia: se agrega una frecuencia no explicitada en la fuente",
+                    "severity": "minor"
+                  }
+                ],
+                "verdict": "borderline",
+                "summary": "El documento conserva buena parte del relato, pero aumenta la certeza clinica al convertir la sospecha urinaria en diagnostico principal, omite que el antibiotico y la conducta seguian pendientes, y contradice la fuente al introducir histerectomia como posibilidad pese a la instruccion de no registrarla."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 2,\n  \"invented_info\": [\n    {\n      \"item\": \"Se cierra como diagnostico principal una infeccion urinaria probable e incluso 'alta' sin confirmacion en la fuente y con conducta aun pendiente\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Que el antibiotico solo se estaba considerando y que no habia antibiotico definido ni formulado al momento\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Incapacidad medica mencionada como no definida no quedo consignada\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"Confiabilidad de la informacion no consignada pese a relato fragmentado y con varias correcciones\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Se menciona histerectomia como posibilidad quirurgica pese a instruccion explicita de no escribirla\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"dosing_error_info\": [\n    {\n      \"item\": \"Losartan 50 mg al dia: se agrega una frecuencia no explicitada en la fuente\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento conserva buena parte del relato, pero aumenta la certeza clinica al convertir la sospecha urinaria en diagnostico principal, omite que el antibiotico y la conducta seguian pendientes, y contradice la fuente al introducir histerectomia como posibilidad pese a la instruccion de no registrarla.\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "run_score_summary": [
+    {
+      "judge_alias": "openai",
+      "judge_provider": "openai",
+      "judge_model": "gpt-5.4",
+      "model_alias": "openai",
+      "provider": "openai_api",
+      "model": "gpt-5.4-mini",
+      "evaluated_output_count": 1,
+      "dimension_averages": {
+        "clinical_safety_score": 3.0,
+        "faithfulness_score": 2.0,
+        "template_adherence_score": 3.0,
+        "uncertainty_handling_score": 2.0
+      },
+      "effective_dimension_averages": {
+        "clinical_safety_score": 3.0,
+        "faithfulness_score": 2.0,
+        "template_adherence_score": 3.0,
+        "uncertainty_handling_score": 2.0
+      },
+      "safety_gate_failures": 0,
+      "critical_invented_count": 0,
+      "critical_missing_count": 0,
+      "critical_contradiction_count": 0,
+      "critical_dosing_error_count": 0,
+      "findings_by_case": [
+        {
+          "case_id": "eval_doc_clinica_co_002",
+          "invented_info": [
+            {
+              "item": "Se cierra como diagnostico principal una infeccion urinaria probable e incluso 'alta' sin confirmacion en la fuente y con conducta aun pendiente",
+              "severity": "major"
+            }
+          ],
+          "missing_info": [
+            {
+              "item": "Que el antibiotico solo se estaba considerando y que no habia antibiotico definido ni formulado al momento",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Incapacidad medica mencionada como no definida no quedo consignada",
+              "severity": "minor",
+              "kind": "template_field"
+            },
+            {
+              "item": "Confiabilidad de la informacion no consignada pese a relato fragmentado y con varias correcciones",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [
+            {
+              "item": "Se menciona histerectomia como posibilidad quirurgica pese a instruccion explicita de no escribirla",
+              "severity": "major"
+            }
+          ],
+          "dosing_error_info": [
+            {
+              "item": "Losartan 50 mg al dia: se agrega una frecuencia no explicitada en la fuente",
+              "severity": "minor"
+            }
+          ]
+        }
+      ],
+      "overall_score": 2.5,
+      "overall_time_to_first_token_ms": 4583,
+      "overall_time_after_first_token_ms": 8751,
+      "total_input_tokens": 4979,
+      "total_output_tokens": 1700,
+      "total_thinking_tokens": 32,
+      "total_estimated_cost_usd": 0.011528,
+      "token_metric_sample_count": 1
+    }
+  ]
+}

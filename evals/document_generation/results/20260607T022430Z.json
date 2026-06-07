@@ -1,0 +1,259 @@
+{
+  "run_started_at": "2026-06-07T02:24:30.268807+00:00",
+  "prompt_version": "document_generation_v003",
+  "judge_prompt_version": "clinical_document_judge_v002",
+  "judge_provider": "openai",
+  "judge_model": "gpt-5.4",
+  "judges": [
+    {
+      "alias": "openai",
+      "provider": "openai",
+      "model": "gpt-5.4"
+    }
+  ],
+  "cases_file": "../evals/document_generation/cases.json",
+  "template_file": "templates/clinical_document_template_v004.md",
+  "requested_case_id": "eval_doc_clinica_co_002",
+  "count_limit": null,
+  "last_limit": null,
+  "selected_case_count": 1,
+  "models": [
+    {
+      "alias": "openai",
+      "provider": "openai_api",
+      "model": "gpt-5.4"
+    }
+  ],
+  "generation_config": {
+    "openai_reasoning_effort": "low",
+    "anthropic_thinking_budget_tokens": null
+  },
+  "prompt_template_preview": "Tu tarea es generar un documento clínico fiel a la información proporcionada.\n\n\n",
+  "judge_prompt_preview": "Eres un evaluador experto en documentacion clinica y seguridad del paciente. Eva",
+  "case_results": [
+    {
+      "case_id": "eval_doc_clinica_co_002",
+      "notes": {
+        "pendientes_no_convertir_en_resultados": [
+          "Creatinina y evaluacion de la funcion renal.",
+          "Hemograma.",
+          "Troponinas.",
+          "Examen de orina, cuyo resultado no fue escuchado por la paciente.",
+          "Cultivo de orina."
+        ],
+        "opciones_condicionales_no_convertir_en_planes_activos": [
+          "La tomografia abdominal solo se consideraria ante empeoramiento, rigidez o resultados sugestivos de complicacion.",
+          "El antibiotico dependera de la evaluacion; no se especificaron medicamento ni dosis y no consta formulacion activa.",
+          "La hospitalizacion o el egreso dependen de datos aun no disponibles.",
+          "El control en tres dias solo se menciono como posibilidad en caso de egreso; no existe cita confirmada."
+        ],
+        "instrucciones_explicitas": [
+          "No tomar naproxeno ni diclofenaco en casa.",
+          "No reiniciar metformina por cuenta propia esa noche.",
+          "No atribuir al medico la suspension previa de metformina, pues fue decision de la paciente."
+        ],
+        "correcciones_tardias": [
+          "La intensidad del dolor se corrige de ocho a seis sobre diez.",
+          "La insulina glargina se corrige de treinta a veinte unidades nocturnas.",
+          "La supuesta warfarina pertenecia al esposo; la paciente cree tomar aspirina.",
+          "La ausencia inicial de vomito se corrige a dos episodios el dia anterior.",
+          "La ausencia inicial de deposiciones negras se modifica por una deposicion de aspecto alquitranado el domingo.",
+          "El dolor lumbar se corrige de izquierdo a derecho."
+        ],
+        "signos_de_alarma_no_suavizar": [
+          "Presion toracica acompanada de palidez, sudoracion referida por la acompanante y mareo.",
+          "Posible caida o episodio de alteracion de conciencia.",
+          "Fiebre de 38.7 C con escalofrios, sintomas urinarios y dolor lumbar derecho.",
+          "Episodio de confusion o desorientacion temporal.",
+          "Deposicion de aspecto alquitranado.",
+          "Posibles signos de alarma explicados: recurrencia del dolor toracico, sincope, disnea intensa, hematemesis, nuevas heces negras, confusion persistente o incapacidad para tolerar liquidos."
+        ],
+        "riesgos_de_alucinacion_documental": [
+          "No inventar examen abdominal, cardiopulmonar ni otros hallazgos fisicos.",
+          "No inventar signos vitales ni cifras de presion arterial.",
+          "No clasificar como confirmada o ausente la alergia a penicilina.",
+          "No documentar histerectomia; el tipo de cirugia anticonceptiva es incierto.",
+          "No completar una lista de medicamentos ni asumir dosis no confirmadas.",
+          "No inventar dosis de insulina rapida, hierro, aspirina o un posible antibiotico.",
+          "No concluir que se descarto sangrado digestivo.",
+          "No inventar embarazo actual ni prueba de embarazo.",
+          "No generar incapacidad de cinco dias.",
+          "No afirmar hospitalizacion, alta, cita de seguimiento ni comprension del plan por parte de la paciente."
+        ]
+      },
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4",
+          "generated_document": "## Datos del documento y del encuentro\n\nTipo de atención: urgencias\n\n## Fuente y confiabilidad de la información\n\nFuente de información: paciente y hija acompañante\n\nConfiabilidad de la información: limitada por relato fragmentado, múltiples correcciones sobre cronología, lateralidad y medicamentos, y anamnesis complementada por la hija\n\n## Motivo de consulta\n\nMotivo de consulta: decaimiento, dolor abdominal bajo, orina de olor fuerte, disuria, polaquiuria, dolor lumbar derecho, fiebre, náuseas, vómito, episodio de dolor en boca del estómago con presión en el pecho y mareo\n\n## Enfermedad actual\n\nEnfermedad actual: paciente refiere que desde el martes se encuentra decaída, con dolor en abdomen bajo y orina \"muy fuerte\". Refiere además ardor al orinar, aumento de la frecuencia urinaria y dolor de espalda del lado derecho, debajo de las costillas; inicialmente dijo izquierdo y luego corrigió a derecho. Refiere fiebre medida en casa de 38.7 anoche y escalofrío. Niega haber visto sangre en la orina.\n\nRefiere náuseas. Inicialmente negó vómito, pero luego corrigió que ayer presentó dos episodios de vómito, en poca cantidad y sin sangre.\n\nSobre deposiciones, refiere que no han sido negras de forma persistente, sino más bien oscuras desde que toma hierro; sin embargo, el domingo presentó una deposición que \"parecía alquitrán\" y olía muy fuerte, sin repetición posterior. Indica que toma hierro desde hace meses por anemia, sin recordar la dosis.\n\nRefiere que anoche presentó dolor en la boca del estómago seguido de sensación de presión en el pecho. Califica la intensidad como 6/10; aclara que al llegar dijo 8/10 porque estaba asustada. Refiere que cedió en 20 minutos estando sentada. La hija refiere que durante ese episodio la vio sudando y pálida. La paciente no percibió sudoración, pero sí mareo. Niega desmayo, aunque posteriormente refiere que el jueves la encontraron sentada en el piso del baño y no sabe si se cayó o se agachó. Según la hija, no hubo golpe en la cabeza.\n\nLa hija refiere que ayer la paciente estaba confundida con la hora y repitió la misma pregunta varias veces. La paciente refiere que estaba recién despierta, pero acepta que se sentía rara. Refiere que esto no ha vuelto a ocurrir hoy.\n\nLa paciente refiere que hoy le tomaron creatinina, hemograma, troponinas y examen de orina. Refiere que también ordenaron cultivo de orina. Menciona que se habló de tira rápida, pero no escuchó el resultado. Refiere que la conducta y la disposición dependen de resultados, signos vitales, función renal, tolerancia oral, estado mental y resultados cardiacos. Refiere que la tomografía solo se consideraría si empeora el dolor abdominal, aparece rigidez o los exámenes sugieren complicación; no está pedida todavía. Refiere que se habló de iniciar antibiótico si la evaluación confirma infección urinaria o si deciden tratar antes del cultivo, pero al momento de esta conversación no le habían informado antibiótico específico, dosis ni formulación.\n\n## Antecedentes\n\nPatológicos: diabetes mellitus referida desde hace años; anemia referida; antecedente referido de \"riñón un poco lento\" en examen previo, sin valor disponible\n\nQuirúrgicos: colecistectomía hace aproximadamente 15 años; procedimiento para no tener hijos a los 35 años, tipo no precisado, referido como incierto\n\nAlérgicos: penicilina incierta; paciente refiere que su madre decía que en la niñez presentó brote con una inyección, sin identificar cuál. Refiere que una vez tomó amoxicilina en la adultez y cree que no ocurrió nada\n\nFarmacológicos / medicamentos actuales: insulina glargina 20 unidades en la noche; insulina rápida, a veces 6, uso no constante; metformina 850 dos veces, suspendida por la paciente hace una semana por no estar comiendo bien; losartán 50; aspirina 100, incierto; hierro, dosis no recordada\n\nGineco-obstétricos: embarazo referido como imposible por la edad; amenorrea desde hace 12 años\n\n## Signos vitales y medidas antropométricas\n\n## Estudios y resultados\n\nExámenes solicitados: creatinina, hemograma, troponinas, examen de orina, cultivo de orina\n\nResultados pendientes: creatinina, hemograma, troponinas, examen de orina, cultivo de orina\n\nProcedimientos: tomografía, condicionada a que empeore el dolor abdominal, aparezca rigidez o los exámenes sugieran complicación; no pedida al momento de la conversación\n\n## Recomendaciones, educación y signos de alarma\n\nRecomendaciones no farmacológicas: no tomar naproxeno ni diclofenaco en la casa; no reiniciar la metformina por su cuenta esta noche\n\nEducación al paciente: se informó que la decisión sobre reiniciar metformina depende de revisar función renal y tolerancia a la comida\n\nSignos de alarma: volver a urgencias si vuelve la presión en el pecho, se desmaya, le falta mucho el aire, vomita sangre, salen heces negras otra vez, sigue confundida o no puede tomar líquidos\n\n## Incapacidad\n\nIncapacidad médica: solicitada, no definida\n\n## Control y seguimiento\n\nControl / seguimiento: control en tres días, mencionado como posibilidad si le dan salida; no quedó cita\n\n## Comprensión y aceptación del plan\n\nComprensión del plan: la hija respondió que sí había entendido; no puede afirmarse comprensión de la paciente porque estaba en el baño al momento de la verificación del plan",
+          "generation_metrics": {
+            "time_to_first_token_ms": 4707,
+            "time_after_first_token_ms": 17029,
+            "total_generation_ms": 21737,
+            "input_tokens": 3901,
+            "output_tokens": 1252,
+            "thinking_tokens": 95,
+            "openai_reasoning_effort": "low"
+          },
+          "judge_result": {
+            "clinical_safety_score": 4,
+            "faithfulness_score": 3,
+            "template_adherence_score": 3,
+            "uncertainty_handling_score": 4,
+            "invented_info": [
+              {
+                "item": "Estado de todos los exámenes como \"pendientes\" sin soporte específico para cada uno",
+                "severity": "minor"
+              }
+            ],
+            "missing_info": [
+              {
+                "item": "No consigna que la lista de medicamentos estaba incompleta y que la paciente no llevó la fórmula",
+                "severity": "minor",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "No consigna que rechazó el analgésico ofrecido hasta conocer la función renal",
+                "severity": "minor",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Faltó diferenciar los exámenes tomados / muestras tomadas; quedaron solo en \"Exámenes solicitados\"",
+                "severity": "minor",
+                "kind": "template_field"
+              },
+              {
+                "item": "Sección de signos vitales incluida sin contenido",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "pass",
+            "summary": "Documento en general fiel y prudente, sin diagnósticos ni tratamientos inventados. Los principales problemas son un exceso leve de certeza al marcar todos los estudios como pendientes, la omisión de que la conciliación de medicamentos seguía incompleta y de que la paciente rechazó analgesia, además de detalles menores de estructura de plantilla."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 4,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [\n    {\n      \"item\": \"Estado de todos los exámenes como \\\"pendientes\\\" sin soporte específico para cada uno\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"No consigna que la lista de medicamentos estaba incompleta y que la paciente no llevó la fórmula\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"No consigna que rechazó el analgésico ofrecido hasta conocer la función renal\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Faltó diferenciar los exámenes tomados / muestras tomadas; quedaron solo en \\\"Exámenes solicitados\\\"\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"Sección de signos vitales incluida sin contenido\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"pass\",\n  \"summary\": \"Documento en general fiel y prudente, sin diagnósticos ni tratamientos inventados. Los principales problemas son un exceso leve de certeza al marcar todos los estudios como pendientes, la omisión de que la conciliación de medicamentos seguía incompleta y de que la paciente rechazó analgesia, además de detalles menores de estructura de plantilla.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 4,
+                "faithfulness_score": 3,
+                "template_adherence_score": 3,
+                "uncertainty_handling_score": 4,
+                "invented_info": [
+                  {
+                    "item": "Estado de todos los exámenes como \"pendientes\" sin soporte específico para cada uno",
+                    "severity": "minor"
+                  }
+                ],
+                "missing_info": [
+                  {
+                    "item": "No consigna que la lista de medicamentos estaba incompleta y que la paciente no llevó la fórmula",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "No consigna que rechazó el analgésico ofrecido hasta conocer la función renal",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Faltó diferenciar los exámenes tomados / muestras tomadas; quedaron solo en \"Exámenes solicitados\"",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  },
+                  {
+                    "item": "Sección de signos vitales incluida sin contenido",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "pass",
+                "summary": "Documento en general fiel y prudente, sin diagnósticos ni tratamientos inventados. Los principales problemas son un exceso leve de certeza al marcar todos los estudios como pendientes, la omisión de que la conciliación de medicamentos seguía incompleta y de que la paciente rechazó analgesia, además de detalles menores de estructura de plantilla."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 4,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [\n    {\n      \"item\": \"Estado de todos los exámenes como \\\"pendientes\\\" sin soporte específico para cada uno\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"No consigna que la lista de medicamentos estaba incompleta y que la paciente no llevó la fórmula\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"No consigna que rechazó el analgésico ofrecido hasta conocer la función renal\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Faltó diferenciar los exámenes tomados / muestras tomadas; quedaron solo en \\\"Exámenes solicitados\\\"\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"Sección de signos vitales incluida sin contenido\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"pass\",\n  \"summary\": \"Documento en general fiel y prudente, sin diagnósticos ni tratamientos inventados. Los principales problemas son un exceso leve de certeza al marcar todos los estudios como pendientes, la omisión de que la conciliación de medicamentos seguía incompleta y de que la paciente rechazó analgesia, además de detalles menores de estructura de plantilla.\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "run_score_summary": [
+    {
+      "judge_alias": "openai",
+      "judge_provider": "openai",
+      "judge_model": "gpt-5.4",
+      "model_alias": "openai",
+      "provider": "openai_api",
+      "model": "gpt-5.4",
+      "evaluated_output_count": 1,
+      "dimension_averages": {
+        "clinical_safety_score": 4.0,
+        "faithfulness_score": 3.0,
+        "template_adherence_score": 3.0,
+        "uncertainty_handling_score": 4.0
+      },
+      "effective_dimension_averages": {
+        "clinical_safety_score": 4.0,
+        "faithfulness_score": 3.0,
+        "template_adherence_score": 3.0,
+        "uncertainty_handling_score": 4.0
+      },
+      "safety_gate_failures": 0,
+      "critical_invented_count": 0,
+      "critical_missing_count": 0,
+      "critical_contradiction_count": 0,
+      "critical_dosing_error_count": 0,
+      "findings_by_case": [
+        {
+          "case_id": "eval_doc_clinica_co_002",
+          "invented_info": [
+            {
+              "item": "Estado de todos los exámenes como \"pendientes\" sin soporte específico para cada uno",
+              "severity": "minor"
+            }
+          ],
+          "missing_info": [
+            {
+              "item": "No consigna que la lista de medicamentos estaba incompleta y que la paciente no llevó la fórmula",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "No consigna que rechazó el analgésico ofrecido hasta conocer la función renal",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Faltó diferenciar los exámenes tomados / muestras tomadas; quedaron solo en \"Exámenes solicitados\"",
+              "severity": "minor",
+              "kind": "template_field"
+            },
+            {
+              "item": "Sección de signos vitales incluida sin contenido",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        }
+      ],
+      "overall_score": 3.6,
+      "overall_time_to_first_token_ms": 4707,
+      "overall_time_after_first_token_ms": 17029,
+      "total_input_tokens": null,
+      "total_output_tokens": null,
+      "total_thinking_tokens": null,
+      "total_estimated_cost_usd": null,
+      "token_metric_sample_count": 0
+    }
+  ]
+}

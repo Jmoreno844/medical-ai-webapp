@@ -8,6 +8,9 @@ from typing import Any
 from app.settings import Settings
 
 
+ANTHROPIC_DOCUMENT_GENERATION_TEMPERATURE = 0.0
+
+
 @lru_cache(maxsize=1)
 def _get_google_client(project_id: str, location: str):
     from google import genai
@@ -94,7 +97,7 @@ async def _stream_with_anthropic(
             with client.messages.stream(
                 model=settings.effective_document_generation_model,
                 max_tokens=settings.max_output_tokens,
-                temperature=0.4,
+                temperature=ANTHROPIC_DOCUMENT_GENERATION_TEMPERATURE,
                 top_p=0.95,
                 messages=[{"role": "user", "content": prompt}],
             ) as stream:
@@ -131,7 +134,7 @@ async def _stream_with_anthropic_api(
     async with client.messages.stream(
         model=settings.effective_document_generation_model,
         max_tokens=settings.max_output_tokens,
-        temperature=0.4,
+        temperature=ANTHROPIC_DOCUMENT_GENERATION_TEMPERATURE,
         messages=[{"role": "user", "content": prompt}],
     ) as stream:
         async for text in stream.text_stream:

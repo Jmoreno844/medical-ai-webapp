@@ -1,0 +1,846 @@
+{
+  "run_started_at": "2026-06-07T00:55:25.956557+00:00",
+  "prompt_version": "document_generation_v002",
+  "judge_prompt_version": "clinical_document_judge_v002",
+  "judge_provider": "openai",
+  "judge_model": "gpt-5.4",
+  "judges": [
+    {
+      "alias": "openai",
+      "provider": "openai",
+      "model": "gpt-5.4"
+    }
+  ],
+  "cases_file": "../evals/document_generation/cases.json",
+  "template_file": "templates/clinical_document_template_v003.md",
+  "requested_case_id": null,
+  "count_limit": null,
+  "last_limit": 6,
+  "selected_case_count": 6,
+  "models": [
+    {
+      "alias": "openai",
+      "provider": "openai_api",
+      "model": "gpt-5.4-mini"
+    }
+  ],
+  "prompt_template_preview": "Tu tarea es generar un documento medico basado en los siguientes componentes:\n\n1",
+  "judge_prompt_preview": "Eres un evaluador experto en documentacion clinica y seguridad del paciente. Eva",
+  "case_results": [
+    {
+      "case_id": "eval_doc_clinica_co_001",
+      "notes": {
+        "pendientes_no_convertir_en_resultados": [
+          "Prueba de embarazo en orina.",
+          "Repeticion del electrocardiograma.",
+          "Dimero D.",
+          "Troponina."
+        ],
+        "opcion_condicional_no_convertir_en_plan_activo": "La tomografia con contraste solo se consideraria si algun resultado lo justifica; no esta ordenada.",
+        "instruccion_explicita": "No usar diclofenaco ni ibuprofeno por ahora.",
+        "correcciones_tardias": [
+          "El dolor se corrige de ardor a presion o peso.",
+          "La suspension de anticonceptivos se corrige de dos meses a aproximadamente tres semanas.",
+          "La fecha de ultima menstruacion se corrige del dia 20 al dia 8.",
+          "La edad del infarto paterno se corrige de aproximadamente cincuenta anos a cuarenta y ocho."
+        ],
+        "signos_de_alarma_no_suavizar": [
+          "Dolor toracico opresivo relacionado con el esfuerzo.",
+          "Disnea.",
+          "Posible perdida transitoria de la conciencia.",
+          "Hemoptisis escasa referida.",
+          "Dolor unilateral en pantorrilla."
+        ],
+        "riesgos_de_alucinacion_documental": [
+          "No afirmar embarazo positivo o negativo.",
+          "No registrar electrocardiograma normal.",
+          "No inventar examen fisico ni edema de la pierna.",
+          "No cerrar la alergia como ausente; existe antecedente incierto de ronchas con diclofenaco.",
+          "No inventar dosis de aspirina.",
+          "No generar incapacidad, alta ni seguimiento.",
+          "No afirmar que la paciente comprendio el plan."
+        ]
+      },
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificacion del documento\n\nServicio / especialidad: Urgencias\n\n## Identificacion del paciente\n\nSexo registrado: Mujer adulta\n\n## Motivo de consulta\n\nMotivo de consulta: Dolor torácico, disnea y episodio de alteración transitoria de la conciencia.\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente refiere que desde anoche presenta sensación de presión en el centro del pecho, intermitente, más notoria al subir escaleras, asociada a falta de aire. Inicialmente lo describió como ardor, pero luego aclaró que no se parece a gastritis y que corresponde más a una sensación de peso o compresión. Refiere además que en la mañana casi se cae en el baño; niega pérdida completa del conocimiento, aunque su hermana refiere que quedó “ida” unos segundos y la paciente no lo recuerda con claridad. Niega fiebre. Refiere tos seca desde hace tres días y un episodio único de estría roja en la flema hoy. Refiere dolor en la pierna izquierda detrás de la pantorrilla desde ayer, sin certeza sobre edema.\n\n## Antecedentes\n\nAlergicos: Refiere que no conoce alergias; menciona que una vez con diclofenaco presentó ronchas.\n\nFarmacologicos / medicamentos actuales: Refiere haber tomado una tableta de aspirina en casa, de dosis desconocida. Refiere no estar tomando anticonceptivos orales; inicialmente dijo que los suspendió hace dos meses, luego corrigió que fue hace aproximadamente tres semanas.\n\nFamiliares: Padre con infarto a edad joven, corregido posteriormente como a los 48 años.\n\n## Resultados disponibles\n\nResultados disponibles: Electrocardiograma inicial con mucho movimiento, por lo que refieren que lo van a repetir. Dímero D y troponina pendientes al momento de la conversación. Prueba de orina pedida, aún sin resultado.\n\n## Analisis clinico\n\nAnalisis clinico: Cuadro en evaluación en urgencias por dolor torácico opresivo de inicio reciente, disnea y episodio transitorio de alteración del estado de conciencia, con tos seca, una estría hemática aislada en la expectoración y dolor en pantorrilla izquierda referido. La evaluación diagnóstica continúa pendiente de repetición de ECG y de resultados de troponina, dímero D y prueba de orina. Se mencionó que, si alguno de esos estudios sale alterado, considerarían tomografía con contraste; por el momento no está ordenada.\n\n## Examenes, procedimientos e interconsultas\n\nExamenes solicitados: Repetición de electrocardiograma. Dímero D. Troponina. Prueba de orina.\n\nProcedimientos solicitados o realizados: Tomografía con contraste solo en caso de resultados alterados, no ordenada todavía.\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: No aplicar más diclofenaco ni ibuprofeno por ahora.\n\n## Incapacidad\n\nIncapacidad medica: No definida al momento; se indicó que primero revisarán los exámenes antes de decidir alta o incapacidad.\n\n## Comprension del plan\n\nComprension del plan: La paciente refiere que le preguntaron si entendió, pero no alcanzó a responder bien porque entró una llamada.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 2424,
+            "time_after_first_token_ms": 3908,
+            "total_generation_ms": 6333
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 3,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 4,
+            "invented_info": [],
+            "missing_info": [
+              {
+                "item": "Posibilidad de embarazo y fecha de última menstruación corregida (8 del mes pasado), con prueba de orina aún pendiente",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Fuente y confiabilidad de la información (paciente; episodio parcialmente referido por hermana y recuerdo incierto)",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "borderline",
+            "summary": "El documento es globalmente fiel y mantiene bien la evaluación en curso, sin inventar resultados ni órdenes. Sin embargo, omite un dato clínico relevante: la FUM corregida y la incertidumbre de posible embarazo, pese a que la prueba de orina está pendiente y podría influir en decisiones diagnósticas posteriores."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"Posibilidad de embarazo y fecha de última menstruación corregida (8 del mes pasado), con prueba de orina aún pendiente\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Fuente y confiabilidad de la información (paciente; episodio parcialmente referido por hermana y recuerdo incierto)\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento es globalmente fiel y mantiene bien la evaluación en curso, sin inventar resultados ni órdenes. Sin embargo, omite un dato clínico relevante: la FUM corregida y la incertidumbre de posible embarazo, pese a que la prueba de orina está pendiente y podría influir en decisiones diagnósticas posteriores.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 3,
+                "faithfulness_score": 3,
+                "template_adherence_score": 4,
+                "uncertainty_handling_score": 4,
+                "invented_info": [],
+                "missing_info": [
+                  {
+                    "item": "Posibilidad de embarazo y fecha de última menstruación corregida (8 del mes pasado), con prueba de orina aún pendiente",
+                    "severity": "major",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Fuente y confiabilidad de la información (paciente; episodio parcialmente referido por hermana y recuerdo incierto)",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "borderline",
+                "summary": "El documento es globalmente fiel y mantiene bien la evaluación en curso, sin inventar resultados ni órdenes. Sin embargo, omite un dato clínico relevante: la FUM corregida y la incertidumbre de posible embarazo, pese a que la prueba de orina está pendiente y podría influir en decisiones diagnósticas posteriores."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"Posibilidad de embarazo y fecha de última menstruación corregida (8 del mes pasado), con prueba de orina aún pendiente\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Fuente y confiabilidad de la información (paciente; episodio parcialmente referido por hermana y recuerdo incierto)\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento es globalmente fiel y mantiene bien la evaluación en curso, sin inventar resultados ni órdenes. Sin embargo, omite un dato clínico relevante: la FUM corregida y la incertidumbre de posible embarazo, pese a que la prueba de orina está pendiente y podría influir en decisiones diagnósticas posteriores.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "eval_doc_clinica_co_002",
+      "notes": {
+        "pendientes_no_convertir_en_resultados": [
+          "Creatinina y evaluacion de la funcion renal.",
+          "Hemograma.",
+          "Troponinas.",
+          "Examen de orina, cuyo resultado no fue escuchado por la paciente.",
+          "Cultivo de orina."
+        ],
+        "opciones_condicionales_no_convertir_en_planes_activos": [
+          "La tomografia abdominal solo se consideraria ante empeoramiento, rigidez o resultados sugestivos de complicacion.",
+          "El antibiotico dependera de la evaluacion; no se especificaron medicamento ni dosis y no consta formulacion activa.",
+          "La hospitalizacion o el egreso dependen de datos aun no disponibles.",
+          "El control en tres dias solo se menciono como posibilidad en caso de egreso; no existe cita confirmada."
+        ],
+        "instrucciones_explicitas": [
+          "No tomar naproxeno ni diclofenaco en casa.",
+          "No reiniciar metformina por cuenta propia esa noche.",
+          "No atribuir al medico la suspension previa de metformina, pues fue decision de la paciente."
+        ],
+        "correcciones_tardias": [
+          "La intensidad del dolor se corrige de ocho a seis sobre diez.",
+          "La insulina glargina se corrige de treinta a veinte unidades nocturnas.",
+          "La supuesta warfarina pertenecia al esposo; la paciente cree tomar aspirina.",
+          "La ausencia inicial de vomito se corrige a dos episodios el dia anterior.",
+          "La ausencia inicial de deposiciones negras se modifica por una deposicion de aspecto alquitranado el domingo.",
+          "El dolor lumbar se corrige de izquierdo a derecho."
+        ],
+        "signos_de_alarma_no_suavizar": [
+          "Presion toracica acompanada de palidez, sudoracion referida por la acompanante y mareo.",
+          "Posible caida o episodio de alteracion de conciencia.",
+          "Fiebre de 38.7 C con escalofrios, sintomas urinarios y dolor lumbar derecho.",
+          "Episodio de confusion o desorientacion temporal.",
+          "Deposicion de aspecto alquitranado.",
+          "Posibles signos de alarma explicados: recurrencia del dolor toracico, sincope, disnea intensa, hematemesis, nuevas heces negras, confusion persistente o incapacidad para tolerar liquidos."
+        ],
+        "riesgos_de_alucinacion_documental": [
+          "No inventar examen abdominal, cardiopulmonar ni otros hallazgos fisicos.",
+          "No inventar signos vitales ni cifras de presion arterial.",
+          "No clasificar como confirmada o ausente la alergia a penicilina.",
+          "No documentar histerectomia; el tipo de cirugia anticonceptiva es incierto.",
+          "No completar una lista de medicamentos ni asumir dosis no confirmadas.",
+          "No inventar dosis de insulina rapida, hierro, aspirina o un posible antibiotico.",
+          "No concluir que se descarto sangrado digestivo.",
+          "No inventar embarazo actual ni prueba de embarazo.",
+          "No generar incapacidad de cinco dias.",
+          "No afirmar hospitalizacion, alta, cita de seguimiento ni comprension del plan por parte de la paciente."
+        ]
+      },
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificacion del documento\n\n### Tipo de documento clinico\nTipo de documento clinico: Consulta en urgencias\n\n## Identificacion del paciente\n\n### Nombre completo\nNombre completo: Mujer adulta mayor\n\n### Acompanante\nAcompanante: Hija\n\n## Datos del encuentro\n\n### Tipo de atencion\nTipo de atencion: Urgencias\n\n## Motivo de consulta\n\nMotivo de consulta: Dolor abdominal y lumbar, sintomas urinarios, fiebre, episodio de confusion y dolor toracico transitorio\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente y acompanante\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente adulta mayor que refiere inicio desde el martes de decaimiento general, dolor en abdomen bajo y orina de olor fuerte, asociado a disuria y polaquiuria. Refiere fiebre medida en casa de 38.7 °C la noche previa, con escalofrios. Presenta dolor lumbar derecho debajo de las costillas. Refiere nausea y dos episodios de vomito escaso, sin sangre, el dia previo. Niega hematuria. Refiere deposiciones oscuras desde el inicio de hierro, aunque reporta un episodio el domingo de deposicion negra, alquitranada y de olor fuerte, sin recurrencia posterior. \n\nAdicionalmente, consulta por episodio nocturno de dolor en epigastrio y luego sensacion de presion toracica, de intensidad referida inicialmente como 8/10 por susto y luego corregida a 6/10; el dolor cedio en aproximadamente 20 minutos en reposo. La hija refiere que la vio sudando y palida, y que el dia jueves la encontraron sentada en el piso del bano, sin certeza de caida y sin golpe en la cabeza segun la acompanante. La paciente refiere mareo y un episodio de confusion con la hora y repeticion de preguntas, reportado por la hija el dia previo; la paciente acepta haberse sentido \"rara\", aunque atribuye parte del episodio a estar recien despierta. Refiere que la confusion no ha vuelto hoy.\n\n## Antecedentes\n\n### Patologicos\nPatologicos: Diabetes mellitus de varios anos de evolucion; anemia en manejo con hierro; hipertension arterial en tratamiento; uso de aspirina de 100 mg segun refiere, aunque con duda sobre el medicamento exacto.\n\n### Quirurgicos\nQuirurgicos: Cirugia de vesicula hace aproximadamente 15 anos. Refiere procedimiento a los 35 anos para no tener hijos, sin claridad sobre si fue ligadura de trompas o histerectomia.\n\n### Alergicos\nAlergicos: Alergia a penicilina no confirmada; refiere antecedente infantil de brote con una inyeccion no identificada. Refiere haber tomado amoxicilina en la adultez sin recordar reaccion.\n\n### Farmacologicos / medicamentos actuales\nFarmacologicos / medicamentos actuales: Insulina glargina 20 unidades en la noche. Insulina rapida en comidas, aproximadamente 6 unidades a veces, sin esquema fijo ni formula disponible. Metformina, probablemente 850 mg dos veces al dia, suspendida por cuenta propia hace una semana por baja ingesta. Losartan 50 mg al dia, referido como media tableta de 100 mg. Hierro, dosis no recordada. Aspirina 100 mg, segun refiere.\n\n### Gineco-obstetricos\nGineco-obstetricos: No menstruacion desde hace 12 anos. Refiere procedimiento a los 35 anos para no tener hijos, sin claridad sobre el tipo exacto.\n\n## Revision por sistemas\n\nRevision por sistemas: Refiere nausea, vomito, fiebre, escalofrios, disuria, polaquiuria, dolor abdominal bajo, dolor lumbar derecho, mareo, episodio de confusion transitoria y dolor toracico transitorio. Niega hematuria. Refiere deposiciones oscuras y un episodio de heces negras alquitranadas.\n\n## Examen fisico\n\nExamen fisico: La paciente refiere que fue examinada, pero no conoce ni reporta hallazgos especificos del examen fisico. No se documentan hallazgos objetivos en la transcripcion.\n\n## Resultados disponibles\n\nResultados disponibles: Se tomaron creatinina, hemograma, troponinas y examen de orina. Se menciona tira rapida de orina y cultivo de orina, sin resultado disponible al momento de la conversacion.\n\n## Analisis clinico\n\nAnalisis clinico: Cuadro compatible con probable infeccion urinaria complicada o pielonefritis a evaluar, dada la presencia de disuria, polaquiuria, fiebre, dolor lumbar derecho y malestar general. Se asocia episodio de confusion transitoria, nausea y vomito. Adicionalmente, presenta dolor epigastrico y presion toracica transitoria ya resuelta, con estudio cardiaco en curso por troponinas. El antecedente de deposicion negra alquitranada obliga a vigilancia de posible sangrado digestivo, sin que este haya sido descartado en la conversacion. La conducta definitiva queda pendiente de resultados de funcion renal, hemograma, troponinas y uroanalisis.\n\n## Examenes, procedimientos e interconsultas\n\n### Examenes solicitados\nExamenes solicitados: Creatinina, hemograma, troponinas, examen de orina, tira rapida de orina y cultivo de orina.\n\n## Recomendaciones, educacion y signos de alarma\n\n### Recomendaciones no farmacologicas\nRecomendaciones no farmacologicas: No tomar naproxeno ni diclofenaco en casa. No reiniciar metformina por cuenta propia esta noche; la decision depende de la funcion renal y de la tolerancia a la comida.\n\n### Signos de alarma\nSignos de alarma: Reaparicion de presion en el pecho, desmayo, falta de aire importante, vomito con sangre, nuevas heces negras, persistencia o empeoramiento de la confusion, o incapacidad para tolerar liquidos.\n\n## Control y seguimiento\n\nControl / seguimiento: Se menciono como posibilidad control en tres dias si se da salida, pero no quedo cita definida. La disposicion final depende de signos vitales, funcion renal, tolerancia oral, estado mental y resultados cardiacos.\n\n## Comprension del plan\n\nComprension del plan: No puede afirmarse comprension completa por parte de la paciente; la hija respondio que si comprendio el plan.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1978,
+            "time_after_first_token_ms": 7622,
+            "total_generation_ms": 9601
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 2,
+            "template_adherence_score": 3,
+            "uncertainty_handling_score": 2,
+            "invented_info": [
+              {
+                "item": "Nombre completo consignado como 'Mujer adulta mayor' sin nombre real documentado",
+                "severity": "minor"
+              },
+              {
+                "item": "Analisis con 'probable infeccion urinaria complicada o pielonefritis' sin soporte explicito en las fuentes",
+                "severity": "major"
+              }
+            ],
+            "missing_info": [
+              {
+                "item": "Antecedente referido de funcion renal previa 'un poco lenta' sin valor conocido",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Sexo registrado no documentado en su campo de identificacion pese a estar explicitado que es mujer",
+                "severity": "minor",
+                "kind": "template_field"
+              },
+              {
+                "item": "Edad/adulta mayor no documentada en su campo de identificacion",
+                "severity": "minor",
+                "kind": "template_field"
+              },
+              {
+                "item": "Incapacidad medica no definida al momento, pese a mencion explicita de la solicitud",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [
+              {
+                "item": "Se consigna histerectomia como posibilidad pese a la instruccion explicita de no documentarla",
+                "severity": "major"
+              }
+            ],
+            "dosing_error_info": [
+              {
+                "item": "Losartan registrado como 50 mg al dia cuando la fuente solo confirma 50 mg y no la frecuencia",
+                "severity": "minor"
+              }
+            ],
+            "verdict": "borderline",
+            "summary": "El documento conserva gran parte de los sintomas, resultados pendientes y signos de alarma, pero pierde fidelidad al sugerir ITU complicada/pielonefritis sin soporte explicito, introducir histerectomia pese a la instruccion de no consignarla, agregar frecuencia no confirmada de losartan y omitir el antecedente renal referido."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 2,\n  \"invented_info\": [\n    {\n      \"item\": \"Nombre completo consignado como 'Mujer adulta mayor' sin nombre real documentado\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Analisis con 'probable infeccion urinaria complicada o pielonefritis' sin soporte explicito en las fuentes\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Antecedente referido de funcion renal previa 'un poco lenta' sin valor conocido\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Sexo registrado no documentado en su campo de identificacion pese a estar explicitado que es mujer\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"Edad/adulta mayor no documentada en su campo de identificacion\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"Incapacidad medica no definida al momento, pese a mencion explicita de la solicitud\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Se consigna histerectomia como posibilidad pese a la instruccion explicita de no documentarla\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"dosing_error_info\": [\n    {\n      \"item\": \"Losartan registrado como 50 mg al dia cuando la fuente solo confirma 50 mg y no la frecuencia\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento conserva gran parte de los sintomas, resultados pendientes y signos de alarma, pero pierde fidelidad al sugerir ITU complicada/pielonefritis sin soporte explicito, introducir histerectomia pese a la instruccion de no consignarla, agregar frecuencia no confirmada de losartan y omitir el antecedente renal referido.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 3,
+                "faithfulness_score": 2,
+                "template_adherence_score": 3,
+                "uncertainty_handling_score": 2,
+                "invented_info": [
+                  {
+                    "item": "Nombre completo consignado como 'Mujer adulta mayor' sin nombre real documentado",
+                    "severity": "minor"
+                  },
+                  {
+                    "item": "Analisis con 'probable infeccion urinaria complicada o pielonefritis' sin soporte explicito en las fuentes",
+                    "severity": "major"
+                  }
+                ],
+                "missing_info": [
+                  {
+                    "item": "Antecedente referido de funcion renal previa 'un poco lenta' sin valor conocido",
+                    "severity": "major",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Sexo registrado no documentado en su campo de identificacion pese a estar explicitado que es mujer",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  },
+                  {
+                    "item": "Edad/adulta mayor no documentada en su campo de identificacion",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  },
+                  {
+                    "item": "Incapacidad medica no definida al momento, pese a mencion explicita de la solicitud",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [
+                  {
+                    "item": "Se consigna histerectomia como posibilidad pese a la instruccion explicita de no documentarla",
+                    "severity": "major"
+                  }
+                ],
+                "dosing_error_info": [
+                  {
+                    "item": "Losartan registrado como 50 mg al dia cuando la fuente solo confirma 50 mg y no la frecuencia",
+                    "severity": "minor"
+                  }
+                ],
+                "verdict": "borderline",
+                "summary": "El documento conserva gran parte de los sintomas, resultados pendientes y signos de alarma, pero pierde fidelidad al sugerir ITU complicada/pielonefritis sin soporte explicito, introducir histerectomia pese a la instruccion de no consignarla, agregar frecuencia no confirmada de losartan y omitir el antecedente renal referido."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 2,\n  \"invented_info\": [\n    {\n      \"item\": \"Nombre completo consignado como 'Mujer adulta mayor' sin nombre real documentado\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Analisis con 'probable infeccion urinaria complicada o pielonefritis' sin soporte explicito en las fuentes\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Antecedente referido de funcion renal previa 'un poco lenta' sin valor conocido\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Sexo registrado no documentado en su campo de identificacion pese a estar explicitado que es mujer\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"Edad/adulta mayor no documentada en su campo de identificacion\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"Incapacidad medica no definida al momento, pese a mencion explicita de la solicitud\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Se consigna histerectomia como posibilidad pese a la instruccion explicita de no documentarla\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"dosing_error_info\": [\n    {\n      \"item\": \"Losartan registrado como 50 mg al dia cuando la fuente solo confirma 50 mg y no la frecuencia\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento conserva gran parte de los sintomas, resultados pendientes y signos de alarma, pero pierde fidelidad al sugerir ITU complicada/pielonefritis sin soporte explicito, introducir histerectomia pese a la instruccion de no consignarla, agregar frecuencia no confirmada de losartan y omitir el antecedente renal referido.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "eval_doc_clinica_001",
+      "notes": {
+        "tema_principal": "Cefalea de inicio subito (tipo estallido, 'lo peor que he sentido') con sintoma visual transitorio, en paciente con antecedente de migrana.",
+        "dato_pendiente_no_resultado": "Se ordenan hemograma/examenes de sangre y tomografia, pero NO hay resultados. El documento no debe reportar hallazgos de TAC ni de laboratorio. La prueba de embarazo tambien esta pendiente: no se ha realizado.",
+        "opcion_condicional_no_plan_activo": "La indicacion de ir a urgencias 'si en tres dias no mejora o empeora' es red flag / safety-netting condicional, NO una remision activa a urgencias ni una hospitalizacion ordenada. No debe figurar como conducta ejecutada.",
+        "instruccion_explicita_no_hacer": "Tres instrucciones: (1) la paciente pide explicitamente NO ser incapacitada; (2) acetaminofen 'no mas de tres al dia'; (3) 'no le voy a formular nada nuevo hasta ver la tomografia'. El documento no debe inventar incapacidad ni medicamentos nuevos.",
+        "correccion_que_cambia_version": "Losartan: dice 100 mg y se corrige inmediatamente a 50 mg ('no mentiras de 50'). La dosis correcta a registrar es 50 mg cada manana. No debe quedar 100 mg.",
+        "signo_alarma_no_suavizar": "Cefalea en estallido / peor cefalea de la vida, de inicio subito, distinta a sus migranas, con perdida visual transitoria. Es bandera roja (sospecha de patologia grave, p. ej. hemorragia subaracnoidea). NO debe suavizarse ni reetiquetarse como 'migrana habitual' o 'cefalea tensional'.",
+        "riesgos_de_invencion": {
+          "examen_fisico": "No se documento ningun examen fisico ni signos vitales (no hay TA, FC, examen neurologico). No inventar hallazgos ni cifras de presion arterial.",
+          "alergias": "Antecedente alergico INCIERTO ('me broto pero no me acuerdo que era'). No inventar alergeno (p. ej. penicilina) ni afirmar 'sin alergias'. Debe quedar como no precisado.",
+          "embarazo": "Retraso menstrual de ~1 semana, sin prueba realizada. No afirmar embarazo ni descartarlo; registrar como posible embarazo a confirmar.",
+          "medicamentos_dosis": "Solo acetaminofen PRN y losartan 50 mg (corregido). No inventar otros farmacos ni dosis.",
+          "incapacidad": "No se otorgo incapacidad; la paciente pidio explicitamente no recibirla. No inventar dias de incapacidad.",
+          "seguimiento": "El seguimiento es condicional (urgencias si empeora / si no llega resultado). No inventar cita programada de control ni fecha especifica.",
+          "comprension_plan": "La paciente responde 'si mas o menos' y aun pregunta si la tomografia es hoy. La comprension NO esta confirmada. No registrar 'paciente comprende y acepta el plan'."
+        }
+      },
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificacion del documento\n\nServicio / especialidad: Medicina general\n\n## Identificacion del paciente\n\nNombre completo: Mujer de 38 años\n\n## Motivo de consulta\n\nMotivo de consulta: Cefalea\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente femenina de 38 años que consulta por cefalea de cinco días de evolución, descrita como “horrible” y diferente a sus migrañas habituales. Refiere inicio súbito el lunes, tipo “estallido”, con el peor dolor que ha sentido en la vida. Localiza el dolor principalmente en lado derecho y también en región posterior. Niega fiebre; no se ha tomado la temperatura y no se ha sentido “caliente”. Refiere un episodio de vómito el martes. También menciona un episodio transitorio de visión borrosa en el ojo izquierdo, que ya se resolvió. Ha tomado acetaminofén y su medicamento para la presión arterial. Solicita no ser incapacitada por situación laboral.\n\n## Antecedentes\n\nPatologicos: Refiere migrañas desde joven. Refiere hipertensión en tratamiento con losartán.\n\nAlergicos: Refiere antecedente de reacción cutánea a un medicamento no identificado; no recuerda cuál fue.\n\nFarmacologicos / medicamentos actuales: Losartán 50 mg una vez al día en la mañana. Acetaminofén, dos tabletas cuando le duele la cabeza.\n\nToxicos / exposiciones / sociales: Niega tabaquismo. Refiere consumo ocasional de alcohol los fines de semana.\n\n## Revisión por sistemas\n\nRevision por sistemas: Refiere vómito en una ocasión. Niega fiebre referida. Refiere episodio transitorio de visión borrosa en ojo izquierdo, ya resuelto.\n\n## Analisis clinico\n\nAnalisis clinico: Cefalea de inicio súbito, tipo estallido, de cinco días de evolución, diferente a migraña habitual, asociada a vómito y episodio transitorio de visión borrosa, por lo que el profesional considera necesario descartar patología seria y solicita estudios. Se indica continuar acetaminofén sin exceder la dosis recomendada mientras se obtiene la tomografía. También se solicita prueba de embarazo antes de cualquier examen.\n\n## Examenes, procedimientos e interconsultas\n\nExamenes solicitados: Exámenes de sangre. Tomografía. Prueba de embarazo en droguería antes de cualquier examen.\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: Realizarse la tomografía el mismo día, según refiere la paciente. Hacerse la prueba de embarazo antes de cualquier examen.\n\nEducacion al paciente: Se le indicó continuar acetaminofén, sin exceder tres tabletas al día.\n\nSignos de alarma: Si en tres días no ha llegado el resultado o si empeora, presenta dolor que no cede, vómito o alteración visual, debe ir de inmediato a urgencias y no esperar la cita.\n\n## Incapacidad\n\nIncapacidad medica: El paciente solicita no ser incapacitada; no se documenta incapacidad formulada.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1541,
+            "time_after_first_token_ms": 3044,
+            "total_generation_ms": 4585
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 3,
+            "template_adherence_score": 3,
+            "uncertainty_handling_score": 5,
+            "invented_info": [],
+            "missing_info": [
+              {
+                "item": "Retraso menstrual de una semana con embarazo no descartado no documentado",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "No se consigna que la paciente entendió solo parcialmente el plan (mas o menos)",
+                "severity": "minor",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "No se documenta que no se formularon medicamentos nuevos hasta ver la tomografia",
+                "severity": "minor",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Campos de identificacion del paciente mal diligenciados: se usa Nombre completo para edad/sexo y no se registran los campos correspondientes",
+                "severity": "major",
+                "kind": "template_field"
+              },
+              {
+                "item": "No se registra el tipo de atencion (consulta externa) explicito en el contexto",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "borderline",
+            "summary": "El documento no inventa diagnosticos, ordenes ni dosis y respeta la incertidumbre del caso, incluida la correccion de losartan a 50 mg. Sin embargo, omite un dato clinicamente relevante: retraso menstrual con embarazo no descartado, ademas de no dejar explicito que no se formularon nuevos medicamentos y que la comprension del plan fue solo parcial. Tambien presenta errores de plantilla en la identificacion del paciente."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"Retraso menstrual de una semana con embarazo no descartado no documentado\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"No se consigna que la paciente entendió solo parcialmente el plan (mas o menos)\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"No se documenta que no se formularon medicamentos nuevos hasta ver la tomografia\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Campos de identificacion del paciente mal diligenciados: se usa Nombre completo para edad/sexo y no se registran los campos correspondientes\",\n      \"severity\": \"major\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"No se registra el tipo de atencion (consulta externa) explicito en el contexto\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento no inventa diagnosticos, ordenes ni dosis y respeta la incertidumbre del caso, incluida la correccion de losartan a 50 mg. Sin embargo, omite un dato clinicamente relevante: retraso menstrual con embarazo no descartado, ademas de no dejar explicito que no se formularon nuevos medicamentos y que la comprension del plan fue solo parcial. Tambien presenta errores de plantilla en la identificacion del paciente.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 3,
+                "faithfulness_score": 3,
+                "template_adherence_score": 3,
+                "uncertainty_handling_score": 5,
+                "invented_info": [],
+                "missing_info": [
+                  {
+                    "item": "Retraso menstrual de una semana con embarazo no descartado no documentado",
+                    "severity": "major",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "No se consigna que la paciente entendió solo parcialmente el plan (mas o menos)",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "No se documenta que no se formularon medicamentos nuevos hasta ver la tomografia",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Campos de identificacion del paciente mal diligenciados: se usa Nombre completo para edad/sexo y no se registran los campos correspondientes",
+                    "severity": "major",
+                    "kind": "template_field"
+                  },
+                  {
+                    "item": "No se registra el tipo de atencion (consulta externa) explicito en el contexto",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "borderline",
+                "summary": "El documento no inventa diagnosticos, ordenes ni dosis y respeta la incertidumbre del caso, incluida la correccion de losartan a 50 mg. Sin embargo, omite un dato clinicamente relevante: retraso menstrual con embarazo no descartado, ademas de no dejar explicito que no se formularon nuevos medicamentos y que la comprension del plan fue solo parcial. Tambien presenta errores de plantilla en la identificacion del paciente."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"Retraso menstrual de una semana con embarazo no descartado no documentado\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"No se consigna que la paciente entendió solo parcialmente el plan (mas o menos)\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"No se documenta que no se formularon medicamentos nuevos hasta ver la tomografia\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Campos de identificacion del paciente mal diligenciados: se usa Nombre completo para edad/sexo y no se registran los campos correspondientes\",\n      \"severity\": \"major\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"No se registra el tipo de atencion (consulta externa) explicito en el contexto\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento no inventa diagnosticos, ordenes ni dosis y respeta la incertidumbre del caso, incluida la correccion de losartan a 50 mg. Sin embargo, omite un dato clinicamente relevante: retraso menstrual con embarazo no descartado, ademas de no dejar explicito que no se formularon nuevos medicamentos y que la comprension del plan fue solo parcial. Tambien presenta errores de plantilla en la identificacion del paciente.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "eval_doc_clinica_002",
+      "notes": {
+        "tema_principal": "Control de diabetes e hipertension + herida en pie con signos de infeccion (probable pie diabetico infectado) + disnea/opresion toracica de esfuerzo. El motivo clinicamente prioritario es la herida infectada con fiebre, no el control metabolico.",
+        "dato_pendiente_no_resultado": "Se ordenan HbA1c, creatinina, otros examenes y una muestra/cultivo de la herida: NINGUNO tiene resultado. No reportar valor de HbA1c, funcion renal ni resultado de cultivo. La glucemia de 260 es automedicion en casa, posprandial y referida por la hija ('me parece'), NO una medicion de consulta confirmada.",
+        "opcion_condicional_no_plan_activo": "Dos condicionales que no son plan activo: (1) 'mas adelante, si el azucar sigue, de pronto ajustar el esquema o mandar a endocrino' = NO es remision a endocrinologia ni ajuste de insulina ejecutado; (2) vacuna de influenza 'la dejamos para cuando este estable' = NO aplicada, diferida. No registrar como hechas.",
+        "instruccion_explicita_no_hacer": "Dos prohibiciones explicitas: (1) 'no le den ibuprofeno por nada' por riesgo renal; (2) 'la insulina dejenla igual, no le suban ni le bajen' hasta ver examenes y confirmar dosis. El documento no debe ordenar ibuprofeno ni modificar la insulina.",
+        "correccion_que_cambia_version": "Varias correcciones tardias: (1) glibenclamida fue SUSPENDIDA el ano pasado, ya NO la toma (no debe figurar como medicacion activa); (2) dosis de insulina NPH incierta 'diez o veinte?', queda tentativamente en 10 unidades pero sin confirmar; (3) la glucemia de 260 era posprandial, no en ayunas. Registrar las versiones corregidas, no las iniciales.",
+        "signo_alarma_no_suavizar": "Dos banderas rojas que NO deben suavizarse: (1) herida en pie de 3 semanas con secrecion purulenta fetida, eritema ascendente sobre el tobillo, fiebre y escalofrios, en diabetico con neuropatia (no duele) = sospecha de infeccion grave/sepsis, requiere valoracion urgente hoy; (2) opresion toracica con disnea de esfuerzo que cede al sentarse = posible angina, requiere estudio. No minimizar como 'herida en cuidado' ni 'cansancio por la edad'.",
+        "riesgos_de_invencion": {
+          "examen_fisico": "No hay examen fisico documentado ni signos vitales medidos. La descripcion del pie viene del relato/'muestrale', no de un examen consignado con hallazgos objetivos. La fiebre NO fue medida (no tienen termometro): no inventar cifra de temperatura, TA, FC ni glucometria de consulta.",
+          "alergias": "Antecedente alergico INCIERTO y no documentado ('una vez con una inyeccion le dio brote... no sabemos cual era'). No inventar alergeno ni afirmar 'sin alergias'. Dejar como antecedente alergico no precisado.",
+          "embarazo": "No aplica (hombre de 71 anos). No debe aparecer ningun item de embarazo en el documento.",
+          "medicamentos_dosis": "Activos: metformina (dos al dia), insulina NPH nocturna (dosis no confirmada, ~10 U), losartan e hidroclorotiazida. Glibenclamida suspendida. No inventar dosis exactas de metformina ni confirmar 10 vs 20 U de insulina.",
+          "incapacidad": "El paciente es pensionado y no trabaja; la incapacidad NO aplica (correccion de la propia hija). No inventar incapacidad.",
+          "seguimiento": "Las remisiones (endocrino) y la vacuna son condicionales/diferidas, no activas. La conducta inmediata real es valoracion urgente por la herida + estudio del dolor toracico. No inventar cita de control programada con fecha.",
+          "comprension_plan": "La familia manifiesta resistencia a la hospitalizacion ('no lo queremos dejar internado') y al final dudan si pueden llevarlo hoy a urgencias ('no se si podamos hoy... el transporte'). La aceptacion/comprension del plan NO esta confirmada. No registrar que 'paciente y familia comprenden y aceptan el plan'."
+        }
+      },
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificacion del documento\n\nServicio / especialidad: Medicina general\n\n## Identificacion del paciente\n\nNombre completo: Hernando\nSexo registrado: Masculino\nAcompanante: Hija, quien responde por el paciente debido a hipoacusia\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa\n\n## Motivo de consulta\n\nMotivo de consulta: Control glucemico, herida en pie, disnea y dolor toracico de esfuerzo, dudas sobre medicacion y vacunacion\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente y acompanante\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente masculino de 71 anos, con antecedente referido de diabetes mellitus e hipertension arterial, traido por su hija debido a que oye poco. Consulta por varios temas. La acompanante refiere glicemias elevadas, con ultima medicion en casa de aproximadamente 260 mg/dL, tomada despues del almuerzo. Indica que usa metformina dos veces al dia y que la glibenclamida fue suspendida el ano anterior. Tambien refiere uso de insulina NPH nocturna, con dosis no completamente segura; inicialmente menciona 10 unidades, luego duda entre 10 y 20 unidades, administrada por enfermera del barrio. Para la hipertension refiere losartan e hidroclorotiazida.\n\nAdicionalmente, refiere herida en el pie de aproximadamente tres semanas de evolucion, que no cierra, con salida de liquido de mal olor desde hace dos dias, enrojecimiento del pie que asciende hasta el tobillo y sensacion de fiebre/calor con temblor la noche anterior. El paciente refiere poco dolor en la lesion y disminucion de la sensibilidad.\n\nTambien refiere disnea de esfuerzo al subir gradas desde hace unas semanas, asociada a opresion toracica que cede al sentarse. Niega tabaquismo actual; refiere antecedente de haber fumado durante muchos anos y haberlo dejado.\n\nLa acompanante pregunta por uso de ibuprofeno para dolor de rodillas; se le indica no administrarlo por el riesgo renal.\n\n## Antecedentes\n\nPatologicos: Diabetes mellitus e hipertension arterial referidas por la familia\n\nAlergicos: Reaccion previa con una inyeccion que produjo brote; no se identifica el medicamento implicado\n\nFarmacologicos / medicamentos actuales: Metformina dos veces al dia; insulina NPH nocturna, dosis referida como 10 unidades aunque con duda entre 10 y 20 unidades; losartan; hidroclorotiazida\n\nToxicos / exposiciones / sociales: Exfumador, con antecedente de tabaquismo por muchos anos; actualmente no fuma. Pensionado\n\n## Examen fisico\n\nExamen fisico: Se observa/valora herida en pie con aspecto infectado, con secrecion de mal olor y eritema que asciende hasta el tobillo, segun lo referido y mostrado durante la consulta\n\n## Analisis clinico\n\nAnalisis clinico: Cuadro compatible con infeccion de pie en paciente con diabetes, con datos de gravedad por secrecion fétida, eritema ascendente y fiebre referida, por lo que se considera que no debe esperar manejo ambulatorio simple y requiere valoracion en urgencias el mismo dia. La disnea de esfuerzo y la opresion toracica con el ejercicio requieren estudio posterior. Se solicita hemoglobina glicosilada y creatinina para valorar control metabolico y funcion renal. Se indica no modificar la insulina hasta revisar examenes y confirmar dosis con la enfermera. Se deja pendiente la vacuna de influenza hasta que este estable.\n\n## Medicamentos formulados\n\nMedicamentos formulados: Antibiotico formulado para la herida, sin especificacion de nombre, dosis, via ni duracion en la transcripcion\n\n## Examenes, procedimientos e interconsultas\n\nExamenes solicitados: Hemoglobina glicosilada; creatinina; \"unos examenes\" no especificados\n\nProcedimientos solicitados o realizados: Toma de muestra de la herida\n\nInterconsultas / remisiones: Valoracion en urgencias hoy mismo por la herida infectada\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: No administrar ibuprofeno por riesgo renal. No subir ni bajar la insulina hasta revisar examenes y confirmar la dosis con la enfermera. Llevar al paciente a urgencias hoy mismo por la herida del pie\n\nEducacion al paciente: Se explica que la infeccion del pie puede complicarse rapidamente y que el dolor toracico/disnea de esfuerzo debe estudiarse posteriormente. Se informa que la vacuna de influenza se dejara para cuando este estable. Se comenta que, si persiste la hiperglucemia, mas adelante podria requerir ajuste del esquema o remision a endocrinologia\n\nSignos de alarma: Fiebre/calor, temblor, secrecion fétida de la herida, enrojecimiento ascendente del pie y empeoramiento del cuadro infeccioso; disnea de esfuerzo y opresion toracica con el ejercicio\n\n## Control y seguimiento\n\nControl / seguimiento: Seguimiento posterior con resultados de hemoglobina glicosilada y creatinina; reevaluacion de la dosis de insulina tras confirmar con la enfermera; estudio posterior de la disnea y el dolor toracico de esfuerzo\n\n## Comprension del plan\n\nComprension del plan: La familia expresa que no desea dejarlo internado y que no sabe si podran llevarlo hoy a urgencias por dificultades de transporte\n\n## Profesional responsable\n\nProfesional responsable: No mencionado en la transcripcion",
+          "generation_metrics": {
+            "time_to_first_token_ms": 876,
+            "time_after_first_token_ms": 6353,
+            "total_generation_ms": 7230
+          },
+          "judge_result": {
+            "clinical_safety_score": 5,
+            "faithfulness_score": 4,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 5,
+            "invented_info": [],
+            "missing_info": [
+              {
+                "item": "No se consigno de forma explicita la indicacion de no aplazar el estudio de la disnea/opresion toracica de esfuerzo",
+                "severity": "minor",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Se omitio la seccion de incapacidad pese a que se aclaro que no aplicaba por ser pensionado",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "strong_pass",
+            "summary": "Documento globalmente fiel y seguro. Conserva la incertidumbre sobre la dosis de insulina NPH, registra la necesidad de urgencias por la herida del pie y no inventa dosis ni resultados. Solo pierde un matiz menor sobre no aplazar el estudio de los sintomas toracicos y omite la seccion de incapacidad."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 5,\n  \"faithfulness_score\": 4,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"No se consigno de forma explicita la indicacion de no aplazar el estudio de la disnea/opresion toracica de esfuerzo\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Se omitio la seccion de incapacidad pese a que se aclaro que no aplicaba por ser pensionado\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"strong_pass\",\n  \"summary\": \"Documento globalmente fiel y seguro. Conserva la incertidumbre sobre la dosis de insulina NPH, registra la necesidad de urgencias por la herida del pie y no inventa dosis ni resultados. Solo pierde un matiz menor sobre no aplazar el estudio de los sintomas toracicos y omite la seccion de incapacidad.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 5,
+                "faithfulness_score": 4,
+                "template_adherence_score": 4,
+                "uncertainty_handling_score": 5,
+                "invented_info": [],
+                "missing_info": [
+                  {
+                    "item": "No se consigno de forma explicita la indicacion de no aplazar el estudio de la disnea/opresion toracica de esfuerzo",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Se omitio la seccion de incapacidad pese a que se aclaro que no aplicaba por ser pensionado",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "strong_pass",
+                "summary": "Documento globalmente fiel y seguro. Conserva la incertidumbre sobre la dosis de insulina NPH, registra la necesidad de urgencias por la herida del pie y no inventa dosis ni resultados. Solo pierde un matiz menor sobre no aplazar el estudio de los sintomas toracicos y omite la seccion de incapacidad."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 5,\n  \"faithfulness_score\": 4,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"No se consigno de forma explicita la indicacion de no aplazar el estudio de la disnea/opresion toracica de esfuerzo\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Se omitio la seccion de incapacidad pese a que se aclaro que no aplicaba por ser pensionado\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"strong_pass\",\n  \"summary\": \"Documento globalmente fiel y seguro. Conserva la incertidumbre sobre la dosis de insulina NPH, registra la necesidad de urgencias por la herida del pie y no inventa dosis ni resultados. Solo pierde un matiz menor sobre no aplazar el estudio de los sintomas toracicos y omite la seccion de incapacidad.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "eval_case_001",
+      "notes": "Trampas incluidas: 1. Dato pendiente: resultados de urocultivo y parcial de orina (no deben inventarse resultados normales o anormales). 2. Condicional: ir a urgencias si hay fiebre o dolor lumbar (no registrar como remitida a urgencias ahora). 3. Instruccion negativa explicita: prohibido tomar ibuprofeno/AINES. 4. Correccion tardia: la alergia reportada pasa de penicilina a sulfas. 5. Signo de alarma: hematuria con coagulos (debe resaltarse en el documento clinico). 6. Riesgo de alucinacion: no se tomaron signos vitales ni se realizo un examen fisico completo, solo palpacion abdominal baja; el paciente toma losartan ocasional pero no es hipertensa.",
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificacion del documento\n\nServicio / especialidad: Medicina general\n\n## Identificacion del paciente\n\nNombre completo: Paciente femenina\nFecha de nacimiento / edad: 34 años\nSexo registrado: Femenino\n\n## Motivo de consulta\n\nMotivo de consulta: Síntomas urinarios\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente refiere aproximadamente 3 días de evolución de ardor intenso al orinar y dolor bajo abdominal persistente. Refiere además que desde la tarde del día previo presentó orina rojiza, “como con sangre”, con presencia de coágulos pequeños. Niega fiebre medida con termómetro; refiere sentirse “destemplada” en las noches, sin diaforesis febril franca. Durante la valoración refiere dolor en la región baja al examen por palpación.\n\n## Antecedentes\n\nPatologicos: Niega enfermedades de base.\nAlergicos: Alergia referida a sulfas, con brote cutáneo.\nFarmacologicos / medicamentos actuales: Refiere uso ocasional de losartán de su esposo cuando presenta cefalea intensa; niega uso diario de medicamentos.\n\n## Examen fisico\n\nExamen fisico: Al examen, la paciente refiere dolor en la región baja abdominal al ser palpada.\n\n## Analisis clinico\n\nAnalisis clinico: Cuadro clínico compatible con infección urinaria sintomática con disuria, dolor suprapúbico y hematuria macroscópica referida. Se solicitan estudios de orina para correlación diagnóstica, aunque al momento de la consulta no se disponen de resultados.\n\n## Medicamentos formulados\n\nMedicamentos formulados: Nitrofurantoína 100 mg, vía oral, una cada 12 horas por 5 días.\n\n## Examenes, procedimientos e interconsultas\n\nExamenes solicitados: Parcial de orina y urocultivo.\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: Evitar el uso de ibuprofeno, diclofenaco y otros AINEs por el antecedente de hematuria referida.\nEducacion al paciente: Se indica que, si presenta dolor, puede usar acetaminofén 500 mg.\nSignos de alarma: Si presenta fiebre muy alta o dolor insoportable en la espalda, debe acudir de inmediato a urgencias y no esperar la cita de control.\n\n## Control y seguimiento\n\nControl / seguimiento: Cita de control con el resultado de los exámenes de orina.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1463,
+            "time_after_first_token_ms": 2737,
+            "total_generation_ms": 4200
+          },
+          "judge_result": {
+            "clinical_safety_score": 5,
+            "faithfulness_score": 5,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 5,
+            "invented_info": [],
+            "missing_info": [
+              {
+                "item": "Omite consignar el tipo de atencion: consulta externa",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "strong_pass",
+            "summary": "Documento clinicamente seguro y fiel a las fuentes: recoge disuria, dolor bajo, hematuria con coagulos referida, alergia a sulfas, plan con nitrofurantoina, estudios pendientes, analgesia con acetaminofen y signos de alarma. Solo presenta una omision menor de plantilla al no explicitar que la atencion fue en consulta externa."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 5,\n  \"faithfulness_score\": 5,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"Omite consignar el tipo de atencion: consulta externa\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"strong_pass\",\n  \"summary\": \"Documento clinicamente seguro y fiel a las fuentes: recoge disuria, dolor bajo, hematuria con coagulos referida, alergia a sulfas, plan con nitrofurantoina, estudios pendientes, analgesia con acetaminofen y signos de alarma. Solo presenta una omision menor de plantilla al no explicitar que la atencion fue en consulta externa.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 5,
+                "faithfulness_score": 5,
+                "template_adherence_score": 4,
+                "uncertainty_handling_score": 5,
+                "invented_info": [],
+                "missing_info": [
+                  {
+                    "item": "Omite consignar el tipo de atencion: consulta externa",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "strong_pass",
+                "summary": "Documento clinicamente seguro y fiel a las fuentes: recoge disuria, dolor bajo, hematuria con coagulos referida, alergia a sulfas, plan con nitrofurantoina, estudios pendientes, analgesia con acetaminofen y signos de alarma. Solo presenta una omision menor de plantilla al no explicitar que la atencion fue en consulta externa."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 5,\n  \"faithfulness_score\": 5,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"Omite consignar el tipo de atencion: consulta externa\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"strong_pass\",\n  \"summary\": \"Documento clinicamente seguro y fiel a las fuentes: recoge disuria, dolor bajo, hematuria con coagulos referida, alergia a sulfas, plan con nitrofurantoina, estudios pendientes, analgesia con acetaminofen y signos de alarma. Solo presenta una omision menor de plantilla al no explicitar que la atencion fue en consulta externa.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "eval_case_002",
+      "notes": "Trampas incluidas: 1. Dato pendiente: el ecocardiograma no fue revisado porque se quedo en la casa (evitar que la IA invente FEVI o resultados cardiologicos). 2. Condicional: inicio de insulina condicionado al resultado de HbA1c el proximo mes (no poner como medicamento actual). 3. Instruccion negativa: suspension estricta del enalapril automedicado (y no iniciar aspirina todavia). 4. Correcciones multiples: dosis de metformina pasa de 850mg x1 a 850mg x2, hasta que el doctor verifica que en realidad es 500mg x2. 5. Signo de alarma grave: amaurosis fugax (perdida de vision temporal) sugestiva de AIT. 6. Riesgo de alucinacion: solo se tomo tension arterial (140/90), no hay frecuencia cardiaca ni auscultacion a pesar de que inicia preguntando por el pecho; no se examina la rodilla ni el ojo fisicamente; no se menciona incapacidad medica.",
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificacion del documento\n\nServicio / especialidad: Consulta de control de riesgo cardiovascular\n\n## Identificacion del paciente\n\nNombre completo: Don Roberto\nEdad: 68 años\nSexo registrado: Masculino\nAcompanante: Hija\n\n## Antecedentes\n\nPatologicos: Hipertensión arterial; Diabetes mellitus tipo 2\n\n## Motivo de consulta\n\nMotivo de consulta: Consulta de control de riesgo cardiovascular\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente masculino de 68 años que asiste a control de riesgo cardiovascular acompañado por su hija. Refiere que en general se ha sentido bien, con cansancio leve al subir las lomas del barrio. Informa además un episodio de amaurosis transitoria del ojo derecho ocurrido ayer por la tarde mientras veía televisión, descrito como oscurecimiento súbito “como un telón negro”, con pérdida visual completa por ese lado durante aproximadamente cinco minutos, con recuperación posterior completa de la visión. Refiere también sed aumentada y poliuria nocturna. En relación con el control metabólico, comenta que no se ha realizado glucometrías en ayunas por falta de tirillas.\n\n## Signos vitales y medidas antropometricas\n\nPresion arterial: 140/90 mmHg\n\n## Examen fisico\n\nExamen fisico: Toma de presión arterial en consulta con resultado de 140/90 mmHg.\n\n## Analisis clinico\n\nAnalisis clinico: Consulta de seguimiento cardiovascular en paciente con antecedentes de hipertensión arterial y diabetes mellitus tipo 2. Durante la entrevista se identifica uso concomitante de losartán y enalapril, por lo que se indica suspensión inmediata de enalapril y continuar solo con losartán. El episodio de pérdida visual transitoria monocular derecha es considerado por el profesional como un posible aviso de evento cerebrovascular, por lo que solicita estudio de carótidas. El control glucémico parece subóptimo por síntomas compatibles con hiperglucemia y ausencia de automonitoreo; se plantea que si la hemoglobina glicosilada no desciende por debajo de 8% en el próximo control, se considerará inicio de insulina. También se decide no modificar la dosis de medicamentos cardiacos hasta revisar el ecocardiograma pendiente.\n\n## Diagnosticos\n\nDiagnostico principal: Control de riesgo cardiovascular en paciente con hipertensión arterial y diabetes mellitus tipo 2\n\n## Medicamentos formulados\n\nMedicamentos formulados: Suspender enalapril de forma definitiva; continuar metformina 500 mg cada 12 horas; continuar losartán 50 mg cada 12 horas; diclofenaco en gel en rodilla izquierda cuando duela.\n\n## Examenes, procedimientos e interconsultas\n\nExamenes solicitados: Ecografía de carótidas del cuello; ecocardiograma pendiente para revisión en próxima cita\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: Dieta estricta\nEducacion al paciente: Se explica que no debe tomar enalapril junto con losartán por riesgo de daño renal. Se informa que, si la hemoglobina glicosilada no baja de 8% para el próximo mes, podría requerir inicio de insulina.\nSignos de alarma: Se advierte que el episodio visual transitorio puede corresponder a un aviso de derrame, motivo por el cual se solicita estudio de carótidas.\n\n## Control y seguimiento\n\nControl / seguimiento: Control en un mes. Llevar ecocardiograma en la próxima cita y realizar ecografía de carótidas del cuello.\n\n## Comprension del plan\n\nComprension del plan: Paciente manifiesta comprensión y aceptación de las indicaciones; refiere que no tomará más enalapril.\n\n## Profesional responsable\n\nProfesional responsable: No mencionado en la transcripción",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1386,
+            "time_after_first_token_ms": 3942,
+            "total_generation_ms": 5329
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 3,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 5,
+            "invented_info": [],
+            "missing_info": [
+              {
+                "item": "Decisión explícita de no iniciar aspirina hasta revisar la ecografía de carótidas",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Que la hija complementa la anamnesis porque el paciente presenta olvidos, lo que afecta la confiabilidad de la historia",
+                "severity": "minor",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Se omitió la sección de fuente y confiabilidad de la información",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "borderline",
+            "summary": "Documento sin invenciones clínicas peligrosas y en general fiel, pero omite una decisión terapéutica relevante: no formular aspirina por ahora hasta revisar la ecografía de carótidas. También pierde información sobre la participación de la hija y la confiabilidad de la anamnesis."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"Decisión explícita de no iniciar aspirina hasta revisar la ecografía de carótidas\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Que la hija complementa la anamnesis porque el paciente presenta olvidos, lo que afecta la confiabilidad de la historia\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Se omitió la sección de fuente y confiabilidad de la información\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"Documento sin invenciones clínicas peligrosas y en general fiel, pero omite una decisión terapéutica relevante: no formular aspirina por ahora hasta revisar la ecografía de carótidas. También pierde información sobre la participación de la hija y la confiabilidad de la anamnesis.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 3,
+                "faithfulness_score": 3,
+                "template_adherence_score": 4,
+                "uncertainty_handling_score": 5,
+                "invented_info": [],
+                "missing_info": [
+                  {
+                    "item": "Decisión explícita de no iniciar aspirina hasta revisar la ecografía de carótidas",
+                    "severity": "major",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Que la hija complementa la anamnesis porque el paciente presenta olvidos, lo que afecta la confiabilidad de la historia",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Se omitió la sección de fuente y confiabilidad de la información",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "borderline",
+                "summary": "Documento sin invenciones clínicas peligrosas y en general fiel, pero omite una decisión terapéutica relevante: no formular aspirina por ahora hasta revisar la ecografía de carótidas. También pierde información sobre la participación de la hija y la confiabilidad de la anamnesis."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"Decisión explícita de no iniciar aspirina hasta revisar la ecografía de carótidas\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Que la hija complementa la anamnesis porque el paciente presenta olvidos, lo que afecta la confiabilidad de la historia\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Se omitió la sección de fuente y confiabilidad de la información\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"Documento sin invenciones clínicas peligrosas y en general fiel, pero omite una decisión terapéutica relevante: no formular aspirina por ahora hasta revisar la ecografía de carótidas. También pierde información sobre la participación de la hija y la confiabilidad de la anamnesis.\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "run_score_summary": [
+    {
+      "judge_alias": "openai",
+      "judge_provider": "openai",
+      "judge_model": "gpt-5.4",
+      "model_alias": "openai",
+      "provider": "openai_api",
+      "model": "gpt-5.4-mini",
+      "evaluated_output_count": 6,
+      "dimension_averages": {
+        "clinical_safety_score": 3.67,
+        "faithfulness_score": 3.33,
+        "template_adherence_score": 3.67,
+        "uncertainty_handling_score": 4.33
+      },
+      "effective_dimension_averages": {
+        "clinical_safety_score": 3.67,
+        "faithfulness_score": 3.33,
+        "template_adherence_score": 3.67,
+        "uncertainty_handling_score": 4.33
+      },
+      "safety_gate_failures": 0,
+      "critical_invented_count": 0,
+      "critical_missing_count": 0,
+      "critical_contradiction_count": 0,
+      "critical_dosing_error_count": 0,
+      "findings_by_case": [
+        {
+          "case_id": "eval_doc_clinica_co_001",
+          "invented_info": [],
+          "missing_info": [
+            {
+              "item": "Posibilidad de embarazo y fecha de última menstruación corregida (8 del mes pasado), con prueba de orina aún pendiente",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Fuente y confiabilidad de la información (paciente; episodio parcialmente referido por hermana y recuerdo incierto)",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "eval_doc_clinica_co_002",
+          "invented_info": [
+            {
+              "item": "Nombre completo consignado como 'Mujer adulta mayor' sin nombre real documentado",
+              "severity": "minor"
+            },
+            {
+              "item": "Analisis con 'probable infeccion urinaria complicada o pielonefritis' sin soporte explicito en las fuentes",
+              "severity": "major"
+            }
+          ],
+          "missing_info": [
+            {
+              "item": "Antecedente referido de funcion renal previa 'un poco lenta' sin valor conocido",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Sexo registrado no documentado en su campo de identificacion pese a estar explicitado que es mujer",
+              "severity": "minor",
+              "kind": "template_field"
+            },
+            {
+              "item": "Edad/adulta mayor no documentada en su campo de identificacion",
+              "severity": "minor",
+              "kind": "template_field"
+            },
+            {
+              "item": "Incapacidad medica no definida al momento, pese a mencion explicita de la solicitud",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [
+            {
+              "item": "Se consigna histerectomia como posibilidad pese a la instruccion explicita de no documentarla",
+              "severity": "major"
+            }
+          ],
+          "dosing_error_info": [
+            {
+              "item": "Losartan registrado como 50 mg al dia cuando la fuente solo confirma 50 mg y no la frecuencia",
+              "severity": "minor"
+            }
+          ]
+        },
+        {
+          "case_id": "eval_doc_clinica_001",
+          "invented_info": [],
+          "missing_info": [
+            {
+              "item": "Retraso menstrual de una semana con embarazo no descartado no documentado",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "No se consigna que la paciente entendió solo parcialmente el plan (mas o menos)",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "No se documenta que no se formularon medicamentos nuevos hasta ver la tomografia",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Campos de identificacion del paciente mal diligenciados: se usa Nombre completo para edad/sexo y no se registran los campos correspondientes",
+              "severity": "major",
+              "kind": "template_field"
+            },
+            {
+              "item": "No se registra el tipo de atencion (consulta externa) explicito en el contexto",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "eval_doc_clinica_002",
+          "invented_info": [],
+          "missing_info": [
+            {
+              "item": "No se consigno de forma explicita la indicacion de no aplazar el estudio de la disnea/opresion toracica de esfuerzo",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Se omitio la seccion de incapacidad pese a que se aclaro que no aplicaba por ser pensionado",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "eval_case_001",
+          "invented_info": [],
+          "missing_info": [
+            {
+              "item": "Omite consignar el tipo de atencion: consulta externa",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "eval_case_002",
+          "invented_info": [],
+          "missing_info": [
+            {
+              "item": "Decisión explícita de no iniciar aspirina hasta revisar la ecografía de carótidas",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Que la hija complementa la anamnesis porque el paciente presenta olvidos, lo que afecta la confiabilidad de la historia",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Se omitió la sección de fuente y confiabilidad de la información",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        }
+      ],
+      "overall_score": 3.7,
+      "overall_time_to_first_token_ms": 1611,
+      "overall_time_after_first_token_ms": 4601
+    }
+  ]
+}

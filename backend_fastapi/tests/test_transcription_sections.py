@@ -449,7 +449,13 @@ async def test_retry_failed_transcription_session_reenqueues_sections(
     session = RetrySession()
     settings = SimpleNamespace()
 
-    success, error_code = await retry_failed_transcription_session(
+    monkeypatch.setattr(
+        transcription_service,
+        "should_use_cloud_tasks",
+        lambda _settings: True,
+    )
+
+    success, error_code, local_sections = await retry_failed_transcription_session(
         session,  # type: ignore[arg-type]
         recording_session,  # type: ignore[arg-type]
         settings=settings,  # type: ignore[arg-type]
@@ -457,9 +463,63 @@ async def test_retry_failed_transcription_session_reenqueues_sections(
 
     assert success is True
     assert error_code is None
+    assert local_sections == []
     assert recording_session.status == SESSION_STATUS_FINISHING
     assert recording_session.error_code is None
     assert recording_session.sections[0].status == SECTION_STATUS_REGISTERED
     assert recording_session.sections[0].retry_count == 1
     assert enqueued == ["section-a"]
+    assert session.committed is True
+
+
+@pytest.mark.asyncio
+async def test_retry_failed_transcription_session_returns_local_sections(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_enqueue(section: object, settings: object) -> str:
+        raise AssertionError("Cloud Tasks enqueue should not run locally")
+
+    monkeypatch.setattr(
+        transcription_service,
+        "enqueue_section_task",
+        fail_enqueue,
+    )
+    monkeypatch.setattr(
+        transcription_service,
+        "should_use_cloud_tasks",
+        lambda _settings: False,
+    )
+
+    encounter = SimpleNamespace(audio_expires_at=None)
+    section = SimpleNamespace(
+        section_id="section-b",
+        status=SECTION_STATUS_FAILED_FINAL,
+        gcs_object_name="audio/b.webm",
+        retry_count=0,
+        error_code="task_dispatch_exhausted",
+    )
+    recording_session = SimpleNamespace(
+        status=SESSION_STATUS_NEEDS_REVIEW,
+        encounter_id=7,
+        error_code="section_failed_final",
+        sections=[section],
+    )
+
+    class RetrySession(FakeSession):
+        async def execute(self, statement: object) -> FakeResult:
+            self.statements.append(statement)
+            return FakeResult(encounter)
+
+    session = RetrySession()
+    settings = SimpleNamespace(transcription_worker_base_url="http://localhost:8091")
+
+    success, error_code, local_sections = await retry_failed_transcription_session(
+        session,  # type: ignore[arg-type]
+        recording_session,  # type: ignore[arg-type]
+        settings=settings,  # type: ignore[arg-type]
+    )
+
+    assert success is True
+    assert error_code is None
+    assert local_sections == [section]
     assert session.committed is True

@@ -1,0 +1,48 @@
+# v002 de document_generation. Las lineas que empiezan con '#' son comentarios de mantenimiento (procedencia de cada regla y reglas desactivadas); el harness las elimina antes de enviar el prompt al modelo. Para reactivar una regla desactivada, quita su '#'.
+Tu tarea es generar un documento medico basado en los siguientes componentes:
+
+1. PLANTILLA:
+{template}
+
+2. CONTEXTO DEL MEDICO:
+{context}
+
+3. TRANSCRIPCION DE LA CONVERSACION:
+{transcription}
+
+Instrucciones:
+- Utiliza la estructura proporcionada en la PLANTILLA.
+- Completa cada seccion con informacion relevante del CONTEXTO y la TRANSCRIPCION.
+- Trata la TRANSCRIPCION como texto crudo de una consulta real: puede venir sin etiquetas de hablante, sin orden cronologico, con interrupciones, correcciones, repeticiones, frases incompletas o errores menores de transcripcion.
+- Reconstruye la narrativa clinica con prudencia, separando lo referido por paciente o acompanante, lo observado o examinado por el profesional, y las decisiones explicitamente tomadas.
+- Si no es claro quien dijo un dato, no lo conviertas en hallazgo objetivo ni en decision del profesional; redactalo como informacion referida o omitelo si no es clinicamente seguro.
+- Si aparece una correccion posterior, usa la version corregida y no la primera mencion.
+- Manten un tono profesional y medico en todo momento.
+- El documento final DEBE estar en Markdown clinico compatible con el editor.
+- Usa encabezados Markdown (`#`, `##`, `###`) para secciones, listas con `-` para vinetas y `**negrita**` para etiquetas clinicas importantes cuando corresponda.
+- No uses HTML, tablas HTML, XML ni bloques de codigo para envolver el documento.
+- No conviertas listas de la plantilla a texto corrido si la estructura original usa vinetas.
+- Omite cualquier seccion de la plantilla si no se puede encontrar informacion en el contexto o la transcripcion.
+- No escribas marcadores de posicion como "Informacion no disponible"; simplemente omite esas secciones.
+# Backup de la capa de enhancement de plantilla. Procedencia gpt-5.4-mini: relleno "Confiabilidad: adecuada" pese a la guia "(solo si...)" ya presente en la plantilla; el enhancement por si solo no basto.
+- Respeta las guias entre parentesis de la plantilla (por ejemplo "(solo incluir si fue mencionado explicitamente)"); si un campo trae un valor de ejemplo pero la fuente no lo respalda, no lo copies: omitelo o reemplazalo por lo que digan las fuentes.
+- No rellenes campos meta (tipo de atencion, confiabilidad de la informacion, comprension o aceptacion del plan, profesional responsable) con suposiciones; consignalos solo si la fuente los menciona, y si no, omitelos.
+- Asegurate de que el documento final sea coherente y siga las convenciones medicas.
+- Incluye fechas, horas y cualquier dato especifico mencionado en la transcripcion.
+- No inventes informacion que no este presente en los datos proporcionados.
+# Procedencia haiku-4.5 (casos eval_doc_clinica_002 y eval_doc_clinica_co_001): invento "ausencia de dolor a la palpacion" y escalo la conducta a "la hospitalizacion no es opcional".
+- No inventes hallazgos del examen fisico, signos vitales, ni decisiones de conducta (hospitalizacion, alta, remision, incapacidad, urgencia obligatoria) que la fuente no afirme explicitamente; no escales la conducta mas alla de lo que el profesional indico.
+- No conviertas una sospecha, posibilidad diagnostica o diagnostico por descartar en un hecho confirmado.
+- Si el medico no afirma un diagnostico de forma explicita, redacta con lenguaje prudente como "impresion clinica", "sugiere", "compatible con" o "a descartar", segun corresponda a la fuente.
+- No cierres diagnosticos, planes, incapacidades, formulas, remisiones, examenes solicitados ni hallazgos negativos relevantes si no aparecen explicitamente en el CONTEXTO o la TRANSCRIPCION.
+- No infieras frases clinicas de mayor certeza que la fuente original. Por ejemplo, no conviertas "sin eritema ni dolor en piernas" en "sin signos de trombosis venosa profunda" salvo que el medico lo afirme.
+# Regla 4 (diferenciales) - postura "escriba de la vida real": un scribe clinico no es medico y no esta facultado para agregar diagnosticos diferenciales ni razonamiento clinico propio; solo documenta lo que el profesional enuncia. Mantiene el prompt alineado con la regla de diferenciales del juez (clinical_document_judge_v002, lineas 38-39). Procedencia: los 3 modelos sobre-especificaron SCA/TEP/HSA no enunciados por la fuente.
+- No agregues diagnosticos diferenciales, sospechas ni hipotesis que el profesional no haya enunciado, aunque parezcan clinicamente obvios; documenta solo los que la fuente exprese. Si la fuente mantiene varias hipotesis a la par, no asciendas una a diagnostico principal dejando las otras como diferenciales.
+# Regla 3 - procedencia haiku-4.5 (caso eval_doc_clinica_co_001): omitio/transformo la instruccion explicita "no usar diclofenaco ni ibuprofeno por ahora". Las prohibiciones son criticas en seguridad: conservarlas literales.
+- Conserva de forma literal las instrucciones explicitas de no hacer o prohibiciones (por ejemplo "no usar ibuprofeno", "no reiniciar metformina por cuenta propia"); no las omitas, no las suavices ni las transformes en otra afirmacion.
+# Reglas 1 y 2 DESACTIVADAS por ahora: sus fallos fueron solo de gemini-3-flash-preview (candidato descartado por baja fidelidad + TTFT ~15 s). Se conservan comentadas por si un modelo o plantilla futura las vuelve a necesitar; reactivar quitando el '#'.
+# - Regla 1 (dosis incierta): Si una dosis, frecuencia, via, cantidad o duracion queda sin confirmar en la fuente (por ejemplo "diez o veinte unidades?"), preserva la incertidumbre tal cual; no elijas un valor ni lo presentes como confirmado.
+# - Regla 2 (signos de alarma): No suavices, reetiquetes ni cambies el umbral de un signo de alarma, criterio de retorno o instruccion de seguridad; transcribe el criterio tal como se enuncio (si la fuente dice "volver si hay vomito", no lo conviertas en "vomito persistente"). No omitas signos de alarma referidos por la fuente.
+- Distingue con claridad entre informacion referida por el paciente o acompanante, hallazgos del examen fisico e interpretacion clinica del medico.
+
+Genera el documento basandote en la plantilla, excluyendo cualquier seccion donde la informacion no este disponible:

@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/commons/components/ui/button";
 import { Input } from "@/commons/components/ui/input";
 import { Label } from "@/commons/components/ui/label";
+import appLogo from "@/assets/icon.svg";
 
 // Logger utility for consistent logging
 import { logger } from "@/lib/logger";
@@ -44,19 +45,19 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
       <div className="flex justify-center w-full mt-0">
         <div className="relative w-full max-w-[9rem] aspect-square">
           <img
-            src="/brand_logo_no_text.png"
+            src={appLogo}
             alt="Logotipo"
             className="object-contain w-full h-full"
           />
         </div>
       </div>
-      <div className="flex flex-col items-center gap-1.5 text-center">
-        <h1 className="text-xl font-bold text-main font-fun tracking-tight">
+      <div className="flex flex-col items-center gap-1 text-center">
+        <p className="font-poppins text-[2.5rem] font-bold leading-none tracking-[0.02em] text-brand-navy">
+          Notia
+        </p>
+        <h1 className="font-poppins text-lg font-bold text-brand-navy tracking-wide">
           Bienvenido/a
         </h1>
-        <p className="text-balance text-sm text-neutral-600 dark:text-neutral-300">
-          Introduzca sus credenciales para acceder
-        </p>
       </div>
       <div className="grid gap-5">
         {error && (
@@ -91,7 +92,7 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
             </Label>
             <Link
               to="/forgot-password"
-              className="ml-auto text-sm text-main hover:text-main_dark underline-offset-4 hover:underline transition-colors"
+              className="ml-auto text-sm text-brand-navy hover:opacity-80 underline-offset-4 hover:underline transition-colors"
             >
               ¿Olvidó su contraseña?
             </Link>
@@ -107,7 +108,7 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
         </div>
         <Button
           type="submit"
-          className="w-full bg-blue-500 hover:bg-main_dark text-white font-medium mt-1 transition-colors"
+          className="w-full bg-brand-purple hover:bg-brand-purple-dark text-white font-medium mt-1 transition-colors"
           disabled={loading}
         >
           {loading ? "Entrando…" : "Iniciar sesión"}
@@ -117,7 +118,7 @@ export function LoginForm(props: React.ComponentPropsWithoutRef<"form">) {
         ¿No tiene cuenta?{" "}
         <Link
           to="/registro"
-          className="font-medium text-main hover:text-main_dark underline underline-offset-4 transition-colors"
+          className="font-medium text-brand-navy hover:opacity-80 underline underline-offset-4 transition-colors"
         >
           Registrarse
         </Link>

@@ -1,0 +1,372 @@
+{
+  "run_started_at": "2026-06-06T22:43:04.127912+00:00",
+  "prompt_version": "document_generation_v001",
+  "judge_prompt_version": "clinical_document_judge_v002",
+  "judge_provider": "openai",
+  "judge_model": "gpt-5.4",
+  "cases_file": "../evals/document_generation/cases.json",
+  "template_file": "templates/clinical_document_template_v003.md",
+  "requested_case_id": null,
+  "count_limit": null,
+  "selected_case_count": 5,
+  "models": [
+    {
+      "alias": "anthropic",
+      "provider": "anthropic_api",
+      "model": "claude-haiku-4-5-20251001"
+    }
+  ],
+  "prompt_template_preview": "Tu tarea es generar un documento medico basado en los siguientes componentes:\n\n1",
+  "judge_prompt_preview": "Eres un evaluador experto en documentacion clinica y seguridad del paciente. Eva",
+  "case_results": [
+    {
+      "case_id": "consulta-externa-disnea-contexto-valido",
+      "notes": "Caso dificil para evaluar uso correcto del contexto manual del medico, prudencia diagnostica, no inventar examen fisico y remision explicita.",
+      "outputs": [
+        {
+          "model_alias": "anthropic",
+          "provider": "anthropic_api",
+          "model": "claude-haiku-4-5-20251001",
+          "generated_document": "## Identificacion del documento\n\nTipo de documento clinico: Nota de consulta externa\nServicio / especialidad: Medicina interna\n\n## Identificacion del paciente\n\nFecha de nacimiento / edad: 67 años\nSexo registrado: Femenino\nAcompanante: Hija (relacion familiar)\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Disnea progresiva y tos\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente y acompanante (hija)\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente refiere sensación de empeoramiento en los últimos días. Inició con tos seca que posteriormente evolucionó a tos productiva con expectoración de flemas blancas. Desde hace aproximadamente tres días presenta disnea de esfuerzo, refiriendo ahogo incluso con actividades dentro del hogar como caminar. La acompañante (hija) refiere que la noche anterior a la consulta la paciente requirió dormir con tres almohadas debido a dificultad para acostarse. Adicionalmente, la paciente reporta edema en miembros inferiores, predominantemente en las tardes, con evolución de aproximadamente dos semanas. Refiere sensación de calor nocturno pero niega haber medido temperatura. Niega fiebre documentada, vómito, diarrea y ardor al orinar. La acompañante comenta que la paciente toma medicamentos para la presión arterial y para el control glucémico, pero refiere incumplimiento ocasional de la furosemida por efectos diuréticos.\n\n## Antecedentes\n\nPatologicos: Hipertensión arterial, diabetes mellitus tipo 2, insuficiencia cardiaca\nFarmacologicos / medicamentos actuales: Medicamentos para hipertensión arterial, medicamentos para diabetes mellitus tipo 2, furosemida (con cumplimiento irregular según refiere acompañante)\n\n## Signos vitales y medidas antropometricas\n\nPresion arterial: 168/96 mmHg\nFrecuencia cardiaca: 104 latidos por minuto\nFrecuencia respiratoria: 24 respiraciones por minuto\nTemperatura: 37.6 °C\nSaturacion de oxigeno: 89% al aire ambiente, 91% en reposo\n\n## Analisis clinico\n\nImpresión clínica: Paciente con antecedentes de hipertensión arterial, diabetes mellitus tipo 2 e insuficiencia cardiaca que presenta cuadro clínico compatible con posible descompensación de falla cardiaca versus infección respiratoria baja. Los hallazgos de disnea progresiva, ortopnea (requiere tres almohadas para dormir), edema en miembros inferiores, tos productiva con expectoración blanca, taquicardia, taquipnea, hipertensión arterial y saturación de oxígeno disminuida sustentan esta impresión clínica.\n\n## Examenes, procedimientos e interconsultas\n\nInterconsultas / remisiones: Remisión inmediata a servicio de urgencias para evaluación, estudios complementarios y manejo\n\n## Comprension del plan\n\nComprension del plan: Paciente y acompañante informados de la necesidad de remisión inmediata a urgencias",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1287,
+            "time_after_first_token_ms": 7838,
+            "total_generation_ms": 9126
+          },
+          "judge_result": {
+            "clinical_safety_score": 5,
+            "faithfulness_score": 5,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 5,
+            "invented_info": [],
+            "missing_info": [
+              {
+                "item": "Impresion diagnostica diferencial consignada solo en analisis clinico y no en la seccion de diagnosticos/diferenciales",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "strong_pass",
+            "summary": "Documento clinicamente seguro y fiel a las fuentes: conserva la incertidumbre diagnostica (posible descompensacion de falla cardiaca versus infeccion respiratoria baja), registra los sintomas y signos vitales relevantes y mantiene la remision inmediata a urgencias sin inventar tratamientos ni hallazgos. Solo presenta una observacion estructural menor de plantilla al no ubicar la impresion diagnostica en la seccion de diagnosticos."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 5,\n  \"faithfulness_score\": 5,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"Impresion diagnostica diferencial consignada solo en analisis clinico y no en la seccion de diagnosticos/diferenciales\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"strong_pass\",\n  \"summary\": \"Documento clinicamente seguro y fiel a las fuentes: conserva la incertidumbre diagnostica (posible descompensacion de falla cardiaca versus infeccion respiratoria baja), registra los sintomas y signos vitales relevantes y mantiene la remision inmediata a urgencias sin inventar tratamientos ni hallazgos. Solo presenta una observacion estructural menor de plantilla al no ubicar la impresion diagnostica en la seccion de diagnosticos.\"\n}"
+        }
+      ]
+    },
+    {
+      "case_id": "control-cronico-medicacion-autocorrecciones",
+      "notes": "Caso dificil para no convertir informacion referida en examen fisico, respetar un plan compacto y no agregar seguimiento o incapacidad no indicada.",
+      "outputs": [
+        {
+          "model_alias": "anthropic",
+          "provider": "anthropic_api",
+          "model": "claude-haiku-4-5-20251001",
+          "generated_document": "## Datos del encuentro\n\nTipo de atencion: Consulta externa - control\nServicio / especialidad: Medicina Familiar\n\n## Identificacion del paciente\n\nSexo registrado: No especificado en la consulta\n\n## Motivo de consulta\n\nMotivo de consulta: Control ambulatorio de hipertensión arterial y diabetes mellitus tipo 2\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente refiere sentirse bien en general. Niega dolor en el pecho, disnea, edema de miembros inferiores o episodios de hipoglucemia.\n\n## Antecedentes\n\nPatologicos: Hipertensión arterial, Diabetes mellitus tipo 2\n\nFarmacologicos / medicamentos actuales: Según refiere el paciente: Losartán 50 mg cada 12 horas, Metformina 850 mg cada 12 horas (refiere olvidos de la dosis nocturna aproximadamente 2 a 3 veces por semana), Atorvastatina 20 mg en la noche.\n\n## Signos vitales y medidas antropometricas\n\nPresion arterial: 146/88 mmHg\n\nFrecuencia cardiaca: 82 latidos por minuto\n\nPeso: 81 kg\n\n## Examen fisico\n\nExamen fisico: No se reportan hallazgos relevantes en la consulta.\n\n## Analisis clinico\n\nAnalisis clinico: Paciente con antecedentes de hipertensión arterial y diabetes mellitus tipo 2 en control ambulatorio. Refiere adherencia parcial a metformina con olvidos ocasionales de la dosis nocturna. Presión arterial en rango elevado (146/88 mmHg). Paciente refiere no monitorizarse la tensión arterial en casa de forma regular. Se identifica necesidad de reforzar adherencia farmacológica y medidas no farmacológicas.\n\n## Medicamentos formulados\n\nMedicamentos formulados: Se mantiene esquema actual. Se refuerza adherencia a Losartán 50 mg cada 12 horas, Metformina 850 mg cada 12 horas y Atorvastatina 20 mg en la noche.\n\n## Examenes, procedimientos e interconsultas\n\nExamenes solicitados: Hemoglobina glicosilada, Perfil lipídico, Función renal\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: Refuerzo de adherencia farmacológica, Reducción de ingesta de sal\n\nEducacion al paciente: Se brindó educación sobre la importancia de la adherencia al tratamiento farmacológico y medidas dietéticas.\n\n## Control y seguimiento\n\nControl / seguimiento: Seguimiento posterior a resultados de laboratorios solicitados",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1477,
+            "time_after_first_token_ms": 6042,
+            "total_generation_ms": 7520
+          },
+          "judge_result": {
+            "clinical_safety_score": 1,
+            "faithfulness_score": 2,
+            "template_adherence_score": 3,
+            "uncertainty_handling_score": 2,
+            "invented_info": [
+              {
+                "item": "Sexo registrado: 'No especificado en la consulta'",
+                "severity": "minor"
+              },
+              {
+                "item": "Examen fisico consignado como 'No se reportan hallazgos relevantes' sin examen documentado",
+                "severity": "critical"
+              },
+              {
+                "item": "Medicamentos cronicos registrados como 'medicamentos formulados' y 'se mantiene esquema actual' sin constar formula o renovacion",
+                "severity": "critical"
+              },
+              {
+                "item": "Seguimiento posterior a resultados de laboratorios no explicitado por la fuente",
+                "severity": "major"
+              }
+            ],
+            "missing_info": [
+              {
+                "item": "No se dejo constancia de que no se otorgo incapacidad medica por ahora",
+                "severity": "major",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "fail",
+            "summary": "El documento conserva motivo de consulta, sintomas, medicamentos referidos y laboratorios solicitados, pero inventa un examen fisico no documentado, transforma la medicacion cronica referida por el paciente en medicacion formulada/continuada y agrega un seguimiento no explicitado. Ademas omite registrar que no se dio incapacidad."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 1,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 2,\n  \"invented_info\": [\n    {\n      \"item\": \"Sexo registrado: 'No especificado en la consulta'\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Examen fisico consignado como 'No se reportan hallazgos relevantes' sin examen documentado\",\n      \"severity\": \"critical\"\n    },\n    {\n      \"item\": \"Medicamentos cronicos registrados como 'medicamentos formulados' y 'se mantiene esquema actual' sin constar formula o renovacion\",\n      \"severity\": \"critical\"\n    },\n    {\n      \"item\": \"Seguimiento posterior a resultados de laboratorios no explicitado por la fuente\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"No se dejo constancia de que no se otorgo incapacidad medica por ahora\",\n      \"severity\": \"major\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"fail\",\n  \"summary\": \"El documento conserva motivo de consulta, sintomas, medicamentos referidos y laboratorios solicitados, pero inventa un examen fisico no documentado, transforma la medicacion cronica referida por el paciente en medicacion formulada/continuada y agrega un seguimiento no explicitado. Ademas omite registrar que no se dio incapacidad.\"\n}"
+        }
+      ]
+    },
+    {
+      "case_id": "urgencias-neurologia-sospecha-ecv-habla-coloquial",
+      "notes": "Caso dificil para evaluar claridad de remision, no inventar manejo farmacologico y manejar tiempo de inicio de sintomas con prudencia.",
+      "outputs": [
+        {
+          "model_alias": "anthropic",
+          "provider": "anthropic_api",
+          "model": "claude-haiku-4-5-20251001",
+          "generated_document": "## Identificacion del documento\n\nTipo de documento clinico: Consulta externa - primera vez\nModalidad: Presencial\n\n## Identificacion del paciente\n\nSexo registrado: Masculino\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\nHora: Aproximadamente 11:00 horas\n\n## Motivo de consulta\n\nMotivo de consulta: Debilidad de hemicuerpo derecho, desviacion de comisura bucal y dificultad para articular palabras de inicio súbito\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Acompañante (familiar del paciente) y observacion clinica directa del paciente\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente refiere por acompañante que se encontraba bien y hace aproximadamente 40 minutos (alrededor de las 10:20 horas) presentó torsion de la boca con imposibilidad para agarrar adecuadamente objetos. El acompañante refiere que al momento de la consulta (aproximadamente las 11:00 horas) persisten los sintomas. El paciente intenta comunicarse pero presenta dificultad para articular palabras.\n\n## Signos vitales y medidas antropometricas\n\nPresion arterial: 190/100 mmHg\n\n## Examen fisico\n\nExamen fisico: Debilidad de hemicuerpo derecho, disartria y desviacion de comisura bucal.\n\n## Analisis clinico\n\nAnalisis clinico: Presentacion clinica compatible con sospecha de evento cerebrovascular agudo, dada la instalacion súbita de debilidad focal de hemicuerpo derecho, alteracion del lenguaje (disartria) y desviacion de comisura bucal, en contexto de presion arterial elevada (190/100 mmHg). El tiempo de evolucion aproximado de 40 minutos desde el inicio de sintomas es clinicamente relevante.\n\n## Diagnosticos\n\nDiagnostico principal: Sospecha de evento cerebrovascular agudo\n\n## Interconsultas / remisiones\n\nInterconsultas / remisiones: Remision inmediata a servicio de urgencias para evaluacion y manejo especializado de evento cerebrovascular agudo.\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: Traslado inmediato a urgencias sin demora.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1768,
+            "time_after_first_token_ms": 5215,
+            "total_generation_ms": 6984
+          },
+          "judge_result": {
+            "clinical_safety_score": 4,
+            "faithfulness_score": 4,
+            "template_adherence_score": 5,
+            "uncertainty_handling_score": 5,
+            "invented_info": [
+              {
+                "item": "Tipo de documento clinico: \"Consulta externa - primera vez\" sin soporte explicito en las fuentes",
+                "severity": "minor"
+              }
+            ],
+            "missing_info": [],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "pass",
+            "summary": "Documento seguro y fiel en lo esencial: registra inicio aproximado, deficit neurologico focal, PA 190/100, sospecha de evento cerebrovascular agudo y remision inmediata a urgencias, sin documentar tratamiento no administrado. Solo agrega un dato administrativo no sustentado de forma explicita."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 4,\n  \"faithfulness_score\": 4,\n  \"template_adherence_score\": 5,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [\n    {\n      \"item\": \"Tipo de documento clinico: \\\"Consulta externa - primera vez\\\" sin soporte explicito en las fuentes\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"pass\",\n  \"summary\": \"Documento seguro y fiel en lo esencial: registra inicio aproximado, deficit neurologico focal, PA 190/100, sospecha de evento cerebrovascular agudo y remision inmediata a urgencias, sin documentar tratamiento no administrado. Solo agrega un dato administrativo no sustentado de forma explicita.\"\n}"
+        }
+      ]
+    },
+    {
+      "case_id": "dolor-abdominal-incertidumbre-y-negativos",
+      "notes": "Caso dificil para diferenciar sintomas, hallazgos objetivos, negativos explicitamente mencionados y uso prudente de diagnosticos diferenciales.",
+      "outputs": [
+        {
+          "model_alias": "anthropic",
+          "provider": "anthropic_api",
+          "model": "claude-haiku-4-5-20251001",
+          "generated_document": "## Identificacion del documento\n\nTipo de documento clinico: Consulta prioritaria de medicina general\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Dolor abdominal\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente refiere inicio de dolor abdominal desde ayer en la tarde, inicialmente localizado alrededor del ombligo y que ha migrado hacia la fosa iliaca derecha en el día de hoy. Asociado a náuseas sin vómito. Refiere sensación de calor durante la madrugada, aunque no confirma fiebre documentada. Niega diarrea. Refiere poco apetito. Niega flujo vaginal y síntomas urinarios.\n\n## Revision por sistemas\n\nRevision por sistemas: Náuseas presentes, sin vómito. Niega diarrea. Refiere sensación de calor en madrugada. Poco apetito. Niega flujo vaginal. Niega síntomas urinarios.\n\n## Signos vitales y medidas antropometricas\n\nPresion arterial: 112/70 mmHg\nFrecuencia cardiaca: 96 latidos por minuto\nTemperatura: 37.8 °C\n\n## Examen fisico\n\nExamen fisico: Abdomen blando. Dolor a la palpación en fosa iliaca derecha. Sin defensa involuntaria. Sin signos claros de irritación peritoneal en este momento.\n\n## Analisis clinico\n\nAnalisis clinico: Paciente con dolor abdominal de 24 horas de evolución, inicialmente periumbilical y actualmente localizado en fosa iliaca derecha, acompañado de náuseas y sensación febril. Al examen físico se documenta dolor en fosa iliaca derecha sin hallazgos de peritonitis franca en este momento. La presentación clínica y la localización del dolor sugieren un proceso inflamatorio abdominal que requiere evaluación complementaria. No es posible descartar apendicitis temprana en esta etapa.\n\n## Recomendaciones, educacion y signos de alarma\n\nSignos de alarma: Paciente instruida sobre signos de alarma: empeoramiento del dolor, fiebre persistente, vómito persistente o mayor intensidad del dolor abdominal, en cuyo caso debe acudir a urgencias.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 728,
+            "time_after_first_token_ms": 4699,
+            "total_generation_ms": 5428
+          },
+          "judge_result": {
+            "clinical_safety_score": 2,
+            "faithfulness_score": 1,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 4,
+            "invented_info": [
+              {
+                "item": "Se interpreta como 'proceso inflamatorio abdominal' que requiere evaluación complementaria sin estar explicitado por la fuente",
+                "severity": "minor"
+              }
+            ],
+            "missing_info": [
+              {
+                "item": "No documenta la fuente de información (paciente)",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [
+              {
+                "item": "Cambia el signo de alarma de 'fiebre' a 'fiebre persistente' para acudir a urgencias",
+                "severity": "critical"
+              }
+            ],
+            "dosing_error_info": [],
+            "verdict": "fail",
+            "summary": "La nota conserva en general la incertidumbre sobre apendicitis y refleja bien síntomas, examen y signos vitales, pero modifica una instrucción de seguridad explícita: la fuente indicó acudir a urgencias si presenta fiebre y el documento lo restringe a fiebre persistente, lo que puede retrasar la consulta."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 2,\n  \"faithfulness_score\": 1,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [\n    {\n      \"item\": \"Se interpreta como 'proceso inflamatorio abdominal' que requiere evaluación complementaria sin estar explicitado por la fuente\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"No documenta la fuente de información (paciente)\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Cambia el signo de alarma de 'fiebre' a 'fiebre persistente' para acudir a urgencias\",\n      \"severity\": \"critical\"\n    }\n  ],\n  \"dosing_error_info\": [],\n  \"verdict\": \"fail\",\n  \"summary\": \"La nota conserva en general la incertidumbre sobre apendicitis y refleja bien síntomas, examen y signos vitales, pero modifica una instrucción de seguridad explícita: la fuente indicó acudir a urgencias si presenta fiebre y el documento lo restringe a fiebre persistente, lo que puede retrasar la consulta.\"\n}"
+        }
+      ]
+    },
+    {
+      "case_id": "pediatria-dosis-y-aclaraciones-del-acompanante",
+      "notes": "Caso dificil para respetar correcciones de dosis, conservar hallazgos del examen solo cuando fueron verbalizados y mantener un plan exacto.",
+      "outputs": [
+        {
+          "model_alias": "anthropic",
+          "provider": "anthropic_api",
+          "model": "claude-haiku-4-5-20251001",
+          "generated_document": "## Identificacion del documento\n\nTipo de documento clinico: Nota de consulta externa - primera vez\n\n## Identificacion del paciente\n\nEdad: 4 años\nPeso: 14,7 kg\nSexo registrado: Masculino\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\nServicio / especialidad: Pediatría general\n\n## Motivo de consulta\n\nMotivo de consulta: Fiebre y tos de dos días de evolución\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Madre del paciente\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente con fiebre y tos de dos días de evolución según refiere la madre. Refiere disminución de la ingesta alimentaria, pero mantiene adecuada ingesta de líquidos. Niega dificultad respiratoria.\n\n## Revision por sistemas\n\nRevision por sistemas: Fiebre y tos presentes. Disminución de apetito. Niega dificultad respiratoria.\n\n## Signos vitales y medidas antropometricas\n\nTemperatura: 38,4 °C\nPeso: 14,7 kg\n\n## Examen fisico\n\nExamen fisico: Orofaringe eritematosa sin placas visibles. Murmullo vesicular conservado bilateralmente. Sin sibilancias. Sin tirajes.\n\n## Analisis clinico\n\nAnalisis clinico: Cuadro clínico compatible con infección de vías respiratorias superiores. Exploración física sin hallazgos de gravedad. Paciente hemodinámicamente estable, sin signos de dificultad respiratoria.\n\n## Medicamentos formulados\n\nMedicamentos formulados: Acetaminofén suspensión 160 mg/5 mL, 7 mL cada 6 horas si presenta fiebre. Amoxicilina suspensión 400 mg/5 mL, 8 mL cada 12 horas por 10 días.\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: Manejo ambulatorio.\nSignos de alarma: Respiración rápida, hundimiento de costillas, incapacidad para recibir líquidos o decaimiento marcado.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 707,
+            "time_after_first_token_ms": 4909,
+            "total_generation_ms": 5616
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 2,
+            "template_adherence_score": 5,
+            "uncertainty_handling_score": 2,
+            "invented_info": [
+              {
+                "item": "Analisis/diagnostico de infeccion de vias respiratorias superiores no explicitado por la fuente",
+                "severity": "major"
+              },
+              {
+                "item": "Afirmacion de paciente hemodinamicamente estable sin soporte en la fuente",
+                "severity": "major"
+              },
+              {
+                "item": "Tipo de documento clinico 'Nota de consulta externa - primera vez' no mencionado explicitamente",
+                "severity": "minor"
+              },
+              {
+                "item": "Murmullo vesicular conservado bilateralmente; la bilateralidad no fue explicitada",
+                "severity": "minor"
+              }
+            ],
+            "missing_info": [],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "borderline",
+            "summary": "El documento conserva los datos clave del caso, incluido peso, temperatura, examen fisico descrito y la dosis corregida de acetaminofen, sin errores de dosis. Sin embargo, agrega interpretaciones no documentadas por la fuente, especialmente un diagnostico de IVRS y estabilidad hemodinamica, lo que reduce la fidelidad y maneja mal la incertidumbre."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 5,\n  \"uncertainty_handling_score\": 2,\n  \"invented_info\": [\n    {\n      \"item\": \"Analisis/diagnostico de infeccion de vias respiratorias superiores no explicitado por la fuente\",\n      \"severity\": \"major\"\n    },\n    {\n      \"item\": \"Afirmacion de paciente hemodinamicamente estable sin soporte en la fuente\",\n      \"severity\": \"major\"\n    },\n    {\n      \"item\": \"Tipo de documento clinico 'Nota de consulta externa - primera vez' no mencionado explicitamente\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Murmullo vesicular conservado bilateralmente; la bilateralidad no fue explicitada\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento conserva los datos clave del caso, incluido peso, temperatura, examen fisico descrito y la dosis corregida de acetaminofen, sin errores de dosis. Sin embargo, agrega interpretaciones no documentadas por la fuente, especialmente un diagnostico de IVRS y estabilidad hemodinamica, lo que reduce la fidelidad y maneja mal la incertidumbre.\"\n}"
+        }
+      ]
+    }
+  ],
+  "run_score_summary": [
+    {
+      "model_alias": "anthropic",
+      "provider": "anthropic_api",
+      "model": "claude-haiku-4-5-20251001",
+      "evaluated_output_count": 5,
+      "dimension_averages": {
+        "clinical_safety_score": 3.0,
+        "faithfulness_score": 2.8,
+        "template_adherence_score": 4.2,
+        "uncertainty_handling_score": 3.6
+      },
+      "effective_dimension_averages": {
+        "clinical_safety_score": 2.8,
+        "faithfulness_score": 2.8,
+        "template_adherence_score": 4.2,
+        "uncertainty_handling_score": 3.6
+      },
+      "safety_gate_failures": 2,
+      "critical_invented_count": 2,
+      "critical_missing_count": 0,
+      "critical_contradiction_count": 1,
+      "critical_dosing_error_count": 0,
+      "findings_by_case": [
+        {
+          "case_id": "consulta-externa-disnea-contexto-valido",
+          "invented_info": [],
+          "missing_info": [
+            {
+              "item": "Impresion diagnostica diferencial consignada solo en analisis clinico y no en la seccion de diagnosticos/diferenciales",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "control-cronico-medicacion-autocorrecciones",
+          "invented_info": [
+            {
+              "item": "Sexo registrado: 'No especificado en la consulta'",
+              "severity": "minor"
+            },
+            {
+              "item": "Examen fisico consignado como 'No se reportan hallazgos relevantes' sin examen documentado",
+              "severity": "critical"
+            },
+            {
+              "item": "Medicamentos cronicos registrados como 'medicamentos formulados' y 'se mantiene esquema actual' sin constar formula o renovacion",
+              "severity": "critical"
+            },
+            {
+              "item": "Seguimiento posterior a resultados de laboratorios no explicitado por la fuente",
+              "severity": "major"
+            }
+          ],
+          "missing_info": [
+            {
+              "item": "No se dejo constancia de que no se otorgo incapacidad medica por ahora",
+              "severity": "major",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "urgencias-neurologia-sospecha-ecv-habla-coloquial",
+          "invented_info": [
+            {
+              "item": "Tipo de documento clinico: \"Consulta externa - primera vez\" sin soporte explicito en las fuentes",
+              "severity": "minor"
+            }
+          ],
+          "missing_info": [],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "dolor-abdominal-incertidumbre-y-negativos",
+          "invented_info": [
+            {
+              "item": "Se interpreta como 'proceso inflamatorio abdominal' que requiere evaluación complementaria sin estar explicitado por la fuente",
+              "severity": "minor"
+            }
+          ],
+          "missing_info": [
+            {
+              "item": "No documenta la fuente de información (paciente)",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [
+            {
+              "item": "Cambia el signo de alarma de 'fiebre' a 'fiebre persistente' para acudir a urgencias",
+              "severity": "critical"
+            }
+          ],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "pediatria-dosis-y-aclaraciones-del-acompanante",
+          "invented_info": [
+            {
+              "item": "Analisis/diagnostico de infeccion de vias respiratorias superiores no explicitado por la fuente",
+              "severity": "major"
+            },
+            {
+              "item": "Afirmacion de paciente hemodinamicamente estable sin soporte en la fuente",
+              "severity": "major"
+            },
+            {
+              "item": "Tipo de documento clinico 'Nota de consulta externa - primera vez' no mencionado explicitamente",
+              "severity": "minor"
+            },
+            {
+              "item": "Murmullo vesicular conservado bilateralmente; la bilateralidad no fue explicitada",
+              "severity": "minor"
+            }
+          ],
+          "missing_info": [],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        }
+      ],
+      "overall_score": 2.78,
+      "overall_time_to_first_token_ms": 1193,
+      "overall_time_after_first_token_ms": 5741
+    }
+  ]
+}

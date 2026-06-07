@@ -4,6 +4,7 @@ import VoiceRecorder from "./subcomponents/VoiceRecorder";
 import PatientEditModal from "./PatientEditModal";
 import Modal from "@/commons/components/Modal";
 import GenerateDocumentationButton from "./subcomponents/GenerateDocumentationButton";
+import TranscribeButton from "./subcomponents/TranscribeButton";
 
 import { useEncuentroContext } from "../../contexts/EncuentroContext";
 import { useTranscriptionContext } from "../../contexts/TranscriptionContext";
@@ -65,14 +66,19 @@ const EncuentroHeaderContent: React.FC = () => {
     isPaused,
     pendingAudioSections,
     transcriptionStatus,
+    canRetryTranscription,
   } = useTranscriptionContext();
   const { capabilities, userData } = useAuth();
   const canUseClinicalFeatures = capabilities.can_use_clinical_features;
   const showClinicalAccessWarning =
     userData !== null && !canUseClinicalFeatures;
 
+  const isTranscriptionError =
+    !isRecording && transcriptionStatus === "error";
+
   const showTranscriptionStatus =
     isRecording ||
+    isTranscriptionError ||
     (!isRecording &&
       (pendingAudioSections > 0 || transcriptionStatus === "pending"));
 
@@ -80,9 +86,20 @@ const EncuentroHeaderContent: React.FC = () => {
     ? isPaused
       ? "Pausado"
       : "Transcribiendo"
-    : pendingAudioSections > 0
-      ? "Pendiente"
-      : "Transcribiendo";
+    : isTranscriptionError
+      ? "Error de transcripción"
+      : pendingAudioSections > 0
+        ? "Pendiente"
+        : "Transcribiendo";
+
+  const showTranscriptionStatusPing =
+    showTranscriptionStatus && !isPaused && !isTranscriptionError;
+
+  const transcriptionStatusDotClass = isTranscriptionError
+    ? "bg-red-500"
+    : isPaused
+      ? "bg-slate-400"
+      : "bg-teal-500";
 
   return (
     <>
@@ -112,23 +129,25 @@ const EncuentroHeaderContent: React.FC = () => {
 
           <div className="flex items-center">
             {showTranscriptionStatus && (
-              <div className="mr-4 flex items-center gap-2 text-[15px] text-slate-800">
+              <div
+                className={`mr-4 flex items-center gap-2 text-[15px] ${
+                  isTranscriptionError ? "text-red-700" : "text-slate-800"
+                }`}
+              >
                 <span className="relative flex h-2.5 w-2.5">
-                  {!isPaused && (
+                  {showTranscriptionStatusPing && (
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-75" />
                   )}
                   <span
-                    className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-                      isPaused ? "bg-slate-400" : "bg-teal-500"
-                    }`}
+                    className={`relative inline-flex h-2.5 w-2.5 rounded-full ${transcriptionStatusDotClass}`}
                   />
                 </span>
                 <span className="font-medium">{transcriptionStatusLabel}</span>
               </div>
             )}
 
-            {/* Generate Documentation Button - Now using context */}
-            <div className="mr-4">
+            <div className="mr-4 flex items-center gap-2">
+              {canRetryTranscription && <TranscribeButton />}
               <GenerateDocumentationButton />
             </div>
 

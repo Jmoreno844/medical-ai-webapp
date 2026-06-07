@@ -26,12 +26,19 @@ const VoiceRecorder: React.FC = () => {
     audioExpiresAt,
     isAudioExpired,
     isCheckingAudio,
+    transcriptionStatus,
+    canRetryTranscription,
     startRecording,
     stopRecording,
     pauseResumeRecording,
   } = useTranscriptionContext();
   const { capabilities } = useAuth();
   const canUseClinicalFeatures = capabilities.can_use_clinical_features;
+
+  // When a transcription retry is the primary action, demote "Reanudar"
+  // (record more audio) to a secondary style so the two don't compete.
+  const isTranscriptionRetryable =
+    !isRecording && transcriptionStatus === "error" && canRetryTranscription;
 
   /**
    * Handle the single primary audio action.
@@ -70,7 +77,9 @@ const VoiceRecorder: React.FC = () => {
       ? "bg-gray-100 text-gray-400 cursor-not-allowed"
       : isRecording
         ? "bg-red-500 text-white hover:bg-red-600"
-        : "bg-purple-500 text-white hover:bg-purple-600"
+        : isTranscriptionRetryable
+          ? "border border-purple-300 bg-white text-purple-700 hover:bg-purple-50"
+          : "bg-purple-500 text-white hover:bg-purple-600"
   }`;
 
   // Show loading state while checking audio existence

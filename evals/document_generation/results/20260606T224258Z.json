@@ -1,0 +1,370 @@
+{
+  "run_started_at": "2026-06-06T22:42:58.161813+00:00",
+  "prompt_version": "document_generation_v001",
+  "judge_prompt_version": "clinical_document_judge_v002",
+  "judge_provider": "openai",
+  "judge_model": "gpt-5.4",
+  "cases_file": "../evals/document_generation/cases.json",
+  "template_file": "templates/clinical_document_template_v003.md",
+  "requested_case_id": null,
+  "count_limit": null,
+  "selected_case_count": 5,
+  "models": [
+    {
+      "alias": "gemini",
+      "provider": "google_vertex",
+      "model": "gemini-3-flash-preview"
+    }
+  ],
+  "prompt_template_preview": "Tu tarea es generar un documento medico basado en los siguientes componentes:\n\n1",
+  "judge_prompt_preview": "Eres un evaluador experto en documentacion clinica y seguridad del paciente. Eva",
+  "case_results": [
+    {
+      "case_id": "consulta-externa-disnea-contexto-valido",
+      "notes": "Caso dificil para evaluar uso correcto del contexto manual del medico, prudencia diagnostica, no inventar examen fisico y remision explicita.",
+      "outputs": [
+        {
+          "model_alias": "gemini",
+          "provider": "google_vertex",
+          "model": "gemini-3-flash-preview",
+          "generated_document": "## Identificacion del documento\n\nServicio / especialidad: Medicina interna\n\n## Identificacion del paciente\n\nFecha de nacimiento / edad: 67 años\nAcompanante: Hija\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\nSede / servicio: Medicina interna\n\n## Motivo de consulta\n\nMotivo de consulta: \"me he sentido peor estos dias, me falta el aire\"\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente y acompañante (hija)\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente femenina de 67 años con antecedentes de falla cardíaca, hipertensión y diabetes. Refiere cuadro clínico de evolución no especificada que se ha agudizado en los últimos días. Inicia con tos seca que posteriormente presenta expectoración hialina (flemas blancas). Refiere disnea que ha progresado en los últimos tres días, limitando la deambulación intradomiciliaria. La acompañante reporta ortopnea severa (requiere dormir con tres almohadas). Adicionalmente, la paciente refiere edema de miembros inferiores de predominio vespertino de dos semanas de evolución. Menciona sensación febril subjetiva de predominio nocturno.\n\n## Antecedentes\n\nPatologicos: Hipertensión arterial, diabetes mellitus tipo 2 e insuficiencia cardiaca.\nFarmacologicos / medicamentos actuales: Medicamentos para la presión arterial, medicamentos para el azúcar y furosemida (esta última con adherencia irregular por decisión de la paciente debido al aumento de la frecuencia urinaria).\n\n## Revision por sistemas\n\nRevision por sistemas: Paciente refiere sensación de calor nocturno. Niega emesis, diarrea o disuria.\n\n## Signos vitales y medidas antropometricas\n\nPresion arterial: 168/96 mmHg\nFrecuencia cardiaca: 104 lpm\nFrecuencia respiratoria: 24 rpm\nTemperatura: 37.6 °C\nSaturacion de oxigeno: 89% al aire ambiente y 91% en reposo\n\n## Analisis clinico\n\nAnalisis clinico: Paciente de 67 años con múltiples comorbilidades cardiovasculares y metabólicas. El cuadro clínico actual de disnea progresiva, ortopnea y edema de miembros inferiores, sumado a los hallazgos de taquicardia, taquipnea, desaturación y cifras tensionales elevadas, sugiere una descompensación de su falla cardíaca de base. No se descarta un proceso infeccioso respiratorio bajo como factor desencadenante dada la presencia de tos con expectoración y la sensación febril. Por la severidad de los síntomas y el riesgo de progresión, se requiere manejo en nivel de mayor complejidad.\n\n## Diagnosticos\n\nDiagnostico principal: Impresión clínica de descompensación de falla cardíaca\nDiagnosticos relacionados: Posible infección respiratoria baja, Hipertensión arterial, Diabetes mellitus tipo 2\n\n## Examenes, procedimientos e interconsultas\n\nInterconsultas / remisiones: Remisión inmediata al servicio de urgencias para estudios complementarios y manejo médico.\n\n## Profesional responsable\n\nProfesional responsable: Profesional tratante de medicina interna (según transcripción)",
+          "generation_metrics": {
+            "time_to_first_token_ms": 10640,
+            "time_after_first_token_ms": 3364,
+            "total_generation_ms": 14005
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 3,
+            "template_adherence_score": 5,
+            "uncertainty_handling_score": 2,
+            "invented_info": [
+              {
+                "item": "Se fija como diagnostico principal la descompensacion de falla cardiaca, cuando la fuente solo plantea posible descompensacion de falla cardiaca versus infeccion respiratoria baja",
+                "severity": "major"
+              }
+            ],
+            "missing_info": [],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "borderline",
+            "summary": "El documento conserva adecuadamente sintomas, antecedentes, signos vitales y la remision a urgencias, pero aumenta indebidamente la certeza diagnostica al convertir una impresion diferencial en un diagnostico principal de descompensacion de falla cardiaca."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 5,\n  \"uncertainty_handling_score\": 2,\n  \"invented_info\": [\n    {\n      \"item\": \"Se fija como diagnostico principal la descompensacion de falla cardiaca, cuando la fuente solo plantea posible descompensacion de falla cardiaca versus infeccion respiratoria baja\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"missing_info\": [],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento conserva adecuadamente sintomas, antecedentes, signos vitales y la remision a urgencias, pero aumenta indebidamente la certeza diagnostica al convertir una impresion diferencial en un diagnostico principal de descompensacion de falla cardiaca.\"\n}"
+        }
+      ]
+    },
+    {
+      "case_id": "control-cronico-medicacion-autocorrecciones",
+      "notes": "Caso dificil para no convertir informacion referida en examen fisico, respetar un plan compacto y no agregar seguimiento o incapacidad no indicada.",
+      "outputs": [
+        {
+          "model_alias": "gemini",
+          "provider": "google_vertex",
+          "model": "gemini-3-flash-preview",
+          "generated_document": "## Identificacion del documento\n\nServicio / especialidad: Medicina familiar\n\n## Identificacion del profesional\n\nProfesion / especialidad: Medicina familiar\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Control de hipertensión arterial y diabetes mellitus tipo 2\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente\nConfiabilidad de la informacion: Buena\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente con diagnóstico de hipertensión arterial (HTA) y diabetes mellitus tipo 2 (DM2) quien asiste a consulta de control ambulatorio. El paciente refiere sentirse bien en general al momento de la atención. En cuanto al manejo farmacológico, el paciente reporta adherencia al tratamiento con losartán y atorvastatina; sin embargo, refiere que olvida la toma nocturna de metformina aproximadamente dos a tres veces por semana. Niega la presencia de dolor torácico, disnea, edema en miembros inferiores o síntomas sugestivos de hipoglucemia. Adicionalmente, manifiesta que no realiza automonitoreo de la presión arterial en su domicilio.\n\n## Antecedentes\n\nPatologicos: Hipertensión arterial y diabetes mellitus tipo 2\nFarmacologicos / medicamentos actuales: Losartán 50 mg cada 12 horas (referido), metformina 850 mg cada 12 horas (referido, con fallas en la adherencia de la dosis nocturna), atorvastatina 20 mg cada noche (referido)\n\n## Revision por sistemas\n\nRevision por sistemas: El paciente niega dolor en el pecho, ahogo, hinchazón de piernas o síntomas de bajones de azúcar.\n\n## Signos vitales y medidas antropometricas\n\nPresion arterial: 146/88 mmHg\nFrecuencia cardiaca: 82 lpm\nPeso: 81 kg\n\n## Analisis clinico\n\nAnalisis clinico: Paciente con antecedentes crónicos de hipertensión arterial y diabetes mellitus tipo 2 en seguimiento ambulatorio. Durante el encuentro se evidencia una presión arterial por encima de las metas terapéuticas y una adherencia parcial al tratamiento antidiabético oral, específicamente por omisión de dosis nocturnas de metformina referida por el paciente. No se reportan síntomas de descompensación aguda ni compromiso de órgano blanco en el interrogatorio. Se requiere optimizar la adherencia terapéutica y realizar estudios paraclínicos para evaluar el control metabólico y la función orgánica.\n\n## Diagnosticos\n\nDiagnostico principal: Hipertensión esencial (primaria)\nDiagnosticos relacionados: Diabetes mellitus tipo 2\n\n## Examenes, procedimientos e interconsultas\n\nExamenes solicitados: Hemoglobina glicosilada, perfil lipídico y pruebas de función renal\n\n## Recomendaciones, educación y signos de alarma\n\nRecomendaciones no farmacologicas: Reducción del consumo de sal en la dieta\nEducacion al paciente: Refuerzo de la adherencia al tratamiento farmacológico prescrito\n\n## Incapacidad\n\nIncapacidad medica: No se otorga incapacidad por criterio médico y ausencia de indicación clínica actual.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 28207,
+            "time_after_first_token_ms": 5436,
+            "total_generation_ms": 33643
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 2,
+            "template_adherence_score": 5,
+            "uncertainty_handling_score": 2,
+            "invented_info": [
+              {
+                "item": "Confiabilidad de la información: buena",
+                "severity": "minor"
+              },
+              {
+                "item": "Diagnóstico principal especificado como hipertensión esencial (primaria)",
+                "severity": "major"
+              }
+            ],
+            "missing_info": [],
+            "contradiction_info": [
+              {
+                "item": "Se documenta consulta externa de primera vez pese a tratarse de control/seguimiento ambulatorio",
+                "severity": "major"
+              }
+            ],
+            "dosing_error_info": [],
+            "verdict": "borderline",
+            "summary": "El documento recoge bien los medicamentos, la falta parcial de adherencia a metformina, los síntomas negados, los signos vitales y el plan de laboratorios. Sin embargo, contradice el contexto al clasificar la atención como primera vez en lugar de control ambulatorio, agrega una confiabilidad 'buena' no documentada y cierra el diagnóstico como hipertensión esencial/primaria sin soporte explícito."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 5,\n  \"uncertainty_handling_score\": 2,\n  \"invented_info\": [\n    {\n      \"item\": \"Confiabilidad de la información: buena\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Diagnóstico principal especificado como hipertensión esencial (primaria)\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"missing_info\": [],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Se documenta consulta externa de primera vez pese a tratarse de control/seguimiento ambulatorio\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento recoge bien los medicamentos, la falta parcial de adherencia a metformina, los síntomas negados, los signos vitales y el plan de laboratorios. Sin embargo, contradice el contexto al clasificar la atención como primera vez en lugar de control ambulatorio, agrega una confiabilidad 'buena' no documentada y cierra el diagnóstico como hipertensión esencial/primaria sin soporte explícito.\"\n}"
+        }
+      ]
+    },
+    {
+      "case_id": "urgencias-neurologia-sospecha-ecv-habla-coloquial",
+      "notes": "Caso dificil para evaluar claridad de remision, no inventar manejo farmacologico y manejar tiempo de inicio de sintomas con prudencia.",
+      "outputs": [
+        {
+          "model_alias": "gemini",
+          "provider": "google_vertex",
+          "model": "gemini-3-flash-preview",
+          "generated_document": "## Identificacion del documento\n\nTipo de documento clinico: Atención prioritaria\nHora de atencion: 11:00 AM aproximadamente\n\n## Identificacion del paciente\n\nAcompanante: Hijo/a del paciente\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Desviación de la comisura bucal y debilidad en la mano derecha\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente y acompañante\nConfiabilidad de la informacion: Buena\n\n## Enfermedad actual\n\nEnfermedad actual: Cuadro clínico de inicio súbito que comenzó aproximadamente a las 10:20 AM del día de hoy. El acompañante refiere que el paciente presentó desviación de la comisura bucal y pérdida de fuerza en el miembro superior derecho, manifestada por la incapacidad para sostener un vaso. Al momento de la valoración (aproximadamente 11:00 AM), el paciente persiste con los síntomas y presenta dificultad para articular palabras.\n\n## Signos vitales y medidas antropometricas\n\nPresion arterial: 190/100 mmHg\n\n## Examen fisico\n\nExamen fisico: Se observa debilidad de hemicuerpo derecho, disartria y desviación de la comisura bucal.\n\n## Analisis clinico\n\nAnalisis clinico: Paciente con déficit neurológico focal agudo caracterizado por compromiso motor en hemicuerpo derecho, alteración del lenguaje y compromiso de pares craneales (facial). Los hallazgos clínicos y las cifras tensionales elevadas sugieren un evento cerebrovascular agudo. Dada la evolución de aproximadamente 40-60 minutos, el paciente se encuentra en ventana terapéutica, por lo cual requiere traslado inmediato a un servicio de urgencias de alta complejidad para estudio imagenológico y manejo especializado. No se realiza intervención farmacológica en el sitio para evitar retrasos en el traslado.\n\n## Diagnosticos\n\nDiagnostico principal: Sospecha de evento cerebrovascular agudo\n\n## Examenes, procedimientos e interconsultas\n\nInterconsultas / remisiones: Remisión inmediata a servicio de urgencias\n\n## Recomendaciones, educacion y signos de alarma\n\nEducacion al paciente: Se explica al acompañante la sospecha de un evento cerebrovascular y la necesidad crítica de traslado inmediato a un centro hospitalario de mayor complejidad.\nSignos de alarma: Se enfatiza que no se debe administrar medicación oral ni retrasar la salida hacia urgencias.\n\n## Control y seguimiento\n\nControl / seguimiento: Valoración inmediata por el servicio de urgencias\n\n## Comprension del plan\n\nComprension del plan: El acompañante manifiesta comprender la gravedad del cuadro y la necesidad del traslado inmediato.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 11308,
+            "time_after_first_token_ms": 2995,
+            "total_generation_ms": 14304
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 3,
+            "template_adherence_score": 5,
+            "uncertainty_handling_score": 3,
+            "invented_info": [
+              {
+                "item": "Afirmacion de ventana terapeutica y remision a urgencias de alta complejidad para estudio imagenologico",
+                "severity": "major"
+              },
+              {
+                "item": "Confiabilidad de la informacion: buena",
+                "severity": "minor"
+              },
+              {
+                "item": "Indicacion de no administrar medicacion oral",
+                "severity": "minor"
+              },
+              {
+                "item": "Comprension del plan expresada por el acompanante",
+                "severity": "minor"
+              }
+            ],
+            "missing_info": [],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "borderline",
+            "summary": "El documento conserva el cuadro neurologico agudo, la PA 190/100 y la remision inmediata a urgencias, pero agrega detalles no sustentados sobre ventana terapeutica, nivel de complejidad e imagenologia, ademas de elementos medico-legales no documentados como confiabilidad y comprension del plan."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 5,\n  \"uncertainty_handling_score\": 3,\n  \"invented_info\": [\n    {\n      \"item\": \"Afirmacion de ventana terapeutica y remision a urgencias de alta complejidad para estudio imagenologico\",\n      \"severity\": \"major\"\n    },\n    {\n      \"item\": \"Confiabilidad de la informacion: buena\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Indicacion de no administrar medicacion oral\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Comprension del plan expresada por el acompanante\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento conserva el cuadro neurologico agudo, la PA 190/100 y la remision inmediata a urgencias, pero agrega detalles no sustentados sobre ventana terapeutica, nivel de complejidad e imagenologia, ademas de elementos medico-legales no documentados como confiabilidad y comprension del plan.\"\n}"
+        }
+      ]
+    },
+    {
+      "case_id": "dolor-abdominal-incertidumbre-y-negativos",
+      "notes": "Caso dificil para diferenciar sintomas, hallazgos objetivos, negativos explicitamente mencionados y uso prudente de diagnosticos diferenciales.",
+      "outputs": [
+        {
+          "model_alias": "gemini",
+          "provider": "google_vertex",
+          "model": "gemini-3-flash-preview",
+          "generated_document": "## Identificacion del documento\n\nTipo de documento clinico: Consulta prioritaria\nServicio / especialidad: Medicina general\n\n## Identificacion del paciente\n\nSexo registrado: Femenino\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Dolor en la barriga\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente refiere cuadro clínico de aproximadamente 24 horas de evolución consistente en dolor abdominal que inició en la región periumbilical y posteriormente se localizó en la fosa ilíaca derecha. La paciente refiere náuseas asociadas, sin episodios de emesis. Menciona marcada hiporexia. Niega deposiciones diarreicas. Refiere sensación subjetiva de fiebre durante la madrugada, sin cuantificación termométrica. Niega sintomatología urinaria y niega presencia de flujo vaginal.\n\n## Revision por sistemas\n\nRevision por sistemas: Refiere náuseas y poco apetito. Niega diarrea, síntomas urinarios y flujo vaginal.\n\n## Signos vitales y medidas antropometricas\n\nPresion arterial: 112/70 mmHg\nFrecuencia cardiaca: 96 lpm\nTemperatura: 37.8 °C\n\n## Examen fisico\n\nExamen fisico: Abdomen blando, dolor a la palpación en fosa ilíaca derecha. No presenta defensa abdominal involuntaria. No se evidencian signos claros de irritación peritoneal en el momento de la evaluación.\n\n## Analisis clinico\n\nAnalisis clinico: Paciente con dolor abdominal agudo cuya cronología (inicio periumbilical y migración a fosa ilíaca derecha) junto con la hiporexia y la temperatura de 37.8 °C obligan a mantener un alto índice de sospecha clínica. Aunque el examen físico actual no muestra signos de peritonismo franco o defensa, no es posible descartar un cuadro de apendicitis temprana. Se requiere vigilancia estrecha de la evolución de los síntomas.\n\n## Diagnosticos\n\nDiagnostico principal: Dolor abdominal en estudio\nDiagnosticos diferenciales: Apendicitis temprana\n\n## Recomendaciones, educacion y signos de alarma\n\nSignos de alarma: Se educa a la paciente sobre la necesidad de consultar inmediatamente al servicio de urgencias en caso de presentar fiebre, vómito persistente, aumento de la intensidad del dolor abdominal o cualquier signo de deterioro clínico.\n\n## Profesional responsable\n\nProfesional responsable: Médico tratante",
+          "generation_metrics": {
+            "time_to_first_token_ms": 9863,
+            "time_after_first_token_ms": 2541,
+            "total_generation_ms": 12404
+          },
+          "judge_result": {
+            "clinical_safety_score": 4,
+            "faithfulness_score": 4,
+            "template_adherence_score": 5,
+            "uncertainty_handling_score": 5,
+            "invented_info": [
+              {
+                "item": "Describe la hiporexia como 'marcada' sin soporte explicito",
+                "severity": "minor"
+              },
+              {
+                "item": "Agrega 'cualquier signo de deterioro clinico' como signo de alarma no mencionado",
+                "severity": "minor"
+              }
+            ],
+            "missing_info": [],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "pass",
+            "summary": "El documento es en general fiel y clinicamente seguro: conserva la incertidumbre diagnostica, no cierra apendicitis y refleja adecuadamente sintomas, examen fisico y signos vitales. Solo hay leves agregados no documentados en la intensidad de la hiporexia y en un signo de alarma generico."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 4,\n  \"faithfulness_score\": 4,\n  \"template_adherence_score\": 5,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [\n    {\n      \"item\": \"Describe la hiporexia como 'marcada' sin soporte explicito\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Agrega 'cualquier signo de deterioro clinico' como signo de alarma no mencionado\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"pass\",\n  \"summary\": \"El documento es en general fiel y clinicamente seguro: conserva la incertidumbre diagnostica, no cierra apendicitis y refleja adecuadamente sintomas, examen fisico y signos vitales. Solo hay leves agregados no documentados en la intensidad de la hiporexia y en un signo de alarma generico.\"\n}"
+        }
+      ]
+    },
+    {
+      "case_id": "pediatria-dosis-y-aclaraciones-del-acompanante",
+      "notes": "Caso dificil para respetar correcciones de dosis, conservar hallazgos del examen solo cuando fueron verbalizados y mantener un plan exacto.",
+      "outputs": [
+        {
+          "model_alias": "gemini",
+          "provider": "google_vertex",
+          "model": "gemini-3-flash-preview",
+          "generated_document": "## Identificacion del paciente\n\nFecha de nacimiento / edad: 4 años\nSexo registrado: Masculino\nAcompanante: Madre\n\n## Identificacion del profesional\n\nProfesion / especialidad: Pediatría general\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Fiebre y tos\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Madre del paciente\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente masculino de 4 años de edad con cuadro clínico de dos días de evolución caracterizado por fiebre y tos. La madre refiere que el niño ha presentado disminución en la ingesta de alimentos (hiporexia), aunque mantiene una adecuada ingesta de líquidos. No se reporta dificultad respiratoria.\n\n## Revision por sistemas\n\nRevision por sistemas: Madre refiere hiporexia; niega dificultad respiratoria.\n\n## Signos vitales y medidas antropometricas\n\nTemperatura: 38.4 °C\nPeso: 14.7 kg\n\n## Examen fisico\n\nExamen fisico: Orofaringe eritematosa, sin placas visibles. A la auscultación pulmonar, murmullo vesicular conservado, sin sibilancias. No se observan tirajes intercostales.\n\n## Analisis clinico\n\nAnalisis clinico: Paciente pediátrico con cuadro febril y respiratorio de corta evolución. Los hallazgos al examen físico muestran inflamación en la orofaringe sin compromiso respiratorio bajo. Se decide manejo médico amb",
+          "generation_metrics": {
+            "time_to_first_token_ms": 38216,
+            "time_after_first_token_ms": 1325,
+            "total_generation_ms": 39541
+          },
+          "judge_result": {
+            "clinical_safety_score": 2,
+            "faithfulness_score": 2,
+            "template_adherence_score": 2,
+            "uncertainty_handling_score": 5,
+            "invented_info": [],
+            "missing_info": [
+              {
+                "item": "Formula de amoxicilina suspension 400 mg/5 mL, 8 mL cada 12 horas por 10 dias",
+                "severity": "critical",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Formula de acetaminofen 160 mg/5 mL, 7 mL cada 6 horas si fiebre (dosis corregida en la conversacion)",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Signos de alarma indicados: respiracion rapida, hundimiento de costillas, no recibir liquidos, decaimiento marcado",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Documento truncado e incompleto; faltan las secciones finales de medicamentos formulados y recomendaciones/signos de alarma de la plantilla",
+                "severity": "major",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "fail",
+            "summary": "El documento recoge de forma aceptable los sintomas y el examen fisico sin inventar hallazgos relevantes, pero omite el plan terapeutico indicado en la consulta, especialmente la amoxicilina con dosis y duracion, el acetaminofen con la dosis corregida de 7 mL, y los signos de alarma. Estas omisiones comprometen la seguridad clinica y la fidelidad del registro, ademas de dejar la plantilla incompleta."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 2,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 2,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [],\n  \"missing_info\": [\n    {\n      \"item\": \"Formula de amoxicilina suspension 400 mg/5 mL, 8 mL cada 12 horas por 10 dias\",\n      \"severity\": \"critical\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Formula de acetaminofen 160 mg/5 mL, 7 mL cada 6 horas si fiebre (dosis corregida en la conversacion)\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Signos de alarma indicados: respiracion rapida, hundimiento de costillas, no recibir liquidos, decaimiento marcado\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Documento truncado e incompleto; faltan las secciones finales de medicamentos formulados y recomendaciones/signos de alarma de la plantilla\",\n      \"severity\": \"major\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"fail\",\n  \"summary\": \"El documento recoge de forma aceptable los sintomas y el examen fisico sin inventar hallazgos relevantes, pero omite el plan terapeutico indicado en la consulta, especialmente la amoxicilina con dosis y duracion, el acetaminofen con la dosis corregida de 7 mL, y los signos de alarma. Estas omisiones comprometen la seguridad clinica y la fidelidad del registro, ademas de dejar la plantilla incompleta.\"\n}"
+        }
+      ]
+    }
+  ],
+  "run_score_summary": [
+    {
+      "model_alias": "gemini",
+      "provider": "google_vertex",
+      "model": "gemini-3-flash-preview",
+      "evaluated_output_count": 5,
+      "dimension_averages": {
+        "clinical_safety_score": 3.0,
+        "faithfulness_score": 2.8,
+        "template_adherence_score": 4.4,
+        "uncertainty_handling_score": 3.4
+      },
+      "effective_dimension_averages": {
+        "clinical_safety_score": 2.8,
+        "faithfulness_score": 2.8,
+        "template_adherence_score": 4.4,
+        "uncertainty_handling_score": 3.4
+      },
+      "safety_gate_failures": 1,
+      "critical_invented_count": 0,
+      "critical_missing_count": 1,
+      "critical_contradiction_count": 0,
+      "critical_dosing_error_count": 0,
+      "findings_by_case": [
+        {
+          "case_id": "consulta-externa-disnea-contexto-valido",
+          "invented_info": [
+            {
+              "item": "Se fija como diagnostico principal la descompensacion de falla cardiaca, cuando la fuente solo plantea posible descompensacion de falla cardiaca versus infeccion respiratoria baja",
+              "severity": "major"
+            }
+          ],
+          "missing_info": [],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "control-cronico-medicacion-autocorrecciones",
+          "invented_info": [
+            {
+              "item": "Confiabilidad de la información: buena",
+              "severity": "minor"
+            },
+            {
+              "item": "Diagnóstico principal especificado como hipertensión esencial (primaria)",
+              "severity": "major"
+            }
+          ],
+          "missing_info": [],
+          "contradiction_info": [
+            {
+              "item": "Se documenta consulta externa de primera vez pese a tratarse de control/seguimiento ambulatorio",
+              "severity": "major"
+            }
+          ],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "urgencias-neurologia-sospecha-ecv-habla-coloquial",
+          "invented_info": [
+            {
+              "item": "Afirmacion de ventana terapeutica y remision a urgencias de alta complejidad para estudio imagenologico",
+              "severity": "major"
+            },
+            {
+              "item": "Confiabilidad de la informacion: buena",
+              "severity": "minor"
+            },
+            {
+              "item": "Indicacion de no administrar medicacion oral",
+              "severity": "minor"
+            },
+            {
+              "item": "Comprension del plan expresada por el acompanante",
+              "severity": "minor"
+            }
+          ],
+          "missing_info": [],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "dolor-abdominal-incertidumbre-y-negativos",
+          "invented_info": [
+            {
+              "item": "Describe la hiporexia como 'marcada' sin soporte explicito",
+              "severity": "minor"
+            },
+            {
+              "item": "Agrega 'cualquier signo de deterioro clinico' como signo de alarma no mencionado",
+              "severity": "minor"
+            }
+          ],
+          "missing_info": [],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "pediatria-dosis-y-aclaraciones-del-acompanante",
+          "invented_info": [],
+          "missing_info": [
+            {
+              "item": "Formula de amoxicilina suspension 400 mg/5 mL, 8 mL cada 12 horas por 10 dias",
+              "severity": "critical",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Formula de acetaminofen 160 mg/5 mL, 7 mL cada 6 horas si fiebre (dosis corregida en la conversacion)",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Signos de alarma indicados: respiracion rapida, hundimiento de costillas, no recibir liquidos, decaimiento marcado",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Documento truncado e incompleto; faltan las secciones finales de medicamentos formulados y recomendaciones/signos de alarma de la plantilla",
+              "severity": "major",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        }
+      ],
+      "overall_score": 2.84,
+      "overall_time_to_first_token_ms": 19647,
+      "overall_time_after_first_token_ms": 3132
+    }
+  ]
+}

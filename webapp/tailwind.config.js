@@ -17,6 +17,10 @@ export default {
   			],
   			fun: [
   				'var(--font-fun)'
+  			],
+  			poppins: [
+  				'Poppins',
+  				'sans-serif'
   			]
   		},
   		colors: {
@@ -25,6 +29,12 @@ export default {
   			main: '#3b82f6',
   			main_light: '#7FB7D7',
   			main_dark: '#2563eb',
+  			brand: {
+  				navy: '#1D2B3B',
+  				mid: '#7A4FAD',
+  				purple: '#A855F7',
+  				'purple-dark': '#9333EA',
+  			},
   			sidebar: {
   				DEFAULT: 'hsl(var(--sidebar-background))',
   				foreground: 'hsl(var(--sidebar-foreground))',

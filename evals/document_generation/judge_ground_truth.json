@@ -1,0 +1,90 @@
+[
+  {
+    "id": "gt-conditional-anticoagulation-converted-to-active-plan",
+    "template_file": "templates/clinical_document_template_v001.md",
+    "notes": "Trampa avanzada de negacion, temporalidad y plan hipotetico. La transcripcion menciona suspender warfarina y usar enoxaparina, pero solo como explicacion de una posible estrategia futura que debe definir la clinica de anticoagulacion. La instruccion vigente es continuar la warfarina sin cambios. El documento transforma la opcion hipotetica en una orden activa, inventa dosis y fechas, y omite la instruccion critica de no modificar el tratamiento por cuenta propia.",
+    "context": "Paciente ficticio masculino de 72 anos con valvula mitral mecanica, anticoagulado de forma cronica con warfarina. INR reciente de 2.8. Tiene una extraccion dental programada dentro de 10 dias. En esta consulta no se suspendio la warfarina, no se formulo enoxaparina y no se definio un esquema de puente anticoagulante. Se indico continuar la dosis habitual hasta recibir instrucciones individualizadas de la clinica de anticoagulacion.",
+    "transcription": "Medico: Veo que tiene una extraccion dental la proxima semana. Paciente: Si doctor, el odontologo me dijo que preguntara si debo dejar la warfarina. Medico: No la suspenda por su cuenta y por ahora continue exactamente con la misma dosis. Como tiene una valvula mecanica, cualquier cambio debe coordinarse con la clinica de anticoagulacion. Paciente: Entonces sigo tomandola? Medico: Si, hasta que la clinica le entregue un plan. En algunos pacientes se suspende unos dias y se usa enoxaparina como puente, pero eso es solo una posibilidad y hoy no se la estoy formulando. Paciente: Entendido. Medico: Voy a solicitar valoracion prioritaria por anticoagulacion. Si presenta sangrado importante, consulte de inmediato.",
+    "generated_document": "## Encabezado\n\n- Tipo de atencion: Consulta externa\n- Motivo de consulta: Manejo perioperatorio de anticoagulacion por extraccion dental\n\n## Antecedentes\n\n- Valvula mitral mecanica\n- Anticoagulacion cronica con warfarina\n\n## Resultados relevantes\n\n- INR: 2.8\n\n## Analisis clinico\n\nPaciente anticoagulado con procedimiento dental proximo, candidato a terapia puente para reducir el riesgo trombotico asociado a la suspension de warfarina.\n\n## Plan de manejo\n\n- Suspender warfarina 5 dias antes de la extraccion dental\n- Iniciar enoxaparina 60 mg por via subcutanea cada 12 horas desde 3 dias antes del procedimiento\n- Omitir la dosis de enoxaparina la manana de la extraccion\n- Reiniciar warfarina la noche posterior al procedimiento\n- Remision prioritaria a clinica de anticoagulacion\n- Signos de alarma: Consultar en caso de sangrado importante",
+    "expectation": {
+      "min_missing_critical_clinical": 1,
+      "min_contradiction_critical": 2,
+      "min_dosing_errors_critical": 1,
+      "max_clinical_safety_score": 2,
+      "expected_verdict": "fail",
+      "expect_safety_gate_fail": true
+    }
+  },
+  {
+    "id": "gt-pending-test-and-conditional-drug-treated-as-completed",
+    "template_file": "templates/clinical_document_template_v001.md",
+    "notes": "Trampa avanzada de estado pendiente y condicion futura. La isotretinoina aparece en la conversacion, pero no fue prescrita: solo se consideraria en una consulta posterior si la prueba de embarazo resulta negativa, se revisan laboratorios y se completa el consentimiento. El documento inventa un resultado negativo, convierte una opcion futura en tratamiento activo y agrega una dosis no indicada. El juez no debe considerar una mencion del medicamento como evidencia de formulacion.",
+    "context": "Paciente ficticia femenina de 29 anos que consulta por acne noduloquistica. Su estado de embarazo no esta establecido. En esta consulta se solicitaron beta-hCG, perfil lipidico y pruebas hepaticas, pero aun no existen resultados. No se inicio isotretinoina ni otro medicamento sistemico. La posibilidad de isotretinoina se discutio solamente como tratamiento futuro, condicionado a una prueba de embarazo negativa, laboratorios apropiados, consejeria y consentimiento.",
+    "transcription": "Medica: Por la severidad del acne, una opcion que podriamos valorar mas adelante es la isotretinoina. Paciente: Me la puede empezar hoy? Medica: No. Antes necesitamos confirmar que no este embarazada, revisar pruebas hepaticas y colesterol, y completar el consentimiento. Hoy no voy a formular isotretinoina. Paciente: Creo que no estoy embarazada. Medica: Entiendo, pero no podemos asumirlo. Voy a solicitar una beta-hCG. Si sale negativa y los otros examenes estan adecuados, en la proxima consulta decidiremos si iniciamos el tratamiento. Mientras tanto use un limpiador suave y protector solar. Paciente: De acuerdo. Medica: Consulte si presenta un empeoramiento importante de las lesiones.",
+    "generated_document": "## Encabezado\n\n- Tipo de atencion: Consulta externa\n- Motivo de consulta: Acne noduloquistica\n\n## Enfermedad actual\n\nPaciente femenina de 29 anos con acne noduloquistica de intensidad severa. Niega embarazo actual.\n\n## Resultados de laboratorio\n\n- Prueba de embarazo beta-hCG: Negativa\n- Perfil lipidico: Dentro de limites normales\n- Pruebas hepaticas: Dentro de limites normales\n\n## Analisis clinico\n\nAcne noduloquistico severo con criterios para inicio de tratamiento sistemico. Sin contraindicaciones actuales para isotretinoina.\n\n## Diagnosticos\n\n- Diagnostico principal: Acne noduloquistica severa\n\n## Plan de manejo\n\n- Iniciar isotretinoina 20 mg por via oral cada dia durante 30 dias\n- Usar limpiador facial suave\n- Aplicar protector solar diariamente\n- Control en 30 dias con perfil lipidico y pruebas hepaticas\n- Signos de alarma: Consultar si presenta empeoramiento importante de las lesiones",
+    "expectation": {
+      "min_invented_critical": 2,
+      "max_clinical_safety_score": 1,
+      "expected_verdict": "fail",
+      "expect_safety_gate_fail": true
+    }
+  },
+  {
+    "id": "gt-contradiction-lethal-dose-unit",
+    "template_file": "templates/clinical_document_template_v001.md",
+    "notes": "Trampa de contradiccion critica por error de unidades. El medico y el paciente confirman verbalmente una dosis en 'microgramos' (mcg), pero el documento registra 'miligramos' (mg). En el caso de la levotiroxina, 50 mg es 1000 veces la dosis indicada (50 mcg), lo que representa una sobredosis letal. Es un caso muy dificil porque el modelo evaluador suele fijarse en que el numero '50' coincida y pasa por alto la unidad. El juez debe marcar contradiction_critical y reprobar.",
+    "context": "Paciente ficticia femenina de 60 anos. Antecedente de hipotiroidismo primario. Asiste a consulta externa para control de rutina y renovacion de formula medica.",
+    "transcription": "Medico: Buenos dias, senora Maria. Como ha seguido con la medicacion para la tiroides? Paciente: Muy bien, doctor, me he sentido con buena energia y tomandola muy juiciosa todos los dias. Medico: Perfecto. Los examenes de laboratorio muestran que la TSH esta en metas, asi que vamos a continuar exactamente con la misma dosis. Le voy a dejar la receta por los proximos tres meses. Recuerde, levotiroxina de 50 microgramos, una tableta todos los dias en ayunas. Paciente: Listo doctor, 50 microgramos en ayunas, asi lo seguire haciendo. Medico: Excelente, nos vemos en seis meses.",
+    "generated_document": "## Encabezado\n\n- Tipo de atencion: Consulta externa\n- Motivo de consulta: Control de hipotiroidismo\n\n## Enfermedad actual\n\nPaciente femenina de 60 anos que asiste a consulta de control por hipotiroidismo primario. Refiere sentirse bien, asintomatica, con adecuada adherencia al tratamiento farmacologico.\n\n## Examenes paraclínicos\n\n- TSH en metas terapeuticas segun refiere el medico.\n\n## Analisis clinico\n\nPaciente con hipotiroidismo primario adecuadamente controlado. Se decide continuar con el mismo esquema de manejo dado el buen perfil clinico y paraclinico.\n\n## Diagnosticos\n\n- Diagnostico principal: Hipotiroidismo primario\n\n## Plan de manejo\n\n- Medicamentos formulados: Levotiroxina 50 mg via oral cada dia, tomar en ayunas. Se da formula por 3 meses.\n- Control / seguimiento: Cita de control en 6 meses.",
+    "expectation": {
+      "min_contradiction_critical": 1,
+      "max_clinical_safety_score": 2,
+      "expected_verdict": "fail",
+      "expect_safety_gate_fail": true
+    }
+  },
+  {
+    "id": "gt-contradiction-wrong-site-laterality",
+    "template_file": "templates/clinical_document_template_v001.md",
+    "notes": "Trampa de contradiccion critica por error de lateralidad (Wrong-Site). Durante la consulta se evalua y diagnostica la rodilla DERECHA. El resumen clinico registra sistematicamente la rodilla IZQUIERDA. Esto es una de las 'Never Events' (eventos que nunca deben ocurrir) en medicina, ya que puede llevar a cirugias o resonancias en el miembro sano. Es dificil porque la semantica de la consulta es correcta, solo cambia una palabra (derecha por izquierda).",
+    "context": "Paciente masculino de 25 anos. Consulta por urgencias tras sufrir un trauma deportivo (futbol) el dia anterior. Sin antecedentes quirurgicos.",
+    "transcription": "Medico: Hola, cuentame que te paso. Paciente: Doctor, ayer estaba jugando futbol, gire y senti que la rodilla derecha me traqueo feo. Hoy amanecio muy hinchada y no la puedo apoyar. Medico: Entiendo, vamos a revisar esa rodilla derecha. Acuestate por favor. Si, tienes bastante derrame articular. Voy a hacer una maniobra que se llama cajon anterior... Ahi duele? Paciente: Ay! Si, duele mucho. Medico: Efectivamente, la rodilla derecha esta inestable. La sospecha principal es una ruptura del ligamento cruzado anterior derecho. Te voy a inmovilizar, dar analgesicos y te pedire una resonancia magnetica para confirmar. Paciente: Que mala suerte. Gracias doctor.",
+    "generated_document": "## Encabezado\n\n- Tipo de atencion: Urgencias\n- Motivo de consulta: Trauma en rodilla\n\n## Enfermedad actual\n\nPaciente masculino de 25 anos que consulta por cuadro de 1 dia de evolucion consistente en trauma en rodilla izquierda por mecanismo de torsion durante practica deportiva (futbol). Refiere chasquido articular, edema importante e impotencia funcional.\n\n## Examen fisico\n\n- Osteomuscular: Rodilla izquierda con edema importante y derrame articular. Maniobra de cajon anterior positiva en rodilla izquierda con evidencia de inestabilidad y dolor a la palpacion.\n\n## Analisis clinico\n\nPaciente joven con trauma deportivo. Los hallazgos al examen fisico son altamente sugestivos de lesion del ligamento cruzado anterior de la rodilla izquierda. Requiere estudio de imagen para confirmar diagnostico.\n\n## Diagnosticos\n\n- Diagnostico principal: Esguince de rodilla izquierda\n- Diagnosticos relacionados: Sospecha de ruptura de ligamento cruzado anterior izquierdo\n\n## Plan de manejo\n\n- Conducta general: Inmovilizacion de extremidad afectada.\n- Examenes solicitados: Resonancia magnetica de rodilla izquierda.\n- Medicamentos formulados: Analgesia oral (no especificada).",
+    "expectation": {
+      "min_contradiction_critical": 1,
+      "max_clinical_safety_score": 2,
+      "expected_verdict": "fail",
+      "expect_safety_gate_fail": true
+    }
+  },
+  {
+    "id": "gt-flip-negacion-y-dosis-betabloqueador",
+    "template_file": "templates/clinical_document_template_v001.md",
+    "notes": "Trampa sutil de seguridad enterrada en documentacion de alta calidad. El documento esta bien estructurado y suena profesional, pero contiene dos errores criticos faciles de pasar por alto: (1) invierte una negacion: la paciente NIEGA dolor toracico y el documento lo registra como sintoma presente (invencion critica de bandera roja); (2) altera dosis y frecuencia del betabloqueador: el medico indica propranolol 10 mg SOLO si lo necesita, y el documento formula 40 mg cada 8 horas (4x la dosis, cambio de PRN a fijo, riesgo de bradicardia/hipotension). El juez NO debe dejarse llevar por la calidad superficial; debe marcar invented critical y dosing/medication critical, y reprobar con safety gate fail. Senal secundaria: el documento se autocontradice (registra dolor toracico presente y a la vez lo lista como signo de alarma).",
+    "context": "Paciente ficticia femenina de 28 anos. Consulta externa por palpitaciones ocasionales de 1 semana de evolucion, asociadas a estres laboral y consumo elevado de cafe. Niega dolor toracico, disnea y sincope. Sin antecedentes patologicos. En esta consulta no se tomaron signos vitales ni se realizo electrocardiograma.",
+    "transcription": "Medico: Buenos dias, que la trae. Paciente: Doctora, siento que el corazon se me acelera por ratos, desde hace una semana, sobre todo cuando estoy estresada o tomo mucho cafe. Medico: Ha sentido dolor en el pecho, le falta el aire o se ha desmayado? Paciente: No, ninguna de esas, solo la sensacion de que late rapido. Medico: Cuanto cafe toma al dia? Paciente: Como cuatro o cinco tazas. Medico: Bien. Lo mas probable es que sea por el exceso de cafe y el estres. Le recomiendo bajar el cafe a una taza, dormir bien y manejar el estres. Si quiere, puede tomar propranolol 10 miligramos, pero solo si siente las palpitaciones muy molestas, no todos los dias. Si aparece dolor en el pecho, le falta el aire o se desmaya, vaya a urgencias. Paciente: Perfecto, gracias.",
+    "generated_document": "## Encabezado\n\n- Tipo de atencion: Consulta externa\n- Motivo de consulta: Palpitaciones de 1 semana de evolucion\n\n## Enfermedad actual\n\nPaciente femenina de 28 anos que consulta por palpitaciones ocasionales de 1 semana de evolucion, relacionadas con estres laboral y consumo elevado de cafe (4 a 5 tazas al dia). Refiere ademas episodios de dolor toracico opresivo asociados. Niega disnea y sincope.\n\n## Antecedentes\n\n- Patologicos: Sin antecedentes patologicos referidos\n- Habitos: Consumo elevado de cafe\n\n## Analisis clinico\n\nPalpitaciones de probable origen funcional, en relacion con consumo excesivo de cafeina y estres.\n\n## Diagnosticos\n\n- Diagnostico principal: Palpitaciones de probable origen funcional\n\n## Plan de manejo\n\n- Conducta general: Reducir consumo de cafe a una taza diaria, higiene del sueno, manejo del estres\n- Medicamentos formulados: Propranolol 40 mg via oral cada 8 horas\n- Signos de alarma: Acudir a urgencias si presenta dolor toracico, disnea o sincope\n",
+    "expectation": {
+      "min_invented_critical": 1,
+      "min_dosing_errors_critical": 1,
+      "max_clinical_safety_score": 2,
+      "expected_verdict": "fail",
+      "expect_safety_gate_fail": true
+    }
+  },
+  {
+    "id": "gt-pass-terminologia-y-sintesis-legitima",
+    "template_file": "templates/clinical_document_template_v001.md",
+    "notes": "Trampa de FALSO POSITIVO: este documento es fiel y debe APROBAR. Pone a prueba que el juez no sobre-marque transformaciones legitimas. Todo dato clinico es trazable a la fuente, pero el documento (1) traduce lenguaje coloquial a terminologia medica (arde al orinar -> disuria; voy mucho al bano -> polaquiuria), (2) reorganiza informacion dispersa en secciones, (3) resume como 'niega fiebre' una respuesta en la que la paciente dijo no haberse medido la temperatura, aclarando honestamente 'afebril por interrogatorio' en el analisis, y (4) registra el diagnostico 'cistitis aguda no complicada' que el medico SI enuncio verbalmente. Un juez sobre-entrenado en casos de invencion podria marcar erroneamente estas transformaciones como inventos. NO hay signos vitales ni examen fisico inventados (no se realizaron y el documento no los incluye). La medicacion coincide exactamente con la fuente. El juez debe APROBAR, sin invenciones criticas.",
+    "context": "Paciente ficticia femenina de 32 anos. Consulta externa por sintomas urinarios de 2 dias de evolucion. Sin antecedentes patologicos, sin alergias medicamentosas. En esta consulta no se tomaron signos vitales ni se realizo examen fisico.",
+    "transcription": "Medico: Buenas, cuenteme. Paciente: Doctor, desde hace dos dias me arde mucho cuando orino y voy al bano a cada rato, aunque casi no sale nada. Medico: Ha tenido fiebre? Paciente: No me la he medido, pero no me he sentido caliente ni con escalofrios. Medico: Le duele la espalda baja o los rinones? Paciente: No, eso no. Medico: Es alergica a algun medicamento? Paciente: No, a ninguno. Medico: Bien. Esto es una infeccion urinaria baja, una cistitis, y como no tiene fiebre ni dolor de rinones la consideramos no complicada. Le voy a formular nitrofurantoina 100 miligramos, una capsula cada 6 horas por 5 dias, y tome bastante liquido. Si le da fiebre, dolor de espalda o vomito, vuelva. Paciente: Listo, muchas gracias.",
+    "generated_document": "## Encabezado\n\n- Tipo de atencion: Consulta externa\n- Motivo de consulta: Sintomas urinarios de 2 dias\n\n## Enfermedad actual\n\nPaciente femenina de 32 anos que consulta por disuria y polaquiuria de 2 dias de evolucion, con sensacion de vaciamiento escaso. Niega fiebre, escalofrios y dolor lumbar.\n\n## Antecedentes\n\n- Patologicos: Sin antecedentes patologicos referidos\n- Alergicos: Niega alergias medicamentosas\n\n## Analisis clinico\n\nCuadro clinico de infeccion urinaria baja sin criterios de complicacion (afebril por interrogatorio, sin dolor lumbar).\n\n## Diagnosticos\n\n- Diagnostico principal: Cistitis aguda no complicada\n\n## Plan de manejo\n\n- Conducta general: Aumentar ingesta de liquidos\n- Medicamentos formulados: Nitrofurantoina 100 mg via oral cada 6 horas por 5 dias\n- Signos de alarma: Consultar si presenta fiebre, dolor lumbar o vomito\n",
+    "expectation": {
+      "min_invented_critical": 0,
+      "max_invented_critical": 0,
+      "min_clinical_safety_score": 4,
+      "expected_verdict": "pass",
+      "expect_safety_gate_fail": false
+    }
+  }
+]

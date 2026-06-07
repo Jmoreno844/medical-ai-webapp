@@ -72,6 +72,16 @@ function extractTiptapPlainText(value: unknown): string {
   return (node.content ?? []).map(extractTiptapPlainText).join("");
 }
 
+function isEffectivelyEmptyTiptapDoc(
+  json: Record<string, unknown> | null,
+): boolean {
+  if (!json) {
+    return true;
+  }
+
+  return normalizeEditorText(extractTiptapPlainText(json)) === "";
+}
+
 function shouldPreferMarkdownOverJson(
   markdown: string,
   json: Record<string, unknown> | null,
@@ -109,7 +119,6 @@ const TextArea: React.FC = () => {
   const {
     transcriptionCompleteTimestamp,
     canRetryTranscription,
-    retryTranscription,
     errorMessage: transcriptionErrorMessage,
   } = useTranscriptionContext();
   const setDraftContent = useDocumentDraftStore((state) => state.setDraftContent);
@@ -513,7 +522,8 @@ const TextArea: React.FC = () => {
         : null;
     const nextJson =
       candidateJson &&
-      !shouldPreferMarkdownOverJson(nextMarkdown, candidateJson)
+      !shouldPreferMarkdownOverJson(nextMarkdown, candidateJson) &&
+      !isEffectivelyEmptyTiptapDoc(candidateJson)
         ? candidateJson
         : null;
 
@@ -735,29 +745,12 @@ const TextArea: React.FC = () => {
         </div>
       )}
 
-      {showTranscriptionRetryBanner && activeDocument && (
-        <div className="border-b border-rose-200 bg-rose-50 px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium text-rose-900">
-                No se pudo completar la transcripción
-              </p>
-              <p className="text-sm text-rose-700">
-                {activeDerivedState?.error ??
-                  transcriptionErrorMessage ??
-                  "El audio de la consulta se conservó. Puede reintentar la transcripción."}
-              </p>
-            </div>
-            <button
-              type="button"
-              className="shrink-0 rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-rose-700"
-              onClick={() => {
-                void retryTranscription(activeDocument.id);
-              }}
-            >
-              Reintentar transcripción
-            </button>
-          </div>
+      {showTranscriptionRetryBanner && (
+        <div className="border-b border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-800">
+          <span className="font-medium text-rose-900">Error de transcripción: </span>
+          {activeDerivedState?.error ??
+            transcriptionErrorMessage ??
+            "No se pudo completar la transcripción. El audio de la consulta se conservó."}
         </div>
       )}
 

@@ -122,12 +122,8 @@ export function TranscriptionProvider({
   const activeWorkspaceDocumentId = useWorkspaceStore(
     (state) => state.activeDocumentId,
   );
-  const documentsById = useWorkspaceStore((state) => state.documentsById);
   const activeDocumentId = activeWorkspaceDocumentId
     ? Number(activeWorkspaceDocumentId)
-    : null;
-  const activeDocument = activeWorkspaceDocumentId
-    ? documentsById[activeWorkspaceDocumentId] ?? null
     : null;
 
   const [transcriptionDocId, setTranscriptionDocId] = useState<number | null>(
@@ -148,6 +144,7 @@ export function TranscriptionProvider({
   const subscribedTranscriptionDocIdRef = useRef<number | null>(null);
   const previousEncounterIdRef = useRef<number | null>(null);
   const activeRecordingSessionIdRef = useRef<string | null>(null);
+  const hydratedTranscriptionDocIdRef = useRef<number | null>(null);
   const activeTranscriptionDocumentId = useDocumentDerivedStore(
     (state) => state.activeTranscriptionDocumentId,
   );
@@ -425,6 +422,7 @@ export function TranscriptionProvider({
     setTranscriptionDocId(initialTranscriptionDocId);
     activeRecordingSessionIdRef.current = null;
     setKnownRecordingSessionId(null);
+    hydratedTranscriptionDocIdRef.current = null;
   }, [
     closeEventSource,
     encounterId,
@@ -434,11 +432,11 @@ export function TranscriptionProvider({
   ]);
 
   useEffect(() => {
-    if (
-      !activeDocumentId ||
-      String(activeDocument?.metadata?.kind ?? activeDocument?.type) !==
-        "transcription"
-    ) {
+    if (!transcriptionDocId) {
+      return;
+    }
+
+    if (hydratedTranscriptionDocIdRef.current === transcriptionDocId) {
       return;
     }
 
@@ -446,27 +444,36 @@ export function TranscriptionProvider({
 
     const hydrateCanonicalSession = async () => {
       const sessionStatus = await getRecordingSessionStatusForDocument(
-        activeDocumentId,
+        transcriptionDocId,
       );
-      if (!sessionStatus || isCancelled) {
+      if (isCancelled) {
+        return;
+      }
+
+      if (!sessionStatus) {
+        hydratedTranscriptionDocIdRef.current = transcriptionDocId;
         return;
       }
 
       const fallbackContent =
-        contentContext.documentContentCache.get(activeDocumentId) ??
-        (transcriptionDocId === activeDocumentId
+        contentContext.documentContentCache.get(transcriptionDocId) ??
+        (activeDocumentId === transcriptionDocId
           ? contentContext.documentContent
           : "") ??
         "";
 
       const applied = applyRecordingSessionState(
-        activeDocumentId,
+        transcriptionDocId,
         sessionStatus,
         fallbackContent,
       );
       if (!applied && !voiceRecorder.recordingSessionId) {
         activeRecordingSessionIdRef.current = null;
         setKnownRecordingSessionId(null);
+      }
+
+      if (!isCancelled) {
+        hydratedTranscriptionDocIdRef.current = transcriptionDocId;
       }
     };
 
@@ -476,8 +483,6 @@ export function TranscriptionProvider({
       isCancelled = true;
     };
   }, [
-    activeDocument?.metadata?.kind,
-    activeDocument?.type,
     activeDocumentId,
     applyRecordingSessionState,
     contentContext.documentContent,

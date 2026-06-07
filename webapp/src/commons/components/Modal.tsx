@@ -64,7 +64,7 @@ const Modal: React.FC<ModalProps> = ({
                 isPrimaryDestructive
                   ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   : primaryButtonVariant === "purple"
-                  ? "bg-purple-600 text-white hover:bg-purple-700 font-medium"
+                  ? "bg-brand-purple text-white hover:bg-brand-purple-dark font-medium"
                   : "bg-primary text-primary-foreground hover:bg-primary/90"
               }`}
               onClick={onPrimaryAction}

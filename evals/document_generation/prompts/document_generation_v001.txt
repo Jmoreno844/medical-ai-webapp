@@ -12,6 +12,10 @@ Tu tarea es generar un documento medico basado en los siguientes componentes:
 Instrucciones:
 - Utiliza la estructura proporcionada en la PLANTILLA.
 - Completa cada seccion con informacion relevante del CONTEXTO y la TRANSCRIPCION.
+- Trata la TRANSCRIPCION como texto crudo de una consulta real: puede venir sin etiquetas de hablante, sin orden cronologico, con interrupciones, correcciones, repeticiones, frases incompletas o errores menores de transcripcion.
+- Reconstruye la narrativa clinica con prudencia, separando lo referido por paciente o acompanante, lo observado o examinado por el profesional, y las decisiones explicitamente tomadas.
+- Si no es claro quien dijo un dato, no lo conviertas en hallazgo objetivo ni en decision del profesional; redactalo como informacion referida o omitelo si no es clinicamente seguro.
+- Si aparece una correccion posterior, usa la version corregida y no la primera mencion.
 - Manten un tono profesional y medico en todo momento.
 - El documento final DEBE estar en Markdown clinico compatible con el editor.
 - Usa encabezados Markdown (`#`, `##`, `###`) para secciones, listas con `-` para vinetas y `**negrita**` para etiquetas clinicas importantes cuando corresponda.

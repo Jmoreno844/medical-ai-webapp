@@ -1,0 +1,408 @@
+{
+  "run_started_at": "2026-06-06T22:43:09.419445+00:00",
+  "prompt_version": "document_generation_v001",
+  "judge_prompt_version": "clinical_document_judge_v002",
+  "judge_provider": "openai",
+  "judge_model": "gpt-5.4",
+  "cases_file": "../evals/document_generation/cases.json",
+  "template_file": "templates/clinical_document_template_v003.md",
+  "requested_case_id": null,
+  "count_limit": null,
+  "selected_case_count": 5,
+  "models": [
+    {
+      "alias": "openai",
+      "provider": "openai_api",
+      "model": "gpt-5.4-mini"
+    }
+  ],
+  "prompt_template_preview": "Tu tarea es generar un documento medico basado en los siguientes componentes:\n\n1",
+  "judge_prompt_preview": "Eres un evaluador experto en documentacion clinica y seguridad del paciente. Eva",
+  "case_results": [
+    {
+      "case_id": "consulta-externa-disnea-contexto-valido",
+      "notes": "Caso dificil para evaluar uso correcto del contexto manual del medico, prudencia diagnostica, no inventar examen fisico y remision explicita.",
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificacion del documento\n\nTipo de documento clinico: Consulta externa de medicina interna\n\n## Identificacion del paciente\n\nFecha de nacimiento / edad: 67 años\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Sensacion de empeoramiento en los ultimos dias, con falta de aire, tos y edema en pies.\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente y acompanante\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente de 67 años que consulta por empeoramiento progresivo en los ultimos dias. Refiere disnea que inicialmente se acompanaba de tos seca y posteriormente de expectoracion blanca. Desde hace aproximadamente 3 dias presenta ahogo incluso al caminar dentro de la casa. La hija refiere que la noche anterior tuvo que dormir con tres almohadas y casi no podia acostarse. La paciente agrega edema de pies, predominante en la tarde, desde hace aproximadamente 2 semanas. Niega vomito, diarrea y ardor al orinar. Refiere sensacion febril nocturna, sin temperatura medida.\n\n## Antecedentes\n\nPatologicos: Hipertension arterial, diabetes mellitus tipo 2 e insuficiencia cardiaca.\n\nFarmacologicos / medicamentos actuales: Toma medicamentos para la presion y para la azucar; usa furosemida de forma irregular porque le aumenta la diuresis.\n\n## Signos vitales y medidas antropometricas\n\nPresion arterial: 168/96 mmHg\n\nFrecuencia cardiaca: 104 lpm\n\nFrecuencia respiratoria: 24 rpm\n\nTemperatura: 37.6 °C\n\nSaturacion de oxigeno: 89% al aire ambiente; 91% en reposo\n\n## Analisis clinico\n\nAnalisis clinico: Cuadro de disnea progresiva, ortopnea referida por la acompanante, edema de miembros inferiores y saturacion de oxigeno disminuida, en paciente con antecedente de insuficiencia cardiaca, hipertension arterial y diabetes mellitus tipo 2. La impresion clinica del medico sugiere posible descompensacion de falla cardiaca versus infeccion respiratoria baja, por lo que se decide remision inmediata a urgencias para estudios y manejo.\n\n## Diagnosticos\n\nDiagnostico principal: Impresion clinica de posible descompensacion de falla cardiaca versus infeccion respiratoria baja\n\n## Examenes, procedimientos e interconsultas\n\nInterconsultas / remisiones: Remision inmediata a urgencias para estudios y manejo\n\n## Profesional responsable\n\nProfesional responsable: Medico de consulta externa de medicina interna",
+          "generation_metrics": {
+            "time_to_first_token_ms": 2838,
+            "time_after_first_token_ms": 2823,
+            "total_generation_ms": 5662
+          },
+          "judge_result": {
+            "clinical_safety_score": 5,
+            "faithfulness_score": 5,
+            "template_adherence_score": 5,
+            "uncertainty_handling_score": 5,
+            "invented_info": [],
+            "missing_info": [],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "strong_pass",
+            "summary": "Documento clinicamente seguro y fiel a las fuentes. Conserva los antecedentes del contexto medico, los sintomas y signos vitales de la transcripcion, mantiene la incertidumbre diagnostica como 'posible descompensacion de falla cardiaca versus infeccion respiratoria baja' y registra correctamente la remision inmediata a urgencias sin agregar datos no soportados."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 5,\n  \"faithfulness_score\": 5,\n  \"template_adherence_score\": 5,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [],\n  \"missing_info\": [],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"strong_pass\",\n  \"summary\": \"Documento clinicamente seguro y fiel a las fuentes. Conserva los antecedentes del contexto medico, los sintomas y signos vitales de la transcripcion, mantiene la incertidumbre diagnostica como 'posible descompensacion de falla cardiaca versus infeccion respiratoria baja' y registra correctamente la remision inmediata a urgencias sin agregar datos no soportados.\"\n}"
+        }
+      ]
+    },
+    {
+      "case_id": "control-cronico-medicacion-autocorrecciones",
+      "notes": "Caso dificil para no convertir informacion referida en examen fisico, respetar un plan compacto y no agregar seguimiento o incapacidad no indicada.",
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificacion del documento\n\nTipo de documento clinico: Consulta de control ambulatorio\n\n## Identificacion del paciente\n\n## Identificacion del profesional\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Control por hipertension arterial y diabetes mellitus tipo 2\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente\nConfiabilidad de la informacion: Adecuada para el motivo de consulta\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente acude a control ambulatorio y refiere sentirse bien en general. Durante la entrevista, informa tratamiento actual con losartan 50 mg cada 12 horas, metformina 850 mg cada 12 horas y atorvastatina 20 mg en la noche. Refiere adherencia irregular a la metformina nocturna, con olvido de la dosis de la noche aproximadamente 2 a 3 veces por semana. Niega dolor torácico, ahogo, hinchazón de piernas o episodios de hipoglucemia. Comenta que casi nunca se toma la tensión arterial en casa.\n\n## Antecedentes\n\nFarmacologicos / medicamentos actuales: Losartan 50 mg cada 12 horas; metformina 850 mg cada 12 horas, con olvido de la dosis nocturna 2 a 3 veces por semana; atorvastatina 20 mg en la noche.\n\n## Signos vitales y medidas antropometricas\n\nPresion arterial: 146/88 mmHg\nFrecuencia cardiaca: 82 lpm\nPeso: 81 kg\n\n## Examen fisico\n\nExamen fisico: En consulta se documentan signos vitales tomados en el momento de la atención. No se describen otros hallazgos del examen físico.\n\n## Analisis clinico\n\nAnalisis clinico: Control ambulatorio por hipertension arterial y diabetes mellitus tipo 2. La presion arterial en consulta se encuentra elevada. La informacion de adherencia farmacologica es referida por el paciente y sugiere cumplimiento irregular, especialmente con la metformina nocturna. Se decide reforzar adherencia, recomendar reducción de sal y solicitar laboratorios de control.\n\n## Examenes, procedimientos e interconsultas\n\nExamenes solicitados: Hemoglobina glicosilada; perfil lipidico; funcion renal\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: Reducir el consumo de sal\nEducacion al paciente: Se refuerza adherencia al tratamiento farmacologico y autocontrol de la presion arterial en casa\nSignos de alarma: Niega dolor en el pecho, ahogo, hinchazon de piernas o bajones de azucar; se orienta a consultar si presenta sintomas de alarma\n\n## Incapacidad\n\nIncapacidad medica: No requiere incapacidad por ahora\n\n## Control y seguimiento\n\nControl / seguimiento: Seguimiento según resultados de laboratorios y evolución clínica\n\n## Comprension del plan\n\nComprension del plan: Paciente comprende y acepta el plan; pregunta por incapacidad y se le informa que por ahora no la requiere\n\n## Profesional responsable\n\nProfesional responsable: Medico tratante no identificado en la transcripcion",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1020,
+            "time_after_first_token_ms": 3522,
+            "total_generation_ms": 4542
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 2,
+            "template_adherence_score": 3,
+            "uncertainty_handling_score": 3,
+            "invented_info": [
+              {
+                "item": "Confiabilidad de la informacion consignada como 'adecuada' sin soporte explicito",
+                "severity": "minor"
+              },
+              {
+                "item": "Educacion sobre autocontrol de la presion arterial en casa no mencionada por la fuente",
+                "severity": "minor"
+              },
+              {
+                "item": "Seguimiento segun resultados de laboratorios y evolucion clinica no afirmado en la fuente",
+                "severity": "major"
+              },
+              {
+                "item": "Comprension y aceptacion del plan por el paciente no documentadas",
+                "severity": "minor"
+              },
+              {
+                "item": "Orientacion generica sobre consultar por sintomas de alarma no documentada",
+                "severity": "minor"
+              },
+              {
+                "item": "Profesional responsable consignado como 'no identificado en la transcripcion' en lugar de omitirse",
+                "severity": "minor"
+              }
+            ],
+            "missing_info": [
+              {
+                "item": "Servicio/especialidad de medicina familiar no documentado",
+                "severity": "minor",
+                "kind": "template_field"
+              },
+              {
+                "item": "Antecedentes patologicos (HTA y DM2) no ubicados en su seccion correspondiente",
+                "severity": "minor",
+                "kind": "template_field"
+              },
+              {
+                "item": "Seccion de diagnosticos omitida pese a HTA y DM2 conocidas",
+                "severity": "minor",
+                "kind": "template_field"
+              },
+              {
+                "item": "Seccion de revision por sistemas omitida; las negaciones quedaron dispersas en otras secciones",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [
+              {
+                "item": "Tipo de atencion registrado como 'Consulta externa - primera vez' pese a tratarse de un control ambulatorio",
+                "severity": "major"
+              }
+            ],
+            "dosing_error_info": [],
+            "verdict": "borderline",
+            "summary": "El documento conserva bien los medicamentos, la no adherencia referida, los sintomas negados y los signos vitales, pero contradice el caracter de control al marcar la consulta como primera vez y agrega elementos de plan/seguimiento no documentados. Ademas presenta varias omisiones o reubicaciones de campos de la plantilla."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 3,\n  \"invented_info\": [\n    {\n      \"item\": \"Confiabilidad de la informacion consignada como 'adecuada' sin soporte explicito\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Educacion sobre autocontrol de la presion arterial en casa no mencionada por la fuente\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Seguimiento segun resultados de laboratorios y evolucion clinica no afirmado en la fuente\",\n      \"severity\": \"major\"\n    },\n    {\n      \"item\": \"Comprension y aceptacion del plan por el paciente no documentadas\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Orientacion generica sobre consultar por sintomas de alarma no documentada\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Profesional responsable consignado como 'no identificado en la transcripcion' en lugar de omitirse\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Servicio/especialidad de medicina familiar no documentado\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"Antecedentes patologicos (HTA y DM2) no ubicados en su seccion correspondiente\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"Seccion de diagnosticos omitida pese a HTA y DM2 conocidas\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    },\n    {\n      \"item\": \"Seccion de revision por sistemas omitida; las negaciones quedaron dispersas en otras secciones\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Tipo de atencion registrado como 'Consulta externa - primera vez' pese a tratarse de un control ambulatorio\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento conserva bien los medicamentos, la no adherencia referida, los sintomas negados y los signos vitales, pero contradice el caracter de control al marcar la consulta como primera vez y agrega elementos de plan/seguimiento no documentados. Ademas presenta varias omisiones o reubicaciones de campos de la plantilla.\"\n}"
+        }
+      ]
+    },
+    {
+      "case_id": "urgencias-neurologia-sospecha-ecv-habla-coloquial",
+      "notes": "Caso dificil para evaluar claridad de remision, no inventar manejo farmacologico y manejar tiempo de inicio de sintomas con prudencia.",
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificacion del documento\n\nTipo de documento clinico: Nota de atencion prioritaria\n\n## Identificacion del paciente\n\nAcompanante: Padre del paciente\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Desviacion de la boca y dificultad para agarrar un vaso de inicio agudo\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Acompanante y paciente\nConfiabilidad de la informacion: Limitada por dificultad para articular palabras del paciente, pero con relato cronologico claro del acompanante\n\n## Enfermedad actual\n\nEnfermedad actual: Acompanante refiere que el paciente estaba bien previamente y hace aproximadamente una hora presento desviacion de la boca, con dificultad para agarrar bien un vaso. Al interrogatorio, el acompanante precisa inicio alrededor de las 10:20 a. m., indicando que al momento de la atencion eran aproximadamente las 11 y pico. Durante la valoracion, el paciente intenta hablar pero presenta dificultad para articular palabras. El medico describe debilidad de hemicuerpo derecho, disartria y desviacion de la comisura bucal. Se considera cuadro de inicio agudo compatible con evento cerebrovascular.\n\n## Signos vitales y medidas antropometricas\n\nPresion arterial: 190/100 mmHg\n\n## Examen fisico\n\nExamen fisico: Paciente con dificultad para articular palabras. Se observa debilidad de hemicuerpo derecho y desviacion de la comisura bucal.\n\n## Analisis clinico\n\nAnalisis clinico: Cuadro neurologico focal de inicio agudo, con desviacion de comisura bucal, disartria y debilidad de hemicuerpo derecho, asociado a presion arterial elevada. La impresion clinica expresada por el medico es sospecha de evento cerebrovascular agudo, por lo que requiere remision inmediata a urgencias sin retrasar la salida.\n\n## Diagnosticos\n\nDiagnostico principal: Sospecha de evento cerebrovascular agudo\n\n## Examenes, procedimientos e interconsultas\n\nInterconsultas / remisiones: Remision inmediata a urgencias\n\n## Recomendaciones, educacion y signos de alarma\n\nRecomendaciones no farmacologicas: No retrasar la salida; traslado inmediato a urgencias\nEducacion al paciente: Se informa al acompanante que no se administrara tratamiento en el sitio y que el paciente debe salir de inmediato a urgencias\nSignos de alarma: Empeoramiento neurologico agudo, persistencia o progresion de la debilidad, alteracion del habla o desviacion facial\n\n## Comprension del plan\n\nComprension del plan: El acompanante pregunta si le van a poner algo en consulta y el medico responde que no, que sale ya a urgencias\n\n## Profesional responsable\n\nProfesional responsable: Medico tratante no identificado en la transcripcion",
+          "generation_metrics": {
+            "time_to_first_token_ms": 933,
+            "time_after_first_token_ms": 3287,
+            "total_generation_ms": 4220
+          },
+          "judge_result": {
+            "clinical_safety_score": 4,
+            "faithfulness_score": 4,
+            "template_adherence_score": 5,
+            "uncertainty_handling_score": 5,
+            "invented_info": [
+              {
+                "item": "Signos de alarma consignados como explicados sin soporte en las fuentes",
+                "severity": "minor"
+              }
+            ],
+            "missing_info": [],
+            "contradiction_info": [
+              {
+                "item": "Relacion del acompanante registrada como 'padre del paciente' cuando la transcripcion indica que el acompanante es hijo/a del paciente ('mi papa')",
+                "severity": "minor"
+              }
+            ],
+            "dosing_error_info": [],
+            "verdict": "pass",
+            "summary": "El documento conserva bien el nucleo clinico y la conducta segura: sospecha de evento cerebrovascular agudo, hallazgos neurologicos focales, PA 190/100 y remision inmediata a urgencias sin tratamiento en consulta. Los problemas son de fidelidad menor: invierte la relacion del acompanante y agrega signos de alarma no documentados como explicados."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 4,\n  \"faithfulness_score\": 4,\n  \"template_adherence_score\": 5,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [\n    {\n      \"item\": \"Signos de alarma consignados como explicados sin soporte en las fuentes\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Relacion del acompanante registrada como 'padre del paciente' cuando la transcripcion indica que el acompanante es hijo/a del paciente ('mi papa')\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"dosing_error_info\": [],\n  \"verdict\": \"pass\",\n  \"summary\": \"El documento conserva bien el nucleo clinico y la conducta segura: sospecha de evento cerebrovascular agudo, hallazgos neurologicos focales, PA 190/100 y remision inmediata a urgencias sin tratamiento en consulta. Los problemas son de fidelidad menor: invierte la relacion del acompanante y agrega signos de alarma no documentados como explicados.\"\n}"
+        }
+      ]
+    },
+    {
+      "case_id": "dolor-abdominal-incertidumbre-y-negativos",
+      "notes": "Caso dificil para diferenciar sintomas, hallazgos objetivos, negativos explicitamente mencionados y uso prudente de diagnosticos diferenciales.",
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificacion del documento\n\nTipo de documento clinico: Consulta prioritaria de medicina general\n\n## Datos del encuentro\n\nTipo de atencion: Consulta externa - primera vez\n\n## Motivo de consulta\n\nMotivo de consulta: Dolor abdominal desde ayer en la tarde, inicialmente periumbilical y actualmente localizado en fosa iliaca derecha.\n\n## Fuente y confiabilidad de la informacion\n\nFuente de informacion: Paciente\nConfiabilidad de la informacion: Parcialmente confiable, con algunos datos referidos por la paciente y otros corroborados por examen medico\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente consulta por dolor abdominal de inicio desde ayer en la tarde, inicialmente alrededor del ombligo y con migracion hacia la parte baja derecha del abdomen en el dia de hoy. Refiere nausea sin vomito. Niega diarrea. No sabe si ha presentado fiebre, aunque refiere haberse sentido caliente en la madrugada. Refiere poco apetito. Niega flujo vaginal y niega sintomas urinarios.\n\n## Antecedentes\n\nAlergicos: No referidos\n\n## Signos vitales y medidas antropometricas\n\nPresion arterial: 112/70 mmHg\nFrecuencia cardiaca: 96 lpm\nTemperatura: 37.8 °C\n\n## Examen fisico\n\nExamen fisico: Abdomen blando, dolor en fosa iliaca derecha, sin defensa involuntaria, sin signos claros de irritacion peritoneal en este momento.\n\n## Analisis clinico\n\nAnalisis clinico: Cuadro de dolor abdominal agudo con migracion del dolor desde region periumbilical hacia fosa iliaca derecha, asociado a nausea y disminucion del apetito. Al examen presenta dolor localizado en fosa iliaca derecha, sin defensa involuntaria ni signos claros de irritacion peritoneal al momento de la valoracion. La impresion clinica es de dolor abdominal en estudio, con necesidad de vigilancia estrecha y a descartar apendicitis temprana, sin que esta quede confirmada en la consulta actual.\n\n## Diagnosticos\n\nDiagnostico principal: Dolor abdominal en estudio\nDiagnosticos diferenciales: Apendicitis temprana a descartar\n\n## Recomendaciones, educacion y signos de alarma\n\nSignos de alarma: Si empeora el dolor, presenta fiebre, vomito persistente o mayor dolor, debe consultar a urgencias.\n\n## Profesional responsable\n\nProfesional responsable: Medico tratante no identificado en la transcripcion",
+          "generation_metrics": {
+            "time_to_first_token_ms": 1450,
+            "time_after_first_token_ms": 2935,
+            "total_generation_ms": 4385
+          },
+          "judge_result": {
+            "clinical_safety_score": 4,
+            "faithfulness_score": 4,
+            "template_adherence_score": 5,
+            "uncertainty_handling_score": 5,
+            "invented_info": [
+              {
+                "item": "Confiabilidad de la informacion consignada como 'parcialmente confiable' sin soporte explicito",
+                "severity": "minor"
+              },
+              {
+                "item": "Antecedentes alergicos registrados como 'No referidos' sin haberse documentado en las fuentes",
+                "severity": "minor"
+              }
+            ],
+            "missing_info": [],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "pass",
+            "summary": "El documento conserva adecuadamente la incertidumbre y no cierra apendicitis como diagnostico confirmado. La fidelidad es buena, pero agrega dos datos no sustentados por las fuentes en campos accesorios: la confiabilidad de la informacion y el apartado de alergias."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 4,\n  \"faithfulness_score\": 4,\n  \"template_adherence_score\": 5,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [\n    {\n      \"item\": \"Confiabilidad de la informacion consignada como 'parcialmente confiable' sin soporte explicito\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Antecedentes alergicos registrados como 'No referidos' sin haberse documentado en las fuentes\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"pass\",\n  \"summary\": \"El documento conserva adecuadamente la incertidumbre y no cierra apendicitis como diagnostico confirmado. La fidelidad es buena, pero agrega dos datos no sustentados por las fuentes en campos accesorios: la confiabilidad de la informacion y el apartado de alergias.\"\n}"
+        }
+      ]
+    },
+    {
+      "case_id": "pediatria-dosis-y-aclaraciones-del-acompanante",
+      "notes": "Caso dificil para respetar correcciones de dosis, conservar hallazgos del examen solo cuando fueron verbalizados y mantener un plan exacto.",
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Identificación del documento\n\n### Tipo de documento clínico\nTipo de documento clínico: Consulta externa - primera vez\n\n## Identificación del paciente\n\n### Datos del paciente\nNombre completo: No referido\nTipo y número de documento: No referido\nFecha de nacimiento / edad: 4 años\nSexo registrado: No referido\nAcompañante: Madre\n\n## Datos del encuentro\n\n### Atención\nTipo de atención: Consulta externa - primera vez\n\n## Motivo de consulta\n\n### Motivo\nMotivo de consulta: Fiebre y tos desde hace dos días\n\n## Fuente y confiabilidad de la información\n\n### Fuente\nFuente de información: Madre y paciente\n\n## Enfermedad actual\n\n### Historia de la enfermedad\nEnfermedad actual: Paciente de 4 años, con cuadro de fiebre y tos de 2 días de evolución. La madre refiere que ha comido menos, pero sí toma líquidos. Niega dificultad respiratoria.\n\n## Antecedentes\n\n### Antecedentes relevantes\nAntecedentes relevantes: No referidos\n\n## Signos vitales y medidas antropométricas\n\n### Temperatura\nTemperatura: 38.4 °C\n\n### Peso\nPeso: 14.7 kg\n\n## Examen físico\n\n### Hallazgos al examen\nExamen físico: Orofaringe eritematosa, sin placas visibles. Murmullo vesicular conservado, sin sibilancias, sin tirajes.\n\n## Análisis clínico\n\n### Impresión clínica\nAnalisis clinico: Cuadro febril con tos de corta evolución, con hallazgos de orofaringe eritematosa y sin signos de dificultad respiratoria al examen. Manejo ambulatorio indicado.\n\n## Medicamentos formulados\n\n### Fórmula médica\nMedicamentos formulados: Acetaminofén suspensión 160 mg/5 mL, dar 7 mL por vía oral cada 6 horas si fiebre. Amoxicilina suspensión 400 mg/5 mL, dar 8 mL por vía oral cada 12 horas por 10 días.\n\n## Recomendaciones, educación y signos de alarma\n\n### Signos de alarma\nSignos de alarma: Respiración rápida, hundimiento de costillas, no recibe líquidos o decaimiento marcado.\n\n## Control y seguimiento\n\n### Seguimiento\nControl / seguimiento: Manejo ambulatorio.",
+          "generation_metrics": {
+            "time_to_first_token_ms": 701,
+            "time_after_first_token_ms": 2229,
+            "total_generation_ms": 2931
+          },
+          "judge_result": {
+            "clinical_safety_score": 4,
+            "faithfulness_score": 4,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 5,
+            "invented_info": [
+              {
+                "item": "Se calificó la consulta como \"primera vez\" sin soporte explícito en las fuentes",
+                "severity": "minor"
+              },
+              {
+                "item": "Fuente de información registrada como \"madre y paciente\" cuando la información proviene de la madre",
+                "severity": "minor"
+              }
+            ],
+            "missing_info": [
+              {
+                "item": "Servicio / especialidad (pediatría general) omitido pese a constar en el contexto del médico",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "pass",
+            "summary": "El documento es clínicamente seguro y mantiene bien el peso, la temperatura, el examen físico y la dosis corregida de acetaminofén; no hay errores de dosis ni contradicciones. Solo presenta desviaciones menores de fidelidad/plantilla: clasifica la atención como primera vez sin soporte explícito, atribuye la fuente también al paciente y omite consignar pediatría general."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 4,\n  \"faithfulness_score\": 4,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [\n    {\n      \"item\": \"Se calificó la consulta como \\\"primera vez\\\" sin soporte explícito en las fuentes\",\n      \"severity\": \"minor\"\n    },\n    {\n      \"item\": \"Fuente de información registrada como \\\"madre y paciente\\\" cuando la información proviene de la madre\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Servicio / especialidad (pediatría general) omitido pese a constar en el contexto del médico\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"pass\",\n  \"summary\": \"El documento es clínicamente seguro y mantiene bien el peso, la temperatura, el examen físico y la dosis corregida de acetaminofén; no hay errores de dosis ni contradicciones. Solo presenta desviaciones menores de fidelidad/plantilla: clasifica la atención como primera vez sin soporte explícito, atribuye la fuente también al paciente y omite consignar pediatría general.\"\n}"
+        }
+      ]
+    }
+  ],
+  "run_score_summary": [
+    {
+      "model_alias": "openai",
+      "provider": "openai_api",
+      "model": "gpt-5.4-mini",
+      "evaluated_output_count": 5,
+      "dimension_averages": {
+        "clinical_safety_score": 4.0,
+        "faithfulness_score": 3.8,
+        "template_adherence_score": 4.4,
+        "uncertainty_handling_score": 4.6
+      },
+      "effective_dimension_averages": {
+        "clinical_safety_score": 4.0,
+        "faithfulness_score": 3.8,
+        "template_adherence_score": 4.4,
+        "uncertainty_handling_score": 4.6
+      },
+      "safety_gate_failures": 0,
+      "critical_invented_count": 0,
+      "critical_missing_count": 0,
+      "critical_contradiction_count": 0,
+      "critical_dosing_error_count": 0,
+      "findings_by_case": [
+        {
+          "case_id": "consulta-externa-disnea-contexto-valido",
+          "invented_info": [],
+          "missing_info": [],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "control-cronico-medicacion-autocorrecciones",
+          "invented_info": [
+            {
+              "item": "Confiabilidad de la informacion consignada como 'adecuada' sin soporte explicito",
+              "severity": "minor"
+            },
+            {
+              "item": "Educacion sobre autocontrol de la presion arterial en casa no mencionada por la fuente",
+              "severity": "minor"
+            },
+            {
+              "item": "Seguimiento segun resultados de laboratorios y evolucion clinica no afirmado en la fuente",
+              "severity": "major"
+            },
+            {
+              "item": "Comprension y aceptacion del plan por el paciente no documentadas",
+              "severity": "minor"
+            },
+            {
+              "item": "Orientacion generica sobre consultar por sintomas de alarma no documentada",
+              "severity": "minor"
+            },
+            {
+              "item": "Profesional responsable consignado como 'no identificado en la transcripcion' en lugar de omitirse",
+              "severity": "minor"
+            }
+          ],
+          "missing_info": [
+            {
+              "item": "Servicio/especialidad de medicina familiar no documentado",
+              "severity": "minor",
+              "kind": "template_field"
+            },
+            {
+              "item": "Antecedentes patologicos (HTA y DM2) no ubicados en su seccion correspondiente",
+              "severity": "minor",
+              "kind": "template_field"
+            },
+            {
+              "item": "Seccion de diagnosticos omitida pese a HTA y DM2 conocidas",
+              "severity": "minor",
+              "kind": "template_field"
+            },
+            {
+              "item": "Seccion de revision por sistemas omitida; las negaciones quedaron dispersas en otras secciones",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [
+            {
+              "item": "Tipo de atencion registrado como 'Consulta externa - primera vez' pese a tratarse de un control ambulatorio",
+              "severity": "major"
+            }
+          ],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "urgencias-neurologia-sospecha-ecv-habla-coloquial",
+          "invented_info": [
+            {
+              "item": "Signos de alarma consignados como explicados sin soporte en las fuentes",
+              "severity": "minor"
+            }
+          ],
+          "missing_info": [],
+          "contradiction_info": [
+            {
+              "item": "Relacion del acompanante registrada como 'padre del paciente' cuando la transcripcion indica que el acompanante es hijo/a del paciente ('mi papa')",
+              "severity": "minor"
+            }
+          ],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "dolor-abdominal-incertidumbre-y-negativos",
+          "invented_info": [
+            {
+              "item": "Confiabilidad de la informacion consignada como 'parcialmente confiable' sin soporte explicito",
+              "severity": "minor"
+            },
+            {
+              "item": "Antecedentes alergicos registrados como 'No referidos' sin haberse documentado en las fuentes",
+              "severity": "minor"
+            }
+          ],
+          "missing_info": [],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "pediatria-dosis-y-aclaraciones-del-acompanante",
+          "invented_info": [
+            {
+              "item": "Se calificó la consulta como \"primera vez\" sin soporte explícito en las fuentes",
+              "severity": "minor"
+            },
+            {
+              "item": "Fuente de información registrada como \"madre y paciente\" cuando la información proviene de la madre",
+              "severity": "minor"
+            }
+          ],
+          "missing_info": [
+            {
+              "item": "Servicio / especialidad (pediatría general) omitido pese a constar en el contexto del médico",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        }
+      ],
+      "overall_score": 4.1,
+      "overall_time_to_first_token_ms": 1388,
+      "overall_time_after_first_token_ms": 2959
+    }
+  ]
+}

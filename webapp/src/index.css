@@ -32,14 +32,6 @@ h1 {
   line-height: 1.1;
 }
 
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
 .medical-document-editor {
   height: 100%;
 }
@@ -74,7 +66,7 @@ button:focus-visible {
   margin: 0.5rem 0;
 }
 
-.medical-document-editor .ProseMirror p.is-empty::before {
+.medical-document-editor .ProseMirror p.is-empty.is-editor-empty::before {
   color: #9ca3af;
   content: attr(data-placeholder);
   float: left;

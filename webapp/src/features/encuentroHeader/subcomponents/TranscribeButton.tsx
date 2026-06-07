@@ -38,12 +38,23 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
     transcribeAudio,
   } = useTranscriptionContext();
 
-  // Reset transcription state when resetKey changes or audio is deleted
+  // Reset transcription state when resetKey changes or audio is deleted.
+  // Never reset while a retryable error is pending, otherwise mounting this
+  // button to offer the retry would immediately clear the error it surfaces.
   useEffect(() => {
-    if (!audioExists && !audioBlob) {
+    const hasRetryableError =
+      transcriptionStatus === "error" && canRetryTranscription;
+    if (!audioExists && !audioBlob && !hasRetryableError) {
       resetTranscriptionState();
     }
-  }, [resetKey, audioExists, audioBlob, resetTranscriptionState]);
+  }, [
+    resetKey,
+    audioExists,
+    audioBlob,
+    transcriptionStatus,
+    canRetryTranscription,
+    resetTranscriptionState,
+  ]);
 
   const hasRealtimeSession = Boolean(
     pendingAudioSections > 0 || transcriptionStatus === "pending",
@@ -110,7 +121,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
 
   // Determine button appearance based on state
   const buttonClasses = `
-    flex items-center justify-center px-2 py-1 rounded-md py-1.5
+    flex items-center justify-center px-4 py-2 rounded-md font-medium
     ${
       isDisabled
         ? "bg-gray-200 text-gray-400 cursor-not-allowed"
@@ -130,6 +141,10 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
   const defaultAriaLabel = shouldContinueRealtimeTranscription
     ? "Continuar transcripción en curso"
     : "Transcribir audio a texto";
+
+  const buttonAriaLabel = shouldOfferRetry
+    ? "Reintentar transcripción"
+    : defaultAriaLabel;
 
   // Button content based on state
   const renderButtonContent = () => {
@@ -230,7 +245,7 @@ const TranscribeButton: React.FC<TranscribeButtonProps> = ({
           onClick={handleTranscribe}
           disabled={isDisabled}
           className={buttonClasses}
-          aria-label={defaultAriaLabel}
+          aria-label={buttonAriaLabel}
         >
           {renderButtonContent()}
         </button>
