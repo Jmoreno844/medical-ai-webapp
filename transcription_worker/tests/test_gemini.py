@@ -7,7 +7,7 @@ from app.settings import Settings
 
 
 @pytest.mark.asyncio
-async def test_transcribe_audio_routes_to_google(
+async def test_transcribe_audio_routes_to_google_with_gcs_uri(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict[str, object] = {}
@@ -20,50 +20,39 @@ async def test_transcribe_audio_routes_to_google(
 
     settings = Settings(ENVIRONMENT="test", TRANSCRIPTION_PROVIDER="google_genai")
     result = await gemini.transcribe_audio(
-        gcs_uri="gs://bucket/file.webm",
-        content_type="audio/webm",
+        gcs_uri="gs://bucket/file.ogg",
+        content_type="audio/ogg",
         settings=settings,
     )
 
     assert result == "ok"
-    assert captured["gcs_uri"] == "gs://bucket/file.webm"
+    assert captured["gcs_uri"] == "gs://bucket/file.ogg"
+    assert captured["audio_bytes"] is None
 
 
 @pytest.mark.asyncio
-async def test_transcribe_audio_routes_to_openai_and_requires_audio_bytes(
+async def test_transcribe_audio_routes_to_google_with_inline_audio(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict[str, object] = {}
 
-    async def fake_openai(**kwargs) -> str:
+    async def fake_google(**kwargs) -> str:
         captured.update(kwargs)
         return "ok"
 
-    monkeypatch.setattr(gemini, "_transcribe_with_openai", fake_openai)
+    monkeypatch.setattr(gemini, "_transcribe_with_google", fake_google)
 
-    settings = Settings(
-        ENVIRONMENT="test",
-        TRANSCRIPTION_PROVIDER="openai",
-        TRANSCRIPTION_MODEL="gpt-4o-mini-transcribe",
-    )
+    settings = Settings(ENVIRONMENT="test", TRANSCRIPTION_PROVIDER="google_genai")
     result = await gemini.transcribe_audio(
-        gcs_uri="gs://bucket/file.webm",
-        content_type="audio/webm",
+        gcs_uri=None,
+        content_type="audio/wav",
         settings=settings,
         audio_bytes=b"abc",
     )
 
     assert result == "ok"
+    assert captured["gcs_uri"] is None
     assert captured["audio_bytes"] == b"abc"
-
-
-def test_effective_transcription_model_uses_openai_default_for_openai_provider() -> None:
-    settings = Settings(
-        ENVIRONMENT="test",
-        TRANSCRIPTION_PROVIDER="openai",
-    )
-
-    assert settings.effective_transcription_model == "gpt-4o-mini-transcribe"
 
 
 def test_effective_transcription_model_prefers_explicit_override() -> None:
@@ -76,25 +65,14 @@ def test_effective_transcription_model_prefers_explicit_override() -> None:
     assert settings.effective_transcription_model == "gemini-2.5-flash"
 
 
-@pytest.mark.asyncio
-async def test_openai_provider_requires_api_key() -> None:
+def test_unsupported_provider_normalizes_to_google_genai() -> None:
     settings = Settings(
         ENVIRONMENT="test",
-        TRANSCRIPTION_PROVIDER="openai",
-        OPENAI_API_KEY="",
+        TRANSCRIPTION_PROVIDER="legacy_provider",
     )
 
-    with pytest.raises(ValueError, match="OPENAI_API_KEY is required"):
-        await gemini.transcribe_audio(
-            gcs_uri="gs://bucket/file.webm",
-            content_type="audio/webm",
-            settings=settings,
-            audio_bytes=b"abc",
-        )
-
-
-def test_filename_for_content_type_normalizes_codec_suffix() -> None:
-    assert gemini._filename_for_content_type("audio/webm;codecs=opus") == "section.webm"
+    assert settings.transcription_provider_name == "google_genai"
+    assert settings.effective_transcription_model == "gemini-2.5-flash"
 
 
 def test_strip_prompt_echo_keeps_transcript_prefix() -> None:

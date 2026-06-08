@@ -166,15 +166,20 @@ export const generateSectionUploadUrl = async (
   recordingSessionId: string,
   clientSectionId: string,
   sectionIndex: number,
-  contentType: string
-): Promise<{ uploadUrl: string; gcsObjectName: string } | null> => {
+  contentTypeOriginal: string,
+  contentTypeClipped: string,
+): Promise<{
+  original: { uploadUrl: string; gcsObjectName: string; contentType: string };
+  clipped: { uploadUrl: string; gcsObjectName: string; contentType: string };
+} | null> => {
   try {
     const response = await axiosInstance.post(
       `/api/v1/transcription/sessions/${recordingSessionId}/sections/upload-url`,
       {
         client_section_id: clientSectionId,
         section_index: sectionIndex,
-        content_type: contentType,
+        content_type_original: contentTypeOriginal,
+        content_type_clipped: contentTypeClipped,
       }
     );
     if (!response.data?.success) {
@@ -185,8 +190,16 @@ export const generateSectionUploadUrl = async (
       return null;
     }
     return {
-      uploadUrl: response.data.upload_url,
-      gcsObjectName: response.data.gcs_object_name,
+      original: {
+        uploadUrl: response.data.original.upload_url,
+        gcsObjectName: response.data.original.gcs_object_name,
+        contentType: response.data.original.content_type,
+      },
+      clipped: {
+        uploadUrl: response.data.clipped.upload_url,
+        gcsObjectName: response.data.clipped.gcs_object_name,
+        contentType: response.data.clipped.content_type,
+      },
     };
   } catch (error) {
     logger.error(
@@ -205,9 +218,14 @@ export const registerAudioSection = async (
     start_time_ms: number;
     end_time_ms: number;
     overlap_ms: number;
-    gcs_object_name: string;
-    content_type: string;
-    byte_size?: number;
+    original_gcs_object_name: string;
+    original_content_type: string;
+    original_byte_size?: number;
+    clipped_gcs_object_name: string;
+    clipped_content_type: string;
+    clipped_byte_size?: number;
+    transcription_source_gcs_object_name: string;
+    frontend_vad_metadata?: Record<string, unknown>;
   }
 ): Promise<{ success: boolean; backendSectionId?: string }> => {
   try {

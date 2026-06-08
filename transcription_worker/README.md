@@ -25,17 +25,9 @@ Provider defaults:
 - `TRANSCRIPTION_PROVIDER=google_genai`
 - `TRANSCRIPTION_GEMINI_MODEL=gemini-2.5-flash`
 
-Testing with OpenAI direct upload from the worker:
-
-```bash
-TRANSCRIPTION_PROVIDER=openai
-TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
-OPENAI_API_KEY=your-key
-```
-
-With `google_genai`, the worker keeps sending `gs://...` references to Vertex
-AI. With `openai`, the worker reuses the downloaded audio bytes from VAD and
-sends the section file directly to OpenAI only for the transcription request.
+The happy path always sends `gs://...` references to Vertex AI for the
+frontend-generated `clipped` artifact. The worker only downloads audio when it
+needs to fall back to Silero over the `original` artifact.
 
 Set `TRANSCRIPTION_WORKER_BASE_URL=http://localhost:8091` in
 `backend_fastapi/.env.local` to let local FastAPI dispatch background section
@@ -47,8 +39,8 @@ For local debugging only, the worker also exposes:
 POST /api/v1/dev/transcription/debug
 ```
 
-It accepts a multipart audio file plus optional `provider` / `model` override
-and is used by the frontend debug page at `/debug/transcripcion`.
+It accepts a multipart audio file plus an optional `model` override and is used
+by the frontend debug page at `/debug/transcripcion`.
 
 ## Logging
 

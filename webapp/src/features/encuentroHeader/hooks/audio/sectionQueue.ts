@@ -1,3 +1,8 @@
+import {
+  openIndexedDb,
+  withIndexedDbStore,
+} from "@/lib/indexedDbStore";
+
 export type LocalSectionStatus =
   | "recorded"
   | "discarded_no_voice"
@@ -18,71 +23,52 @@ export type LocalAudioSection = {
   start_time_ms: number;
   end_time_ms: number;
   overlap_ms: number;
-  blob?: Blob;
-  content_type: string;
+  original_blob?: Blob;
+  clipped_blob?: Blob;
+  original_content_type: string;
+  clipped_content_type: string;
   status: LocalSectionStatus;
   retry_count: number;
   speech_frame_count?: number;
   discard_reason?: string;
-  gcs_object_name?: string;
+  original_gcs_object_name?: string;
+  clipped_gcs_object_name?: string;
+  transcription_source_gcs_object_name?: string;
+  frontend_vad_metadata?: Record<string, unknown>;
   backend_section_id?: string;
   created_at: string;
   updated_at: string;
 };
 
 const DB_NAME = "vexthealth-audio-sections";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "sections";
-
-let dbPromise: Promise<IDBDatabase> | null = null;
-
-function openDb(): Promise<IDBDatabase> {
-  if (dbPromise) return dbPromise;
-
-  dbPromise = new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, {
-          keyPath: "local_section_id",
-        });
-        store.createIndex("encounter_id", "encounter_id");
-        store.createIndex("recording_session_id", "recording_session_id");
-        store.createIndex("status", "status");
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-
-  return dbPromise;
-}
-
-async function withStore<T>(
-  mode: IDBTransactionMode,
-  fn: (store: IDBObjectStore) => IDBRequest<T> | void,
-): Promise<T | undefined> {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, mode);
-    const store = transaction.objectStore(STORE_NAME);
-    const request = fn(store);
-    let result: T | undefined;
-
-    if (request) {
-      request.onsuccess = () => {
-        result = request.result;
-      };
-      request.onerror = () => reject(request.error);
-    }
-    transaction.oncomplete = () => resolve(result);
-    transaction.onerror = () => reject(transaction.error);
-  });
-}
+const databaseDefinition = {
+  name: DB_NAME,
+  version: DB_VERSION,
+  stores: {
+    [STORE_NAME]: {
+      keyPath: "local_section_id",
+      indexes: [
+        { name: "encounter_id", keyPath: "encounter_id" },
+        { name: "recording_session_id", keyPath: "recording_session_id" },
+        { name: "status", keyPath: "status" },
+      ],
+    },
+    debug_sections: {
+      keyPath: "id",
+      indexes: [
+        { name: "status", keyPath: "status" },
+        { name: "createdAt", keyPath: "createdAt" },
+      ],
+    },
+  },
+} as const;
 
 export async function saveLocalSection(section: LocalAudioSection) {
-  await withStore("readwrite", (store) => store.put(section));
+  await withIndexedDbStore(databaseDefinition, STORE_NAME, "readwrite", (store) =>
+    store.put(section),
+  );
 }
 
 export async function updateLocalSection(
@@ -101,7 +87,7 @@ export async function updateLocalSection(
 export async function getLocalSection(
   localSectionId: string,
 ): Promise<LocalAudioSection | undefined> {
-  return withStore<LocalAudioSection>("readonly", (store) =>
+  return withIndexedDbStore<LocalAudioSection>(databaseDefinition, STORE_NAME, "readonly", (store) =>
     store.get(localSectionId),
   );
 }
@@ -109,7 +95,7 @@ export async function getLocalSection(
 export async function listPendingSections(
   encounterId?: number,
 ): Promise<LocalAudioSection[]> {
-  const db = await openDb();
+  const db = await openIndexedDb(databaseDefinition);
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, "readonly");
     const store = transaction.objectStore(STORE_NAME);
@@ -134,7 +120,7 @@ export async function listPendingSections(
 export async function deleteLocalSectionBlob(localSectionId: string) {
   const current = await getLocalSection(localSectionId);
   if (!current) return;
-  const withoutBlob: Omit<LocalAudioSection, "blob"> = {
+  const withoutBlob: Omit<LocalAudioSection, "original_blob" | "clipped_blob"> = {
     local_section_id: current.local_section_id,
     recording_session_id: current.recording_session_id,
     encounter_id: current.encounter_id,
@@ -143,12 +129,17 @@ export async function deleteLocalSectionBlob(localSectionId: string) {
     start_time_ms: current.start_time_ms,
     end_time_ms: current.end_time_ms,
     overlap_ms: current.overlap_ms,
-    content_type: current.content_type,
+    original_content_type: current.original_content_type,
+    clipped_content_type: current.clipped_content_type,
     status: current.status,
     retry_count: current.retry_count,
     speech_frame_count: current.speech_frame_count,
     discard_reason: current.discard_reason,
-    gcs_object_name: current.gcs_object_name,
+    original_gcs_object_name: current.original_gcs_object_name,
+    clipped_gcs_object_name: current.clipped_gcs_object_name,
+    transcription_source_gcs_object_name:
+      current.transcription_source_gcs_object_name,
+    frontend_vad_metadata: current.frontend_vad_metadata,
     backend_section_id: current.backend_section_id,
     created_at: current.created_at,
     updated_at: current.updated_at,

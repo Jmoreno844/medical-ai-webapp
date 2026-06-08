@@ -7,6 +7,12 @@ import react from "@vitejs/plugin-react-swc";
 export default defineConfig({
   base: process.env.VITE_BASE_URL || "/",
   plugins: [react()],
+  worker: {
+    format: "es",
+  },
+  optimizeDeps: {
+    exclude: ["onnxruntime-web"],
+  },
   server: {
     proxy: {
       "/otel/v1/traces": {

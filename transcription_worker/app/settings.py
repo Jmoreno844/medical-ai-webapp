@@ -37,11 +37,6 @@ class Settings(BaseSettings):
         default="gemini-2.5-flash",
         alias="TRANSCRIPTION_GEMINI_MODEL",
     )
-    transcription_openai_model: str = Field(
-        default="gpt-4o-mini-transcribe",
-        alias="TRANSCRIPTION_OPENAI_MODEL",
-    )
-    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     cloud_tasks_invoker_service_account: str | None = Field(
         default=None,
         alias="CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT",
@@ -64,13 +59,14 @@ class Settings(BaseSettings):
 
     @property
     def transcription_provider_name(self) -> str:
-        return self.transcription_provider.strip().lower()
+        normalized = self.transcription_provider.strip().lower()
+        if normalized in {"google", "google_genai", "gemini"}:
+            return normalized
+        return "google_genai"
 
     @property
     def effective_transcription_model(self) -> str:
         model = (self.transcription_model or "").strip()
         if model:
             return model
-        if self.transcription_provider_name in {"openai", "openai_api"}:
-            return self.transcription_openai_model
         return self.transcription_gemini_model

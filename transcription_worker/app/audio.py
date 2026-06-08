@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import subprocess
+import wave
+from io import BytesIO
 
 import numpy as np
 from google.cloud import storage
@@ -48,10 +50,6 @@ def convert_audio_to_pcm_wav(audio_bytes: bytes) -> bytes:
     return process.stdout
 
 
-def convert_audio_to_openai_wav(audio_bytes: bytes) -> bytes:
-    return convert_audio_to_wav(audio_bytes)
-
-
 def convert_audio_to_wav(audio_bytes: bytes) -> bytes:
     process = subprocess.run(
         [
@@ -79,3 +77,15 @@ def convert_audio_to_wav(audio_bytes: bytes) -> bytes:
     if process.returncode != 0:
         raise ValueError("audio_transcode_failed")
     return process.stdout
+
+
+def encode_float32_pcm_to_wav(audio_samples: np.ndarray) -> bytes:
+    clipped = np.clip(audio_samples, -1.0, 1.0)
+    pcm_int16 = (clipped * 32767).astype(np.int16)
+    buffer = BytesIO()
+    with wave.open(buffer, "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(16000)
+        wav_file.writeframes(pcm_int16.tobytes())
+    return buffer.getvalue()

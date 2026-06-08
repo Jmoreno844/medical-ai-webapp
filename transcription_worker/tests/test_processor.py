@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from app.processor import Processor
@@ -15,113 +17,136 @@ class FakeBackend:
         return {
             "section_id": section_id,
             "session_id": "session-1",
-            "gcs_object_name": "encounter_audio/1/test.webm",
-            "gcs_uri": "gs://bucket/encounter_audio/1/test.webm",
-            "content_type": "audio/webm",
+            "clipped_gcs_object_name": "encounter_audio/1/clipped.ogg",
+            "clipped_gcs_uri": "gs://bucket/encounter_audio/1/clipped.ogg",
+            "clipped_content_type": "audio/ogg",
+            "transcription_source_gcs_object_name": "encounter_audio/1/clipped.ogg",
+            "transcription_source_gcs_uri": "gs://bucket/encounter_audio/1/clipped.ogg",
+            "transcription_source_content_type": "audio/ogg",
+            "original_gcs_object_name": "encounter_audio/1/original.webm",
         }
 
     async def post_section_result(self, section_id: str, payload: dict) -> None:
         self.section_results.append({"section_id": section_id, **payload})
 
 
-@pytest.mark.asyncio
-async def test_no_speech_section_skips_gemini(monkeypatch: pytest.MonkeyPatch) -> None:
-    backend = FakeBackend()
-    processor = Processor(
-        settings=Settings(ENVIRONMENT="test"),
+def build_processor(backend: FakeBackend) -> Processor:
+    return Processor(
+        settings=Settings(ENVIRONMENT="test", TRANSCRIPTION_PROVIDER="google_genai"),
         backend=backend,
-        vad_semaphore=None,  # type: ignore[arg-type]
-        gemini_semaphore=None,  # type: ignore[arg-type]
+        vad_semaphore=asyncio.Semaphore(1),
+        gemini_semaphore=asyncio.Semaphore(1),
     )
 
-    async def fake_download_audio(_object_name: str) -> bytes:
-        return b"audio"
-
-    async def fake_vad(_audio_bytes: bytes) -> VadResult:
-        return VadResult(is_speech=False, speech_ms=0, speech_ratio=0.0)
-
-    async def fail_gemini(**_kwargs) -> str:
-        raise AssertionError("Gemini should not be called for no-speech sections")
-
-    monkeypatch.setattr(processor, "_download_audio_bytes", fake_download_audio)
-    monkeypatch.setattr(processor, "_run_vad", fake_vad)
-    monkeypatch.setattr("app.processor.transcribe_audio", fail_gemini)
-
-    await processor.process_section("section-1")
-
-    assert backend.section_results[0]["status"] == "discarded_no_speech"
-
 
 @pytest.mark.asyncio
-async def test_vad_error_fails_open_to_gemini(
+async def test_happy_path_transcribes_from_gcs_without_downloading_clipped(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     backend = FakeBackend()
-    processor = Processor(
-        settings=Settings(ENVIRONMENT="test"),
-        backend=backend,
-        vad_semaphore=None,  # type: ignore[arg-type]
-        gemini_semaphore=__import__("asyncio").Semaphore(1),
-    )
+    processor = build_processor(backend)
+    downloaded_objects: list[str] = []
+    captured_calls: list[dict[str, object]] = []
 
-    async def fake_download_audio(_object_name: str) -> bytes:
-        return b"audio"
-
-    async def fake_vad(_audio_bytes: bytes) -> VadResult:
-        return VadResult(
-            is_speech=True,
-            speech_ms=0,
-            speech_ratio=0.0,
-            error_code="vad_error",
-        )
-
-    async def fake_gemini(**_kwargs) -> str:
-        return "Paciente refiere dolor."
-
-    monkeypatch.setattr(processor, "_download_audio_bytes", fake_download_audio)
-    monkeypatch.setattr(processor, "_run_vad", fake_vad)
-    monkeypatch.setattr("app.processor.transcribe_audio", fake_gemini)
-
-    await processor.process_section("section-1")
-
-    assert backend.section_results[0]["status"] == "transcribed"
-    assert backend.section_results[0]["vad_decision"] == "fail_open"
-
-
-@pytest.mark.asyncio
-async def test_openai_provider_receives_audio_bytes(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    backend = FakeBackend()
-    processor = Processor(
-        settings=Settings(
-            ENVIRONMENT="test",
-            TRANSCRIPTION_PROVIDER="openai",
-            TRANSCRIPTION_MODEL="gpt-4o-mini-transcribe",
-        ),
-        backend=backend,
-        vad_semaphore=None,  # type: ignore[arg-type]
-        gemini_semaphore=__import__("asyncio").Semaphore(1),
-    )
-
-    async def fake_download_audio(_object_name: str) -> bytes:
-        return b"audio-bytes"
-
-    async def fake_vad(_audio_bytes: bytes) -> VadResult:
-        return VadResult(is_speech=True, speech_ms=1200, speech_ratio=0.7)
-
-    captured: dict[str, object] = {}
+    async def fake_download_audio(object_name: str) -> bytes:
+        downloaded_objects.append(object_name)
+        return b"original-audio"
 
     async def fake_transcribe(**kwargs) -> str:
-        captured.update(kwargs)
+        captured_calls.append(kwargs)
         return "Paciente refiere dolor."
 
     monkeypatch.setattr(processor, "_download_audio_bytes", fake_download_audio)
-    monkeypatch.setattr(processor, "_run_vad", fake_vad)
     monkeypatch.setattr("app.processor.transcribe_audio", fake_transcribe)
 
     await processor.process_section("section-1")
 
+    assert downloaded_objects == []
+    assert len(captured_calls) == 1
+    assert captured_calls[0]["gcs_uri"] == "gs://bucket/encounter_audio/1/clipped.ogg"
+    assert "audio_bytes" not in captured_calls[0]
     assert backend.section_results[0]["status"] == "transcribed"
-    assert captured["audio_bytes"] == b"audio-bytes"
-    assert captured["gcs_uri"] == "gs://bucket/encounter_audio/1/test.webm"
+    assert backend.section_results[0]["transcription_source"] == "clipped_frontend"
+
+
+@pytest.mark.asyncio
+async def test_empty_clipped_transcript_downloads_only_original_for_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = FakeBackend()
+    processor = build_processor(backend)
+    downloaded_objects: list[str] = []
+    transcribe_calls: list[dict[str, object]] = []
+
+    async def fake_download_audio(object_name: str) -> bytes:
+        downloaded_objects.append(object_name)
+        return b"original-audio"
+
+    async def fake_transcribe(**kwargs) -> str:
+        transcribe_calls.append(kwargs)
+        return "" if len(transcribe_calls) == 1 else "Paciente refiere dolor."
+
+    async def fake_build_worker_fallback_audio(
+        _audio_bytes: bytes,
+    ) -> tuple[VadResult, bytes]:
+        return (
+            VadResult(is_speech=True, speech_ms=1200, speech_ratio=0.7),
+            b"trimmed-fallback-audio",
+        )
+
+    monkeypatch.setattr(processor, "_download_audio_bytes", fake_download_audio)
+    monkeypatch.setattr(
+        processor,
+        "_build_worker_fallback_audio",
+        fake_build_worker_fallback_audio,
+    )
+    monkeypatch.setattr("app.processor.transcribe_audio", fake_transcribe)
+
+    await processor.process_section("section-1")
+
+    assert downloaded_objects == ["encounter_audio/1/original.webm"]
+    assert len(transcribe_calls) == 2
+    assert transcribe_calls[0]["gcs_uri"] == "gs://bucket/encounter_audio/1/clipped.ogg"
+    assert "audio_bytes" not in transcribe_calls[0]
+    assert transcribe_calls[1]["gcs_uri"] is None
+    assert transcribe_calls[1]["audio_bytes"] == b"trimmed-fallback-audio"
+    assert backend.section_results[0]["status"] == "transcribed"
+    assert backend.section_results[0]["transcription_source"] == "fallback_worker_from_original"
+
+
+@pytest.mark.asyncio
+async def test_no_speech_fallback_discards_section(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = FakeBackend()
+    processor = build_processor(backend)
+    downloaded_objects: list[str] = []
+
+    async def fake_download_audio(object_name: str) -> bytes:
+        downloaded_objects.append(object_name)
+        return b"original-audio"
+
+    async def fake_transcribe(**_kwargs) -> str:
+        return ""
+
+    async def fake_build_worker_fallback_audio(
+        _audio_bytes: bytes,
+    ) -> tuple[VadResult, bytes]:
+        return (
+            VadResult(is_speech=False, speech_ms=0, speech_ratio=0.0, error_code=None),
+            b"trimmed-fallback-audio",
+        )
+
+    monkeypatch.setattr(processor, "_download_audio_bytes", fake_download_audio)
+    monkeypatch.setattr(
+        processor,
+        "_build_worker_fallback_audio",
+        fake_build_worker_fallback_audio,
+    )
+    monkeypatch.setattr("app.processor.transcribe_audio", fake_transcribe)
+
+    await processor.process_section("section-1")
+
+    assert downloaded_objects == ["encounter_audio/1/original.webm"]
+    assert backend.section_results[0]["status"] == "discarded_no_speech"
+    assert backend.section_results[0]["transcription_source"] == "fallback_worker_from_original"

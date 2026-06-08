@@ -54,6 +54,15 @@ axiosInstance.interceptors.request.use(
 
     logger.debug(`Request: ${config.method?.toUpperCase()} ${config.url}`);
 
+    if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+      if (typeof config.headers?.delete === "function") {
+        config.headers.delete("Content-Type");
+      } else if (config.headers) {
+        delete config.headers["Content-Type"];
+        delete config.headers["content-type"];
+      }
+    }
+
     if (csrfToken) {
       config.headers["X-CSRFToken"] = csrfToken;
     }

@@ -58,7 +58,25 @@ cp webapp/.env.example webapp/.env.local
 Por defecto:
 
 - `VITE_API_URL=http://localhost:8001`
-- `VITE_TRANSCRIPTION_WORKER_URL=http://localhost:8091` para la pagina local `/debug/transcripcion`
+- `VITE_UPLOAD_ORIGINAL_AUDIO_ENABLED=true`
+
+La pagina local `/debug/transcripcion` ahora llama a FastAPI bajo
+`/api/v1/transcription/debug/sections`; no necesita un `VITE_TRANSCRIPTION_WORKER_URL`
+separado, pero el backend local si necesita `TRANSCRIPTION_WORKER_BASE_URL`
+apuntando al worker para hacer el bridge de debug.
+
+La transcripción segmentada ahora prepara dos artefactos por sección en el
+navegador:
+
+- `original`: blob original de respaldo
+- `clipped`: audio recortado para transcripción
+
+Ambos se suben directo a GCS con signed URLs; FastAPI solo firma, valida en GCS
+y registra referencias.
+
+El `clipped` ahora se encodea en el navegador con `WebCodecs AudioEncoder`
+cuando el browser soporta Opus; si no, cae al fallback `opus-recorder`
+servido desde `webapp/public/opus-recorder/encoderWorker.min.js`.
 
 ### Document Generation Worker
 

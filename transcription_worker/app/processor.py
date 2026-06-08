@@ -9,11 +9,12 @@ import anyio
 
 from app.audio import decode_audio_to_float32_pcm, download_gcs_object
 from app.backend_client import BackendClient
+from app.debug_cuts import build_worker_debug_cut
 from app.gemini import transcribe_audio
 from app.observability import bind_log_context, log_event
 from app.settings import Settings
 from app.text_filters import normalize_transcript
-from app.vad import VadResult, run_silero_vad
+from app.vad import VadResult
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +43,17 @@ class Processor:
             provider=self.settings.transcription_provider_name,
             model=self.settings.effective_transcription_model,
         ):
-            audio_bytes = await self._download_audio_bytes(work_item["gcs_object_name"])
-            vad_result = await self._run_vad(audio_bytes)
-
-            if not vad_result.is_speech and vad_result.error_code is None:
+            transcript, transcription_source, vad_result, error_code = (
+                await self._transcribe_with_frontend_clip_fallback(
+                    work_item=work_item,
+                )
+            )
+            normalized = normalize_transcript(transcript)
+            if (
+                transcription_source == "fallback_worker_from_original"
+                and not vad_result.is_speech
+                and vad_result.error_code is None
+            ):
                 await self.backend.post_section_result(
                     section_id,
                     {
@@ -56,30 +64,10 @@ class Processor:
                         "vad_speech_ms": vad_result.speech_ms,
                         "vad_speech_ratio": vad_result.speech_ratio,
                         "worker_latency_ms": self._elapsed_ms(started_at),
+                        "transcription_source": transcription_source,
                     },
                 )
-                log_event(
-                    logger,
-                    logging.INFO,
-                    "Section discarded after VAD",
-                    event="vad_no_speech",
-                    error_code="no_speech_detected",
-                    duration_ms=self._elapsed_ms(started_at),
-                )
                 return
-
-            llm_started_at = time.monotonic()
-            async with self.gemini_semaphore:
-                transcript = await transcribe_audio(
-                    gcs_uri=work_item["gcs_uri"],
-                    content_type=work_item["content_type"],
-                    settings=self.settings,
-                    audio_bytes=audio_bytes
-                    if self.settings.transcription_provider_name in {"openai", "openai_api"}
-                    else None,
-                )
-            normalized = normalize_transcript(transcript)
-            error_code = None if normalized else "empty_or_noise_only_transcript"
             await self.backend.post_section_result(
                 section_id,
                 {
@@ -94,8 +82,8 @@ class Processor:
                     "vad_error_code": vad_result.error_code,
                     "transcription_provider": self.settings.transcription_provider_name,
                     "transcription_model": self.settings.effective_transcription_model,
-                    "llm_latency_ms": self._elapsed_ms(llm_started_at),
                     "worker_latency_ms": self._elapsed_ms(started_at),
+                    "transcription_source": transcription_source,
                 },
             )
             log_event(
@@ -114,17 +102,102 @@ class Processor:
             gcs_object_name,
         )
 
-    async def _run_vad(self, audio_bytes: bytes) -> VadResult:
+    async def _transcribe_with_frontend_clip_fallback(
+        self,
+        *,
+        work_item: dict[str, str],
+    ) -> tuple[str, str, VadResult, str | None]:
+        clipped_gcs_uri = work_item.get("clipped_gcs_uri") or work_item[
+            "transcription_source_gcs_uri"
+        ]
+        clipped_content_type = work_item.get("clipped_content_type") or work_item[
+            "transcription_source_content_type"
+        ]
+        async with self.gemini_semaphore:
+            clipped_transcript = await transcribe_audio(
+                gcs_uri=clipped_gcs_uri,
+                content_type=clipped_content_type,
+                settings=self.settings,
+            )
+        normalized_clipped = normalize_transcript(clipped_transcript)
+        if normalized_clipped:
+            return (
+                normalized_clipped,
+                "clipped_frontend",
+                VadResult(
+                    is_speech=True,
+                    speech_ms=0,
+                    speech_ratio=0.0,
+                    error_code=None,
+                ),
+                None,
+            )
+
+        original_object_name = work_item.get("original_gcs_object_name")
+        if not original_object_name:
+            return (
+                clipped_transcript,
+                "clipped_frontend",
+                VadResult(
+                    is_speech=True,
+                    speech_ms=0,
+                    speech_ratio=0.0,
+                    error_code=None,
+                ),
+                "empty_or_noise_only_transcript",
+            )
+
+        original_audio_bytes = await self._download_audio_bytes(original_object_name)
+        vad_result, fallback_audio_bytes = await self._build_worker_fallback_audio(
+            original_audio_bytes,
+        )
+        if not vad_result.is_speech and vad_result.error_code is None:
+            return (
+                "",
+                "fallback_worker_from_original",
+                vad_result,
+                "no_speech_detected",
+            )
+
+        async with self.gemini_semaphore:
+            fallback_transcript = await transcribe_audio(
+                gcs_uri=None,
+                content_type="audio/wav",
+                settings=self.settings,
+                audio_bytes=fallback_audio_bytes,
+            )
+        return (
+            normalize_transcript(fallback_transcript),
+            "fallback_worker_from_original",
+            vad_result,
+            None,
+        )
+
+    async def _build_worker_fallback_audio(
+        self,
+        audio_bytes: bytes,
+    ) -> tuple[VadResult, bytes]:
         try:
             async with self.vad_semaphore:
                 samples = await anyio.to_thread.run_sync(
                     decode_audio_to_float32_pcm,
                     audio_bytes,
                 )
-                return await anyio.to_thread.run_sync(
-                    run_silero_vad,
-                    samples,
-                    self.settings,
+                analysis, _worker_cut, trimmed_audio_bytes = (
+                    await anyio.to_thread.run_sync(
+                        build_worker_debug_cut,
+                        samples,
+                        self.settings,
+                    )
+                )
+                return (
+                    VadResult(
+                        is_speech=analysis.is_speech,
+                        speech_ms=analysis.speech_ms,
+                        speech_ratio=analysis.speech_ratio,
+                        error_code=analysis.error_code,
+                    ),
+                    trimmed_audio_bytes,
                 )
         except Exception as exc:
             log_event(
@@ -134,11 +207,14 @@ class Processor:
                 event="vad_fail_open",
                 error_code=exc.__class__.__name__,
             )
-            return VadResult(
-                is_speech=True,
-                speech_ms=0,
-                speech_ratio=0.0,
-                error_code="vad_error",
+            return (
+                VadResult(
+                    is_speech=True,
+                    speech_ms=0,
+                    speech_ratio=0.0,
+                    error_code="vad_error",
+                ),
+                audio_bytes,
             )
 
     @staticmethod

@@ -3,16 +3,24 @@ from __future__ import annotations
 import json
 import logging
 from datetime import timedelta
+from typing import TypedDict
 
 import google.auth
 from google.auth import impersonated_credentials
 from google.auth.transport import requests as google_requests
+from google.api_core.exceptions import NotFound
 from google.cloud import storage
 from google.oauth2 import service_account
 
 from app.core.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
+
+
+class GcsObjectMetadata(TypedDict):
+    exists: bool
+    size: int | None
+    content_type: str | None
 
 _GCS_IAM_SIGNING_SCOPES = ("https://www.googleapis.com/auth/cloud-platform",)
 
@@ -156,3 +164,24 @@ def generate_v4_upload_signed_url(
             _gcs_signed_url_error_detail(exc),
         )
         raise
+
+
+def get_gcs_object_metadata(
+    *,
+    settings: Settings,
+    gcs_object_name: str,
+) -> GcsObjectMetadata:
+    storage_client = get_storage_client(settings)
+    bucket = storage_client.bucket(settings.gcs_bucket_name)
+    blob = bucket.blob(gcs_object_name)
+
+    try:
+        blob.reload()
+    except NotFound:
+        return {"exists": False, "size": None, "content_type": None}
+
+    return {
+        "exists": True,
+        "size": int(blob.size) if blob.size is not None else None,
+        "content_type": blob.content_type,
+    }

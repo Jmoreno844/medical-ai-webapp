@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import difflib
+import json
 import logging
 import re
 import uuid
@@ -132,6 +133,19 @@ def serialize_section(section: TranscriptionAudioSection) -> AudioSectionRespons
         gcs_object_name=section.gcs_object_name,
         content_type=section.content_type,
         byte_size=section.byte_size,
+        original_gcs_object_name=section.original_gcs_object_name,
+        original_content_type=section.original_content_type,
+        original_byte_size=section.original_byte_size,
+        clipped_gcs_object_name=section.clipped_gcs_object_name,
+        clipped_content_type=section.clipped_content_type,
+        clipped_byte_size=section.clipped_byte_size,
+        transcription_source_gcs_object_name=section.transcription_source_gcs_object_name,
+        frontend_vad_metadata=(
+            json.loads(section.frontend_vad_metadata_json)
+            if section.frontend_vad_metadata_json
+            else None
+        ),
+        transcription_source=section.transcription_source,
         status=section.status,
         raw_transcript=section.raw_transcript,
         error_code=section.error_code,
@@ -262,20 +276,39 @@ async def _update_encounter_audio_duration(
         )
 
 
-def build_section_object_name(
+def build_section_object_names(
     *,
     encounter_id: int,
     session_id: str,
     client_section_id: str,
     section_index: int,
-) -> str:
+    original_content_type: str,
+    clipped_content_type: str,
+) -> tuple[str, str]:
     safe_client_id = "".join(
         char for char in client_section_id if char.isalnum() or char in {"-", "_"}
     )[:64]
-    return (
-        f"encounter_audio/{encounter_id}/sessions/{session_id}/sections/"
-        f"{section_index:06d}-{safe_client_id or uuid.uuid4().hex}.webm"
+    base = (
+        f"encounters/{encounter_id}/sessions/{session_id}/sections/"
+        f"{section_index:06d}_{safe_client_id or uuid.uuid4().hex}"
     )
+    return (
+        f"{base}/original{_extension_for_content_type(original_content_type)}",
+        f"{base}/clipped{_extension_for_content_type(clipped_content_type)}",
+    )
+
+
+def _extension_for_content_type(content_type: str) -> str:
+    normalized = content_type.split(";", 1)[0].strip().lower()
+    if normalized == "audio/webm":
+        return ".webm"
+    if normalized in {"audio/ogg", "audio/opus"}:
+        return ".ogg"
+    if normalized in {"audio/mp4", "audio/aac", "audio/x-m4a", "audio/m4a"}:
+        return ".m4a"
+    if normalized == "audio/wav":
+        return ".wav"
+    return ".audio"
 
 
 def generate_section_upload_url(
@@ -302,9 +335,14 @@ async def register_audio_section(
     start_time_ms: int,
     end_time_ms: int,
     overlap_ms: int,
-    gcs_object_name: str,
-    content_type: str,
-    byte_size: int | None,
+    original_gcs_object_name: str,
+    original_content_type: str,
+    original_byte_size: int | None,
+    clipped_gcs_object_name: str,
+    clipped_content_type: str,
+    clipped_byte_size: int | None,
+    transcription_source_gcs_object_name: str,
+    frontend_vad_metadata: dict | None,
 ) -> TranscriptionAudioSection:
     now = datetime.now(timezone.utc)
     encounter_id = recording_session.encounter_id
@@ -331,9 +369,22 @@ async def register_audio_section(
         start_time_ms=start_time_ms,
         end_time_ms=end_time_ms,
         overlap_ms=overlap_ms,
-        gcs_object_name=gcs_object_name,
-        content_type=content_type,
-        byte_size=byte_size,
+        gcs_object_name=transcription_source_gcs_object_name,
+        content_type=clipped_content_type,
+        byte_size=clipped_byte_size,
+        original_gcs_object_name=original_gcs_object_name,
+        original_content_type=original_content_type,
+        original_byte_size=original_byte_size,
+        clipped_gcs_object_name=clipped_gcs_object_name,
+        clipped_content_type=clipped_content_type,
+        clipped_byte_size=clipped_byte_size,
+        transcription_source_gcs_object_name=transcription_source_gcs_object_name,
+        frontend_vad_metadata_json=(
+            json.dumps(frontend_vad_metadata, ensure_ascii=True)
+            if frontend_vad_metadata is not None
+            else None
+        ),
+        transcription_source="clipped_frontend",
         status=SECTION_STATUS_REGISTERED,
         raw_transcript=None,
         error_code=None,
@@ -481,9 +532,28 @@ async def get_section_work_item(
         encounter_id=recording_session.encounter_id,
         document_id=recording_session.document_id,
         section_index=section.section_index,
-        gcs_object_name=section.gcs_object_name,
-        gcs_uri=f"gs://{settings.gcs_bucket_name}/{section.gcs_object_name}",
-        content_type=section.content_type,
+        original_gcs_object_name=section.original_gcs_object_name,
+        original_gcs_uri=(
+            f"gs://{settings.gcs_bucket_name}/{section.original_gcs_object_name}"
+            if section.original_gcs_object_name
+            else None
+        ),
+        original_content_type=section.original_content_type,
+        clipped_gcs_object_name=section.clipped_gcs_object_name,
+        clipped_gcs_uri=(
+            f"gs://{settings.gcs_bucket_name}/{section.clipped_gcs_object_name}"
+            if section.clipped_gcs_object_name
+            else None
+        ),
+        clipped_content_type=section.clipped_content_type,
+        transcription_source_gcs_object_name=(
+            section.transcription_source_gcs_object_name or section.gcs_object_name
+        ),
+        transcription_source_gcs_uri=(
+            f"gs://{settings.gcs_bucket_name}/"
+            f"{section.transcription_source_gcs_object_name or section.gcs_object_name}"
+        ),
+        transcription_source_content_type=section.content_type,
     )
 
 
@@ -494,6 +564,7 @@ async def apply_section_worker_result(
     status: str,
     transcript: str | None,
     error_code: str | None,
+    transcription_source: str | None,
     settings: Settings,
 ) -> TranscriptionAudioSection | None:
     result = await db_session.execute(
@@ -515,6 +586,8 @@ async def apply_section_worker_result(
         return section
 
     section.updated_at = datetime.now(timezone.utc)
+    if transcription_source:
+        section.transcription_source = transcription_source
     if status == SECTION_STATUS_DISCARDED_NO_SPEECH:
         section.raw_transcript = ""
         section.status = SECTION_STATUS_DISCARDED_NO_SPEECH

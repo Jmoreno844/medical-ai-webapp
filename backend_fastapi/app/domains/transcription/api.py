@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import logging
+import json
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
-from fastapi.responses import JSONResponse
+import httpx
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -18,6 +20,7 @@ from app.domains.documents.service import get_document_for_doctor, get_encounter
 from app.domains.transcription.schemas import (
     AudioSectionRegisterRequest,
     AudioSectionRegisterResponse,
+    DebugTranscriptionBridgeResponse,
     RecordingSessionCreate,
     RecordingSessionFinishResponse,
     RecordingSessionResponse,
@@ -33,7 +36,7 @@ from app.domains.transcription.schemas import (
 from app.domains.transcription.service import (
     SESSION_STATUS_FINISHING,
     apply_section_worker_result,
-    build_section_object_name,
+    build_section_object_names,
     consolidate_recording_session,
     create_recording_session,
     enqueue_section_task,
@@ -51,13 +54,20 @@ from app.domains.transcription.service import (
 )
 from app.domains.transcription.worker_auth import verify_transcription_worker_request
 from app.integrations.http_json import post_json_async
-from app.integrations.storage import upload_url_user_error_message
+from app.integrations.storage import (
+    get_gcs_object_metadata,
+    upload_url_user_error_message,
+)
 from app.integrations.transcription_tasks import (
     should_use_cloud_tasks,
 )
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _is_local_environment(settings: Settings) -> bool:
+    return settings.environment.strip().lower() in {"local", "dev", "development", "test", "ci"}
 
 
 async def _consolidate_session_background(session_id: str) -> None:
@@ -86,6 +96,74 @@ async def _post_worker_task_background(path: str, settings: Settings) -> None:
             event="transcription_worker_dispatch_failed",
             section_id=path.rsplit("/", 1)[-1],
         )
+
+
+async def _post_debug_transcription_to_worker(
+    *,
+    settings: Settings,
+    file_name: str,
+    content_type: str,
+    audio_bytes: bytes,
+    provider: str,
+    model: str,
+    mode: str,
+    frontend_cut_json: str,
+) -> dict[str, object]:
+    if not settings.transcription_worker_base_url:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "TRANSCRIPTION_WORKER_BASE_URL is required for debug transcription",
+        )
+
+    url = f"{settings.transcription_worker_base_url.rstrip('/')}/api/v1/dev/transcription/debug"
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(
+            url,
+            data={
+                "mode": mode,
+                "provider": provider,
+                "model": model,
+                "frontend_cut_json": frontend_cut_json,
+            },
+            files={
+                "file": (
+                    file_name,
+                    audio_bytes,
+                    content_type,
+                )
+            },
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+async def _post_debug_trimmed_audio_to_worker(
+    *,
+    settings: Settings,
+    file_name: str,
+    content_type: str,
+    audio_bytes: bytes,
+) -> bytes:
+    if not settings.transcription_worker_base_url:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "TRANSCRIPTION_WORKER_BASE_URL is required for debug transcription",
+        )
+
+    url = f"{settings.transcription_worker_base_url.rstrip('/')}/api/v1/dev/transcription/debug/trimmed-audio"
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(
+            url,
+            files={
+                "file": (
+                    file_name,
+                    audio_bytes,
+                    content_type,
+                )
+            },
+        )
+        response.raise_for_status()
+        return response.content
 
 
 @router.post("/transcription/start", response_model=TranscriptionResponse)
@@ -132,6 +210,142 @@ async def start_transcription(
             "Use segmented recording sessions so transcription runs in the worker."
         ),
     )
+
+
+@router.post(
+    "/transcription/debug/sections",
+    response_model=DebugTranscriptionBridgeResponse,
+)
+async def debug_transcription_section(
+    file: UploadFile = File(...),
+    mode: str = Form(default="transcribe"),
+    provider: str = Form(...),
+    model: str = Form(...),
+    frontend_cut_json: str = Form(...),
+    section_id: str = Form(...),
+    start_time_ms: int = Form(...),
+    end_time_ms: int = Form(...),
+    overlap_ms: int = Form(default=0),
+    content_type: str = Form(default="audio/webm"),
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> DebugTranscriptionBridgeResponse:
+    require_clinical_access(user)
+    if not _is_local_environment(settings):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+
+    audio_bytes = await file.read()
+    if not audio_bytes:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Audio file is empty")
+
+    try:
+        json.loads(frontend_cut_json)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "frontend_cut_json must be valid JSON",
+        ) from exc
+
+    try:
+        payload = await _post_debug_transcription_to_worker(
+            settings=settings,
+            file_name=file.filename or f"{section_id}.webm",
+            content_type=file.content_type or content_type,
+            audio_bytes=audio_bytes,
+            mode=mode,
+            provider=provider,
+            model=model,
+            frontend_cut_json=frontend_cut_json,
+        )
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            exc.response.status_code,
+            exc.response.text or "Debug transcription worker request failed",
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Debug transcription worker is unavailable",
+        ) from exc
+
+    logger.info(
+        "debug_transcription_section section_id=%s start_time_ms=%s end_time_ms=%s overlap_ms=%s",
+        section_id,
+        start_time_ms,
+        end_time_ms,
+        overlap_ms,
+    )
+    return DebugTranscriptionBridgeResponse.model_validate(payload)
+
+
+@router.post("/transcription/debug/sections/trimmed-audio")
+async def debug_transcription_section_trimmed_audio(
+    file: UploadFile = File(...),
+    section_id: str = Form(...),
+    content_type: str = Form(default="audio/webm"),
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    require_clinical_access(user)
+    if not _is_local_environment(settings):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+
+    audio_bytes = await file.read()
+    if not audio_bytes:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Audio file is empty")
+
+    try:
+        preview_audio = await _post_debug_trimmed_audio_to_worker(
+            settings=settings,
+            file_name=file.filename or f"{section_id}.webm",
+            content_type=file.content_type or content_type,
+            audio_bytes=audio_bytes,
+        )
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            exc.response.status_code,
+            exc.response.text or "Debug transcription worker request failed",
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Debug transcription worker is unavailable",
+        ) from exc
+
+    return Response(
+        content=preview_audio,
+        media_type="audio/wav",
+        headers={
+            "Content-Disposition": f'inline; filename="{section_id}-worker-trimmed.wav"'
+        },
+    )
+
+
+def _validate_uploaded_artifact(
+    *,
+    settings: Settings,
+    gcs_object_name: str,
+    expected_content_type: str,
+) -> tuple[bool, str | None, int | None]:
+    metadata = get_gcs_object_metadata(
+        settings=settings,
+        gcs_object_name=gcs_object_name,
+    )
+    if not metadata["exists"]:
+        return False, "Objeto no encontrado en GCS", None
+    size = metadata["size"] or 0
+    if size <= 0:
+        return False, "Objeto subido vacio en GCS", size
+
+    actual_content_type = (metadata["content_type"] or "").split(";", 1)[0].strip().lower()
+    expected_normalized = expected_content_type.split(";", 1)[0].strip().lower()
+    if actual_content_type and expected_normalized and actual_content_type != expected_normalized:
+        return (
+            False,
+            f"Content-Type inesperado en GCS: {actual_content_type}",
+            size,
+        )
+    return True, None, size
 
 
 @router.post("/transcription/sessions", response_model=RecordingSessionResponse)
@@ -204,17 +418,24 @@ async def create_section_upload_url(
     if not recording_session:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Sesión no encontrada")
 
-    gcs_object_name = build_section_object_name(
+    original_gcs_object_name, clipped_gcs_object_name = build_section_object_names(
         encounter_id=recording_session.encounter_id,
         session_id=recording_session.session_id,
         client_section_id=payload.client_section_id,
         section_index=payload.section_index,
+        original_content_type=payload.content_type_original,
+        clipped_content_type=payload.content_type_clipped,
     )
     try:
-        upload_url = generate_section_upload_url(
+        original_upload_url = generate_section_upload_url(
             settings=settings,
-            gcs_object_name=gcs_object_name,
-            content_type=payload.content_type,
+            gcs_object_name=original_gcs_object_name,
+            content_type=payload.content_type_original,
+        )
+        clipped_upload_url = generate_section_upload_url(
+            settings=settings,
+            gcs_object_name=clipped_gcs_object_name,
+            content_type=payload.content_type_clipped,
         )
     except Exception as exc:
         logger.exception(
@@ -231,8 +452,16 @@ async def create_section_upload_url(
         )
     return SectionUploadUrlResponse(
         success=True,
-        upload_url=upload_url,
-        gcs_object_name=gcs_object_name,
+        original={
+            "upload_url": original_upload_url,
+            "gcs_object_name": original_gcs_object_name,
+            "content_type": payload.content_type_original,
+        },
+        clipped={
+            "upload_url": clipped_upload_url,
+            "gcs_object_name": clipped_gcs_object_name,
+            "content_type": payload.content_type_clipped,
+        },
     )
 
 
@@ -258,6 +487,28 @@ async def register_transcription_section(
     if not recording_session:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Sesión no encontrada")
 
+    original_ok, original_error, original_size = _validate_uploaded_artifact(
+        settings=settings,
+        gcs_object_name=payload.original_gcs_object_name,
+        expected_content_type=payload.original_content_type,
+    )
+    if not original_ok:
+        return AudioSectionRegisterResponse(
+            success=False,
+            error=original_error,
+        )
+
+    clipped_ok, clipped_error, clipped_size = _validate_uploaded_artifact(
+        settings=settings,
+        gcs_object_name=payload.clipped_gcs_object_name,
+        expected_content_type=payload.clipped_content_type,
+    )
+    if not clipped_ok:
+        return AudioSectionRegisterResponse(
+            success=False,
+            error=clipped_error,
+        )
+
     section = await register_audio_section(
         session,
         recording_session=recording_session,
@@ -266,9 +517,14 @@ async def register_transcription_section(
         start_time_ms=payload.start_time_ms,
         end_time_ms=payload.end_time_ms,
         overlap_ms=payload.overlap_ms,
-        gcs_object_name=payload.gcs_object_name,
-        content_type=payload.content_type,
-        byte_size=payload.byte_size,
+        original_gcs_object_name=payload.original_gcs_object_name,
+        original_content_type=payload.original_content_type,
+        original_byte_size=payload.original_byte_size or original_size,
+        clipped_gcs_object_name=payload.clipped_gcs_object_name,
+        clipped_content_type=payload.clipped_content_type,
+        clipped_byte_size=payload.clipped_byte_size or clipped_size,
+        transcription_source_gcs_object_name=payload.transcription_source_gcs_object_name,
+        frontend_vad_metadata=payload.frontend_vad_metadata,
     )
     await record_audit_event(
         session,
@@ -504,6 +760,7 @@ async def receive_worker_section_result(
         status=payload.status,
         transcript=payload.transcript,
         error_code=payload.error_code,
+        transcription_source=payload.transcription_source,
         settings=settings,
     )
     if not section:

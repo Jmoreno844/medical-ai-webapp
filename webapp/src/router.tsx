@@ -10,6 +10,7 @@ import PlantillasPage from "./features/plantillas/PlantillaPage";
 import EncuentroPage from "./features/encuentro/EncuentroPage";
 import EncuentroDetailPage from "./features/encuentro/EncuentroDetailPage";
 import DebugTranscriptionPage from "./features/debugTranscription/DebugTranscriptionPage";
+import DebugAudioRecordingPage from "./features/debugAudioRecording/DebugAudioRecordingPage";
 import AdminRoute from "./features/admin/AdminRoute";
 import AdminAuditPage from "./features/admin/AdminAuditPage";
 import AdminUsersPage from "./features/admin/AdminUsersPage";
@@ -74,6 +75,14 @@ const routes: RouteObject[] = [
         element: (
           <SpecialLayout>
             <DebugTranscriptionPage />
+          </SpecialLayout>
+        ),
+      },
+      {
+        path: "debug/grabacion",
+        element: (
+          <SpecialLayout>
+            <DebugAudioRecordingPage />
           </SpecialLayout>
         ),
       },

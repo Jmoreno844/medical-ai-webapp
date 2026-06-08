@@ -17,7 +17,6 @@ dependencies = [
   "opentelemetry-instrumentation-httpx>=0.48b0,<0.60",
   "opentelemetry-sdk>=1.27.0,<2",
   "onnxruntime>=1.20.0,<2",
-  "openai>=1.99.9,<2",
   "pydantic-settings>=2.8.0,<3",
   "python-dotenv>=1.0.1,<2",
   "python-multipart>=0.0.20,<0.1",

@@ -156,7 +156,7 @@ secretos por nombre/versión.
 | `*-audio`        | Delete after 7 days | Audio `.webm`/`.mp4` se elimina automáticamente |
 | `*-frontend-spa` | Ninguna             | Los archivos se sobreescriben en cada deploy    |
 
-El bucket `*-audio` también necesita CORS para subida directa desde el navegador vía signed URL. En `stg`, Terraform deriva `audio_cors_origins` desde `fastapi_cors_allowed_origins` más los orígenes locales de desarrollo (`localhost:3000`, `localhost:5173`, etc.) con métodos `PUT`, `GET`, `HEAD`, `OPTIONS` y `DELETE`.
+El bucket `*-audio` también necesita CORS para subida directa desde el navegador vía signed URL. En `stg`, Terraform deriva `audio_cors_origins` desde `fastapi_cors_allowed_origins` más los orígenes locales de desarrollo (`localhost:3000`, `localhost:5173`, etc.) con métodos `PUT`, `GET`, `HEAD`, `OPTIONS` y `DELETE`. Para el nuevo flujo de doble artefacto (`original` + `clipped`) sigue siendo obligatorio aceptar al menos header `Content-Type` en preflight para ambos PUT.
 
 ## Cloud Tasks
 
