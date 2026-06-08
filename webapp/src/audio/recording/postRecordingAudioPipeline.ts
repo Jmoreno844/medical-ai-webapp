@@ -45,7 +45,7 @@ export type FrontendCutMetadataLike = {
 };
 
 const TARGET_SAMPLE_RATE = 16_000;
-export const RETAINED_SEGMENT_JOIN_SILENCE_MS = 1_000;
+export const RETAINED_SEGMENT_JOIN_SILENCE_MS = 1_500;
 
 const getAudioContextCtor = (): BrowserAudioContextCtor => {
   const ctor = (window.AudioContext ??

@@ -1334,6 +1334,20 @@ wheels = [
 ]
 
 [[package]]
+name = "transcription-contract"
+version = "0.1.0"
+source = { editable = "../shared/transcription_contract" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.8.0,<3" }]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.3.4,<9" }]
+
+[[package]]
 name = "transcription-worker"
 version = "0.1.0"
 source = { virtual = "." }
@@ -1354,6 +1368,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
     { name = "python-multipart" },
+    { name = "transcription-contract" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1382,6 +1397,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.8.0,<3" },
     { name = "python-dotenv", specifier = ">=1.0.1,<2" },
     { name = "python-multipart", specifier = ">=0.0.20,<0.1" },
+    { name = "transcription-contract", editable = "../shared/transcription_contract" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34.0,<0.35" },
 ]
 

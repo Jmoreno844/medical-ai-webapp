@@ -10,13 +10,16 @@ from app.domains.transcription.service import (
     SECTION_STATUS_FAILED_FINAL,
     SECTION_STATUS_REGISTERED,
     SECTION_STATUS_TRANSCRIBING,
+    SECTION_STATUS_TRANSCRIBED,
     SESSION_STATUS_FINISHING,
     SESSION_STATUS_NEEDS_REVIEW,
     STUCK_SECTION_MANUAL_RETRY_THRESHOLD_SECONDS,
     STUCK_SECTION_THRESHOLD_SECONDS,
+    _build_session_chunks,
     _merge_session_with_existing_document,
     _merge_with_light_dedup,
     _normalize_transcript_for_document,
+    _section_turns,
     create_recording_session,
     is_recording_session_ready_for_consolidation,
     reconcile_stuck_transcription_sections,
@@ -25,6 +28,77 @@ from app.domains.transcription.service import (
     retry_failed_transcription_session,
     transcription_user_message,
 )
+from transcription_contract.models import TranscriptionTurn
+
+
+def test_section_turns_reads_structured_json() -> None:
+    section = SimpleNamespace(
+        turns_json=[
+            {
+                "speaker": "MEDICO",
+                "text": "Buenos dias",
+                "overlaps_previous": False,
+                "overlaps_next": False,
+            }
+        ],
+        raw_transcript="legacy",
+    )
+
+    turns = _section_turns(section)  # type: ignore[arg-type]
+
+    assert len(turns) == 1
+    assert turns[0].speaker == "MEDICO"
+
+
+def test_section_turns_falls_back_to_legacy_raw_transcript() -> None:
+    section = SimpleNamespace(turns_json=None, raw_transcript="texto legacy")
+
+    turns = _section_turns(section)  # type: ignore[arg-type]
+
+    assert len(turns) == 1
+    assert turns[0].speaker == "DESCONOCIDO"
+    assert turns[0].text == "texto legacy"
+
+
+def test_build_session_chunks_orders_and_dedupes_adjacent_chunks() -> None:
+    recording_session = SimpleNamespace(
+        sections=[
+            SimpleNamespace(
+                section_id="s2",
+                section_index=2,
+                start_time_ms=2000,
+                end_time_ms=3000,
+                status=SECTION_STATUS_TRANSCRIBED,
+                turns_json=[
+                    TranscriptionTurn(
+                        speaker="MEDICO",
+                        text="como estas hoy",
+                    ).model_dump()
+                ],
+                raw_transcript=None,
+            ),
+            SimpleNamespace(
+                section_id="s1",
+                section_index=1,
+                start_time_ms=0,
+                end_time_ms=1000,
+                status=SECTION_STATUS_TRANSCRIBED,
+                turns_json=[
+                    TranscriptionTurn(
+                        speaker="MEDICO",
+                        text="Buenos dias como estas",
+                    ).model_dump()
+                ],
+                raw_transcript=None,
+            ),
+        ]
+    )
+
+    chunks = _build_session_chunks(recording_session)  # type: ignore[arg-type]
+
+    assert [chunk.chunk_id for chunk in chunks] == ["1", "2"]
+    assert chunks[0].turns[0].text == "Buenos dias como estas"
+    assert chunks[1].turns[0].text == "hoy"
 
 
 def test_merge_with_light_dedup_removes_boundary_overlap() -> None:

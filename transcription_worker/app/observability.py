@@ -18,6 +18,14 @@ _LOG_CONTEXT: dict[str, contextvars.ContextVar[Any | None]] = {
     "error_code": contextvars.ContextVar("error_code", default=None),
     "duration_ms": contextvars.ContextVar("duration_ms", default=None),
     "status_code": contextvars.ContextVar("status_code", default=None),
+    "finish_reason": contextvars.ContextVar("finish_reason", default=None),
+    "prompt_token_count": contextvars.ContextVar("prompt_token_count", default=None),
+    "candidates_token_count": contextvars.ContextVar(
+        "candidates_token_count",
+        default=None,
+    ),
+    "thoughts_token_count": contextvars.ContextVar("thoughts_token_count", default=None),
+    "total_token_count": contextvars.ContextVar("total_token_count", default=None),
 }
 
 _ALLOWED_LOG_FIELDS = (
@@ -30,6 +38,11 @@ _ALLOWED_LOG_FIELDS = (
     "error_code",
     "duration_ms",
     "status_code",
+    "finish_reason",
+    "prompt_token_count",
+    "candidates_token_count",
+    "thoughts_token_count",
+    "total_token_count",
 )
 
 _SENSITIVE_FIELD_MARKERS = {

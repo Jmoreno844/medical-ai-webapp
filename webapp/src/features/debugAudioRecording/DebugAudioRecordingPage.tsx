@@ -74,7 +74,7 @@ export default function DebugAudioRecordingPage() {
           <Separator />
           <p className="text-sm text-slate-500">
             Graba audio y observa cómo se crean secciones cuando la voz efectiva
-            alcanza 60 s y aparece una pausa de 1,5 s, o al acercarse a 90 s de
+            alcanza 20 s y aparece una pausa de 1,5 s, o al acercarse a 90 s de
             voz.
           </p>
         </>

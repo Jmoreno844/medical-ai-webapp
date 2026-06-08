@@ -118,6 +118,7 @@ erDiagram
         datetime finished_at
         datetime finalized_at
         text consolidated_transcript
+        jsonb transcript_json
         varchar error_code
     }
 
@@ -168,7 +169,13 @@ erDiagram
         varchar gcs_object_name
         varchar content_type
         int byte_size
+        varchar original_gcs_object_name
+        varchar clipped_gcs_object_name
+        varchar transcription_source_gcs_object_name
+        text frontend_vad_metadata_json
+        varchar transcription_source
         varchar status
+        jsonb turns_json
         text raw_transcript
         varchar error_code
         int retry_count
@@ -547,6 +554,17 @@ Notas de operación:
 - FastAPI, no el frontend, resuelve anchors a `resolved_start/resolved_end`.
 - Si el `base_hash` ya no coincide al aplicar, el `CopilotPatchSet` pasa a `stale`.
 - El endpoint legacy `/api/copilot/runs/{run_id}/review` sigue existiendo solo para patch sets de un cambio mientras migra la UI.
+
+---
+
+## Transcripción estructurada (`chunks[].turns[]`)
+
+- **Canónico por sección:** `transcription_audio_section.turns_json` (JSONB).
+- **Canónico consolidado:** `transcription_recording_session.transcript_json` con forma `{ session_id, chunks: [{ chunk_id, start_ms, end_ms, turns[] }] }`.
+- **Legacy:** `raw_transcript` y `consolidated_transcript` siguen existiendo para sesiones históricas; no hay backfill automático a speakers/overlaps.
+- **Proyección:** `documents_document.content_markdown` se deriva al consolidar para editor y generación documental legacy; la generación nueva lee primero `transcript_json`.
+- **Speakers permitidos:** `MEDICO`, `PACIENTE`, `ACOMPANANTE`, `DESCONOCIDO`.
+- **Dedup:** solo entre chunks vecinos al consolidar; `overlaps_*` del modelo describe solapamiento conversacional, no el overlap técnico de audio.
 
 ---
 

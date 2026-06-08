@@ -28,8 +28,12 @@ dependencies = [
   "python-multipart>=0.0.20,<1",
   "sqlalchemy[asyncio]>=2.0.36,<3",
   "sqlparse>=0.5.5",
+  "transcription-contract",
   "uvicorn[standard]>=0.34.0,<0.35",
 ]
+
+[tool.uv.sources]
+transcription-contract = { path = "../shared/transcription_contract", editable = true }
 
 [dependency-groups]
 dev = [

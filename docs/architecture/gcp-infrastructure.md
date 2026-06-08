@@ -280,6 +280,7 @@ Después de `terraform apply`, configurar las mismas claves como **variables del
 | `DOCUMENT_GENERATION_ANTHROPIC_MODEL` | _(opcional)_ Fallback para Anthropic; por defecto `claude-haiku-4-5-20251001`                                                           |
 | `DOCUMENT_GENERATION_GOOGLE_MODEL` | _(opcional)_ Fallback para Google Vertex; por defecto `gemini-3.1-flash-lite-preview`                                                      |
 | `TRANSCRIPTION_GEMINI_MODEL`    | _(opcional)_ Modelo usado por transcription worker y legacy transcription Cloud Function; si no existe, se usa `gemini-2.5-flash`               |
+| `TRANSCRIPTION_GEMINI_MAX_OUTPUT_TOKENS` | _(opcional)_ Presupuesto de salida para Gemini STT; por defecto `8192` en el worker                                                   |
 | `VERTEX_AI_LOCATION`            | `global` para Gemini; para Claude en Vertex usar una región compatible. No confundir con `CLOUD_TASKS_REGION`, que sigue siendo la región de la cola |
 
 El secret `GCP_SA_KEY` puede eliminarse una vez confirmado que WIF funciona.

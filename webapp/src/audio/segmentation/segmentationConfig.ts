@@ -1,5 +1,5 @@
 export const SEGMENTATION_CONFIG = {
-  minSpeechDurationMs: 60_000,
+  minSpeechDurationMs: 20_000,
   maxSpeechDurationMs: 90_000,
 
   cutSilenceDurationMs: 1_500,

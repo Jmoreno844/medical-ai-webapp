@@ -1,4 +1,5 @@
 import { DocumentoOut } from "@/types/documento";
+import type { TranscriptionTurn } from "@/types/transcription";
 
 export type DocumentJsonContent = Record<string, unknown> | null;
 
@@ -49,6 +50,7 @@ export type TranscriptionBlock = {
   sectionId: string;
   startTimeMs: number;
   endTimeMs: number;
+  turns: TranscriptionTurn[];
   text: string;
   status: string;
 };

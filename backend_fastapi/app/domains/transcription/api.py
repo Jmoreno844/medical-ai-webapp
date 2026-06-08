@@ -35,6 +35,7 @@ from app.domains.transcription.schemas import (
 )
 from app.domains.transcription.service import (
     SESSION_STATUS_FINISHING,
+    WORKER_SUCCESS_STATUSES,
     apply_section_worker_result,
     build_section_object_names,
     consolidate_recording_session,
@@ -50,6 +51,7 @@ from app.domains.transcription.service import (
     register_audio_section,
     retry_failed_transcription_session,
     serialize_section,
+    serialize_session_chunks,
     transcription_user_message,
 )
 from app.domains.transcription.worker_auth import verify_transcription_worker_request
@@ -64,6 +66,9 @@ from app.integrations.transcription_tasks import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Local dispatch waits for the worker to finish Gemini + callback path.
+LOCAL_TRANSCRIPTION_WORKER_DISPATCH_TIMEOUT_SECONDS = 120
 
 
 def _is_local_environment(settings: Settings) -> bool:
@@ -87,7 +92,11 @@ async def _post_worker_task_background(path: str, settings: Settings) -> None:
     url = f"{settings.transcription_worker_base_url.rstrip('/')}{path}"
     try:
         with bind_log_context(section_id=path.rsplit("/", 1)[-1]):
-            await post_json_async(url, {}, timeout=5)
+            await post_json_async(
+                url,
+                {},
+                timeout=LOCAL_TRANSCRIPTION_WORKER_DISPATCH_TIMEOUT_SECONDS,
+            )
     except Exception:
         log_event(
             logger,
@@ -632,6 +641,7 @@ async def get_transcription_recording_session_status(
         finished_at=recording_session.finished_at,
         finalized_at=recording_session.finalized_at,
         consolidated_transcript=recording_session.consolidated_transcript,
+        chunks=serialize_session_chunks(recording_session),
         error_code=recording_session.error_code,
         sections=[serialize_section(section) for section in recording_session.sections],
     )
@@ -673,6 +683,7 @@ async def get_transcription_document_recording_session_status(
         finished_at=recording_session.finished_at,
         finalized_at=recording_session.finalized_at,
         consolidated_transcript=recording_session.consolidated_transcript,
+        chunks=serialize_session_chunks(recording_session),
         error_code=recording_session.error_code,
         sections=[serialize_section(section) for section in recording_session.sections],
     )
@@ -758,7 +769,7 @@ async def receive_worker_section_result(
         session,
         section_id=section_id,
         status=payload.status,
-        transcript=payload.transcript,
+        turns=payload.turns,
         error_code=payload.error_code,
         transcription_source=payload.transcription_source,
         settings=settings,
@@ -768,7 +779,7 @@ async def receive_worker_section_result(
     await record_audit_event(
         session,
         action="service.audio_processed",
-        result="success" if payload.status == "completed" else "failure",
+        result="success" if payload.status in WORKER_SUCCESS_STATUSES else "failure",
         request=request,
         actor=AuditActor(None, "service", None, None),
         encounter_id=section.recording_session.encounter_id,
@@ -783,10 +794,10 @@ async def receive_worker_section_result(
         session,
         action=(
             "audio.transcription_completed"
-            if payload.status == "completed"
+            if payload.status in WORKER_SUCCESS_STATUSES
             else "audio.transcription_failed"
         ),
-        result="success" if payload.status == "completed" else "failure",
+        result="success" if payload.status in WORKER_SUCCESS_STATUSES else "failure",
         request=request,
         actor=AuditActor(None, "service", None, None),
         encounter_id=section.recording_session.encounter_id,

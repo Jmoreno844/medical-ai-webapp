@@ -25,3 +25,11 @@ def configure_logging(settings: Settings, *, service_name: str) -> None:
         )
     )
     root.addHandler(handler)
+
+    for noisy_logger_name in (
+        "urllib3",
+        "httpcore",
+        "httpx",
+        "google_genai",
+    ):
+        logging.getLogger(noisy_logger_name).setLevel(logging.WARNING)

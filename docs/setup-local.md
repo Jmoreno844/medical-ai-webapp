@@ -149,6 +149,8 @@ Variables clave:
 - `TRANSCRIPTION_PROVIDER=google_genai` por defecto, o `openai` para pruebas directas
 - `TRANSCRIPTION_MODEL` para override explicito del modelo
 - `TRANSCRIPTION_GEMINI_MODEL=gemini-2.5-flash` como fallback legado para Gemini
+- `TRANSCRIPTION_GEMINI_MAX_OUTPUT_TOKENS=8192` para el presupuesto de salida de
+  Gemini en transcripcion literal
 - `TRANSCRIPTION_OPENAI_MODEL=gpt-4o-mini-transcribe` como fallback para OpenAI
 - `OPENAI_API_KEY` solo si `TRANSCRIPTION_PROVIDER=openai`
 - OTEL local opcional:

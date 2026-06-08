@@ -94,7 +94,7 @@ export class FallbackVadAdapter implements VadAdapter {
   }
 
   getModelVersion(): string | undefined {
-    return undefined;
+    return "energy_rms_peak";
   }
 
   private poll(): void {
@@ -132,14 +132,11 @@ export class FallbackVadAdapter implements VadAdapter {
   }
 
   private applyHysteresis(rawSpeech: boolean, probability: number): boolean {
-    if (rawSpeech && probability >= SEGMENTATION_CONFIG.speechThreshold) {
+    if (rawSpeech) {
       this.isSpeechState = true;
       return true;
     }
-    if (
-      !rawSpeech ||
-      probability < SEGMENTATION_CONFIG.negativeSpeechThreshold
-    ) {
+    if (probability < SEGMENTATION_CONFIG.negativeSpeechThreshold) {
       this.isSpeechState = false;
       return false;
     }

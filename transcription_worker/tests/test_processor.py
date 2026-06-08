@@ -7,6 +7,7 @@ import pytest
 from app.processor import Processor
 from app.settings import Settings
 from app.vad import VadResult
+from transcription_contract.models import TranscriptionTurn
 
 
 class FakeBackend:
@@ -39,6 +40,10 @@ def build_processor(backend: FakeBackend) -> Processor:
     )
 
 
+def _sample_turns(text: str = "Paciente refiere dolor.") -> list[TranscriptionTurn]:
+    return [TranscriptionTurn(speaker="PACIENTE", text=text)]
+
+
 @pytest.mark.asyncio
 async def test_happy_path_transcribes_from_gcs_without_downloading_clipped(
     monkeypatch: pytest.MonkeyPatch,
@@ -52,21 +57,22 @@ async def test_happy_path_transcribes_from_gcs_without_downloading_clipped(
         downloaded_objects.append(object_name)
         return b"original-audio"
 
-    async def fake_transcribe(**kwargs) -> str:
+    async def fake_transcribe(**kwargs) -> list[TranscriptionTurn]:
         captured_calls.append(kwargs)
-        return "Paciente refiere dolor."
+        return _sample_turns()
 
     monkeypatch.setattr(processor, "_download_audio_bytes", fake_download_audio)
-    monkeypatch.setattr("app.processor.transcribe_audio", fake_transcribe)
+    monkeypatch.setattr("app.processor.transcribe_chunk_audio", fake_transcribe)
 
     await processor.process_section("section-1")
 
     assert downloaded_objects == []
     assert len(captured_calls) == 1
     assert captured_calls[0]["gcs_uri"] == "gs://bucket/encounter_audio/1/clipped.ogg"
-    assert "audio_bytes" not in captured_calls[0]
+    assert captured_calls[0]["audio_bytes"] is None
     assert backend.section_results[0]["status"] == "transcribed"
     assert backend.section_results[0]["transcription_source"] == "clipped_frontend"
+    assert backend.section_results[0]["turns"][0]["speaker"] == "PACIENTE"
 
 
 @pytest.mark.asyncio
@@ -82,9 +88,11 @@ async def test_empty_clipped_transcript_downloads_only_original_for_fallback(
         downloaded_objects.append(object_name)
         return b"original-audio"
 
-    async def fake_transcribe(**kwargs) -> str:
+    async def fake_transcribe(**kwargs) -> list[TranscriptionTurn]:
         transcribe_calls.append(kwargs)
-        return "" if len(transcribe_calls) == 1 else "Paciente refiere dolor."
+        if len(transcribe_calls) == 1:
+            return []
+        return _sample_turns()
 
     async def fake_build_worker_fallback_audio(
         _audio_bytes: bytes,
@@ -100,14 +108,14 @@ async def test_empty_clipped_transcript_downloads_only_original_for_fallback(
         "_build_worker_fallback_audio",
         fake_build_worker_fallback_audio,
     )
-    monkeypatch.setattr("app.processor.transcribe_audio", fake_transcribe)
+    monkeypatch.setattr("app.processor.transcribe_chunk_audio", fake_transcribe)
 
     await processor.process_section("section-1")
 
     assert downloaded_objects == ["encounter_audio/1/original.webm"]
     assert len(transcribe_calls) == 2
     assert transcribe_calls[0]["gcs_uri"] == "gs://bucket/encounter_audio/1/clipped.ogg"
-    assert "audio_bytes" not in transcribe_calls[0]
+    assert transcribe_calls[0]["audio_bytes"] is None
     assert transcribe_calls[1]["gcs_uri"] is None
     assert transcribe_calls[1]["audio_bytes"] == b"trimmed-fallback-audio"
     assert backend.section_results[0]["status"] == "transcribed"
@@ -126,8 +134,8 @@ async def test_no_speech_fallback_discards_section(
         downloaded_objects.append(object_name)
         return b"original-audio"
 
-    async def fake_transcribe(**_kwargs) -> str:
-        return ""
+    async def fake_transcribe(**_kwargs) -> list[TranscriptionTurn]:
+        return []
 
     async def fake_build_worker_fallback_audio(
         _audio_bytes: bytes,
@@ -143,10 +151,11 @@ async def test_no_speech_fallback_discards_section(
         "_build_worker_fallback_audio",
         fake_build_worker_fallback_audio,
     )
-    monkeypatch.setattr("app.processor.transcribe_audio", fake_transcribe)
+    monkeypatch.setattr("app.processor.transcribe_chunk_audio", fake_transcribe)
 
     await processor.process_section("section-1")
 
     assert downloaded_objects == ["encounter_audio/1/original.webm"]
     assert backend.section_results[0]["status"] == "discarded_no_speech"
+    assert backend.section_results[0]["turns"] == []
     assert backend.section_results[0]["transcription_source"] == "fallback_worker_from_original"

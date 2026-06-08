@@ -8,13 +8,16 @@ from pydantic import BaseModel
 
 from app.auth import verify_cloud_tasks_request
 from app.audio import decode_audio_to_float32_pcm
+from app.chunk_transcription import transcribe_chunk_audio_raw
 from app.debug_cuts import build_worker_debug_cut
 from app.logging_config import configure_logging
 from app.tracing import configure_tracing
 from app.processor import Processor
 from app.settings import Settings
-from app.gemini import transcribe_audio
-from app.text_filters import normalize_transcript
+from transcription_contract.merge import merge_consecutive_turns
+from transcription_contract.models import ChunkTranscript, TranscriptionTurn
+from transcription_contract.render import render_turns_to_clinical_text
+from transcription_contract.sanitize import TranscriptParseError
 
 settings = Settings()
 configure_logging(settings, service_name="vexthealth-transcription-worker")
@@ -46,12 +49,20 @@ class EmptyPayload(BaseModel):
     pass
 
 
+class DebugTranscriptionTurnResponse(BaseModel):
+    speaker: str
+    text: str
+    overlaps_previous: bool = False
+    overlaps_next: bool = False
+
+
 class DebugTranscriptionResponse(BaseModel):
     success: bool
     mode: str = "transcribe"
     provider: str
     model: str
-    transcript: str
+    turns: list[DebugTranscriptionTurnResponse]
+    rendered_text: str | None = None
     content_type: str
     vad_decision: str
     vad_speech_ms: int
@@ -159,43 +170,73 @@ async def debug_transcription(
         }
     )
     frontend_cut = _parse_frontend_cut(frontend_cut_json)
+    content_type = file.content_type or "audio/webm"
     audio_samples = decode_audio_to_float32_pcm(audio_bytes)
     decoded_duration_ms = int(round((len(audio_samples) / 16000) * 1000))
     vad_result, worker_cut, trimmed_audio_bytes = build_worker_debug_cut(
         audio_samples,
         effective_settings,
     )
-    vad_decision = "speech"
-    transcript = ""
+    raw_turns: list[TranscriptionTurn] = []
 
-    if not vad_result.is_speech and vad_result.error_code is None:
-        vad_decision = "no_speech"
-    elif vad_result.error_code is not None:
-        vad_decision = "fail_open"
-    elif mode == "vad_only":
-        vad_decision = "speech"
+    if mode == "vad_only":
+        vad_decision = (
+            "fail_open"
+            if vad_result.error_code is not None
+            else "speech" if vad_result.is_speech else "no_speech"
+        )
     else:
-        async with worker.gemini_semaphore:
-            transcript = await transcribe_audio(
-                gcs_uri=None,
-                content_type="audio/wav",
-                settings=effective_settings,
-                audio_bytes=trimmed_audio_bytes,
-            )
-        transcript = normalize_transcript(transcript)
+        vad_decision = _frontend_vad_decision(frontend_cut)
+        try:
+            async with worker.gemini_semaphore:
+                raw_turns = await transcribe_chunk_audio_raw(
+                    gcs_uri=None,
+                    content_type=content_type,
+                    audio_bytes=audio_bytes,
+                    settings=effective_settings,
+                )
+        except TranscriptParseError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail="Invalid structured transcription response",
+            ) from exc
 
+    merged_turns = merge_consecutive_turns(raw_turns)
+    rendered_text = (
+        render_turns_to_clinical_text(
+            [
+                ChunkTranscript(
+                    chunk_id="debug",
+                    start_ms=0,
+                    end_ms=0,
+                    turns=merged_turns,
+                )
+            ]
+        )
+        if merged_turns
+        else None
+    )
     comparison = _build_cut_comparison(frontend_cut, worker_cut)
     return DebugTranscriptionComparisonResponse(
         success=True,
         mode=mode,
         provider=effective_settings.transcription_provider_name,
         model=effective_settings.effective_transcription_model,
-        transcript=transcript,
-        content_type=file.content_type or "audio/webm",
+        turns=[_serialize_debug_turn(turn) for turn in raw_turns],
+        rendered_text=rendered_text,
+        content_type=content_type,
         vad_decision=vad_decision,
-        vad_speech_ms=vad_result.speech_ms,
-        vad_speech_ratio=vad_result.speech_ratio,
-        vad_error_code=vad_result.error_code,
+        vad_speech_ms=(
+            frontend_cut.speech_duration_ms
+            if mode == "transcribe"
+            else vad_result.speech_ms
+        ),
+        vad_speech_ratio=(
+            _frontend_vad_ratio(frontend_cut)
+            if mode == "transcribe"
+            else vad_result.speech_ratio
+        ),
+        vad_error_code=vad_result.error_code if mode == "vad_only" else None,
         frontend_cut=frontend_cut,
         worker_input=DebugWorkerInputResponse(
             input_byte_size=len(audio_bytes),
@@ -237,6 +278,23 @@ async def debug_trimmed_audio(
     )
 
 
+def _frontend_vad_decision(frontend_cut: DebugFrontendCutResponse) -> str:
+    if frontend_cut.has_detected_speech:
+        return "speech"
+    if frontend_cut.section_duration_ms > 0:
+        return "no_speech"
+    return "speech"
+
+
+def _frontend_vad_ratio(frontend_cut: DebugFrontendCutResponse) -> float:
+    if frontend_cut.section_duration_ms <= 0:
+        return 0.0
+    return min(
+        1.0,
+        frontend_cut.speech_duration_ms / frontend_cut.section_duration_ms,
+    )
+
+
 def _parse_frontend_cut(frontend_cut_json: str | None) -> DebugFrontendCutResponse:
     if not frontend_cut_json:
         return DebugFrontendCutResponse(
@@ -251,6 +309,15 @@ def _parse_frontend_cut(frontend_cut_json: str | None) -> DebugFrontendCutRespon
             retained_intervals=[],
         )
     return DebugFrontendCutResponse.model_validate_json(frontend_cut_json)
+
+
+def _serialize_debug_turn(turn: TranscriptionTurn) -> DebugTranscriptionTurnResponse:
+    return DebugTranscriptionTurnResponse(
+        speaker=turn.speaker,
+        text=turn.text,
+        overlaps_previous=turn.overlaps_previous,
+        overlaps_next=turn.overlaps_next,
+    )
 
 
 def _serialize_worker_cut(worker_cut) -> DebugWorkerCutResponse:

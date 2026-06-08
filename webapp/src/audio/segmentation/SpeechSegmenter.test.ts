@@ -46,25 +46,25 @@ function emitSegment(
 }
 
 describe("SpeechSegmenter", () => {
-  it("1. 59s speech + 10s silence does not close before minimum", () => {
+  it("1. 19s speech + 10s silence does not close before minimum", () => {
     const segmenter = new SpeechSegmenter();
     segmenter.start(true);
     const endMs = emitSegment(segmenter, {
-      speechMs: 59_000,
+      speechMs: 19_000,
       silenceMs: 10_000,
     });
-    expect(endMs).toBe(69_000);
-    expect(segmenter.getSnapshot().speechDurationMs).toBe(59_000);
+    expect(endMs).toBe(29_000);
+    expect(segmenter.getSnapshot().speechDurationMs).toBe(19_000);
     expect(segmenter.getSnapshot().state).toBe("collecting");
   });
 
-  it("2. 60s speech + 1.4s silence does not close", () => {
+  it("2. 20s speech + 1.4s silence does not close", () => {
     const segmenter = new SpeechSegmenter();
     segmenter.start(true);
-    emitSegment(segmenter, { speechMs: 60_000, silenceMs: 1_400 });
+    emitSegment(segmenter, { speechMs: 20_000, silenceMs: 1_400 });
     expect(segmenter.getSnapshot().state).not.toBe("stopped");
     const cut = segmenter.processFrame({
-      timestampMs: 61_400,
+      timestampMs: 21_400,
       durationMs: 0,
       speechProbability: 0.1,
       isSpeech: false,
@@ -72,13 +72,13 @@ describe("SpeechSegmenter", () => {
     expect(cut).toBeNull();
   });
 
-  it("3. 60s speech + 1.5s silence closes with silence_after_minimum", () => {
+  it("3. 20s speech + 1.5s silence closes with silence_after_minimum", () => {
     const segmenter = new SpeechSegmenter();
     segmenter.start(true);
     let cutSignal = null as ReturnType<SpeechSegmenter["processFrame"]>;
-    emitSegment(segmenter, { speechMs: 60_000, silenceMs: 1_400, startMs: 0 });
+    emitSegment(segmenter, { speechMs: 20_000, silenceMs: 1_400, startMs: 0 });
     cutSignal = segmenter.processFrame({
-      timestampMs: 61_400,
+      timestampMs: 21_400,
       durationMs: 100,
       speechProbability: 0.1,
       isSpeech: false,
@@ -143,11 +143,11 @@ describe("SpeechSegmenter", () => {
     );
   });
 
-  it("8. 180s wall with 20s speech triggers wall_clock_limit", () => {
+  it("8. 180s wall with 15s speech triggers wall_clock_limit", () => {
     const segmenter = new SpeechSegmenter();
     segmenter.start(true);
     let wallCut: ReturnType<SpeechSegmenter["processFrame"]> = null;
-    for (let timestampMs = 0; timestampMs < 20_000; timestampMs += 100) {
+    for (let timestampMs = 0; timestampMs < 15_000; timestampMs += 100) {
       segmenter.processFrame({
         timestampMs,
         durationMs: 100,
@@ -155,7 +155,7 @@ describe("SpeechSegmenter", () => {
         isSpeech: true,
       });
     }
-    for (let timestampMs = 20_000; timestampMs < 180_000; timestampMs += 100) {
+    for (let timestampMs = 15_000; timestampMs < 180_000; timestampMs += 100) {
       const cut = segmenter.processFrame({
         timestampMs,
         durationMs: 100,
@@ -167,7 +167,7 @@ describe("SpeechSegmenter", () => {
       }
     }
     expect(wallCut?.cutReason).toBe("wall_clock_limit");
-    expect(wallCut?.speechDurationMs).toBe(20_000);
+    expect(wallCut?.speechDurationMs).toBe(15_000);
   });
 
   it("9. fallback mode continues after Silero unavailable", () => {

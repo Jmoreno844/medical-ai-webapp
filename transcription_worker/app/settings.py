@@ -37,6 +37,10 @@ class Settings(BaseSettings):
         default="gemini-2.5-flash",
         alias="TRANSCRIPTION_GEMINI_MODEL",
     )
+    transcription_gemini_max_output_tokens: int = Field(
+        default=8192,
+        alias="TRANSCRIPTION_GEMINI_MAX_OUTPUT_TOKENS",
+    )
     cloud_tasks_invoker_service_account: str | None = Field(
         default=None,
         alias="CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT",

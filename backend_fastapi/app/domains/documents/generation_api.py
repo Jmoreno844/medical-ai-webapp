@@ -26,6 +26,7 @@ from app.domains.documents.service import (
     get_document_for_doctor,
     get_effective_template_content,
 )
+from app.domains.transcription.service import resolve_transcription_content_for_generation
 from app.domains.documents.sse_hub import get_processing_id, publish_document_event
 from app.domains.documents.worker_auth import verify_document_generation_worker_request
 from app.integrations.document_generation_tasks import (
@@ -123,7 +124,13 @@ async def generate_document_endpoint(
             status.HTTP_403_FORBIDDEN,
             "No tienes permiso para acceder a uno o más documentos requeridos",
         )
-    if not doc_transcription.content_markdown.strip():
+    transcription_content = await resolve_transcription_content_for_generation(
+        session,
+        document_id=doc_transcription.id,
+        doctor_id=user.id,
+        fallback_markdown=doc_transcription.content_markdown,
+    )
+    if not transcription_content.strip():
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "El documento de transcripción está vacío. Se requiere contenido para generar el documento.",
@@ -286,7 +293,12 @@ async def get_document_generation_work_item(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Plantilla no encontrada")
 
     template_content = get_effective_template_content(doctor_template)
-    transcription_content = doc_transcription.content_markdown
+    transcription_content = await resolve_transcription_content_for_generation(
+        session,
+        document_id=doc_transcription.id,
+        doctor_id=payload.doctor_id,
+        fallback_markdown=doc_transcription.content_markdown,
+    )
     if not transcription_content.strip() or not template_content.strip():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Work item inválido")
 

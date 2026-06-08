@@ -3,6 +3,7 @@ import {
   withIndexedDbStore,
 } from "@/lib/indexedDbStore";
 import type { RemovableSilence, SpeechInterval } from "@/audio/segmentation/types";
+import type { TranscriptionTurn } from "@/types/transcription";
 
 export type DebugCutReason =
   | "natural_pause"
@@ -59,7 +60,8 @@ export type DebugTranscriptResult = {
   mode?: "transcribe" | "vad_only";
   provider: string;
   model: string;
-  transcript: string;
+  turns: TranscriptionTurn[];
+  renderedText?: string | null;
   contentType: string;
   responseTimeMs: number;
   vadDecision: string;

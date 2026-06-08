@@ -6,7 +6,7 @@ import {
 } from "./postRecordingAudioPipeline";
 
 describe("trimMonoSamples", () => {
-  it("inserts one second of silence between retained segments", () => {
+  it("inserts configured silence between retained segments", () => {
     const samples = new Float32Array(32_000).fill(1);
     const trimmed = trimMonoSamples(samples, [
       { startMs: 0, endMs: 500 },

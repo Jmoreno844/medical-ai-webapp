@@ -8,7 +8,9 @@ import TranscribeButton from "./subcomponents/TranscribeButton";
 
 import { useEncuentroContext } from "../../contexts/EncuentroContext";
 import { useTranscriptionContext } from "../../contexts/TranscriptionContext";
+import { useGenerationContext } from "../../contexts/GenerationContext";
 import { useAuth } from "@/commons/hooks/useAuth";
+import { resolveEncounterActivityStatus } from "./resolveEncounterActivityStatus";
 
 /**
  * EncuentroHeader component for the encounter page
@@ -65,41 +67,25 @@ const EncuentroHeaderContent: React.FC = () => {
     isRecording,
     isPaused,
     pendingAudioSections,
+    isTranscribing,
     transcriptionStatus,
     canRetryTranscription,
   } = useTranscriptionContext();
+  const { isGenerating, generationStatus } = useGenerationContext();
   const { capabilities, userData } = useAuth();
   const canUseClinicalFeatures = capabilities.can_use_clinical_features;
   const showClinicalAccessWarning =
     userData !== null && !canUseClinicalFeatures;
 
-  const isTranscriptionError =
-    !isRecording && transcriptionStatus === "error";
-
-  const showTranscriptionStatus =
-    isRecording ||
-    isTranscriptionError ||
-    (!isRecording &&
-      (pendingAudioSections > 0 || transcriptionStatus === "pending"));
-
-  const transcriptionStatusLabel = isRecording
-    ? isPaused
-      ? "Pausado"
-      : "Transcribiendo"
-    : isTranscriptionError
-      ? "Error de transcripción"
-      : pendingAudioSections > 0
-        ? "Pendiente"
-        : "Transcribiendo";
-
-  const showTranscriptionStatusPing =
-    showTranscriptionStatus && !isPaused && !isTranscriptionError;
-
-  const transcriptionStatusDotClass = isTranscriptionError
-    ? "bg-red-500"
-    : isPaused
-      ? "bg-slate-400"
-      : "bg-teal-500";
+  const activityStatus = resolveEncounterActivityStatus({
+    isRecording,
+    isPaused,
+    pendingAudioSections,
+    isTranscribing,
+    transcriptionStatus,
+    isGenerating,
+    generationError: generationStatus.error,
+  });
 
   return (
     <>
@@ -128,21 +114,21 @@ const EncuentroHeaderContent: React.FC = () => {
           </div>
 
           <div className="flex items-center">
-            {showTranscriptionStatus && (
+            {activityStatus.showBadge && (
               <div
-                className={`mr-4 flex items-center gap-2 text-[15px] ${
-                  isTranscriptionError ? "text-red-700" : "text-slate-800"
-                }`}
+                className={`mr-4 flex items-center gap-2 text-[15px] ${activityStatus.textClassName}`}
               >
                 <span className="relative flex h-2.5 w-2.5">
-                  {showTranscriptionStatusPing && (
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-75" />
+                  {activityStatus.showPing && (
+                    <span
+                      className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${activityStatus.pingClassName}`}
+                    />
                   )}
                   <span
-                    className={`relative inline-flex h-2.5 w-2.5 rounded-full ${transcriptionStatusDotClass}`}
+                    className={`relative inline-flex h-2.5 w-2.5 rounded-full ${activityStatus.dotClassName}`}
                   />
                 </span>
-                <span className="font-medium">{transcriptionStatusLabel}</span>
+                <span className="font-medium">{activityStatus.label}</span>
               </div>
             )}
 

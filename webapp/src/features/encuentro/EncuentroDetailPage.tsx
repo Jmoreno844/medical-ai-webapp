@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import EncuentroHeader from "../encuentroHeader/EncuentroHeader";
 import DocumentArea from "../encuentroTextArea/DocumentArea";
@@ -13,6 +13,10 @@ export default function EncuentroDetailPage() {
   const [transcriptionDocId, setTranscriptionDocId] = useState<number | null>(
     null
   );
+
+  useEffect(() => {
+    setTranscriptionDocId(null);
+  }, [encounterId]);
 
   // Handler for when a transcription document is found
   const handleTranscriptionDocumentFound = useCallback((docId: number) => {

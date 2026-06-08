@@ -15,6 +15,7 @@ import {
   generateSectionUploadUrl,
   getRecordingSessionStatus,
   registerAudioSection,
+  resolveRecordingSessionIdsToFinishWhenDrained,
   uploadAudioToCloud,
 } from "./uploadService";
 import {
@@ -289,15 +290,17 @@ export const useVoiceRecorder = (
       }
 
       await refreshPendingSectionCount();
-      if (finishSessionsWhenDrained && processedSessionIds.size > 0) {
-        const remainingSections = await listPendingSections(encounterId);
-        if (remainingSections.length === 0) {
-          await Promise.all(
-            Array.from(processedSessionIds).map((sessionId) =>
-              finishRecordingSession(sessionId),
-            ),
-          );
-        }
+      const remainingSections = await listPendingSections(encounterId);
+      const sessionIdsToFinish = resolveRecordingSessionIdsToFinishWhenDrained(
+        processedSessionIds,
+        recordingSessionIdRef.current,
+        remainingSections.length,
+        finishSessionsWhenDrained,
+      );
+      if (sessionIdsToFinish.length > 0) {
+        await Promise.all(
+          sessionIdsToFinish.map((sessionId) => finishRecordingSession(sessionId)),
+        );
       }
     },
     [encounterId, refreshPendingSectionCount],

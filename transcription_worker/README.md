@@ -24,10 +24,17 @@ Provider defaults:
 
 - `TRANSCRIPTION_PROVIDER=google_genai`
 - `TRANSCRIPTION_GEMINI_MODEL=gemini-2.5-flash`
+- `TRANSCRIPTION_GEMINI_MAX_OUTPUT_TOKENS=8192`
 
 The happy path always sends `gs://...` references to Vertex AI for the
 frontend-generated `clipped` artifact. The worker only downloads audio when it
 needs to fall back to Silero over the `original` artifact.
+
+Gemini transcription disables thinking for this literal STT call and logs safe
+response metadata (`finish_reason` and token counts) without transcript text.
+If final words disappear again, check whether `finish_reason` is `MAX_TOKENS` or
+whether `thoughts_token_count` is unexpectedly non-zero before changing audio
+segmentation.
 
 Set `TRANSCRIPTION_WORKER_BASE_URL=http://localhost:8091` in
 `backend_fastapi/.env.local` to let local FastAPI dispatch background section

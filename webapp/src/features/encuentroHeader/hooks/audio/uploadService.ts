@@ -1,6 +1,10 @@
 import { SpanKind, trace } from "@opentelemetry/api";
 import axios from "axios";
 import axiosInstance from "@/commons/utils/axiosInstance";
+import type {
+  ChunkTranscript,
+  TranscriptionTurn,
+} from "@/types/transcription";
 import { logger } from "@/lib/logger";
 
 const tracer = trace.getTracer("vexthealth-webapp");
@@ -141,6 +145,7 @@ export type RecordingSessionSection = {
   content_type: string;
   byte_size?: number | null;
   status: string;
+  turns?: TranscriptionTurn[] | null;
   raw_transcript?: string | null;
   error_code?: string | null;
   retry_count: number;
@@ -158,9 +163,44 @@ export type RecordingSessionStatus = {
   finished_at?: string | null;
   finalized_at?: string | null;
   consolidated_transcript?: string | null;
+  chunks?: ChunkTranscript[];
   error_code?: string | null;
   sections: RecordingSessionSection[];
 };
+
+const RECORDING_SECTION_COMPLETE_STATUSES = new Set([
+  "transcribed",
+  "discarded_no_speech",
+]);
+
+export function areAllRecordingSectionsComplete(
+  sections: RecordingSessionSection[],
+): boolean {
+  return (
+    sections.length > 0 &&
+    sections.every((section) =>
+      RECORDING_SECTION_COMPLETE_STATUSES.has(section.status),
+    )
+  );
+}
+
+export function resolveRecordingSessionIdsToFinishWhenDrained(
+  processedSessionIds: Iterable<string>,
+  activeRecordingSessionId: string | null,
+  remainingPendingSectionCount: number,
+  finishSessionsWhenDrained: boolean,
+): string[] {
+  if (!finishSessionsWhenDrained || remainingPendingSectionCount > 0) {
+    return [];
+  }
+
+  const sessionIds = new Set(processedSessionIds);
+  if (activeRecordingSessionId) {
+    sessionIds.add(activeRecordingSessionId);
+  }
+
+  return Array.from(sessionIds);
+}
 
 export const generateSectionUploadUrl = async (
   recordingSessionId: string,

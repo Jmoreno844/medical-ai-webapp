@@ -137,8 +137,12 @@ sesion.
 El frontend actual mantiene blobs WebM independientes por seccion. Esto evita
 enviar a Gemini recortes internos de un WebM continuo, porque despues del
 primer recorte pueden faltar metadatos del contenedor y Vertex puede responder
-`Failed to decode audio or visual data`. El corte principal ya usa VAD en el
-navegador con estos parametros operativos:
+`Failed to decode audio or visual data`. Durante la grabacion, el corte usa una
+senal live simple de energia RMS/peak para acumular tiempo con voz o ruido y
+detectar silencios. Al cerrar cada blob, el frontend reanaliza la seccion
+completa con Silero offline y usa ese resultado para construir el `clipped`
+real que se sube a GCS. Esto evita que un backlog del VAD live marque como
+silencio audio que si quedo grabado. Parametros operativos:
 
 - `pre-roll`: `400ms` como ventana de pausa confirmada antes de rearmar una nueva seccion;
 - `tail`: `600ms` antes de cerrar por pausa natural;

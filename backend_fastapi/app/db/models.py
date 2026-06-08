@@ -98,6 +98,7 @@ class TranscriptionRecordingSession(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     consolidated_transcript: Mapped[str | None] = mapped_column(Text)
+    transcript_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     error_code: Mapped[str | None] = mapped_column(String(64))
 
     encounter: Mapped[Encounter] = relationship(
@@ -154,6 +155,7 @@ class TranscriptionAudioSection(Base):
     transcription_source: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(32))
     raw_transcript: Mapped[str | None] = mapped_column(Text)
+    turns_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     error_code: Mapped[str | None] = mapped_column(String(64))
     retry_count: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

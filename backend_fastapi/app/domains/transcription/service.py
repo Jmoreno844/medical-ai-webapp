@@ -21,8 +21,19 @@ from app.db.models import (
 )
 from app.domains.documents.content import set_document_content_fields
 from app.domains.documents.sse_hub import publish_document_event
-from app.domains.transcription.schemas import AudioSectionResponse
-from app.domains.transcription.schemas import SectionWorkItemResponse
+from app.domains.transcription.schemas import (
+    AudioSectionResponse,
+    ChunkTranscriptResponse,
+    SectionWorkItemResponse,
+    TranscriptionTurnResponse,
+)
+from transcription_contract.consolidate import (
+    SectionTurnsData,
+    build_chunks_from_sections,
+    dedupe_adjacent_chunks,
+)
+from transcription_contract.models import ChunkTranscript, ConsultationTranscript, TranscriptionTurn
+from transcription_contract.render import render_turns_to_clinical_text
 from app.integrations.transcription_tasks import (
     enqueue_transcription_task,
     should_use_cloud_tasks,
@@ -43,6 +54,10 @@ SECTION_STATUS_DISCARDED_NO_SPEECH = "discarded_no_speech"
 SECTION_STATUS_FAILED_RETRYABLE = "failed_retryable"
 SECTION_STATUS_FAILED_FINAL = "failed_final"
 SECTION_COMPLETE_STATUSES = {
+    SECTION_STATUS_TRANSCRIBED,
+    SECTION_STATUS_DISCARDED_NO_SPEECH,
+}
+WORKER_SUCCESS_STATUSES = {
     SECTION_STATUS_TRANSCRIBED,
     SECTION_STATUS_DISCARDED_NO_SPEECH,
 }
@@ -122,7 +137,127 @@ REMOVABLE_INLINE_TAGS = {
 }
 
 
+def _deserialize_turns(
+    turns_json: list[dict[str, object]] | None,
+) -> list[TranscriptionTurn] | None:
+    if turns_json is None:
+        return None
+    return [TranscriptionTurn.model_validate(item) for item in turns_json]
+
+
+def _section_turns(section: TranscriptionAudioSection) -> list[TranscriptionTurn]:
+    if section.turns_json is not None:
+        return _deserialize_turns(section.turns_json) or []
+    if section.raw_transcript:
+        text = section.raw_transcript.strip()
+        if text:
+            return [TranscriptionTurn(speaker="DESCONOCIDO", text=text)]
+    return []
+
+
+def _serialize_turns(
+    turns: list[TranscriptionTurn] | None,
+) -> list[TranscriptionTurnResponse] | None:
+    if turns is None:
+        return None
+    return [
+        TranscriptionTurnResponse(
+            speaker=turn.speaker,
+            text=turn.text,
+            overlaps_previous=turn.overlaps_previous,
+            overlaps_next=turn.overlaps_next,
+        )
+        for turn in turns
+    ]
+
+
+def _chunk_to_response(chunk: ChunkTranscript) -> ChunkTranscriptResponse:
+    return ChunkTranscriptResponse(
+        chunk_id=chunk.chunk_id,
+        start_ms=chunk.start_ms,
+        end_ms=chunk.end_ms,
+        turns=_serialize_turns(chunk.turns) or [],
+    )
+
+
+def _chunks_to_dict(chunks: list[ChunkTranscript]) -> list[dict[str, object]]:
+    return [chunk.model_dump() for chunk in chunks]
+
+
+def _build_session_chunks(
+    recording_session: TranscriptionRecordingSession,
+) -> list[ChunkTranscript]:
+    sections_data = [
+        SectionTurnsData(
+            section_id=section.section_id,
+            section_index=section.section_index,
+            start_ms=section.start_time_ms,
+            end_ms=section.end_time_ms,
+            turns=_section_turns(section),
+            status=section.status,
+        )
+        for section in sorted(
+            recording_session.sections,
+            key=lambda item: item.section_index,
+        )
+    ]
+    return dedupe_adjacent_chunks(build_chunks_from_sections(sections_data))
+
+
+def _persist_session_transcript_json(
+    recording_session: TranscriptionRecordingSession,
+    chunks: list[ChunkTranscript],
+) -> None:
+    consultation = ConsultationTranscript(
+        session_id=recording_session.session_id,
+        chunks=chunks,
+    )
+    recording_session.transcript_json = consultation.model_dump()
+
+
+async def resolve_transcription_content_for_generation(
+    session: AsyncSession,
+    *,
+    document_id: int,
+    doctor_id: int,
+    fallback_markdown: str | None,
+) -> str:
+    recording_session = await get_canonical_recording_session_for_document(
+        session,
+        document_id=document_id,
+        doctor_id=doctor_id,
+    )
+    if recording_session and recording_session.transcript_json:
+        consultation = ConsultationTranscript.model_validate(
+            recording_session.transcript_json
+        )
+        rendered = render_turns_to_clinical_text(consultation.chunks)
+        if rendered.strip():
+            return rendered
+
+    if fallback_markdown and fallback_markdown.strip():
+        return fallback_markdown.strip()
+
+    return ""
+
+
+def serialize_session_chunks(
+    recording_session: TranscriptionRecordingSession,
+) -> list[ChunkTranscriptResponse]:
+    if recording_session.transcript_json:
+        consultation = ConsultationTranscript.model_validate(
+            recording_session.transcript_json
+        )
+        return [_chunk_to_response(chunk) for chunk in consultation.chunks]
+    return [_chunk_to_response(chunk) for chunk in _build_session_chunks(recording_session)]
+
+
 def serialize_section(section: TranscriptionAudioSection) -> AudioSectionResponse:
+    turns = (
+        _deserialize_turns(section.turns_json)
+        if section.turns_json is not None
+        else None
+    )
     return AudioSectionResponse(
         section_id=section.section_id,
         client_section_id=section.client_section_id,
@@ -147,6 +282,7 @@ def serialize_section(section: TranscriptionAudioSection) -> AudioSectionRespons
         ),
         transcription_source=section.transcription_source,
         status=section.status,
+        turns=_serialize_turns(turns),
         raw_transcript=section.raw_transcript,
         error_code=section.error_code,
         retry_count=section.retry_count,
@@ -243,6 +379,7 @@ async def reset_recording_session(
     recording_session.finished_at = None
     recording_session.finalized_at = None
     recording_session.consolidated_transcript = None
+    recording_session.transcript_json = None
     recording_session.error_code = None
 
     if recording_session.encounter:
@@ -562,7 +699,7 @@ async def apply_section_worker_result(
     *,
     section_id: str,
     status: str,
-    transcript: str | None,
+    turns: list[TranscriptionTurnResponse] | None,
     error_code: str | None,
     transcription_source: str | None,
     settings: Settings,
@@ -589,11 +726,16 @@ async def apply_section_worker_result(
     if transcription_source:
         section.transcription_source = transcription_source
     if status == SECTION_STATUS_DISCARDED_NO_SPEECH:
-        section.raw_transcript = ""
+        section.turns_json = []
+        section.raw_transcript = None
         section.status = SECTION_STATUS_DISCARDED_NO_SPEECH
         section.error_code = error_code or "no_speech_detected"
     elif status == SECTION_STATUS_TRANSCRIBED:
-        section.raw_transcript = _normalize_transcript_for_document(transcript)
+        parsed_turns = [
+            TranscriptionTurn.model_validate(turn.model_dump()) for turn in (turns or [])
+        ]
+        section.turns_json = [turn.model_dump() for turn in parsed_turns]
+        section.raw_transcript = None
         section.status = SECTION_STATUS_TRANSCRIBED
         section.error_code = error_code
     elif status == SECTION_STATUS_FAILED_FINAL:
@@ -617,36 +759,33 @@ async def apply_section_worker_result(
     recording_session = section.recording_session
     await db_session.commit()
 
-    ordered_transcripts = [
-        _normalize_transcript_for_document(item.raw_transcript)
-        for item in sorted(recording_session.sections, key=lambda item: item.section_index)
-    ]
-    session_streaming_content = ""
-    for item in ordered_transcripts:
-        if not item:
-            continue
-        session_streaming_content = _merge_with_light_dedup(
-            session_streaming_content,
-            item,
+    streaming_chunks = _build_session_chunks(recording_session)
+    _persist_session_transcript_json(recording_session, streaming_chunks)
+    streaming_content = render_turns_to_clinical_text(streaming_chunks)
+    if recording_session.consolidated_transcript:
+        streaming_content = _merge_session_with_existing_document(
+            recording_session,
+            streaming_content,
         )
-    streaming_content = _merge_session_with_existing_document(
-        recording_session,
-        session_streaming_content,
-    )
 
-    # Persist the merged partial transcript so refresh/HMR can recover the last
-    # realtime text even before the final consolidation finishes.
     set_document_content_fields(
         recording_session.document,
         content_markdown=streaming_content,
         preferred_source="markdown",
     )
+    recording_session.consolidated_transcript = streaming_content or None
     await db_session.commit()
 
+    latest_chunk = streaming_chunks[-1] if streaming_chunks else None
     await publish_document_event(
         recording_session.document_id,
         "transcription_update",
-        {"content": streaming_content},
+        {
+            "chunks": _chunks_to_dict(streaming_chunks),
+            "latest_chunk": latest_chunk.model_dump() if latest_chunk else None,
+            "rendered_text": streaming_content,
+            "content": streaming_content,
+        },
     )
     if is_recording_session_ready_for_consolidation(recording_session):
         try:
@@ -702,35 +841,36 @@ async def consolidate_recording_session(
     recording_session.status = SESSION_STATUS_CONSOLIDATING
     await db_session.commit()
 
-    session_transcript = ""
-    for section in sections:
-        if section.status != SECTION_STATUS_TRANSCRIBED:
-            continue
-        normalized = _normalize_transcript_for_document(section.raw_transcript)
-        if not normalized:
-            continue
-        session_transcript = _merge_with_light_dedup(
-            session_transcript,
-            normalized,
+    consolidated_chunks = _build_session_chunks(recording_session)
+    _persist_session_transcript_json(recording_session, consolidated_chunks)
+    consolidated = render_turns_to_clinical_text(consolidated_chunks)
+    if recording_session.consolidated_transcript and not consolidated_chunks:
+        consolidated = _merge_session_with_existing_document(recording_session, "")
+    elif recording_session.consolidated_transcript:
+        consolidated = _merge_session_with_existing_document(
+            recording_session,
+            consolidated,
         )
-
-    consolidated = _merge_session_with_existing_document(
-        recording_session,
-        session_transcript,
-    )
     if consolidated.strip():
         set_document_content_fields(
             recording_session.document,
             content_markdown=consolidated,
             preferred_source="markdown",
         )
-    recording_session.consolidated_transcript = consolidated
+    recording_session.consolidated_transcript = consolidated or None
     recording_session.status = SESSION_STATUS_CONSOLIDATED
     recording_session.finalized_at = datetime.now(timezone.utc)
     recording_session.error_code = None
     recording_session.encounter.has_been_transcribed = True
     await db_session.commit()
-    await publish_document_event(recording_session.document_id, "transcription_complete")
+    await publish_document_event(
+        recording_session.document_id,
+        "transcription_complete",
+        {
+            "chunks": _chunks_to_dict(consolidated_chunks),
+            "rendered_text": consolidated,
+        },
+    )
     return recording_session
 
 

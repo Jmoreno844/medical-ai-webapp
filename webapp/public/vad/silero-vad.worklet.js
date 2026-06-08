@@ -3,17 +3,7 @@
  * via MessagePort (bypasses the main thread).
  */
 class SileroVadCaptureProcessor extends AudioWorkletProcessor {
-  constructor(options) {
-    super();
-    this.version = "20260607_01";
-    this.targetSampleRate = 16000;
-    this.inputSampleRate = sampleRate;
-    this.ratio = this.inputSampleRate / this.targetSampleRate;
-    this.chunkSamples = 512;
-    this.resampleBuffer = new Float32Array(this.chunkSamples * 8);
-    this.resampleLength = 0;
-    this.sessionStart = currentTime;
-    this.port.postMessage({
+  constructor(options) {r
       type: "worklet_ready",
       version: this.version,
       sampleRate: this.inputSampleRate,
@@ -23,8 +13,7 @@ class SileroVadCaptureProcessor extends AudioWorkletProcessor {
   appendResampleSample(sample) {
     if (this.resampleLength >= this.resampleBuffer.length) {
       return;
-    }
-    this.resampleBuffer[this.resampleLength] = sample;
+    }r
     this.resampleLength += 1;
   }
 

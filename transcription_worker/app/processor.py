@@ -9,12 +9,13 @@ import anyio
 
 from app.audio import decode_audio_to_float32_pcm, download_gcs_object
 from app.backend_client import BackendClient
+from app.chunk_transcription import transcribe_chunk_audio
 from app.debug_cuts import build_worker_debug_cut
-from app.gemini import transcribe_audio
 from app.observability import bind_log_context, log_event
 from app.settings import Settings
-from app.text_filters import normalize_transcript
 from app.vad import VadResult
+from transcription_contract.models import TranscriptionTurn
+from transcription_contract.sanitize import TranscriptParseError
 
 logger = logging.getLogger(__name__)
 
@@ -43,12 +44,32 @@ class Processor:
             provider=self.settings.transcription_provider_name,
             model=self.settings.effective_transcription_model,
         ):
-            transcript, transcription_source, vad_result, error_code = (
-                await self._transcribe_with_frontend_clip_fallback(
-                    work_item=work_item,
+            try:
+                turns, transcription_source, vad_result, error_code = (
+                    await self._transcribe_with_frontend_clip_fallback(
+                        work_item=work_item,
+                    )
                 )
-            )
-            normalized = normalize_transcript(transcript)
+            except TranscriptParseError as exc:
+                await self.backend.post_section_result(
+                    section_id,
+                    {
+                        "status": "failed_retryable",
+                        "turns": None,
+                        "error_code": "invalid_transcript_json",
+                        "worker_latency_ms": self._elapsed_ms(started_at),
+                    },
+                )
+                log_event(
+                    logger,
+                    logging.WARNING,
+                    "Transcript parse failed",
+                    event="transcript_parse_failed",
+                    error_code=exc.__class__.__name__,
+                    duration_ms=self._elapsed_ms(started_at),
+                )
+                return
+
             if (
                 transcription_source == "fallback_worker_from_original"
                 and not vad_result.is_speech
@@ -58,7 +79,7 @@ class Processor:
                     section_id,
                     {
                         "status": "discarded_no_speech",
-                        "transcript": "",
+                        "turns": [],
                         "error_code": "no_speech_detected",
                         "vad_decision": "no_speech",
                         "vad_speech_ms": vad_result.speech_ms,
@@ -72,7 +93,7 @@ class Processor:
                 section_id,
                 {
                     "status": "transcribed",
-                    "transcript": normalized,
+                    "turns": _serialize_turns(turns),
                     "error_code": error_code,
                     "vad_decision": "speech"
                     if vad_result.error_code is None
@@ -106,7 +127,9 @@ class Processor:
         self,
         *,
         work_item: dict[str, str],
-    ) -> tuple[str, str, VadResult, str | None]:
+    ) -> tuple[list[TranscriptionTurn], str, VadResult, str | None]:
+        # Primary path: transcribe the frontend-clipped GCS artifact as-is.
+        # Worker Silero VAD runs only on the original-audio fallback below.
         clipped_gcs_uri = work_item.get("clipped_gcs_uri") or work_item[
             "transcription_source_gcs_uri"
         ]
@@ -114,15 +137,15 @@ class Processor:
             "transcription_source_content_type"
         ]
         async with self.gemini_semaphore:
-            clipped_transcript = await transcribe_audio(
+            clipped_turns = await transcribe_chunk_audio(
                 gcs_uri=clipped_gcs_uri,
                 content_type=clipped_content_type,
+                audio_bytes=None,
                 settings=self.settings,
             )
-        normalized_clipped = normalize_transcript(clipped_transcript)
-        if normalized_clipped:
+        if clipped_turns:
             return (
-                normalized_clipped,
+                clipped_turns,
                 "clipped_frontend",
                 VadResult(
                     is_speech=True,
@@ -136,7 +159,7 @@ class Processor:
         original_object_name = work_item.get("original_gcs_object_name")
         if not original_object_name:
             return (
-                clipped_transcript,
+                clipped_turns,
                 "clipped_frontend",
                 VadResult(
                     is_speech=True,
@@ -153,21 +176,21 @@ class Processor:
         )
         if not vad_result.is_speech and vad_result.error_code is None:
             return (
-                "",
+                [],
                 "fallback_worker_from_original",
                 vad_result,
                 "no_speech_detected",
             )
 
         async with self.gemini_semaphore:
-            fallback_transcript = await transcribe_audio(
+            fallback_turns = await transcribe_chunk_audio(
                 gcs_uri=None,
                 content_type="audio/wav",
-                settings=self.settings,
                 audio_bytes=fallback_audio_bytes,
+                settings=self.settings,
             )
         return (
-            normalize_transcript(fallback_transcript),
+            fallback_turns,
             "fallback_worker_from_original",
             vad_result,
             None,
@@ -220,3 +243,7 @@ class Processor:
     @staticmethod
     def _elapsed_ms(started_at: float) -> int:
         return int((time.monotonic() - started_at) * 1000)
+
+
+def _serialize_turns(turns: list[TranscriptionTurn]) -> list[dict[str, object]]:
+    return [turn.model_dump() for turn in turns]

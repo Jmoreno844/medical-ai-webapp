@@ -12,7 +12,8 @@ import type {
   SegmentState,
 } from "../segmentation/types";
 import type { VadAdapter } from "../vad/VadAdapter";
-import { createVadAdapter } from "../vad/SileroVadAdapter";
+import { FallbackVadAdapter } from "../vad/FallbackVadAdapter";
+import { analyzeUploadedAudioWithSilero } from "../vad/analyzeUploadedAudioWithSilero";
 
 const logger = createChildLogger("AudioRecorderController");
 
@@ -187,20 +188,12 @@ export class AudioRecorderController {
         this.startFullSessionRecorder();
       }
 
-      const vadResult = await createVadAdapter(this.stream);
-      this.vadAdapter = vadResult.adapter;
-      this.usedFallback = vadResult.usedFallback;
-      if (vadResult.initError) {
-        this.initWarning = "Modo compatibilidad: Silero no disponible.";
-        logger.warn("[AudioRecorder] VAD fallback active", {
-          reason: vadResult.initError,
-        });
-      }
+      const energyVad = new FallbackVadAdapter();
+      await energyVad.initialize(this.stream);
+      await energyVad.start();
+      this.vadAdapter = energyVad;
 
       this.segmenter.start(!this.usedFallback);
-      if (this.usedFallback) {
-        this.segmenter.enterFallback();
-      }
 
       this.vadUnsubscribe = this.vadAdapter.onFrame((frame) => {
         this.lastSpeechProbability = frame.speechProbability;
@@ -709,24 +702,19 @@ export class AudioRecorderController {
       Math.round(signal.wallClockDurationMs),
       recordedDurationMs,
     );
-    const normalizedSpeechIntervals = mergeSpeechIntervals(signal.speechIntervals)
-      .map((interval) => ({
-        startMs: Math.max(0, Math.min(Math.round(interval.startMs), normalizedWallClockDurationMs)),
-        endMs: Math.max(0, Math.min(Math.round(interval.endMs), normalizedWallClockDurationMs)),
-      }))
-      .filter((interval) => interval.endMs > interval.startMs);
-    const normalizedRemovableSilences = detectRemovableSilences(
-      normalizedSpeechIntervals,
+    const finalVad = await this.buildFinalVadMetadata(
+      blob,
+      signal,
       normalizedWallClockDurationMs,
     );
 
     const metadata: AudioSectionMetadata = {
       sectionId: section.id,
       sequence: this.sequence,
-      wallClockDurationMs: normalizedWallClockDurationMs,
-      speechDurationMs: signal.speechDurationMs,
-      speechIntervals: normalizedSpeechIntervals,
-      removableSilences: normalizedRemovableSilences,
+      wallClockDurationMs: finalVad.wallClockDurationMs,
+      speechDurationMs: finalVad.speechDurationMs,
+      speechIntervals: finalVad.speechIntervals,
+      removableSilences: finalVad.removableSilences,
       cutReason: signal.cutReason,
       forcedCut: signal.forcedCut,
       overlapBeforeMs: section.overlapMs,
@@ -748,6 +736,58 @@ export class AudioRecorderController {
     this.sectionListeners.forEach((listener) => listener(recorded));
     this.publishState();
     return recorded;
+  }
+
+  private async buildFinalVadMetadata(
+    blob: Blob,
+    signal: SectionCutSignal,
+    normalizedWallClockDurationMs: number,
+  ): Promise<{
+    wallClockDurationMs: number;
+    speechDurationMs: number;
+    speechIntervals: AudioSectionMetadata["speechIntervals"];
+    removableSilences: AudioSectionMetadata["removableSilences"];
+  }> {
+    try {
+      const analysis = await analyzeUploadedAudioWithSilero(blob);
+      return {
+        wallClockDurationMs: Math.max(
+          analysis.sectionDurationMs,
+          normalizedWallClockDurationMs,
+        ),
+        speechDurationMs: analysis.speechDurationMs,
+        speechIntervals: analysis.speechIntervals,
+        removableSilences: analysis.removableSilences,
+      };
+    } catch (error) {
+      logger.warn("[AudioRecorder] Final offline VAD analysis failed", {
+        error: error instanceof Error ? error.message : "unknown_error",
+      });
+    }
+
+    const speechIntervals = mergeSpeechIntervals(signal.speechIntervals)
+      .map((interval) => ({
+        startMs: Math.max(
+          0,
+          Math.min(Math.round(interval.startMs), normalizedWallClockDurationMs),
+        ),
+        endMs: Math.max(
+          0,
+          Math.min(Math.round(interval.endMs), normalizedWallClockDurationMs),
+        ),
+      }))
+      .filter((interval) => interval.endMs > interval.startMs);
+    const removableSilences = detectRemovableSilences(
+      speechIntervals,
+      normalizedWallClockDurationMs,
+    );
+
+    return {
+      wallClockDurationMs: normalizedWallClockDurationMs,
+      speechDurationMs: signal.speechDurationMs,
+      speechIntervals,
+      removableSilences,
+    };
   }
 
   private revokeSectionUrls(): void {

@@ -108,6 +108,7 @@ dependencies = [
     { name = "python-multipart" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "sqlparse" },
+    { name = "transcription-contract" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -144,6 +145,7 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.20,<1" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.36,<3" },
     { name = "sqlparse", specifier = ">=0.5.5" },
+    { name = "transcription-contract", editable = "../shared/transcription_contract" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34.0,<0.35" },
 ]
 
@@ -1269,6 +1271,20 @@ sdist = { url = "https://files.pythonhosted.org/packages/47/c6/ee486fd809e357697
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d7/c1/eb8f9debc45d3b7918a32ab756658a0904732f75e555402972246b0b8e71/tenacity-9.1.4-py3-none-any.whl", hash = "sha256:6095a360c919085f28c6527de529e76a06ad89b23659fa881ae0649b867a9d55", size = 28926, upload-time = "2026-02-07T10:45:32.24Z" },
 ]
+
+[[package]]
+name = "transcription-contract"
+version = "0.1.0"
+source = { editable = "../shared/transcription_contract" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.8.0,<3" }]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.3.4,<9" }]
 
 [[package]]
 name = "typing-extensions"

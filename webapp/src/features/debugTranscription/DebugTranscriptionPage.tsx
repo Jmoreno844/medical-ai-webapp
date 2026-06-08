@@ -27,6 +27,11 @@ import { analyzeUploadedAudioWithSilero } from "@/audio/vad/analyzeUploadedAudio
 import { getStoredMicrophoneDeviceId } from "@/features/encuentroHeader/hooks/audio/useMicrophoneDevices";
 import { createChildLogger } from "@/lib/logger";
 import {
+  mergeConsecutiveTurns,
+  renderTurnsToClinicalText,
+  type TranscriptionTurn,
+} from "@/types/transcription";
+import {
   clearDebugSections,
   type DebugCutMetadata,
   type DebugSectionRecord,
@@ -49,6 +54,7 @@ import {
 const logger = createChildLogger("DebugTranscription");
 
 type ProviderKey = "gemini" | "workerVad";
+type GeminiOutputView = "text" | "json";
 
 type SectionView = DebugSectionRecord & {
   url: string;
@@ -59,7 +65,13 @@ type BackendDebugPayload = {
   mode?: "transcribe" | "vad_only";
   provider: string;
   model: string;
-  transcript: string;
+  turns: Array<{
+    speaker: string;
+    text: string;
+    overlaps_previous?: boolean;
+    overlaps_next?: boolean;
+  }>;
+  rendered_text?: string | null;
   content_type: string;
   vad_decision: string;
   vad_speech_ms: number;
@@ -173,7 +185,13 @@ const mapBackendPayloadToTranscriptResult = (
   mode: payload.mode ?? "transcribe",
   provider: payload.provider,
   model: payload.model,
-  transcript: payload.transcript,
+  turns: payload.turns.map((turn) => ({
+    speaker: turn.speaker as DebugTranscriptResult["turns"][number]["speaker"],
+    text: turn.text,
+    overlaps_previous: Boolean(turn.overlaps_previous),
+    overlaps_next: Boolean(turn.overlaps_next),
+  })),
+  renderedText: payload.rendered_text ?? null,
   contentType: payload.content_type,
   responseTimeMs,
   vadDecision: payload.vad_decision,
@@ -334,6 +352,9 @@ export default function DebugTranscriptionPage() {
   >({});
   const [workerPreviewUrls, setWorkerPreviewUrls] = useState<
     Record<string, string>
+  >({});
+  const [geminiOutputViewBySection, setGeminiOutputViewBySection] = useState<
+    Record<string, GeminiOutputView>
   >({});
 
   const controllerRef = useRef<AudioRecorderController | null>(null);
@@ -779,6 +800,53 @@ export default function DebugTranscriptionPage() {
     </div>
   );
 
+  const renderTurnsSurface = (turns: TranscriptionTurn[] | undefined) => {
+    if (!turns?.length) {
+      return renderTranscriptSurface("");
+    }
+
+    return (
+      <div className="min-h-[180px] space-y-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-800">
+        {turns.map((turn, index) => (
+          <div key={`${turn.speaker}-${index}`} className="whitespace-pre-wrap break-words">
+            <span className="mr-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {turn.speaker}
+            </span>
+            {turn.text}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const getMergedDebugTurns = (result?: DebugTranscriptResult | null) =>
+    mergeConsecutiveTurns(result?.turns ?? []);
+
+  const getDebugRenderedText = (result?: DebugTranscriptResult | null) =>
+    result?.renderedText?.trim() ||
+    renderTurnsToClinicalText(getMergedDebugTurns(result));
+
+  const getGeminiOutputView = (sectionId: string): GeminiOutputView =>
+    geminiOutputViewBySection[sectionId] ?? "text";
+
+  const getGeminiJsonOutput = (result?: DebugTranscriptResult | null) =>
+    JSON.stringify({ turns: result?.turns ?? [] }, null, 2);
+
+  const getGeminiCopyPayload = (
+    result: DebugTranscriptResult | null | undefined,
+    view: GeminiOutputView,
+  ) => (view === "json" ? getGeminiJsonOutput(result) : getDebugRenderedText(result));
+
+  const renderGeminiOutput = (
+    result: DebugTranscriptResult | null | undefined,
+    view: GeminiOutputView,
+  ) => {
+    if (view === "json") {
+      return renderTranscriptSurface(getGeminiJsonOutput(result));
+    }
+    return renderTurnsSurface(getMergedDebugTurns(result));
+  };
+
   const formatIntervalLabel = (interval: SpeechInterval) =>
     `${formatMs(interval.startMs)} - ${formatMs(interval.endMs)} (${formatMs(
       interval.endMs - interval.startMs,
@@ -1069,7 +1137,7 @@ export default function DebugTranscriptionPage() {
         </h1>
         <p className="max-w-3xl text-sm text-slate-600">
           Esta pagina usa el mismo motor de seccionado que grabacion y
-          produccion: minimo 60 s de voz real antes del corte natural, cierre
+          produccion: minimo 20 s de voz real antes del corte natural, cierre
           forzado cerca de 90 s de voz y silencios de 3 s solo como metadata.
         </p>
       </div>
@@ -1173,7 +1241,7 @@ export default function DebugTranscriptionPage() {
           <div className="mt-2 space-y-2 text-sm">
             <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
               <span className="font-medium">1. Frontend</span>: usa el mismo
-              motor real de 60–90 s de voz.
+              motor real de 20–90 s de voz.
             </div>
             <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
               <span className="font-medium">2. Backend bridge</span>: reenvia la
@@ -1475,8 +1543,8 @@ export default function DebugTranscriptionPage() {
 
                 <div className="space-y-2">
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-medium">Gemini</span>
                         {geminiResult ? (
                           <Badge variant="secondary">
@@ -1484,19 +1552,74 @@ export default function DebugTranscriptionPage() {
                           </Badge>
                         ) : null}
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() =>
-                          void copyText(geminiResult?.transcript || "")
-                        }
-                        disabled={!geminiResult?.transcript}
-                      >
-                        <Copy className="mr-2 h-4 w-4" />
-                        Copiar
-                      </Button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5">
+                          <Button
+                            size="sm"
+                            variant={
+                              getGeminiOutputView(section.id) === "text"
+                                ? "secondary"
+                                : "ghost"
+                            }
+                            onClick={() =>
+                              setGeminiOutputViewBySection((current) => ({
+                                ...current,
+                                [section.id]: "text",
+                              }))
+                            }
+                          >
+                            Texto
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={
+                              getGeminiOutputView(section.id) === "json"
+                                ? "secondary"
+                                : "ghost"
+                            }
+                            onClick={() =>
+                              setGeminiOutputViewBySection((current) => ({
+                                ...current,
+                                [section.id]: "json",
+                              }))
+                            }
+                          >
+                            JSON
+                          </Button>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            void copyText(
+                              getGeminiCopyPayload(
+                                geminiResult,
+                                getGeminiOutputView(section.id),
+                              ),
+                            )
+                          }
+                          disabled={
+                            !getGeminiCopyPayload(
+                              geminiResult,
+                              getGeminiOutputView(section.id),
+                            )
+                          }
+                        >
+                          <Copy className="mr-2 h-4 w-4" />
+                          Copiar
+                        </Button>
+                      </div>
                     </div>
-                    {renderTranscriptSurface(geminiResult?.transcript || "")}
+                    <p className="text-xs text-slate-500">
+                      Gemini transcribe la seccion tal como la dejo el VAD
+                      frontend, sin recorte adicional de Silero worker. El
+                      corte worker solo aparece en fallback de produccion o en
+                      los botones de preview / Silero worker.
+                    </p>
+                    {renderGeminiOutput(
+                      geminiResult,
+                      getGeminiOutputView(section.id),
+                    )}
                     {geminiResult ? (
                       <>
                         <p className="text-xs text-slate-500">

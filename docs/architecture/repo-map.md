@@ -28,10 +28,13 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
     sesiones, signed URLs por sección, registro idempotente, dispatch a Cloud
     Tasks, callbacks desde `transcription_worker`, status y finalización.
   - Publica eventos por el hub SSE de documentos, pero no es dueño del hub.
+- `shared/transcription_contract/`
+  - Contrato Python compartido entre worker y backend: `turns[]`, `chunks[]`,
+    parser/sanitizer, deduplicación entre chunks vecinos y renderizado de borde.
 - `transcription_worker/`
   - Servicio Cloud Run privado para trabajo computacional de transcripción:
     descarga audio desde GCS, ejecuta VAD Silero ONNX, llama Gemini y devuelve
-    resultados saneados a FastAPI.
+    `turns[]` estructurados a FastAPI.
   - No escribe directamente en PostgreSQL ni publica SSE; FastAPI conserva la
     autoridad clínica y transaccional.
 - `document_generation_worker/`
@@ -67,7 +70,8 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
   - Sesiones/secciones: `backend_fastapi/app/domains/transcription/api.py`
   - Cola: `backend_fastapi/app/domains/transcription/service.py`
   - Worker: `transcription_worker/app/`
-  - Gemini async: `transcription_worker/app/gemini.py`
+  - Gemini async + parser: `transcription_worker/app/gemini.py`, `shared/transcription_contract/`
+  - Fuente canónica consolidada: `transcription_recording_session.transcript_json`
 - Generación documental:
   - Kickoff, SSE, callbacks y work-items: `backend_fastapi/app/domains/documents/`
   - Servicios: `backend_fastapi/app/domains/documents/service.py`

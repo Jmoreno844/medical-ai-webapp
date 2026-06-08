@@ -1,9 +1,25 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+SpeakerLiteral = Literal["MEDICO", "PACIENTE", "ACOMPANANTE", "DESCONOCIDO"]
+
+
+class TranscriptionTurnResponse(BaseModel):
+    speaker: SpeakerLiteral
+    text: str
+    overlaps_previous: bool = False
+    overlaps_next: bool = False
+
+
+class ChunkTranscriptResponse(BaseModel):
+    chunk_id: str
+    start_ms: int
+    end_ms: int
+    turns: list[TranscriptionTurnResponse] = Field(default_factory=list)
 
 
 class TranscriptionRequest(BaseModel):
@@ -85,6 +101,7 @@ class AudioSectionResponse(BaseModel):
     frontend_vad_metadata: dict[str, Any] | None = None
     transcription_source: str | None = None
     status: str
+    turns: list[TranscriptionTurnResponse] | None = None
     raw_transcript: str | None = None
     error_code: str | None = None
     retry_count: int
@@ -108,6 +125,7 @@ class RecordingSessionStatusResponse(BaseModel):
     finished_at: datetime | None
     finalized_at: datetime | None
     consolidated_transcript: str | None
+    chunks: list[ChunkTranscriptResponse] = Field(default_factory=list)
     error_code: str | None
     sections: list[AudioSectionResponse]
 
@@ -144,7 +162,7 @@ class SectionWorkItemResponse(BaseModel):
 
 class SectionResultRequest(BaseModel):
     status: str
-    transcript: str | None = None
+    turns: list[TranscriptionTurnResponse] | None = None
     error_code: str | None = None
     vad_decision: str | None = None
     vad_speech_ms: int | None = None
@@ -207,7 +225,8 @@ class DebugTranscriptionBridgeResponse(BaseModel):
     mode: str = "transcribe"
     provider: str
     model: str
-    transcript: str
+    turns: list[TranscriptionTurnResponse] = Field(default_factory=list)
+    rendered_text: str | None = None
     content_type: str
     vad_decision: str
     vad_speech_ms: int
