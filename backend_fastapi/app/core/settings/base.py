@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     sse_token_minutes: int = 5
     transcription_callback_token_minutes: int = 15
     generation_callback_token_minutes: int = 30
+    clinical_extraction_callback_token_minutes: int = 30
 
     transcription_task_target_url: str | None = Field(
         default=None,
@@ -93,6 +94,38 @@ class Settings(BaseSettings):
     document_generation_worker_base_url: str | None = Field(
         default=None,
         alias="DOCUMENT_GENERATION_WORKER_BASE_URL",
+    )
+    clinical_extraction_enabled: bool = Field(
+        default=False,
+        alias="CLINICAL_EXTRACTION_ENABLED",
+    )
+    clinical_extraction_provider: str = Field(
+        default="gemini",
+        alias="CLINICAL_EXTRACTION_PROVIDER",
+    )
+    clinical_extraction_model: str = Field(
+        default="gemini-2.5-flash",
+        alias="CLINICAL_EXTRACTION_MODEL",
+    )
+    clinical_extraction_openai_model: str = Field(
+        default="gpt-5.4-mini",
+        alias="CLINICAL_EXTRACTION_OPENAI_MODEL",
+    )
+    clinical_extraction_task_target_url: str | None = Field(
+        default=None,
+        alias="CLINICAL_EXTRACTION_TASK_TARGET_URL",
+    )
+    clinical_extraction_queue_name: str | None = Field(
+        default=None,
+        alias="CLINICAL_EXTRACTION_QUEUE_NAME",
+    )
+    clinical_extraction_worker_base_url: str | None = Field(
+        default=None,
+        alias="CLINICAL_EXTRACTION_WORKER_BASE_URL",
+    )
+    clinical_extraction_worker_service_account: str | None = Field(
+        default=None,
+        alias="CLINICAL_EXTRACTION_WORKER_SERVICE_ACCOUNT",
     )
     document_generation_provider: str = Field(
         default="anthropic_api",
@@ -172,7 +205,7 @@ class Settings(BaseSettings):
             return value
         return []
 
-    @field_validator("debug", "cookie_secure", mode="before")
+    @field_validator("debug", "cookie_secure", "clinical_extraction_enabled", mode="before")
     @classmethod
     def parse_bool(cls, value: object) -> bool:
         if isinstance(value, bool):

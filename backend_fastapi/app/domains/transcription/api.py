@@ -75,12 +75,13 @@ def _is_local_environment(settings: Settings) -> bool:
     return settings.environment.strip().lower() in {"local", "dev", "development", "test", "ci"}
 
 
-async def _consolidate_session_background(session_id: str) -> None:
+async def _consolidate_session_background(session_id: str, settings: Settings) -> None:
     async with AsyncSessionLocal() as db_session:
         try:
             await consolidate_recording_session(
                 db_session,
                 session_id=session_id,
+                settings=settings,
             )
         except Exception:
             logger.exception("Local background transcription consolidation failed")
@@ -590,6 +591,7 @@ async def finish_transcription_recording_session(
     background_tasks: BackgroundTasks,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
 ) -> RecordingSessionFinishResponse:
     require_clinical_access(user)
     recording_session = await get_recording_session_for_doctor(
@@ -609,6 +611,7 @@ async def finish_transcription_recording_session(
         background_tasks.add_task(
             _consolidate_session_background,
             recording_session.session_id,
+            settings,
         )
 
     return RecordingSessionFinishResponse(success=True, status=recording_session.status)

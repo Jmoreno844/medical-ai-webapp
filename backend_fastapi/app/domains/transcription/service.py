@@ -21,6 +21,9 @@ from app.db.models import (
 )
 from app.domains.documents.content import set_document_content_fields
 from app.domains.documents.sse_hub import publish_document_event
+from app.domains.clinical_extraction.service import (
+    trigger_clinical_extraction_for_session,
+)
 from app.domains.transcription.schemas import (
     AudioSectionResponse,
     ChunkTranscriptResponse,
@@ -472,17 +475,31 @@ async def register_audio_section(
     start_time_ms: int,
     end_time_ms: int,
     overlap_ms: int,
-    original_gcs_object_name: str,
-    original_content_type: str,
-    original_byte_size: int | None,
-    clipped_gcs_object_name: str,
-    clipped_content_type: str,
-    clipped_byte_size: int | None,
-    transcription_source_gcs_object_name: str,
-    frontend_vad_metadata: dict | None,
+    original_gcs_object_name: str | None = None,
+    original_content_type: str | None = None,
+    original_byte_size: int | None = None,
+    clipped_gcs_object_name: str | None = None,
+    clipped_content_type: str | None = None,
+    clipped_byte_size: int | None = None,
+    transcription_source_gcs_object_name: str | None = None,
+    frontend_vad_metadata: dict | None = None,
+    gcs_object_name: str | None = None,
+    content_type: str | None = None,
+    byte_size: int | None = None,
 ) -> TranscriptionAudioSection:
     now = datetime.now(timezone.utc)
     encounter_id = recording_session.encounter_id
+    original_gcs_object_name = original_gcs_object_name or gcs_object_name
+    clipped_gcs_object_name = clipped_gcs_object_name or original_gcs_object_name
+    transcription_source_gcs_object_name = (
+        transcription_source_gcs_object_name or clipped_gcs_object_name
+    )
+    original_content_type = original_content_type or content_type or "audio/webm"
+    clipped_content_type = clipped_content_type or content_type or "audio/ogg"
+    original_byte_size = original_byte_size if original_byte_size is not None else byte_size
+    clipped_byte_size = clipped_byte_size if clipped_byte_size is not None else byte_size
+    if not original_gcs_object_name or not transcription_source_gcs_object_name:
+        raise ValueError("audio_section_gcs_object_required")
     existing = await session.execute(
         select(TranscriptionAudioSection).where(
             TranscriptionAudioSection.recording_session_id == recording_session.id,
@@ -792,6 +809,7 @@ async def apply_section_worker_result(
             await consolidate_recording_session(
                 db_session,
                 session_id=recording_session.session_id,
+                settings=settings,
             )
         except Exception:
             logger.exception(
@@ -805,6 +823,7 @@ async def consolidate_recording_session(
     db_session: AsyncSession,
     *,
     session_id: str,
+    settings: Settings | None = None,
 ) -> TranscriptionRecordingSession | None:
     result = await db_session.execute(
         select(TranscriptionRecordingSession)
@@ -871,6 +890,19 @@ async def consolidate_recording_session(
             "rendered_text": consolidated,
         },
     )
+    if settings:
+        try:
+            await trigger_clinical_extraction_for_session(
+                db_session,
+                recording_session,
+                settings=settings,
+            )
+            await db_session.commit()
+        except Exception:
+            logger.exception(
+                "Clinical extraction shadow dispatch failed for session %s",
+                recording_session.session_id,
+            )
     return recording_session
 
 

@@ -566,6 +566,24 @@ Notas de operación:
 - **Speakers permitidos:** `MEDICO`, `PACIENTE`, `ACOMPANANTE`, `DESCONOCIDO`.
 - **Dedup:** solo entre chunks vecinos al consolidar; `overlaps_*` del modelo describe solapamiento conversacional, no el overlap técnico de audio.
 
+## Extracción clínica shadow (`clinical_facts_v1`)
+
+- **`clinical_extraction`**: una fila única por
+  `transcription_recording_session.session_id`. Guarda estado
+  `pending | extracting | extracted | failed_extraction | failed_validation`,
+  modelo usado, `raw_model_output_json`, `facts_json` post-validación,
+  `grounding_stats_json`, `retry_count`, `error_code`, `created_at` y
+  `finalized_at`.
+- **`clinical_fact_evidence`**: una fila por cita emitida por el modelo. Guarda
+  `fact_path`, `quote`, `supports_fields`, `chunk_hint`, resultado de matching,
+  chunks localizados, rol diarizado derivado por código y banderas de ambigüedad
+  o mismatch de hablante.
+- **Fuente canónica:** el worker recibe `transcript_json.chunks[].turns[]`; no usa
+  `consolidated_transcript` ni `documents_document.content_markdown`.
+- **Shadow:** estas tablas no alimentan render, generación documental ni SSE. Su
+  propósito es medir calidad de extracción contra transcripciones reales antes
+  de construir proyecciones user-facing.
+
 ---
 
 ## Convenciones de naming

@@ -41,6 +41,10 @@ simular staging conviene usar secretos explícitos.
 - `GCP_STORAGE_IMPERSONATED_SERVICE_ACCOUNT`
 - `TRANSCRIPTION_TASK_TARGET_URL=http://localhost:8001/api/v1/internal/transcription/tasks`
 - `DOCUMENT_GENERATION_TASK_TARGET_URL=http://localhost:8001/api/v1/internal/document-generation/tasks`
+- `CLINICAL_EXTRACTION_ENABLED=false` por defecto; usa `true` solo si quieres
+  correr el shadow worker localmente
+- `CLINICAL_EXTRACTION_WORKER_BASE_URL=http://localhost:8093`
+- `CLINICAL_EXTRACTION_TASK_TARGET_URL=http://localhost:8093/api/v1/internal/clinical-extraction/tasks`
 
 Para transcripcion por secciones, `ENVIRONMENT=local` debe usar `BackgroundTasks`
 como fallback por defecto. Puedes probar Cloud Tasks real desde local solo si la
@@ -136,6 +140,34 @@ DOCUMENT_GENERATION_PROVIDER=anthropic_vertex \
 DOCUMENT_GENERATION_MODEL=claude-3-5-sonnet-v2@20241022 \
 VERTEX_AI_LOCATION=us-east5 \
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8092 --reload
+```
+
+### Clinical Extraction Worker
+
+Worker shadow: no modifica documentos ni SSE. Solo se dispara si el backend tiene
+`CLINICAL_EXTRACTION_ENABLED=true`.
+
+Variables clave:
+
+- `ENVIRONMENT=local`
+- `BACKEND_INTERNAL_BASE_URL=http://localhost:8001`
+- `CLINICAL_EXTRACTION_PROVIDER=gemini` por defecto
+- `CLINICAL_EXTRACTION_MODEL=gemini-2.5-flash`
+- `CLINICAL_EXTRACTION_OPENAI_MODEL=gpt-5.4-mini` si usas provider `openai`
+- `GCP_PROJECT_ID` y `VERTEX_AI_LOCATION=global` para Gemini en Vertex AI
+- `OPENAI_API_KEY` solo si `CLINICAL_EXTRACTION_PROVIDER=openai`
+
+Ejemplo con Gemini:
+
+```bash
+cd clinical_extraction_worker
+uv sync --group dev
+ENVIRONMENT=local \
+BACKEND_INTERNAL_BASE_URL=http://localhost:8001 \
+GCP_PROJECT_ID=tu-proyecto \
+CLINICAL_EXTRACTION_PROVIDER=gemini \
+CLINICAL_EXTRACTION_MODEL=gemini-2.5-flash \
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8093 --reload
 ```
 
 ### Transcription Worker
@@ -394,6 +426,7 @@ Workers:
 ```bash
 python -m pytest transcription_worker/tests
 python -m pytest document_generation_worker/tests
+python -m pytest clinical_extraction_worker/tests
 ```
 
 Copilot agent:
@@ -428,6 +461,7 @@ Detalle completo en [`docs/backend/tracing.md`](backend/tracing.md).
 - `5433` — PostgreSQL local
 - `8091` — transcription worker
 - `8092` — document generation worker
+- `8093` — clinical extraction worker
 - `8090` — copilot agent service
 - `16686` — Jaeger UI
 - `4318` — OTLP HTTP para Jaeger

@@ -112,6 +112,9 @@ class TranscriptionRecordingSession(Base):
         back_populates="recording_session",
         order_by="TranscriptionAudioSection.section_index",
     )
+    clinical_extraction: Mapped["ClinicalExtraction | None"] = relationship(
+        back_populates="recording_session",
+    )
 
 
 class TranscriptionAudioSection(Base):
@@ -163,6 +166,62 @@ class TranscriptionAudioSection(Base):
 
     recording_session: Mapped[TranscriptionRecordingSession] = relationship(
         back_populates="sections"
+    )
+
+
+class ClinicalExtraction(Base):
+    __tablename__ = "clinical_extraction"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[str] = mapped_column(
+        ForeignKey("transcription_recording_session.session_id"),
+        unique=True,
+        index=True,
+    )
+    encounter_id: Mapped[int] = mapped_column(ForeignKey("encounters_encounter.id"))
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents_document.id"))
+    doctor_id: Mapped[int] = mapped_column(ForeignKey("users_user.id"))
+    schema_version: Mapped[str] = mapped_column(String(64), default="clinical_facts_v1")
+    extraction_model: Mapped[str | None] = mapped_column(String(128))
+    extraction_status: Mapped[str] = mapped_column(String(32))
+    facts_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    raw_model_output_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    grounding_stats_json: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    recording_session: Mapped[TranscriptionRecordingSession] = relationship(
+        back_populates="clinical_extraction",
+    )
+    encounter: Mapped[Encounter] = relationship()
+    document: Mapped[Document] = relationship()
+    doctor: Mapped[User] = relationship()
+    evidence_rows: Mapped[list["ClinicalFactEvidence"]] = relationship(
+        back_populates="extraction",
+        cascade="all, delete-orphan",
+    )
+
+
+class ClinicalFactEvidence(Base):
+    __tablename__ = "clinical_fact_evidence"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    extraction_id: Mapped[int] = mapped_column(ForeignKey("clinical_extraction.id"))
+    fact_path: Mapped[str] = mapped_column(String(512))
+    quote: Mapped[str] = mapped_column(Text)
+    supports_fields: Mapped[list[str]] = mapped_column(JSONB)
+    chunk_hint: Mapped[str | None] = mapped_column(String(128))
+    matched: Mapped[bool] = mapped_column(Boolean)
+    match_score: Mapped[float | None] = mapped_column(Float)
+    matched_chunk_ids: Mapped[list[str]] = mapped_column(JSONB)
+    uttered_by_role: Mapped[str | None] = mapped_column(String(64))
+    ambiguous: Mapped[bool] = mapped_column(Boolean)
+    speaker_mismatch: Mapped[bool] = mapped_column(Boolean)
+
+    extraction: Mapped[ClinicalExtraction] = relationship(
+        back_populates="evidence_rows",
     )
 
 

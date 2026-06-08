@@ -27,11 +27,9 @@ from evals.document_generation.run_eval import (  # noqa: E402
     ANTHROPIC_EVAL_MAX_OUTPUT_TOKENS,
     GenerationConfig,
     _generate_with_anthropic_api,
-    _generate_with_openai_api,
     _generate_with_openai_chat_api,
     _generate_with_openai_responses_api,
 )
-from app.settings import Settings  # noqa: E402
 
 
 def test_load_cases_reads_shared_cases_dataset() -> None:
@@ -40,7 +38,7 @@ def test_load_cases_reads_shared_cases_dataset() -> None:
     assert len(cases) >= 3
     assert all(isinstance(case, EvalCase) for case in cases)
     assert cases[0].id
-    assert "## Identificacion del documento" in cases[0].template
+    assert "REGLAS DE LA PLANTILLA" in cases[0].template
 
 
 def test_render_generation_prompt_includes_case_content() -> None:
@@ -64,7 +62,9 @@ def test_load_cases_applies_runner_template_file(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(eval_lib, "EVALS_ROOT", tmp_path)
-    template_path = tmp_path / "shared-template.md"
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    template_path = templates_dir / "shared-template.md"
     template_path.write_text("## Plan de manejo", encoding="utf-8")
     cases_path = tmp_path / "cases.json"
     cases_path.write_text(
@@ -80,7 +80,7 @@ def test_load_cases_applies_runner_template_file(
         encoding="utf-8",
     )
 
-    cases = load_cases(cases_path, template_file="shared-template.md")
+    cases = load_cases(cases_path, template_file="templates/shared-template.md")
 
     assert [case.template for case in cases] == ["## Plan de manejo"]
 

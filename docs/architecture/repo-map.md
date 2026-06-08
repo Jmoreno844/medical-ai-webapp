@@ -9,6 +9,7 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 | `backend_fastapi/`                                                                                                                            | API central, modelos SQLAlchemy, auth, JWT, SSE, orquestación y migraciones Alembic | Sí                                             |
 | `transcription_worker/`                                                                                                                       | Worker Cloud Run para VAD Silero + Gemini de transcripción por secciones            | Sí                                             |
 | `document_generation_worker/`                                                                                                                 | Worker Cloud Run para generación documental con provider LLM configurable           | Sí                                             |
+| `clinical_extraction_worker/`                                                                                                                 | Worker Cloud Run shadow para extracción `ClinicalFactsV1` desde transcripción estructurada | Sí                                             |
 | `webapp/`                                                                                                                                     | SPA del médico                                                                      | Sí                                             |
 | `infra/`                                                                                                                                      | Infra GCP, IAM, budgets, deploy base                                                | Sí                                             |
 | `landing-page/`                                                                                                                               | Sitio marketing separado                                                            | Sí, pero no es parte del flujo clínico central |
@@ -42,6 +43,11 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
     recibe Cloud Tasks con IDs, pide el work-item clínico a FastAPI, llama
     al provider LLM configurado y devuelve chunks saneados al callback existente.
   - No escribe directamente en PostgreSQL ni publica SSE.
+- `clinical_extraction_worker/`
+  - Servicio Cloud Run privado y shadow para extracción estructurada:
+    recibe Cloud Tasks con `session_id`, pide `transcript_json.chunks[]` a FastAPI,
+    llama Gemini por defecto u OpenAI opcional y devuelve facts/evidencia por callback.
+  - No escribe directamente en PostgreSQL, no publica SSE y no modifica documentos.
 - `backend_fastapi/app/domains/templates/`
   - Dueño de plantillas base y plantillas del médico.
 - `backend_fastapi/app/domains/patients/`

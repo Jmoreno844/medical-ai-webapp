@@ -41,6 +41,7 @@ Verificado en:
 - `PATCH /api/v1/documents/by-function/{id}`
 - `POST /api/v1/documents/generation-chunk`
 - `POST /api/v1/transcription/notify-complete`
+- `POST /api/v1/internal/clinical-extraction/results/{session_id}`
 
 Firma: misma clave vía `get_jwt_signing_key()`.
 
@@ -69,6 +70,17 @@ Payload mínimo:
 
 - `user_id`, `document_id`, `process_id`, `exp`, `purpose`: `"document_generation"`
 - `iss`, `aud`
+
+### Extracción clínica shadow
+
+Payload mínimo:
+
+- `user_id`, `session_id`, `encounter_id`, `document_id`, `exp`, `purpose`: `"clinical_extraction"`
+- `iss`, `aud`
+
+Uso: callback del `clinical_extraction_worker` hacia FastAPI. Este token no
+autoriza cambios sobre `documents_document.content_markdown`; solo permite
+persistir el JSON shadow y su evidencia.
 
 ### SSE
 
@@ -118,3 +130,11 @@ Payload mínimo:
 | `DOCUMENT_GENERATION_TASK_TARGET_URL` | URL base del worker privado de generación documental |
 | `DOCUMENT_GENERATION_QUEUE_NAME` | Cola Cloud Tasks separada para generación documental |
 | `DOCUMENT_GENERATION_WORKER_SERVICE_ACCOUNT` | Service account esperada en llamadas internas worker -> FastAPI |
+| `CLINICAL_EXTRACTION_ENABLED` | Habilita el worker shadow al consolidar una sesión de transcripción |
+| `CLINICAL_EXTRACTION_PROVIDER` | Provider del shadow worker; default `gemini` |
+| `CLINICAL_EXTRACTION_MODEL` | Modelo Gemini por defecto; default `gemini-2.5-flash` |
+| `CLINICAL_EXTRACTION_OPENAI_MODEL` | Modelo OpenAI opcional; default `gpt-5.4-mini` |
+| `CLINICAL_EXTRACTION_TASK_TARGET_URL` | URL base Cloud Tasks del worker shadow |
+| `CLINICAL_EXTRACTION_QUEUE_NAME` | Cola Cloud Tasks separada para extracción clínica |
+| `CLINICAL_EXTRACTION_WORKER_BASE_URL` | Fallback local para invocar el worker sin Cloud Tasks |
+| `CLINICAL_EXTRACTION_WORKER_SERVICE_ACCOUNT` | Service account esperada en llamadas internas worker -> FastAPI |
