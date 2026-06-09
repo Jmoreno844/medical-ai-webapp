@@ -1,259 +1,207 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 
-EVIDENCE_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "quote": {"type": "string"},
-        "supports_fields": {"type": "array", "items": {"type": "string"}},
-        "chunk_hint": {"type": ["string", "null"]},
-    },
-    "required": ["quote", "supports_fields", "chunk_hint"],
-}
+def _object_schema(
+    *,
+    title: str,
+    description: str,
+    properties: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "title": title,
+        "description": description,
+        "type": "object",
+        "additionalProperties": False,
+        "properties": properties,
+        "required": list(properties),
+    }
 
-FACT_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "concept_raw_text": {"type": ["string", "null"]},
-        "text_raw": {"type": ["string", "null"]},
-        "value_raw": {"type": ["string", "null"]},
-        "unit_raw": {"type": ["string", "null"]},
-        "event_kind": {
-            "type": ["string", "null"],
+
+def _nullable_string(*, title: str, description: str) -> dict[str, Any]:
+    return {
+        "title": title,
+        "description": description,
+        "anyOf": [
+            {"type": "string"},
+            {"type": "null"},
+        ],
+    }
+
+
+def _nullable_enum(
+    values: list[str],
+    *,
+    title: str,
+    description: str,
+) -> dict[str, Any]:
+    return {
+        "title": title,
+        "description": description,
+        "anyOf": [
+            {"type": "string", "enum": values},
+            {"type": "null"},
+        ],
+    }
+
+
+def _array(
+    items: dict[str, Any],
+    *,
+    title: str | None = None,
+    description: str | None = None,
+) -> dict[str, Any]:
+    schema: dict[str, Any] = {"type": "array", "items": items}
+    if title:
+        schema["title"] = title
+    if description:
+        schema["description"] = description
+    return schema
+
+
+EVIDENCE_ITEM_SCHEMA: dict[str, Any] = _object_schema(
+    title="MentionEvidence",
+    description="Single-turn verbatim evidence used to ground one mention.",
+    properties={
+        "quote": {
+            "title": "Verbatim Quote",
+            "description": "Exact contiguous transcript text from one turn; do not normalize or summarize it.",
+            "type": "string",
+        },
+        "turn_id": _nullable_string(
+            title="Turn Hint",
+            description=(
+                "Turn identifier that points to the quoted turn; it is a hint for "
+                "grounding, not a substitute for the quote."
+            ),
+        ),
+    },
+)
+
+ATTRIBUTE_SCHEMA: dict[str, Any] = _object_schema(
+    title="MentionAttribute",
+    description="Sensitive attribute text that stays attached to the same proposition instead of becoming a separate mention.",
+    properties={
+        "kind": {
+            "title": "Attribute Kind",
+            "description": "Literal attribute role. Use correction kinds only for explicit repair language or replaced values; do not infer units or semantics.",
+            "type": "string",
             "enum": [
-                "symptom",
-                "negative_symptom",
-                "episode",
-                "fall_or_possible_fall",
-                "confusion_episode",
-                "patient_action",
-                "treatment_response",
-                "other_explicit",
-                None,
+                "dose_value",
+                "dose_unit",
+                "route",
+                "frequency",
+                "duration",
+                "measurement_value",
+                "measurement_unit",
+                "result_text",
+                "prior_value",
+                "replacement_value",
+                "repair_language",
             ],
         },
-        "body_site_raw": {"type": ["string", "null"]},
-        "laterality_raw": {"type": ["string", "null"]},
-        "severity_raw": {"type": ["string", "null"]},
-        "onset_raw": {"type": ["string", "null"]},
-        "duration_raw": {"type": ["string", "null"]},
-        "time_expression_raw": {"type": ["string", "null"]},
-        "name_raw": {"type": ["string", "null"]},
-        "dose_value": {"type": ["string", "null"]},
-        "dose_unit": {"type": ["string", "null"]},
-        "route_raw": {"type": ["string", "null"]},
-        "frequency_raw": {"type": ["string", "null"]},
-        "timing_raw": {"type": ["string", "null"]},
-        "exposure_duration_raw": {"type": ["string", "null"]},
-        "prescribed_duration_raw": {"type": ["string", "null"]},
-        "adherence_raw": {"type": ["string", "null"]},
-        "substance_raw": {"type": ["string", "null"]},
-        "reaction_raw": {"type": ["string", "null"]},
-        "category": {"type": ["string", "null"]},
-        "result_content_raw": {"type": ["string", "null"]},
-        "type_raw": {"type": ["string", "null"]},
-        "decision_status": {"type": ["string", "null"]},
-        "execution_status": {"type": ["string", "null"]},
-        "reason_raw": {"type": ["string", "null"]},
-        "conditional_on_raw_text": {"type": ["string", "null"]},
-        "information_source_role": {
-            "type": ["string", "null"],
+        "raw_text": {
+            "title": "Attribute Text",
+            "description": "Exact text span for the attribute as spoken in the evidence quote.",
+            "type": "string",
+        },
+    },
+)
+
+MENTION_SCHEMA: dict[str, Any] = _object_schema(
+    title="ClinicalMention",
+    description="Atomic clinical proposition with one entity focus, one speech act, optional sensitive attributes, and grounded evidence.",
+    properties={
+        "entity_type": {
+            "title": "Entity Type",
+            "description": "Entity family being discussed. Choose clinical_concept for symptoms, conditions, impressions, or non-medication clinical content.",
+            "type": "string",
             "enum": [
-                "patient",
-                "companion",
-                "clinician",
-                "prior_record",
-                "other_explicit",
-                None,
+                "clinical_concept",
+                "medication",
+                "allergy",
+                "diagnostic_test",
+                "measurement",
+                "procedure",
+                "care_instruction",
             ],
         },
-        "subject_role": {
-            "type": ["string", "null"],
+        "entity_raw": {
+            "title": "Entity Text",
+            "description": "Literal text span naming the main entity, kept narrower than proposition_raw when possible.",
+            "type": "string",
+        },
+        "proposition_raw": {
+            "title": "Proposition Text",
+            "description": "Literal text span for the whole atomic proposition, including the entity and any attached meaning that belongs to the same speech act.",
+            "type": "string",
+        },
+        "speech_act": {
+            "title": "Speech Act",
+            "description": (
+                "How the proposition is stated. Use 'instruction_to_avoid' ONLY for strict "
+                "medical prohibitions. Use 'deferred_action' for things postponed, and "
+                "'patient_preference' for patient requests."
+            ),
+            "type": "string",
             "enum": [
+                "assertion",
+                "negation",
+                "uncertain_statement",
+                "question",
+                "hypothesis",
+                "prescription",
+                "order",
+                "instruction_to_avoid",
+                "deferred_action",
+                "patient_preference",
+                "conditional_instruction",
+                "reported_result",
+                "pending_result",
+                "correction",
+            ],
+        },
+        "subject_role": _nullable_enum(
+            [
                 "patient",
                 "companion",
                 "family_member",
                 "clinician",
                 "other_explicit",
-                None,
             ],
-        },
-        "subject_raw_text": {"type": ["string", "null"]},
-        "assertion": {
-            "type": "string",
-            "enum": [
-                "present",
-                "absent",
-                "uncertain",
-                "conditional",
-                "unknown_to_source",
-            ],
-        },
-        "claim_lifecycle": {
-            "type": "string",
-            "enum": ["active", "superseded", "retracted"],
-        },
-        "reported_certainty": {
-            "type": ["string", "null"],
-            "enum": ["stated_plainly", "hedged", "uncertain", None],
-        },
-        "evidence": {"type": "array", "items": EVIDENCE_SCHEMA},
+            title="Subject Role",
+            description=(
+                "Who the proposition is about relative to the encounter focus. Keep it "
+                "minimal and explicit; use null when the subject is not clear."
+            ),
+        ),
+        "attributes": _array(
+            ATTRIBUTE_SCHEMA,
+            title="Mention Attributes",
+            description="Literal subspans that remain attached to the same proposition, such as dose, duration, result text, or correction values.",
+        ),
+        "evidence": _array(
+            EVIDENCE_ITEM_SCHEMA,
+            title="Mention Evidence",
+            description="One primary evidence item is preferred, but the contract allows a list for grounding stability.",
+        ),
     },
-    "required": [
-        "concept_raw_text",
-        "text_raw",
-        "value_raw",
-        "unit_raw",
-        "event_kind",
-        "body_site_raw",
-        "laterality_raw",
-        "severity_raw",
-        "onset_raw",
-        "duration_raw",
-        "time_expression_raw",
-        "name_raw",
-        "dose_value",
-        "dose_unit",
-        "route_raw",
-        "frequency_raw",
-        "timing_raw",
-        "exposure_duration_raw",
-        "prescribed_duration_raw",
-        "adherence_raw",
-        "substance_raw",
-        "reaction_raw",
-        "category",
-        "result_content_raw",
-        "type_raw",
-        "decision_status",
-        "execution_status",
-        "reason_raw",
-        "conditional_on_raw_text",
-        "information_source_role",
-        "subject_role",
-        "subject_raw_text",
-        "assertion",
-        "claim_lifecycle",
-        "reported_certainty",
-        "evidence",
-    ],
-}
+)
 
-SUMMARY_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "assertion": {
-            "type": ["string", "null"],
-            "enum": ["none_reported", "some_reported", None],
-        },
-        "scope_raw_text": {"type": ["string", "null"]},
-        "evidence": {"type": "array", "items": EVIDENCE_SCHEMA},
+CLINICAL_MENTIONS_SCHEMA: dict[str, Any] = _object_schema(
+    title="ClinicalMentionsV2",
+    description="List of atomic grounded clinical propositions for debug and future shadow extraction.",
+    properties={
+        "mentions": _array(
+            MENTION_SCHEMA,
+            title="Mentions",
+            description="Atomic propositions extracted from the encounter transcript.",
+        ),
     },
-    "required": ["assertion", "scope_raw_text", "evidence"],
-}
+)
 
-CLINICAL_FACTS_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "information_sources": {"type": "array", "items": FACT_SCHEMA},
-        "chief_complaints": {"type": "array", "items": FACT_SCHEMA},
-        "clinical_events": {"type": "array", "items": FACT_SCHEMA},
-        "history": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "conditions": {"type": "array", "items": FACT_SCHEMA},
-                "surgeries_and_procedures": {"type": "array", "items": FACT_SCHEMA},
-                "trauma": {"type": "array", "items": FACT_SCHEMA},
-                "family_history": {"type": "array", "items": FACT_SCHEMA},
-                "gynecologic_obstetric": {"type": "array", "items": FACT_SCHEMA},
-                "social_history": {"type": "array", "items": FACT_SCHEMA},
-                "exposures": {"type": "array", "items": FACT_SCHEMA},
-                "unclassified_explicit_history_facts": {
-                    "type": "array",
-                    "items": FACT_SCHEMA,
-                },
-            },
-            "required": [
-                "conditions",
-                "surgeries_and_procedures",
-                "trauma",
-                "family_history",
-                "gynecologic_obstetric",
-                "social_history",
-                "exposures",
-                "unclassified_explicit_history_facts",
-            ],
-        },
-        "allergies": {"type": "array", "items": FACT_SCHEMA},
-        "allergy_summary": SUMMARY_SCHEMA,
-        "medications": {"type": "array", "items": FACT_SCHEMA},
-        "medication_summary": SUMMARY_SCHEMA,
-        "objective_data": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "vital_signs": {"type": "array", "items": FACT_SCHEMA},
-                "anthropometrics": {"type": "array", "items": FACT_SCHEMA},
-                "physical_exam_findings": {"type": "array", "items": FACT_SCHEMA},
-            },
-            "required": [
-                "vital_signs",
-                "anthropometrics",
-                "physical_exam_findings",
-            ],
-        },
-        "diagnostic_studies": {"type": "array", "items": FACT_SCHEMA},
-        "interventions": {"type": "array", "items": FACT_SCHEMA},
-        "clinician_assessment": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "stated_impressions": {"type": "array", "items": FACT_SCHEMA},
-                "stated_diagnoses": {"type": "array", "items": FACT_SCHEMA},
-                "stated_differentials": {"type": "array", "items": FACT_SCHEMA},
-                "stated_risk_assessments": {"type": "array", "items": FACT_SCHEMA},
-            },
-            "required": [
-                "stated_impressions",
-                "stated_diagnoses",
-                "stated_differentials",
-                "stated_risk_assessments",
-            ],
-        },
-        "care_plan": {"type": "array", "items": FACT_SCHEMA},
-        "data_quality": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "corrections": {"type": "array", "items": FACT_SCHEMA},
-                "unresolved_conflicts": {"type": "array", "items": FACT_SCHEMA},
-            },
-            "required": ["corrections", "unresolved_conflicts"],
-        },
-        "custom_facts": {"type": "array", "items": FACT_SCHEMA},
-    },
-    "required": [
-        "information_sources",
-        "chief_complaints",
-        "clinical_events",
-        "history",
-        "allergies",
-        "allergy_summary",
-        "medications",
-        "medication_summary",
-        "objective_data",
-        "diagnostic_studies",
-        "interventions",
-        "clinician_assessment",
-        "care_plan",
-        "data_quality",
-        "custom_facts",
-    ],
-}
+
+def copy_clinical_mentions_schema() -> dict[str, Any]:
+    return deepcopy(CLINICAL_MENTIONS_SCHEMA)

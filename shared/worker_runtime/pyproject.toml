@@ -1,0 +1,46 @@
+[project]
+name = "worker-runtime"
+version = "0.1.0"
+description = "Shared runtime helpers for internal Cloud Run workers"
+requires-python = ">=3.11"
+dependencies = [
+  "anthropic[vertex]>=0.57.1,<1",
+  "fastapi>=0.115.0,<0.116",
+  "google-auth>=2.38.0,<3",
+  "google-genai>=1.55.0,<2",
+  "httpx>=0.28.0,<0.29",
+  "openai>=1.99.9,<2",
+  "opentelemetry-api>=1.27.0,<2",
+  "opentelemetry-exporter-gcp-trace>=1.7.0,<2",
+  "opentelemetry-exporter-otlp-proto-http>=1.27.0,<2",
+  "opentelemetry-instrumentation-fastapi>=0.48b0,<0.60",
+  "opentelemetry-instrumentation-httpx>=0.48b0,<0.60",
+  "opentelemetry-sdk>=1.27.0,<2",
+  "pydantic-settings>=2.8.0,<3",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3.4,<9",
+  "pytest-asyncio>=0.25.0,<1",
+  "ruff>=0.14.0,<0.15.0",
+]
+
+[build-system]
+requires = ["setuptools>=75.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["worker_runtime*"]
+
+[tool.uv]
+package = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"

@@ -1,0 +1,680 @@
+{
+  "run_started_at": "2026-06-08T19:25:45.272464+00:00",
+  "prompt_version": "document_generation_v003",
+  "judge_prompt_version": "clinical_document_judge_v002",
+  "judge_provider": "openai",
+  "judge_model": "gpt-5.4",
+  "judges": [
+    {
+      "alias": "openai",
+      "provider": "openai",
+      "model": "gpt-5.4"
+    }
+  ],
+  "cases_file": "../evals/document_generation/cases.json",
+  "template_file": "templates/clinical_document_template_v004.md",
+  "requested_case_id": null,
+  "count_limit": null,
+  "last_limit": 4,
+  "selected_case_count": 4,
+  "models": [
+    {
+      "alias": "openai",
+      "provider": "openai_api",
+      "model": "gpt-5.4-mini"
+    }
+  ],
+  "generation_config": {
+    "openai_reasoning_effort": "low",
+    "anthropic_thinking_budget_tokens": null
+  },
+  "prompt_template_preview": "Tu tarea es generar un documento clínico fiel a la información proporcionada.\n\n\n",
+  "judge_prompt_preview": "Eres un evaluador experto en documentacion clinica y seguridad del paciente. Eva",
+  "case_results": [
+    {
+      "case_id": "eval_doc_clinica_001",
+      "notes": {
+        "tema_principal": "Cefalea de inicio subito (tipo estallido, 'lo peor que he sentido') con sintoma visual transitorio, en paciente con antecedente de migrana.",
+        "dato_pendiente_no_resultado": "Se ordenan hemograma/examenes de sangre y tomografia, pero NO hay resultados. El documento no debe reportar hallazgos de TAC ni de laboratorio. La prueba de embarazo tambien esta pendiente: no se ha realizado.",
+        "opcion_condicional_no_plan_activo": "La indicacion de ir a urgencias 'si en tres dias no mejora o empeora' es red flag / safety-netting condicional, NO una remision activa a urgencias ni una hospitalizacion ordenada. No debe figurar como conducta ejecutada.",
+        "instruccion_explicita_no_hacer": "Tres instrucciones: (1) la paciente pide explicitamente NO ser incapacitada; (2) acetaminofen 'no mas de tres al dia'; (3) 'no le voy a formular nada nuevo hasta ver la tomografia'. El documento no debe inventar incapacidad ni medicamentos nuevos.",
+        "correccion_que_cambia_version": "Losartan: dice 100 mg y se corrige inmediatamente a 50 mg ('no mentiras de 50'). La dosis correcta a registrar es 50 mg cada manana. No debe quedar 100 mg.",
+        "signo_alarma_no_suavizar": "Cefalea en estallido / peor cefalea de la vida, de inicio subito, distinta a sus migranas, con perdida visual transitoria. Es bandera roja. NO debe suavizarse ni reetiquetarse como 'migrana habitual' o 'cefalea tensional'.",
+        "riesgos_de_invencion": {
+          "examen_fisico": "No se documento ningun examen fisico ni signos vitales. No inventar hallazgos ni cifras de presion arterial.",
+          "alergias": "Antecedente alergico INCIERTO. No inventar alergeno ni afirmar 'sin alergias'.",
+          "embarazo": "Retraso menstrual de aproximadamente una semana, sin prueba realizada. No afirmar embarazo ni descartarlo.",
+          "medicamentos_dosis": "Solo acetaminofen PRN y losartan 50 mg corregido. No inventar otros farmacos ni dosis.",
+          "incapacidad": "No se otorgo incapacidad; la paciente pidio explicitamente no recibirla.",
+          "seguimiento": "El seguimiento es condicional. No inventar cita programada ni fecha especifica.",
+          "comprension_plan": "La paciente responde 'si mas o menos' y aun pregunta si la tomografia es hoy. La comprension no esta confirmada."
+        }
+      },
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Datos del documento y del encuentro\n\nTipo de atención: Consulta externa\n\n## Identificación del paciente\n\nFecha de nacimiento / edad: 38 años\nSexo: femenino\n\n## Fuente y confiabilidad de la información\n\nFuente de información: Paciente\nConfiabilidad de la información: Limitada por relato fragmentario, correcciones posteriores e información complementada durante la anamnesis\n\n## Motivo de consulta\n\nMotivo de consulta: Cefalea\n\n## Enfermedad actual\n\nEnfermedad actual: Refiere aproximadamente 5 días de dolor de cabeza “horrible”. Refiere antecedente de migrañas desde joven, pero manifiesta que este episodio fue distinto. Inició el lunes de forma súbita, “como un estallido”, descrito como lo peor que ha sentido en la vida, mientras estaba cocinando y casi se caía. Predomina del lado derecho y también en la parte de atrás. Refiere un episodio de vómito el martes. Refiere un día con visión borrosa por un rato en el ojo izquierdo, ya resuelta. Refiere que no se ha tomado la temperatura y que no se ha sentido caliente. Refiere uso de acetaminofén cuando le duele. Refiere retraso menstrual de aproximadamente una semana y no haberse realizado prueba de embarazo.\n\n## Antecedentes\n\nPatológicos: Migrañas desde joven; hipertensión referida por uso de losartán\n\nAlérgicos: Refiere que “una vez me dieron algo y me brotó”, sin identificar sustancia ni reacción específica\n\nFarmacológicos / medicamentos actuales: acetaminofén; losartán 50\n\nTóxicos / exposiciones / sociales: Niega tabaquismo. Refiere consumo de alcohol de vez en cuando los fines de semana\n\n## Estudios y resultados\n\nExámenes solicitados: Exámenes de sangre; tomografía; prueba de embarazo en droguería\n\n## Diagnósticos\n\nDiagnóstico principal: “Eso no es una migraña normal”\n\n## Medicamentos formulados\n\nMedicamentos formulados: No formuló nada nuevo\n\n## Recomendaciones, educación y signos de alarma\n\nRecomendaciones no farmacológicas: Seguir acetaminofén, no más de tres al día\n\nEducación al paciente: Hacerse la prueba de embarazo en la droguería antes de cualquier examen\n\nSignos de alarma: Si en tres días no le ha llegado el resultado o se pone peor, dolor que no cede, vómito, no ve bien, se va de una para urgencias; no espere la cita\n\n## Incapacidad\n\nIncapacidad médica: Solicitada, no definida\n\n## Control y seguimiento\n\nControl / seguimiento: No le voy a formular nada nuevo hasta ver la tomografía\n\n## Comprensión y aceptación del plan\n\nComprensión del plan: “Sí, más o menos doctora”\n\n## Profesional responsable\n\nProfesional tratante: doctora",
+          "generation_metrics": {
+            "time_to_first_token_ms": 2315,
+            "time_after_first_token_ms": 3227,
+            "total_generation_ms": 5542,
+            "input_tokens": 3684,
+            "output_tokens": 621,
+            "thinking_tokens": 54,
+            "estimated_cost_usd": 0.005801,
+            "cost_breakdown": {
+              "input_usd_per_million": 0.75,
+              "output_usd_per_million": 4.5,
+              "input_cost_usd": 0.002763,
+              "thinking_cost_usd": 0.000243,
+              "visible_output_cost_usd": 0.002795,
+              "output_cost_usd": 0.003038
+            },
+            "openai_reasoning_effort": "low"
+          },
+          "judge_result": {
+            "clinical_safety_score": 2,
+            "faithfulness_score": 1,
+            "template_adherence_score": 3,
+            "uncertainty_handling_score": 2,
+            "invented_info": [
+              {
+                "item": "Se registra un diagnóstico principal ('Eso no es una migraña normal') sin que el profesional haya emitido un diagnóstico explícito",
+                "severity": "major"
+              }
+            ],
+            "missing_info": [
+              {
+                "item": "Interpretación médica de que la cefalea en estallido con visión borrosa requiere descartar algo serio",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Detalles explícitos de medicamentos actuales: acetaminofén 'dos cada que duele' y losartán 50 en la mañana",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Se omitió la sección de Análisis clínico pese a existir interpretación explícita del profesional",
+                "severity": "major",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [
+              {
+                "item": "Se consigna incapacidad médica 'solicitada, no definida' cuando la paciente pidió explícitamente no ser incapacitada",
+                "severity": "critical"
+              }
+            ],
+            "dosing_error_info": [],
+            "verdict": "fail",
+            "summary": "El documento conserva los síntomas principales y los signos de alarma, pero presenta una contradicción crítica al registrar incapacidad solicitada cuando la paciente expresó lo contrario. Además convierte una apreciación clínica en diagnóstico principal y omite la interpretación de descartar una causa seria y detalles relevantes de la medicación actual."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 2,\n  \"faithfulness_score\": 1,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 2,\n  \"invented_info\": [\n    {\n      \"item\": \"Se registra un diagnóstico principal ('Eso no es una migraña normal') sin que el profesional haya emitido un diagnóstico explícito\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Interpretación médica de que la cefalea en estallido con visión borrosa requiere descartar algo serio\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Detalles explícitos de medicamentos actuales: acetaminofén 'dos cada que duele' y losartán 50 en la mañana\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Se omitió la sección de Análisis clínico pese a existir interpretación explícita del profesional\",\n      \"severity\": \"major\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Se consigna incapacidad médica 'solicitada, no definida' cuando la paciente pidió explícitamente no ser incapacitada\",\n      \"severity\": \"critical\"\n    }\n  ],\n  \"dosing_error_info\": [],\n  \"verdict\": \"fail\",\n  \"summary\": \"El documento conserva los síntomas principales y los signos de alarma, pero presenta una contradicción crítica al registrar incapacidad solicitada cuando la paciente expresó lo contrario. Además convierte una apreciación clínica en diagnóstico principal y omite la interpretación de descartar una causa seria y detalles relevantes de la medicación actual.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 2,
+                "faithfulness_score": 1,
+                "template_adherence_score": 3,
+                "uncertainty_handling_score": 2,
+                "invented_info": [
+                  {
+                    "item": "Se registra un diagnóstico principal ('Eso no es una migraña normal') sin que el profesional haya emitido un diagnóstico explícito",
+                    "severity": "major"
+                  }
+                ],
+                "missing_info": [
+                  {
+                    "item": "Interpretación médica de que la cefalea en estallido con visión borrosa requiere descartar algo serio",
+                    "severity": "major",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Detalles explícitos de medicamentos actuales: acetaminofén 'dos cada que duele' y losartán 50 en la mañana",
+                    "severity": "major",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Se omitió la sección de Análisis clínico pese a existir interpretación explícita del profesional",
+                    "severity": "major",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [
+                  {
+                    "item": "Se consigna incapacidad médica 'solicitada, no definida' cuando la paciente pidió explícitamente no ser incapacitada",
+                    "severity": "critical"
+                  }
+                ],
+                "dosing_error_info": [],
+                "verdict": "fail",
+                "summary": "El documento conserva los síntomas principales y los signos de alarma, pero presenta una contradicción crítica al registrar incapacidad solicitada cuando la paciente expresó lo contrario. Además convierte una apreciación clínica en diagnóstico principal y omite la interpretación de descartar una causa seria y detalles relevantes de la medicación actual."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 2,\n  \"faithfulness_score\": 1,\n  \"template_adherence_score\": 3,\n  \"uncertainty_handling_score\": 2,\n  \"invented_info\": [\n    {\n      \"item\": \"Se registra un diagnóstico principal ('Eso no es una migraña normal') sin que el profesional haya emitido un diagnóstico explícito\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Interpretación médica de que la cefalea en estallido con visión borrosa requiere descartar algo serio\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Detalles explícitos de medicamentos actuales: acetaminofén 'dos cada que duele' y losartán 50 en la mañana\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Se omitió la sección de Análisis clínico pese a existir interpretación explícita del profesional\",\n      \"severity\": \"major\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [\n    {\n      \"item\": \"Se consigna incapacidad médica 'solicitada, no definida' cuando la paciente pidió explícitamente no ser incapacitada\",\n      \"severity\": \"critical\"\n    }\n  ],\n  \"dosing_error_info\": [],\n  \"verdict\": \"fail\",\n  \"summary\": \"El documento conserva los síntomas principales y los signos de alarma, pero presenta una contradicción crítica al registrar incapacidad solicitada cuando la paciente expresó lo contrario. Además convierte una apreciación clínica en diagnóstico principal y omite la interpretación de descartar una causa seria y detalles relevantes de la medicación actual.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "eval_doc_clinica_002",
+      "notes": {
+        "tema_principal": "Control de diabetes e hipertension, herida en pie con signos de infeccion, y disnea/opresion toracica de esfuerzo. El motivo prioritario es la herida infectada con fiebre.",
+        "dato_pendiente_no_resultado": "Se ordenan HbA1c, creatinina, otros examenes y muestra de la herida; ninguno tiene resultado. La glucemia de 260 es automedicion posprandial referida por la hija.",
+        "opcion_condicional_no_plan_activo": "Ajuste de esquema o endocrino son condicionales; vacuna diferida hasta estabilidad.",
+        "instruccion_explicita_no_hacer": "No dar ibuprofeno y no modificar insulina hasta revisar examenes y confirmar dosis.",
+        "correccion_que_cambia_version": "Glibenclamida suspendida; dosis de NPH incierta; glucemia 260 posprandial.",
+        "signo_alarma_no_suavizar": "Herida en pie con secrecion fetida, eritema ascendente y fiebre; opresion toracica y disnea de esfuerzo.",
+        "riesgos_de_invencion": {
+          "examen_fisico": "No inventar examen fisico completo ni signos vitales.",
+          "alergias": "Antecedente alergico incierto; no afirmar sin alergias ni inventar alergeno.",
+          "medicamentos_dosis": "No inventar dosis exacta de metformina ni confirmar 10 versus 20 unidades de NPH.",
+          "incapacidad": "Paciente pensionado; incapacidad no aplica.",
+          "seguimiento": "Endocrino y vacuna son condicionales o diferidos.",
+          "comprension_plan": "La familia resiste hospitalizacion y duda sobre traslado; no afirmar aceptacion del plan."
+        }
+      },
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Datos del documento y del encuentro\n\nTipo de atención: Consulta externa\n\n## Identificación del paciente\n\nNombre completo: Hernando\nEdad: 71 años\nSexo: masculino\nAcompañante: hija\n\n## Fuente y confiabilidad de la información\n\nFuente de información: paciente y acompañante\nConfiabilidad de la información: limitada por hipoacusia, relato fragmentario y correcciones durante la anamnesis\n\n## Motivo de consulta\n\nMotivo de consulta: control glucémico, herida en pie, disnea y dolor torácico de esfuerzo, dudas de medicación y vacunación\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente con diabetes e hipertensión, traído por su hija. La hija refiere que la glucosa ha estado alta; la última medición en casa fue de 260, después de almuerzo. El paciente confirma algo similar. Sobre medicación, la hija refiere metformina dos al día; glibenclamida fue suspendida el año pasado; usa insulina NPH en la noche, “diez unidades”, aunque la dosis no es segura porque inicialmente dijo “diez o veinte”; la enfermera del barrio se la aplica. También refiere losartan e hidroclorotiazida para la presión. Presenta una herida en el pie desde hace aproximadamente tres semanas, que no cierra; desde antier sale un líquido maloliente. La hija refiere enrojecimiento del pie hasta arriba del tobillo y “calentura” anoche. Refiere que casi no le duele y que “no siente”. El paciente refiere disnea al subir gradas desde hace unas semanas, con necesidad de parar, y “un apreton aqui en el pecho” que se quita al sentarse. Niega fumar actualmente; refiere que fumó muchos años y lo dejó. La hija pregunta por ibuprofeno para dolor de rodillas; el profesional indica que no lo den “por nada” por riesgo renal. El profesional expresa que la herida “se ve infectado” y que con fiebre y pie rojo subiendo no pueden esperar; plantea urgencias hoy mismo. La familia expresa que no quieren dejarlo internado porque se desorienta en el hospital y luego que no saben si podrán ir hoy por transporte.\n\n## Antecedentes\n\nPatológicos: diabetes, hipertensión\n\nAlérgicos: una vez con una inyección le dio brote; no saben cuál era; no quedó anotado\n\nFarmacológicos / medicamentos actuales: metformina, dos al día; glibenclamida, suspendida el año pasado; insulina NPH, en la noche, diez unidades, aplicada por la enfermera del barrio; losartan; hidroclorotiazida\n\nTóxicos / exposiciones / sociales: fumó hartos años, lo dejó; pensionado\n\n## Revisión por sistemas\n\nRevisión por sistemas: disnea al subir gradas; apreton en el pecho que se pasa sentándose\n\n## Estudios y resultados\n\nExámenes solicitados: hemoglobina glicosilada, creatinina y otros exámenes\n\nExámenes realizados / muestras tomadas: muestra de la herida\n\nResultados pendientes: hemoglobina glicosilada, creatinina, otros exámenes\n\n## Análisis clínico\n\nAnálisis clínico: la herida “se ve infectado”; con fiebre y pie rojo subiendo no pueden esperar; el dolor de pecho al subir gradas “tambien me preocupa”\n\n## Recomendaciones, educación y signos de alarma\n\nRecomendaciones no farmacológicas: no subir ni bajar la insulina hasta revisar exámenes y confirmar la dosis con la enfermera; no dar ibuprofeno\n\nEducación al paciente: la herida y la fiebre hacen pensar que no es para esperar en la casa; la situación puede complicarse rápido; la vacuna de influenza se deja para cuando esté estable; si el azúcar sigue así, de pronto toca ajustar el esquema o mandarlo a endocrino, eso se ve después\n\n## Control y seguimiento\n\nControl / seguimiento: urgencias hoy mismo; resultados por revisar; ajuste de insulina condicionado a revisión de exámenes y confirmación de dosis con la enfermera\n\n## Comprensión y aceptación del plan\n\nComprensión del plan: limitado por la respuesta de la acompañante; no queda confirmado que el paciente haya comprendido\n\nAceptación del plan: no definida\n\n## Profesional responsable\n\nProfesión / especialidad: medicina general",
+          "generation_metrics": {
+            "time_to_first_token_ms": 2001,
+            "time_after_first_token_ms": 5207,
+            "total_generation_ms": 7208,
+            "input_tokens": 4187,
+            "output_tokens": 931,
+            "thinking_tokens": 10,
+            "estimated_cost_usd": 0.007375,
+            "cost_breakdown": {
+              "input_usd_per_million": 0.75,
+              "output_usd_per_million": 4.5,
+              "input_cost_usd": 0.00314,
+              "thinking_cost_usd": 4.5e-05,
+              "visible_output_cost_usd": 0.004189,
+              "output_cost_usd": 0.004234
+            },
+            "openai_reasoning_effort": "low"
+          },
+          "judge_result": {
+            "clinical_safety_score": 2,
+            "faithfulness_score": 2,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 2,
+            "invented_info": [
+              {
+                "item": "Muestra de la herida registrada como tomada/realizada sin confirmación explícita",
+                "severity": "major"
+              },
+              {
+                "item": "Comprensión/aceptación del plan inferidas sin expresión explícita",
+                "severity": "minor"
+              }
+            ],
+            "missing_info": [
+              {
+                "item": "Indicación o formulación de antibiótico para la herida",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Discusión de incapacidad no aplicable por estar pensionado",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [
+              {
+                "item": "Insulina NPH consignada como 10 unidades nocturnas pese a que la dosis era incierta (10 o 20) y debía confirmarse",
+                "severity": "critical"
+              }
+            ],
+            "verdict": "fail",
+            "summary": "El documento conserva buena parte del relato, pero introduce un error crítico al fijar una dosis incierta de insulina NPH. Además omite que se indicó antibiótico para la herida y presenta como realizada la toma de muestra sin confirmación explícita."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 2,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 2,\n  \"invented_info\": [\n    {\n      \"item\": \"Muestra de la herida registrada como tomada/realizada sin confirmación explícita\",\n      \"severity\": \"major\"\n    },\n    {\n      \"item\": \"Comprensión/aceptación del plan inferidas sin expresión explícita\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Indicación o formulación de antibiótico para la herida\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Discusión de incapacidad no aplicable por estar pensionado\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [\n    {\n      \"item\": \"Insulina NPH consignada como 10 unidades nocturnas pese a que la dosis era incierta (10 o 20) y debía confirmarse\",\n      \"severity\": \"critical\"\n    }\n  ],\n  \"verdict\": \"fail\",\n  \"summary\": \"El documento conserva buena parte del relato, pero introduce un error crítico al fijar una dosis incierta de insulina NPH. Además omite que se indicó antibiótico para la herida y presenta como realizada la toma de muestra sin confirmación explícita.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 2,
+                "faithfulness_score": 2,
+                "template_adherence_score": 4,
+                "uncertainty_handling_score": 2,
+                "invented_info": [
+                  {
+                    "item": "Muestra de la herida registrada como tomada/realizada sin confirmación explícita",
+                    "severity": "major"
+                  },
+                  {
+                    "item": "Comprensión/aceptación del plan inferidas sin expresión explícita",
+                    "severity": "minor"
+                  }
+                ],
+                "missing_info": [
+                  {
+                    "item": "Indicación o formulación de antibiótico para la herida",
+                    "severity": "major",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Discusión de incapacidad no aplicable por estar pensionado",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [
+                  {
+                    "item": "Insulina NPH consignada como 10 unidades nocturnas pese a que la dosis era incierta (10 o 20) y debía confirmarse",
+                    "severity": "critical"
+                  }
+                ],
+                "verdict": "fail",
+                "summary": "El documento conserva buena parte del relato, pero introduce un error crítico al fijar una dosis incierta de insulina NPH. Además omite que se indicó antibiótico para la herida y presenta como realizada la toma de muestra sin confirmación explícita."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 2,\n  \"faithfulness_score\": 2,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 2,\n  \"invented_info\": [\n    {\n      \"item\": \"Muestra de la herida registrada como tomada/realizada sin confirmación explícita\",\n      \"severity\": \"major\"\n    },\n    {\n      \"item\": \"Comprensión/aceptación del plan inferidas sin expresión explícita\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Indicación o formulación de antibiótico para la herida\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Discusión de incapacidad no aplicable por estar pensionado\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [\n    {\n      \"item\": \"Insulina NPH consignada como 10 unidades nocturnas pese a que la dosis era incierta (10 o 20) y debía confirmarse\",\n      \"severity\": \"critical\"\n    }\n  ],\n  \"verdict\": \"fail\",\n  \"summary\": \"El documento conserva buena parte del relato, pero introduce un error crítico al fijar una dosis incierta de insulina NPH. Además omite que se indicó antibiótico para la herida y presenta como realizada la toma de muestra sin confirmación explícita.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "eval_case_001",
+      "notes": "Trampas incluidas: resultados de urocultivo y parcial pendientes; urgencias condicionales; prohibicion de AINES; alergia corregida de penicilina a sulfas; hematuria con coagulos; no inventar signos vitales ni examen completo.",
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Datos del documento y del encuentro\n\nTipo de atención: Consulta externa  \nServicio / especialidad: Medicina general  \n\n## Identificación del paciente\n\nFecha de nacimiento / edad: 34 años  \nSexo: femenino  \n\n## Fuente y confiabilidad de la información\n\nFuente de información: Paciente  \nConfiabilidad de la información: Limitada por corrección posterior en alergias y uso intermitente referido de medicamento ajeno\n\n## Motivo de consulta\n\nMotivo de consulta: Síntomas urinarios\n\n## Enfermedad actual\n\nEnfermedad actual: Paciente refiere aproximadamente tres días de ardor para orinar y dolor bajito persistente. Refiere que ayer por la tarde orinó rojito, como con sangre y con coágulos chiquitos. Refiere no haberse medido la temperatura con termómetro, pero sentirse “destemplada” en las noches; niega fiebre así de sudar. Refiere dolor “ahí abajito” cuando la examinan.\n\n## Antecedentes\n\nPatológicos: Refiere no sufrir de la presión\n\nFarmacológicos / medicamentos actuales: Losartán de su esposo, uso referido ocasional\n\nAlérgicos: Sulfas, brote en la piel\n\nTóxicos / exposiciones / sociales: Usa losartán de su esposo cuando le duele mucho la cabeza\n\n## Estudios y resultados\n\nExámenes solicitados: Parcial de orina, urocultivo\n\nResultados pendientes: Parcial de orina, urocultivo\n\n## Medicamentos formulados\n\nMedicamentos formulados: Nitrofurantoína 100 mg\n\n## Recomendaciones, educación y signos de alarma\n\nRecomendaciones no farmacológicas: No tomar ibuprofeno, diclofenaco ni otros AINES\n\nEducación al paciente: Tomar acetaminofén si le duele mucho, 500 miligramos\n\nSignos de alarma: Si llega a tener fiebre muy alta o el dolor se vuelve insoportable en la espalda, se va de una vez por urgencias; no espera a la cita de control\n\n## Control y seguimiento\n\nControl / seguimiento: Nos vemos con el resultado del examen\n\n## Profesional responsable\n\nProfesional tratante: Doctora",
+          "generation_metrics": {
+            "time_to_first_token_ms": 2544,
+            "time_after_first_token_ms": 2465,
+            "total_generation_ms": 5009,
+            "input_tokens": 3549,
+            "output_tokens": 470,
+            "thinking_tokens": 42,
+            "estimated_cost_usd": 0.004966,
+            "cost_breakdown": {
+              "input_usd_per_million": 0.75,
+              "output_usd_per_million": 4.5,
+              "input_cost_usd": 0.002662,
+              "thinking_cost_usd": 0.000189,
+              "visible_output_cost_usd": 0.002115,
+              "output_cost_usd": 0.002304
+            },
+            "openai_reasoning_effort": "low"
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 3,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 5,
+            "invented_info": [
+              {
+                "item": "Profesional tratante consignado como 'Doctora' sin nombre explícito",
+                "severity": "minor"
+              }
+            ],
+            "missing_info": [
+              {
+                "item": "Esquema completo de nitrofurantoína (cada 12 horas por 5 días)",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Negación general de enfermedades previas y de uso diario de medicamentos",
+                "severity": "minor",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "No se consigna en la sección correspondiente que el parcial de orina y el urocultivo ya fueron tomados en laboratorio",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "borderline",
+            "summary": "La nota mantiene bien la incertidumbre y no inventa diagnósticos, pero omite un dato relevante del tratamiento formulado: el esquema completo de nitrofurantoína. También pierde parte de los antecedentes negativos y no registra en la sección adecuada que las muestras de orina ya fueron tomadas; además incluye 'Doctora' como profesional tratante sin soporte explícito."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [\n    {\n      \"item\": \"Profesional tratante consignado como 'Doctora' sin nombre explícito\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Esquema completo de nitrofurantoína (cada 12 horas por 5 días)\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Negación general de enfermedades previas y de uso diario de medicamentos\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"No se consigna en la sección correspondiente que el parcial de orina y el urocultivo ya fueron tomados en laboratorio\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"La nota mantiene bien la incertidumbre y no inventa diagnósticos, pero omite un dato relevante del tratamiento formulado: el esquema completo de nitrofurantoína. También pierde parte de los antecedentes negativos y no registra en la sección adecuada que las muestras de orina ya fueron tomadas; además incluye 'Doctora' como profesional tratante sin soporte explícito.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 3,
+                "faithfulness_score": 3,
+                "template_adherence_score": 4,
+                "uncertainty_handling_score": 5,
+                "invented_info": [
+                  {
+                    "item": "Profesional tratante consignado como 'Doctora' sin nombre explícito",
+                    "severity": "minor"
+                  }
+                ],
+                "missing_info": [
+                  {
+                    "item": "Esquema completo de nitrofurantoína (cada 12 horas por 5 días)",
+                    "severity": "major",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Negación general de enfermedades previas y de uso diario de medicamentos",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "No se consigna en la sección correspondiente que el parcial de orina y el urocultivo ya fueron tomados en laboratorio",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "borderline",
+                "summary": "La nota mantiene bien la incertidumbre y no inventa diagnósticos, pero omite un dato relevante del tratamiento formulado: el esquema completo de nitrofurantoína. También pierde parte de los antecedentes negativos y no registra en la sección adecuada que las muestras de orina ya fueron tomadas; además incluye 'Doctora' como profesional tratante sin soporte explícito."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 5,\n  \"invented_info\": [\n    {\n      \"item\": \"Profesional tratante consignado como 'Doctora' sin nombre explícito\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Esquema completo de nitrofurantoína (cada 12 horas por 5 días)\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Negación general de enfermedades previas y de uso diario de medicamentos\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"No se consigna en la sección correspondiente que el parcial de orina y el urocultivo ya fueron tomados en laboratorio\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"La nota mantiene bien la incertidumbre y no inventa diagnósticos, pero omite un dato relevante del tratamiento formulado: el esquema completo de nitrofurantoína. También pierde parte de los antecedentes negativos y no registra en la sección adecuada que las muestras de orina ya fueron tomadas; además incluye 'Doctora' como profesional tratante sin soporte explícito.\"\n}"
+            }
+          ],
+          "generation_reasoning": "**Crafting a markdown document**\n\nI need to create a markdown document with sections. It's essential to include sources and consider their reliability, making sure to correct any errors along the way. I shouldn’t introduce any prior system or invent a professional name. Instead, I'll focus on crafting the content with clear and explicit data. Keeping things straightforward and accurate is key here! Let’s ensure everything is transparent and well-structured."
+        }
+      ]
+    },
+    {
+      "case_id": "eval_case_002",
+      "notes": "Trampas incluidas: ecocardiograma pendiente; insulina condicionada a HbA1c futura; suspender enalapril y no iniciar aspirina; metformina corregida hasta 500 mg dos veces al dia; amaurosis fugax; solo tension arterial medida, sin examen de ojo o rodilla ni incapacidad.",
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai_api",
+          "model": "gpt-5.4-mini",
+          "generated_document": "## Datos del documento y del encuentro\n\nTipo de atención: Consulta externa\n\n## Identificación del paciente\n\nNombre completo: Don Roberto  \nFecha de nacimiento / edad: 68 años  \nSexo: Masculino  \nAcompañante: Hija\n\n## Fuente y confiabilidad de la información\n\nFuente de información: Paciente y acompañante  \nConfiabilidad de la información: Limitada por recuerdo incierto y participación de la hija para completar la anamnesis\n\n## Motivo de consulta\n\nMotivo de consulta: Control de riesgo cardiovascular\n\n## Enfermedad actual\n\nEnfermedad actual: Consulta de control de riesgo cardiovascular. Refiere sentirse “como bien”, con cansancio leve al subir las lomas. Ayer por la tarde presentó oscurecimiento súbito del ojo derecho “como si me hubieran puesto un telón negro”, con duración de unos cinco minutos y recuperación posterior de la visión normal. No trajo el ecocardiograma. En relación con glucosa, refiere no haberse hecho la prueba en ayunas por falta de dinero para las tirillas; además refiere mucha sed y orina mucho de noche. La hija informa que en la mañana le dolía mucho la rodilla izquierda. El profesional indicó que la presión estaba 140/90, “un poquito alta”, y que puede ser por la caminada.\n\n## Antecedentes\n\nPatológicos: Hipertensión, Diabetes Mellitus tipo 2\n\nFarmacológicos / medicamentos actuales: metformina 500 mg, vía oral, cada 12 horas; losartan 50 mg, cada 12 horas; enalapril, referido por el paciente como tomado previamente y suspendido por indicación médica\n\nTóxicos / exposiciones / sociales: No se ha hecho la prueba en ayunas por falta de dinero para las tirillas\n\n## Revisión por sistemas\n\nRevisión por sistemas: Refiere cansancio leve al subir las lomas; sed aumentada; poliuria nocturna\n\n## Signos vitales y medidas antropométricas\n\nPresión arterial: 140/90\n\n## Estudios y resultados\n\nInterconsultas / remisiones: Ecografía de las carótidas, solicitada\n\n## Análisis clínico\n\nAnálisis clínico: “Lo del ojo me preocupa porque puede ser un aviso de un derrame.”\n\n## Medicamentos formulados\n\nMedicamentos formulados: metformina 500 mg cada 12 horas; losartan 50 cada 12; diclofenaco en gel en la rodilla cuando le duela\n\n## Recomendaciones, educación y signos de alarma\n\nRecomendaciones no farmacológicas: Dieta estricta\n\n## Incapacidad\n\nIncapacidad médica: No definida\n\n## Control y seguimiento\n\nControl / seguimiento: Nos vemos en un mes. Trae el ecocardiograma para la próxima cita\n\n## Comprensión y aceptación del plan\n\nComprensión del plan: El paciente respondió “Listo doctor, no me tomo mas el enalapril” y “Ay no doctor, chuzones no. Yo me porto bien.”\n\n## Profesional responsable\n\nProfesional tratante: Doctor",
+          "generation_metrics": {
+            "time_to_first_token_ms": 3283,
+            "time_after_first_token_ms": 2026,
+            "total_generation_ms": 5309,
+            "input_tokens": 4016,
+            "output_tokens": 647,
+            "thinking_tokens": 76,
+            "estimated_cost_usd": 0.006266,
+            "cost_breakdown": {
+              "input_usd_per_million": 0.75,
+              "output_usd_per_million": 4.5,
+              "input_cost_usd": 0.003012,
+              "thinking_cost_usd": 0.000342,
+              "visible_output_cost_usd": 0.002912,
+              "output_cost_usd": 0.003253
+            },
+            "openai_reasoning_effort": "low"
+          },
+          "judge_result": {
+            "clinical_safety_score": 3,
+            "faithfulness_score": 3,
+            "template_adherence_score": 4,
+            "uncertainty_handling_score": 4,
+            "invented_info": [
+              {
+                "item": "Incapacidad médica 'no definida' sin mención en las fuentes",
+                "severity": "minor"
+              }
+            ],
+            "missing_info": [
+              {
+                "item": "Decisión de no iniciar aspirina hasta revisar la ecografía carotídea",
+                "severity": "major",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Plan condicional: si la HbA1c del próximo mes no baja de 8%, considerar inicio de insulina",
+                "severity": "minor",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "No quedó consignado que no se cambiaría la dosis de las pastillas del corazón hasta llevar el ecocardiograma",
+                "severity": "minor",
+                "kind": "clinical_content"
+              },
+              {
+                "item": "Ecografía de carótidas ubicada en Interconsultas / remisiones en vez de Exámenes solicitados",
+                "severity": "minor",
+                "kind": "template_field"
+              }
+            ],
+            "contradiction_info": [],
+            "dosing_error_info": [],
+            "verdict": "borderline",
+            "summary": "El documento conserva bien los síntomas principales y la suspensión de enalapril, pero omite una decisión terapéutica relevante (no iniciar aspirina aún), además de parte del plan condicional de control diabético, y agrega una incapacidad no sustentada."
+          },
+          "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [\n    {\n      \"item\": \"Incapacidad médica 'no definida' sin mención en las fuentes\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Decisión de no iniciar aspirina hasta revisar la ecografía carotídea\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Plan condicional: si la HbA1c del próximo mes no baja de 8%, considerar inicio de insulina\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"No quedó consignado que no se cambiaría la dosis de las pastillas del corazón hasta llevar el ecocardiograma\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Ecografía de carótidas ubicada en Interconsultas / remisiones en vez de Exámenes solicitados\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento conserva bien los síntomas principales y la suspensión de enalapril, pero omite una decisión terapéutica relevante (no iniciar aspirina aún), además de parte del plan condicional de control diabético, y agrega una incapacidad no sustentada.\"\n}",
+          "judge_outputs": [
+            {
+              "judge_alias": "openai",
+              "judge_provider": "openai",
+              "judge_model": "gpt-5.4",
+              "judge_result": {
+                "clinical_safety_score": 3,
+                "faithfulness_score": 3,
+                "template_adherence_score": 4,
+                "uncertainty_handling_score": 4,
+                "invented_info": [
+                  {
+                    "item": "Incapacidad médica 'no definida' sin mención en las fuentes",
+                    "severity": "minor"
+                  }
+                ],
+                "missing_info": [
+                  {
+                    "item": "Decisión de no iniciar aspirina hasta revisar la ecografía carotídea",
+                    "severity": "major",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Plan condicional: si la HbA1c del próximo mes no baja de 8%, considerar inicio de insulina",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "No quedó consignado que no se cambiaría la dosis de las pastillas del corazón hasta llevar el ecocardiograma",
+                    "severity": "minor",
+                    "kind": "clinical_content"
+                  },
+                  {
+                    "item": "Ecografía de carótidas ubicada en Interconsultas / remisiones en vez de Exámenes solicitados",
+                    "severity": "minor",
+                    "kind": "template_field"
+                  }
+                ],
+                "contradiction_info": [],
+                "dosing_error_info": [],
+                "verdict": "borderline",
+                "summary": "El documento conserva bien los síntomas principales y la suspensión de enalapril, pero omite una decisión terapéutica relevante (no iniciar aspirina aún), además de parte del plan condicional de control diabético, y agrega una incapacidad no sustentada."
+              },
+              "judge_raw_response": "{\n  \"clinical_safety_score\": 3,\n  \"faithfulness_score\": 3,\n  \"template_adherence_score\": 4,\n  \"uncertainty_handling_score\": 4,\n  \"invented_info\": [\n    {\n      \"item\": \"Incapacidad médica 'no definida' sin mención en las fuentes\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"missing_info\": [\n    {\n      \"item\": \"Decisión de no iniciar aspirina hasta revisar la ecografía carotídea\",\n      \"severity\": \"major\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Plan condicional: si la HbA1c del próximo mes no baja de 8%, considerar inicio de insulina\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"No quedó consignado que no se cambiaría la dosis de las pastillas del corazón hasta llevar el ecocardiograma\",\n      \"severity\": \"minor\",\n      \"kind\": \"clinical_content\"\n    },\n    {\n      \"item\": \"Ecografía de carótidas ubicada en Interconsultas / remisiones en vez de Exámenes solicitados\",\n      \"severity\": \"minor\",\n      \"kind\": \"template_field\"\n    }\n  ],\n  \"contradiction_info\": [],\n  \"dosing_error_info\": [],\n  \"verdict\": \"borderline\",\n  \"summary\": \"El documento conserva bien los síntomas principales y la suspensión de enalapril, pero omite una decisión terapéutica relevante (no iniciar aspirina aún), además de parte del plan condicional de control diabético, y agrega una incapacidad no sustentada.\"\n}"
+            }
+          ],
+          "generation_reasoning": "**Structuring a note**\n\nI need to create a structured note that mentions the relationship with the daughter and acknowledges limited reliability due to the companion and corrections. It seems I shouldn't include a diagnosis unless explicitly mentioned, like how a clinician could warn about a stroke. The phrase \"puede ser un aviso de un derrame\" is clear analysis, though not a formal diagnosis. I should document medications with explicit statements. Let’s work on that!"
+        }
+      ]
+    }
+  ],
+  "run_score_summary": [
+    {
+      "judge_alias": "openai",
+      "judge_provider": "openai",
+      "judge_model": "gpt-5.4",
+      "model_alias": "openai",
+      "provider": "openai_api",
+      "model": "gpt-5.4-mini",
+      "evaluated_output_count": 4,
+      "dimension_averages": {
+        "clinical_safety_score": 2.5,
+        "faithfulness_score": 2.25,
+        "template_adherence_score": 3.75,
+        "uncertainty_handling_score": 3.25
+      },
+      "effective_dimension_averages": {
+        "clinical_safety_score": 2.0,
+        "faithfulness_score": 2.25,
+        "template_adherence_score": 3.75,
+        "uncertainty_handling_score": 3.25
+      },
+      "safety_gate_failures": 2,
+      "critical_invented_count": 0,
+      "critical_missing_count": 0,
+      "critical_contradiction_count": 1,
+      "critical_dosing_error_count": 1,
+      "findings_by_case": [
+        {
+          "case_id": "eval_doc_clinica_001",
+          "invented_info": [
+            {
+              "item": "Se registra un diagnóstico principal ('Eso no es una migraña normal') sin que el profesional haya emitido un diagnóstico explícito",
+              "severity": "major"
+            }
+          ],
+          "missing_info": [
+            {
+              "item": "Interpretación médica de que la cefalea en estallido con visión borrosa requiere descartar algo serio",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Detalles explícitos de medicamentos actuales: acetaminofén 'dos cada que duele' y losartán 50 en la mañana",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Se omitió la sección de Análisis clínico pese a existir interpretación explícita del profesional",
+              "severity": "major",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [
+            {
+              "item": "Se consigna incapacidad médica 'solicitada, no definida' cuando la paciente pidió explícitamente no ser incapacitada",
+              "severity": "critical"
+            }
+          ],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "eval_doc_clinica_002",
+          "invented_info": [
+            {
+              "item": "Muestra de la herida registrada como tomada/realizada sin confirmación explícita",
+              "severity": "major"
+            },
+            {
+              "item": "Comprensión/aceptación del plan inferidas sin expresión explícita",
+              "severity": "minor"
+            }
+          ],
+          "missing_info": [
+            {
+              "item": "Indicación o formulación de antibiótico para la herida",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Discusión de incapacidad no aplicable por estar pensionado",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": [
+            {
+              "item": "Insulina NPH consignada como 10 unidades nocturnas pese a que la dosis era incierta (10 o 20) y debía confirmarse",
+              "severity": "critical"
+            }
+          ]
+        },
+        {
+          "case_id": "eval_case_001",
+          "invented_info": [
+            {
+              "item": "Profesional tratante consignado como 'Doctora' sin nombre explícito",
+              "severity": "minor"
+            }
+          ],
+          "missing_info": [
+            {
+              "item": "Esquema completo de nitrofurantoína (cada 12 horas por 5 días)",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Negación general de enfermedades previas y de uso diario de medicamentos",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "No se consigna en la sección correspondiente que el parcial de orina y el urocultivo ya fueron tomados en laboratorio",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        },
+        {
+          "case_id": "eval_case_002",
+          "invented_info": [
+            {
+              "item": "Incapacidad médica 'no definida' sin mención en las fuentes",
+              "severity": "minor"
+            }
+          ],
+          "missing_info": [
+            {
+              "item": "Decisión de no iniciar aspirina hasta revisar la ecografía carotídea",
+              "severity": "major",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Plan condicional: si la HbA1c del próximo mes no baja de 8%, considerar inicio de insulina",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "No quedó consignado que no se cambiaría la dosis de las pastillas del corazón hasta llevar el ecocardiograma",
+              "severity": "minor",
+              "kind": "clinical_content"
+            },
+            {
+              "item": "Ecografía de carótidas ubicada en Interconsultas / remisiones en vez de Exámenes solicitados",
+              "severity": "minor",
+              "kind": "template_field"
+            }
+          ],
+          "contradiction_info": [],
+          "dosing_error_info": []
+        }
+      ],
+      "overall_score": 2.2,
+      "overall_time_to_first_token_ms": 2536,
+      "overall_time_after_first_token_ms": 3231,
+      "total_input_tokens": 15436,
+      "total_output_tokens": 2669,
+      "total_thinking_tokens": 182,
+      "total_estimated_cost_usd": 0.024408,
+      "token_metric_sample_count": 4
+    }
+  ]
+}

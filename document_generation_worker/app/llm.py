@@ -2,34 +2,30 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
-from functools import lru_cache
 from typing import Any
 
 from app.settings import Settings
+from worker_runtime.llm.anthropic import (
+    get_anthropic_api_client,
+    get_anthropic_vertex_client,
+    require_anthropic_api_key,
+)
+from worker_runtime.llm.google import get_google_genai_client
 
 
 ANTHROPIC_DOCUMENT_GENERATION_TEMPERATURE = 0.0
 
 
-@lru_cache(maxsize=1)
 def _get_google_client(project_id: str, location: str):
-    from google import genai
-
-    return genai.Client(vertexai=True, project=project_id, location=location)
+    return get_google_genai_client(project_id, location)
 
 
-@lru_cache(maxsize=1)
 def _get_anthropic_client(project_id: str, region: str):
-    from anthropic import AnthropicVertex
-
-    return AnthropicVertex(project_id=project_id, region=region)
+    return get_anthropic_vertex_client(project_id, region)
 
 
-@lru_cache(maxsize=1)
 def _get_anthropic_api_client(api_key: str):
-    from anthropic import AsyncAnthropic
-
-    return AsyncAnthropic(api_key=api_key)
+    return get_anthropic_api_client(api_key)
 
 
 async def stream_document_generation(
@@ -127,8 +123,7 @@ async def _stream_with_anthropic_api(
     settings: Settings,
 ) -> AsyncIterator[str]:
     api_key = (settings.anthropic_api_key or "").strip()
-    if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY is required")
+    api_key = require_anthropic_api_key(api_key)
 
     client = _get_anthropic_api_client(api_key)
     async with client.messages.stream(

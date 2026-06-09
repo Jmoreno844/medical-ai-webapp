@@ -1,0 +1,277 @@
+{
+  "run_started_at": "2026-06-09T00:53:29.187766+00:00",
+  "cases_file": "../evals/clinical_extraction/cases.json",
+  "requested_case_id": null,
+  "count_limit": 1,
+  "last_limit": null,
+  "selected_case_count": 1,
+  "models": [
+    {
+      "alias": "openai",
+      "provider": "openai",
+      "model": "gpt-5.4-mini"
+    }
+  ],
+  "judge_provider": "openai",
+  "judge_model": "gpt-5.4",
+  "judge_reasoning_effort": "medium",
+  "judge_prompt_version": "clinical_extraction_judge_v001",
+  "judge_prompt_preview": "Eres un evaluador experto de extraccion clinica estructurada.\n\nTu trabajo es eva",
+  "case_results": [
+    {
+      "case_id": "medication_question_and_avoid",
+      "notes": "Pregunta de medicacion, restriccion explicita de AINEs y una prescripcion simple con atributos literales.",
+      "outputs": [
+        {
+          "model_alias": "openai",
+          "provider": "openai",
+          "model": "gpt-5.4-mini",
+          "extraction_output": {
+            "session_id": "medication_question_and_avoid",
+            "status": "extracted",
+            "raw_mentions": {
+              "mentions": [
+                {
+                  "entity_type": "medication",
+                  "entity_raw": "ibuprofeno",
+                  "proposition_raw": "me puedo tomar ibuprofeno para este dolor?",
+                  "speech_act": "question",
+                  "subject_role": "patient",
+                  "attributes": [],
+                  "evidence": [
+                    {
+                      "quote": "Doctora, me puedo tomar ibuprofeno para este dolor?",
+                      "turn_id": "s0:0"
+                    }
+                  ]
+                },
+                {
+                  "entity_type": "medication",
+                  "entity_raw": "ibuprofeno",
+                  "proposition_raw": "no tome ibuprofeno",
+                  "speech_act": "instruction_to_avoid",
+                  "subject_role": "patient",
+                  "attributes": [],
+                  "evidence": [
+                    {
+                      "quote": "No, por favor no tome ibuprofeno ni diclofenaco. Si le duele mucho, tome acetaminofen quinientos miligramos.",
+                      "turn_id": "s0:1"
+                    }
+                  ]
+                },
+                {
+                  "entity_type": "medication",
+                  "entity_raw": "diclofenaco",
+                  "proposition_raw": "no tome diclofenaco",
+                  "speech_act": "instruction_to_avoid",
+                  "subject_role": "patient",
+                  "attributes": [],
+                  "evidence": [
+                    {
+                      "quote": "No, por favor no tome ibuprofeno ni diclofenaco. Si le duele mucho, tome acetaminofen quinientos miligramos.",
+                      "turn_id": "s0:1"
+                    }
+                  ]
+                },
+                {
+                  "entity_type": "medication",
+                  "entity_raw": "acetaminofen",
+                  "proposition_raw": "tome acetaminofen quinientos miligramos",
+                  "speech_act": "conditional_instruction",
+                  "subject_role": "patient",
+                  "attributes": [
+                    {
+                      "kind": "dose_value",
+                      "raw_text": "quinientos"
+                    },
+                    {
+                      "kind": "dose_unit",
+                      "raw_text": "miligramos"
+                    }
+                  ],
+                  "evidence": [
+                    {
+                      "quote": "No, por favor no tome ibuprofeno ni diclofenaco. Si le duele mucho, tome acetaminofen quinientos miligramos.",
+                      "turn_id": "s0:1"
+                    }
+                  ]
+                }
+              ]
+            },
+            "processed_mentions": {
+              "mentions": [
+                {
+                  "entity_type": "medication",
+                  "entity_raw": "ibuprofeno",
+                  "proposition_raw": "me puedo tomar ibuprofeno para este dolor?",
+                  "speech_act": "question",
+                  "subject_role": "patient",
+                  "attributes": [],
+                  "evidence": [
+                    {
+                      "quote": "Doctora, me puedo tomar ibuprofeno para este dolor?",
+                      "turn_id": "s0:0"
+                    }
+                  ]
+                },
+                {
+                  "entity_type": "medication",
+                  "entity_raw": "ibuprofeno",
+                  "proposition_raw": "no tome ibuprofeno",
+                  "speech_act": "instruction_to_avoid",
+                  "subject_role": "patient",
+                  "attributes": [],
+                  "evidence": [
+                    {
+                      "quote": "No, por favor no tome ibuprofeno ni diclofenaco. Si le duele mucho, tome acetaminofen quinientos miligramos.",
+                      "turn_id": "s0:1"
+                    }
+                  ]
+                },
+                {
+                  "entity_type": "medication",
+                  "entity_raw": "acetaminofen",
+                  "proposition_raw": "tome acetaminofen quinientos miligramos",
+                  "speech_act": "conditional_instruction",
+                  "subject_role": "patient",
+                  "attributes": [
+                    {
+                      "kind": "dose_value",
+                      "raw_text": "quinientos"
+                    },
+                    {
+                      "kind": "dose_unit",
+                      "raw_text": "miligramos"
+                    }
+                  ],
+                  "evidence": [
+                    {
+                      "quote": "No, por favor no tome ibuprofeno ni diclofenaco. Si le duele mucho, tome acetaminofen quinientos miligramos.",
+                      "turn_id": "s0:1"
+                    }
+                  ]
+                }
+              ]
+            },
+            "evidence": [
+              {
+                "fact_path": "mentions[0]",
+                "quote": "Doctora, me puedo tomar ibuprofeno para este dolor?",
+                "turn_id": "s0:0",
+                "matched": true,
+                "match_score": 100.0,
+                "matched_chunk_ids": [
+                  "s0:0"
+                ],
+                "uttered_by_role": "patient",
+                "ambiguous": false,
+                "speaker_mismatch": false
+              },
+              {
+                "fact_path": "mentions[1]",
+                "quote": "No, por favor no tome ibuprofeno ni diclofenaco. Si le duele mucho, tome acetaminofen quinientos miligramos.",
+                "turn_id": "s0:1",
+                "matched": true,
+                "match_score": 100.0,
+                "matched_chunk_ids": [
+                  "s0:1"
+                ],
+                "uttered_by_role": "clinician",
+                "ambiguous": false,
+                "speaker_mismatch": false
+              },
+              {
+                "fact_path": "mentions[2]",
+                "quote": "No, por favor no tome ibuprofeno ni diclofenaco. Si le duele mucho, tome acetaminofen quinientos miligramos.",
+                "turn_id": "s0:1",
+                "matched": true,
+                "match_score": 100.0,
+                "matched_chunk_ids": [
+                  "s0:1"
+                ],
+                "uttered_by_role": "clinician",
+                "ambiguous": false,
+                "speaker_mismatch": false
+              },
+              {
+                "fact_path": "mentions[3]",
+                "quote": "No, por favor no tome ibuprofeno ni diclofenaco. Si le duele mucho, tome acetaminofen quinientos miligramos.",
+                "turn_id": "s0:1",
+                "matched": true,
+                "match_score": 100.0,
+                "matched_chunk_ids": [
+                  "s0:1"
+                ],
+                "uttered_by_role": "clinician",
+                "ambiguous": false,
+                "speaker_mismatch": false
+              }
+            ],
+            "grounding_stats": {
+              "mentions_emitted": 3,
+              "mentions_dropped_unmatched": 1,
+              "mentions_dropped_ambiguous": 0,
+              "attributes_dropped_ungrounded": 0,
+              "correction_mentions_rejected": 0,
+              "quotes_unmatched": 0,
+              "quotes_ambiguous": 0,
+              "ground_strict_forced_null": 1,
+              "duplicate_mentions_removed": 0,
+              "latency_ms": 2861,
+              "validation_warnings": [
+                "mentions[2].proposition_raw: ungrounded"
+              ]
+            },
+            "extraction_model": "gpt-5.4-mini",
+            "provider": "openai",
+            "model": "gpt-5.4-mini",
+            "latency_ms": 2861,
+            "error_code": null
+          },
+          "judge_result": {
+            "faithfulness_score": 3,
+            "atomicity_score": 5,
+            "coding_score": 4,
+            "grounding_score": 3,
+            "invented_mentions": [],
+            "missing_mentions": [
+              {
+                "item": "Falta la mención de instrucción para evitar diclofenaco ('No tome diclofenaco').",
+                "severity": "major"
+              }
+            ],
+            "atomicity_issues": [],
+            "coding_issues": [
+              {
+                "item": "La mención de acetaminofen usa speech_act 'conditional_instruction' en lugar de la clasificación esperada 'prescription'.",
+                "severity": "minor"
+              }
+            ],
+            "verdict": "borderline",
+            "summary": "La salida candidata conserva bien la pregunta sobre ibuprofeno y la indicación de evitar ibuprofeno, y captura la indicación de acetaminofen con dosis correcta. Sin embargo, omite una instrucción clínicamente relevante: evitar diclofenaco. La atomicidad es buena. Hay un desajuste menor de clasificación en acetaminofen y el grounding es solo parcial, con una advertencia de proposition_raw no sustentada y una mención descartada por el pipeline."
+          },
+          "judge_raw_response": "{\n  \"faithfulness_score\": 3,\n  \"atomicity_score\": 5,\n  \"coding_score\": 4,\n  \"grounding_score\": 3,\n  \"invented_mentions\": [],\n  \"missing_mentions\": [\n    {\n      \"item\": \"Falta la mención de instrucción para evitar diclofenaco ('No tome diclofenaco').\",\n      \"severity\": \"major\"\n    }\n  ],\n  \"atomicity_issues\": [],\n  \"coding_issues\": [\n    {\n      \"item\": \"La mención de acetaminofen usa speech_act 'conditional_instruction' en lugar de la clasificación esperada 'prescription'.\",\n      \"severity\": \"minor\"\n    }\n  ],\n  \"verdict\": \"borderline\",\n  \"summary\": \"La salida candidata conserva bien la pregunta sobre ibuprofeno y la indicación de evitar ibuprofeno, y captura la indicación de acetaminofen con dosis correcta. Sin embargo, omite una instrucción clínicamente relevante: evitar diclofenaco. La atomicidad es buena. Hay un desajuste menor de clasificación en acetaminofen y el grounding es solo parcial, con una advertencia de proposition_raw no sustentada y una mención descartada por el pipeline.\"\n}"
+        }
+      ]
+    }
+  ],
+  "run_score_summary": [
+    {
+      "model_alias": "openai",
+      "provider": "openai",
+      "model": "gpt-5.4-mini",
+      "evaluated_output_count": 1,
+      "dimension_averages": {
+        "faithfulness_score": 3.0,
+        "atomicity_score": 5.0,
+        "coding_score": 4.0,
+        "grounding_score": 3.0
+      },
+      "critical_invented_count": 0,
+      "critical_missing_count": 0,
+      "critical_atomicity_issue_count": 0,
+      "critical_coding_issue_count": 0,
+      "overall_score": 3.75
+    }
+  ]
+}

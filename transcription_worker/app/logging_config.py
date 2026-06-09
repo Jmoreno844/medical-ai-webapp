@@ -1,35 +1,11 @@
 from __future__ import annotations
 
-import logging
-
-from app.observability import (
-    JsonTelemetryFormatter,
-    SensitiveTelemetryFilter,
-    TraceContextFilter,
-)
-from app.settings import Settings
+from worker_runtime.logging import configure_logging as _configure_logging
 
 
-def configure_logging(settings: Settings, *, service_name: str) -> None:
-    root = logging.getLogger()
-    root.handlers.clear()
-    root.setLevel(getattr(logging, settings.log_level.upper(), logging.INFO))
-
-    handler = logging.StreamHandler()
-    handler.setFormatter(JsonTelemetryFormatter())
-    handler.addFilter(SensitiveTelemetryFilter())
-    handler.addFilter(
-        TraceContextFilter(
-            service_name=service_name,
-            environment=settings.environment,
-        )
+def configure_logging(settings, *, service_name: str) -> None:
+    _configure_logging(
+        settings,
+        service_name=service_name,
+        noisy_logger_names=("urllib3", "httpcore", "httpx", "google_genai"),
     )
-    root.addHandler(handler)
-
-    for noisy_logger_name in (
-        "urllib3",
-        "httpcore",
-        "httpx",
-        "google_genai",
-    ):
-        logging.getLogger(noisy_logger_name).setLevel(logging.WARNING)

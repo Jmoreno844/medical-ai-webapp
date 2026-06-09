@@ -1,25 +1,12 @@
 from __future__ import annotations
 
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from worker_runtime.settings import BaseWorkerSettings
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env.local",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-    environment: str = Field(default="local", alias="ENVIRONMENT")
+class Settings(BaseWorkerSettings):
     port: int = Field(default=8093, alias="PORT")
     log_level: str = Field(default="INFO", alias="CLINICAL_EXTRACTION_LOG_LEVEL")
-    backend_internal_base_url: str = Field(
-        default="http://localhost:8001",
-        alias="BACKEND_INTERNAL_BASE_URL",
-    )
-    gcp_project_id: str | None = Field(default=None, alias="GCP_PROJECT_ID")
-    vertex_ai_location: str = Field(default="global", alias="VERTEX_AI_LOCATION")
     clinical_extraction_provider: str = Field(
         default="gemini",
         alias="CLINICAL_EXTRACTION_PROVIDER",
@@ -32,6 +19,10 @@ class Settings(BaseSettings):
         default="gpt-5.4-mini",
         alias="CLINICAL_EXTRACTION_OPENAI_MODEL",
     )
+    clinical_extraction_anthropic_model: str = Field(
+        default="claude-haiku-4-5-20251001",
+        alias="CLINICAL_EXTRACTION_ANTHROPIC_MODEL",
+    )
     clinical_extraction_max_concurrent: int = Field(
         default=4,
         alias="CLINICAL_EXTRACTION_MAX_CONCURRENT",
@@ -41,18 +32,7 @@ class Settings(BaseSettings):
         alias="CLINICAL_EXTRACTION_MAX_OUTPUT_TOKENS",
     )
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
-    cloud_tasks_invoker_service_account: str | None = Field(
-        default=None,
-        alias="CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT",
-    )
-
-    @property
-    def environment_name(self) -> str:
-        return self.environment.strip().lower()
-
-    @property
-    def is_local(self) -> bool:
-        return self.environment_name in {"local", "dev", "develop", "test"}
+    anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
 
     @property
     def provider_name(self) -> str:
@@ -63,6 +43,9 @@ class Settings(BaseSettings):
             "google_genai": "gemini",
             "gemini": "gemini",
             "openai": "openai",
+            "claude": "anthropic_api",
+            "anthropic": "anthropic_api",
+            "anthropic_api": "anthropic_api",
         }
         return aliases.get(provider, provider)
 
@@ -70,4 +53,6 @@ class Settings(BaseSettings):
     def effective_model(self) -> str:
         if self.provider_name == "openai":
             return self.clinical_extraction_openai_model
+        if self.provider_name == "anthropic_api":
+            return self.clinical_extraction_anthropic_model
         return self.clinical_extraction_model

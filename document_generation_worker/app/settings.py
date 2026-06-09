@@ -1,27 +1,12 @@
 from __future__ import annotations
 
 from pydantic import AliasChoices, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from worker_runtime.settings import BaseWorkerSettings
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env.local",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-    environment: str = Field(default="local", alias="ENVIRONMENT")
+class Settings(BaseWorkerSettings):
     port: int = Field(default=8092, alias="PORT")
     log_level: str = Field(default="INFO", alias="DOCUMENT_GENERATION_LOG_LEVEL")
-
-    backend_internal_base_url: str = Field(
-        default="http://localhost:8001",
-        alias="BACKEND_INTERNAL_BASE_URL",
-    )
-    gcp_project_id: str | None = Field(default=None, alias="GCP_PROJECT_ID")
-    gcp_region: str = Field(default="us-east1", alias="GCP_REGION")
-    vertex_ai_location: str = Field(default="global", alias="VERTEX_AI_LOCATION")
     document_generation_provider: str = Field(
         default="anthropic_api",
         alias="DOCUMENT_GENERATION_PROVIDER",
@@ -41,10 +26,6 @@ class Settings(BaseSettings):
         default="claude-haiku-4-5-20251001",
         alias="DOCUMENT_GENERATION_ANTHROPIC_MODEL",
     )
-    cloud_tasks_invoker_service_account: str | None = Field(
-        default=None,
-        alias="CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT",
-    )
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     llm_max_concurrent: int = Field(
         default=4,
@@ -63,18 +44,6 @@ class Settings(BaseSettings):
     langsmith_project: str | None = Field(default=None, alias="LANGSMITH_PROJECT")
     langsmith_api_key: str | None = Field(default=None, alias="LANGSMITH_API_KEY")
     langsmith_endpoint: str | None = Field(default=None, alias="LANGSMITH_ENDPOINT")
-
-    @property
-    def environment_name(self) -> str:
-        return self.environment.strip().lower()
-
-    @property
-    def is_local(self) -> bool:
-        return self.environment_name in {"local", "dev", "develop", "test"}
-
-    @property
-    def is_production(self) -> bool:
-        return self.environment_name in {"prod", "production"}
 
     @property
     def langsmith_enabled(self) -> bool:

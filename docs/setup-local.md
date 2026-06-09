@@ -69,6 +69,14 @@ La pagina local `/debug/transcripcion` ahora llama a FastAPI bajo
 separado, pero el backend local si necesita `TRANSCRIPTION_WORKER_BASE_URL`
 apuntando al worker para hacer el bridge de debug.
 
+La pagina local `/debug/extraccion` llama a FastAPI bajo
+`/api/v1/clinical-extraction/debug/extract` y opcionalmente
+`/api/v1/clinical-extraction/debug/sessions/{session_id}/transcript`.
+El backend hace bridge al worker en `POST /api/v1/dev/clinical-extraction/extract`.
+Requiere `CLINICAL_EXTRACTION_WORKER_BASE_URL=http://localhost:8093` y el worker
+levantado en ese puerto. No requiere `CLINICAL_EXTRACTION_ENABLED=true` porque el
+debug no pasa por el trigger shadow post-consolidación.
+
 La transcripción segmentada ahora prepara dos artefactos por sección en el
 navegador:
 
@@ -154,19 +162,22 @@ Variables clave:
 - `CLINICAL_EXTRACTION_PROVIDER=gemini` por defecto
 - `CLINICAL_EXTRACTION_MODEL=gemini-2.5-flash`
 - `CLINICAL_EXTRACTION_OPENAI_MODEL=gpt-5.4-mini` si usas provider `openai`
+- `CLINICAL_EXTRACTION_ANTHROPIC_MODEL=claude-haiku-4-5-20251001` si usas
+  provider `anthropic_api`
 - `GCP_PROJECT_ID` y `VERTEX_AI_LOCATION=global` para Gemini en Vertex AI
 - `OPENAI_API_KEY` solo si `CLINICAL_EXTRACTION_PROVIDER=openai`
+- `ANTHROPIC_API_KEY` solo si `CLINICAL_EXTRACTION_PROVIDER=anthropic_api`
+
+El debug local (`/debug/extraccion`) acepta `provider=anthropic_api` sin cambiar el
+provider por defecto del worker.
 
 Ejemplo con Gemini:
 
 ```bash
 cd clinical_extraction_worker
+cp .env.local.example .env.local
+# editar GCP_PROJECT_ID en .env.local
 uv sync --group dev
-ENVIRONMENT=local \
-BACKEND_INTERNAL_BASE_URL=http://localhost:8001 \
-GCP_PROJECT_ID=tu-proyecto \
-CLINICAL_EXTRACTION_PROVIDER=gemini \
-CLINICAL_EXTRACTION_MODEL=gemini-2.5-flash \
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8093 --reload
 ```
 

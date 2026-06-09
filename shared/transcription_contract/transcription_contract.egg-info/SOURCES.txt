@@ -1,0 +1,16 @@
+pyproject.toml
+tests/test_consolidate.py
+tests/test_merge.py
+tests/test_render.py
+tests/test_sanitize.py
+transcription_contract/__init__.py
+transcription_contract/consolidate.py
+transcription_contract/merge.py
+transcription_contract/models.py
+transcription_contract/render.py
+transcription_contract/sanitize.py
+transcription_contract.egg-info/PKG-INFO
+transcription_contract.egg-info/SOURCES.txt
+transcription_contract.egg-info/dependency_links.txt
+transcription_contract.egg-info/requires.txt
+transcription_contract.egg-info/top_level.txt

@@ -580,6 +580,14 @@ Notas de operación:
   o mismatch de hablante.
 - **Fuente canónica:** el worker recibe `transcript_json.chunks[].turns[]`; no usa
   `consolidated_transcript` ni `documents_document.content_markdown`.
+- **Grounding:** las citas se matchean contra turnos individuales con IDs
+  estables (`chunk_id:turn_index`) y solo usan ventanas de turnos vecinos cuando
+  no hay match suficiente en un turno. El rol `uttered_by_role` se deriva del
+  speaker diarizado del turno localizado.
+- **Validación shadow:** errores de contrato clínico se guardan como warnings en
+  `facts_json.data_quality.extraction_warnings`; no bloquean el estado
+  `extracted` durante esta fase. `none_reported` requiere negación explícita en
+  la transcripción; ausencia de mención permanece como `null`.
 - **Shadow:** estas tablas no alimentan render, generación documental ni SSE. Su
   propósito es medir calidad de extracción contra transcripciones reales antes
   de construir proyecciones user-facing.

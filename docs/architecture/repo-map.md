@@ -10,6 +10,7 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 | `transcription_worker/`                                                                                                                       | Worker Cloud Run para VAD Silero + Gemini de transcripción por secciones            | Sí                                             |
 | `document_generation_worker/`                                                                                                                 | Worker Cloud Run para generación documental con provider LLM configurable           | Sí                                             |
 | `clinical_extraction_worker/`                                                                                                                 | Worker Cloud Run shadow para extracción `ClinicalFactsV1` desde transcripción estructurada | Sí                                             |
+| `shared/worker_runtime/`                                                                                                                       | Runtime compartido para auth, backend clients, logging, tracing y providers LLM de workers | Sí                                             |
 | `webapp/`                                                                                                                                     | SPA del médico                                                                      | Sí                                             |
 | `infra/`                                                                                                                                      | Infra GCP, IAM, budgets, deploy base                                                | Sí                                             |
 | `landing-page/`                                                                                                                               | Sitio marketing separado                                                            | Sí, pero no es parte del flujo clínico central |
@@ -48,6 +49,11 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
     recibe Cloud Tasks con `session_id`, pide `transcript_json.chunks[]` a FastAPI,
     llama Gemini por defecto u OpenAI opcional y devuelve facts/evidencia por callback.
   - No escribe directamente en PostgreSQL, no publica SSE y no modifica documentos.
+- `shared/worker_runtime/`
+  - Paquete editable compartido entre workers para concentrar autenticación de
+    Cloud Tasks, backend clients internos, logging, observability, tracing y
+    factories de providers LLM.
+  - No contiene prompts, schemas clínicos ni processors de negocio.
 - `backend_fastapi/app/domains/templates/`
   - Dueño de plantillas base y plantillas del médico.
 - `backend_fastapi/app/domains/patients/`

@@ -102,7 +102,9 @@ function cleanParams(
   params: Record<string, number | string | undefined>,
 ): Record<string, number | string> {
   return Object.fromEntries(
-    Object.entries(params).filter(([, value]) => value !== undefined && value !== ""),
+    Object.entries(params).filter(
+      ([, value]) => value !== undefined && value !== "",
+    ),
   ) as Record<string, number | string>;
 }
 

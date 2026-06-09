@@ -1,0 +1,13 @@
+anthropic[vertex]<1,>=0.57.1
+fastapi<0.116,>=0.115.0
+google-auth<3,>=2.38.0
+google-genai<2,>=1.55.0
+httpx<0.29,>=0.28.0
+openai<2,>=1.99.9
+opentelemetry-api<2,>=1.27.0
+opentelemetry-exporter-gcp-trace<2,>=1.7.0
+opentelemetry-exporter-otlp-proto-http<2,>=1.27.0
+opentelemetry-instrumentation-fastapi<0.60,>=0.48b0
+opentelemetry-instrumentation-httpx<0.60,>=0.48b0
+opentelemetry-sdk<2,>=1.27.0
+pydantic-settings<3,>=2.8.0

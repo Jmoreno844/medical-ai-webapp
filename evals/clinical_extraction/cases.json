@@ -1,0 +1,924 @@
+[
+  {
+    "id": "medication_question_and_avoid",
+    "notes": "Pregunta de medicacion, restriccion explicita de AINEs y una prescripcion simple con atributos literales.",
+    "transcript_json": {
+      "session_id": "medication_question_and_avoid",
+      "language": "es",
+      "chunks": [
+        {
+          "chunk_id": "s0",
+          "turns": [
+            {
+              "speaker": "PACIENTE",
+              "text": "Doctora, me puedo tomar ibuprofeno para este dolor?"
+            },
+            {
+              "speaker": "MEDICO",
+              "text": "No, por favor no tome ibuprofeno ni diclofenaco. Si le duele mucho, tome acetaminofen quinientos miligramos."
+            }
+          ]
+        }
+      ]
+    },
+    "reference_mentions": {
+      "mentions": [
+        {
+          "entity_type": "medication",
+          "entity_raw": "ibuprofeno",
+          "proposition_raw": "me puedo tomar ibuprofeno",
+          "speech_act": "question",
+          "subject_role": "patient",
+          "attributes": [],
+          "evidence": [
+            {
+              "quote": "Doctora, me puedo tomar ibuprofeno para este dolor?",
+              "turn_id": "s0:0"
+            }
+          ]
+        },
+        {
+          "entity_type": "medication",
+          "entity_raw": "ibuprofeno",
+          "proposition_raw": "No tome ibuprofeno",
+          "speech_act": "instruction_to_avoid",
+          "subject_role": "patient",
+          "attributes": [],
+          "evidence": [
+            {
+              "quote": "No, por favor no tome ibuprofeno ni diclofenaco.",
+              "turn_id": "s0:1"
+            }
+          ]
+        },
+        {
+          "entity_type": "medication",
+          "entity_raw": "diclofenaco",
+          "proposition_raw": "No tome diclofenaco",
+          "speech_act": "instruction_to_avoid",
+          "subject_role": "patient",
+          "attributes": [],
+          "evidence": [
+            {
+              "quote": "No, por favor no tome ibuprofeno ni diclofenaco.",
+              "turn_id": "s0:1"
+            }
+          ]
+        },
+        {
+          "entity_type": "medication",
+          "entity_raw": "acetaminofen",
+          "proposition_raw": "tome acetaminofen quinientos miligramos",
+          "speech_act": "prescription",
+          "subject_role": "patient",
+          "attributes": [
+            {
+              "kind": "dose_value",
+              "raw_text": "quinientos"
+            },
+            {
+              "kind": "dose_unit",
+              "raw_text": "miligramos"
+            }
+          ],
+          "evidence": [
+            {
+              "quote": "Si le duele mucho, tome acetaminofen quinientos miligramos.",
+              "turn_id": "s0:1"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "pending_test_hypothesis_and_prescription",
+    "notes": "Hipotesis clinica, estudio pendiente y nueva prescripcion con atributos en la misma frase.",
+    "transcript_json": {
+      "session_id": "pending_test_hypothesis_and_prescription",
+      "language": "es",
+      "chunks": [
+        {
+          "chunk_id": "s0",
+          "turns": [
+            {
+              "speaker": "PACIENTE",
+              "text": "Tengo ardor para orinar y desde ayer vi la orina rojita."
+            },
+            {
+              "speaker": "MEDICO",
+              "text": "Puede ser una infeccion urinaria. Se tomo el urocultivo esta manana y falta el resultado. Le voy a iniciar nitrofurantoina cien miligramos cada doce horas por cinco dias."
+            }
+          ]
+        }
+      ]
+    },
+    "reference_mentions": {
+      "mentions": [
+        {
+          "entity_type": "clinical_concept",
+          "entity_raw": "infeccion urinaria",
+          "proposition_raw": "Puede ser una infeccion urinaria",
+          "speech_act": "hypothesis",
+          "subject_role": "patient",
+          "attributes": [],
+          "evidence": [
+            {
+              "quote": "Puede ser una infeccion urinaria.",
+              "turn_id": "s0:1"
+            }
+          ]
+        },
+        {
+          "entity_type": "diagnostic_test",
+          "entity_raw": "urocultivo",
+          "proposition_raw": "falta el resultado",
+          "speech_act": "pending_result",
+          "subject_role": "patient",
+          "attributes": [],
+          "evidence": [
+            {
+              "quote": "Se tomo el urocultivo esta manana y falta el resultado.",
+              "turn_id": "s0:1"
+            }
+          ]
+        },
+        {
+          "entity_type": "medication",
+          "entity_raw": "nitrofurantoina",
+          "proposition_raw": "Le voy a iniciar nitrofurantoina cien miligramos cada doce horas por cinco dias",
+          "speech_act": "prescription",
+          "subject_role": "patient",
+          "attributes": [
+            {
+              "kind": "dose_value",
+              "raw_text": "cien"
+            },
+            {
+              "kind": "dose_unit",
+              "raw_text": "miligramos"
+            },
+            {
+              "kind": "frequency",
+              "raw_text": "cada doce horas"
+            },
+            {
+              "kind": "duration",
+              "raw_text": "por cinco dias"
+            }
+          ],
+          "evidence": [
+            {
+              "quote": "Le voy a iniciar nitrofurantoina cien miligramos cada doce horas por cinco dias.",
+              "turn_id": "s0:1"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "eval_doc_clinica_co_001",
+    "notes": "Importado desde evals/document_generation/cases.json.",
+    "transcript_json": {
+      "session_id": "eval_doc_clinica_co_001",
+      "language": "es",
+      "chunks": [
+        {
+          "chunk_id": "section-0",
+          "turns": [
+            {
+              "speaker": "PATIENT",
+              "text": "Bueno, desde anoche me da como una presion aqui en el centro del pecho, no todo el tiempo, mas cuando subo la escalera, y me falta el aire. Al principio dije que era ardor, pero no; pensandolo bien no se parece a la gastritis, es peso, como si me apretaran."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Esta manana casi me voy al piso en el bano. No perdi el conocimiento... bueno, mi hermana dice que si quede ida unos segundos; yo no me acuerdo bien."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "No he tenido fiebre. Tos si, seca, desde hace tres dias, y hoy vi una rayita roja en la flema, una sola vez."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "No, no estoy tomando anticonceptivos. Deje las pastillas hace dos meses... espere, las deje fue hace como tres semanas."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "La ultima menstruacion no fue el 20, fue el 8 del mes pasado. No se si pueda estar embarazada."
+            }
+          ]
+        },
+        {
+          "chunk_id": "section-1",
+          "turns": [
+            {
+              "speaker": "PATIENT",
+              "text": "La prueba de orina quedo pedida, todavia no ha salido, entonces no pongamos que es negativa."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Alergias, que yo sepa ninguna, aunque una vez con diclofenaco me salieron ronchas, no se si cuenta."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "No se aplique mas diclofenaco ni ibuprofeno por ahora; eso si queda claro."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Tome una tableta de aspirina que habia en la casa, no se de cuantos miligramos."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Mi papa tuvo un infarto joven, a los cincuenta y... cuarenta y ocho, me corrigio mi mama."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "La pierna izquierda me dolio ayer detras de la pantorrilla, pero no se si esta hinchada; nadie la ha medido."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Aqui no me han dicho que el electro este normal. Dijeron que lo van a repetir porque el primero tenia mucho movimiento. Tambien falta el dimero D y una troponina; estan pendientes, no son resultados."
+            }
+          ]
+        },
+        {
+          "chunk_id": "section-2",
+          "turns": [
+            {
+              "speaker": "PATIENT",
+              "text": "Si alguno sale alterado, hablaron de hacer una tomografia con contraste, pero solo en ese caso; no esta ordenada todavia."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "¿Me puedo ir a trabajar?"
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "No, todavia no han definido incapacidad ni alta. Primero van a revisar esos examenes."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Me preguntaron si entendi, pero justo entro una llamada y no alcance a responder bien."
+            }
+          ]
+        }
+      ]
+    },
+    "reference_mentions": {
+      "mentions": []
+    }
+  },
+  {
+    "id": "eval_doc_clinica_co_002",
+    "notes": "Importado desde evals/document_generation/cases.json.",
+    "transcript_json": {
+      "session_id": "eval_doc_clinica_co_002",
+      "language": "es",
+      "chunks": [
+        {
+          "chunk_id": "section-0",
+          "turns": [
+            {
+              "speaker": "PATIENT",
+              "text": "Desde el martes estoy como decaida, con dolor abajo del abdomen y la orina muy fuerte, pero vine por otra cosa tambien, porque anoche me dio un dolor en la boca del estomago y luego como presion en el pecho."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "No fue diez de diez, seria seis, aunque al llegar dije ocho porque estaba asustada. Se me paso en veinte minutos sentada."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "Yo la vi sudando y palida."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Yo no senti sudor, pero si como mareo. No me desmaye... bueno, el jueves si me encontraron sentada en el piso del bano. No se si me cai o me agache."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "No hubo golpe en la cabeza."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Tengo diabetes desde hace anos. Uso insulina treinta unidades en la noche. No, treinta no, perdon: son veinte de glargina. La de las comidas es rapida, a veces seis, pero no siempre y no traje la formula."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Tambien tomo metformina, creo que de 850 dos veces, aunque la suspendi por mi cuenta hace una semana porque no estaba comiendo bien. No escriba que el medico la suspendio."
+            }
+          ]
+        },
+        {
+          "chunk_id": "section-1",
+          "turns": [
+            {
+              "speaker": "PATIENT",
+              "text": "La pastilla de la presion es losartan de cincuenta..."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "La caja es de cien y parte la mitad."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Entonces serian cincuenta, si. Y una para la sangre, warfarina no, esa fue mi esposo; yo tomo aspirina de cien, o eso creo. No hay lista completa todavia."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "He tenido nauseas. Vomito no... espere, ayer vomite dos veces, poquito, sin sangre."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Deposiciones negras no, mas bien oscuras desde que tomo hierro, pero el domingo si hubo una que parecia alquitran y olia muy fuerte; despues no volvio. El hierro lo empece hace meses por anemia, no recuerdo la dosis. No me pongan sangrado digestivo descartado porque nadie lo ha descartado."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Fiebre medida en la casa, 38.7 anoche; hoy no se. Escalofrio si. Me duele la espalda del lado derecho, primero dije izquierdo; es derecho, debajo de las costillas. La orina arde y voy a cada rato; no he visto sangre."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "Ayer estaba confundida con la hora y repitio la misma pregunta varias veces."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Yo estaba recien despierta, pero si acepto que me sentia rara. Eso no ha vuelto hoy."
+            }
+          ]
+        },
+        {
+          "chunk_id": "section-2",
+          "turns": [
+            {
+              "speaker": "PATIENT",
+              "text": "Alergia a penicilina no estoy segura. Mi mama decia que de nina me dio brote con una inyeccion, pero no se cual. Una vez tome amoxicilina adulta y creo que no paso nada. Entonces no inventen alergia confirmada ni tampoco pongan que no tengo."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Embarazo imposible por la edad; bueno, me operaron para no tener hijos a los treinta y cinco y ya no menstruo desde hace doce anos. No recuerdo si fue ligadura o me quitaron algo, asi que no escriban histerectomia."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Cirugias: vesicula, eso si, hace como quince anos. Rinon, me dijeron que estaba un poco lento en un examen viejo, pero no se el valor."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Hoy tomaron creatinina, hemograma, troponinas y examen de orina; todavia no estan todos. La tira rapida la mencionaron, pero yo no escuche el resultado. Tambien mandaron cultivo de orina; obviamente ese demora, no lo pongan positivo ni negativo."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Me revisaron, pero no se que encontraron. No me dijeron que el abdomen estuviera blando ni que no hubiera dolor, y nadie me comento ruidos del corazon o pulmones."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "La presion la tomaron dos veces; la primera salio alta porque estaba caminando. No recuerdo numeros. No inventar signos vitales."
+            }
+          ]
+        },
+        {
+          "chunk_id": "section-3",
+          "turns": [
+            {
+              "speaker": "PATIENT",
+              "text": "Me ofrecieron algo para el dolor, pero dije que no queria mas medicamentos hasta saber como estaba el rinon."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "No tome naproxeno ni diclofenaco en la casa. Tampoco reinicie la metformina por su cuenta esta noche; eso se decide cuando revisemos funcion renal y tolerancia a la comida."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "La tomografia solo se consideraria si el dolor abdominal empeora, aparece rigidez o los examenes sugieren complicacion; no esta pedida todavia."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "El antibiotico se iniciaria si la evaluacion confirma infeccion urinaria o si por el estado general decidimos tratar antes del cultivo. Por ahora no hay medicamento, dosis ni formulacion activa."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "¿La van a hospitalizar?"
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Depende de signos vitales, funcion renal, tolerancia oral, estado mental y resultados cardiacos. No significa que ya este hospitalizada ni que vaya para la casa."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Yo necesito incapacidad para el trabajo de cuidadora, pero no la han definido. No pongan cinco dias porque eso fue lo que yo pedi."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Un control en tres dias es solo una posibilidad si le damos salida; no hay cita confirmada."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Si vuelve la presion en el pecho, se desmaya, le falta mucho el aire, vomita sangre, salen heces negras otra vez, sigue confundida o no puede tomar liquidos, eso es de urgencias."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Entendio?"
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "Si."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Yo estaba en el bano, entonces no se puede afirmar que yo comprendi todo el plan."
+            }
+          ]
+        }
+      ]
+    },
+    "reference_mentions": {
+      "mentions": []
+    }
+  },
+  {
+    "id": "eval_doc_clinica_001",
+    "notes": "Importado desde evals/document_generation/cases.json.",
+    "transcript_json": {
+      "session_id": "eval_doc_clinica_001",
+      "language": "es",
+      "chunks": [
+        {
+          "chunk_id": "section-0",
+          "turns": [
+            {
+              "speaker": "CLINICIAN",
+              "text": "Bueno, cuenteme que la trae."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "No, pues es que llevo como cinco dias con un dolor de cabeza horrible, horrible. Yo de migranas si sufro desde joven, pero esto fue distinto. El lunes me dio asi de una, como un estallido, lo peor que he sentido en la vida; estaba cocinando y casi me caigo."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿De que lado?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Del lado derecho mas que todo, atras tambien. Vomito no... bueno, una vez si trasboque el martes. Fiebre no me he tomado la temperatura, pero caliente no me he sentido."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Espere, y un dia vi como borroso un ratico, el ojo izquierdo, pero ya se me quito."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Que toma?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "El acetaminofen, dos cada que me duele, y la pastilla de la presion: la losartan de 100, no mentiras, de 50, perdon, 50, una en la manana."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "No fumo. Trago de vez en cuando los fines de semana."
+            }
+          ]
+        },
+        {
+          "chunk_id": "section-1",
+          "turns": [
+            {
+              "speaker": "PATIENT",
+              "text": "Mire, yo le pido un favor: no me vaya a incapacitar, que estoy en periodo de prueba en el trabajo y me da miedo; prefiero ir asi."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Alergias?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Uy, no se. Una vez me dieron algo y me broto, pero no me acuerdo que era; no le se decir."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Embarazo?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Tengo un retraso de como una semana, pero no me he hecho nada. No se."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Le voy a ordenar unos examenes de sangre y una tomografia. Eso del estallido y lo borroso no me gusta; hay que descartar algo serio. Eso no es una migrana normal."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Mientras tanto siga el acetaminofen, pero no mas de tres al dia; no se exceda. No le voy a formular nada nuevo hasta ver la tomografia. Hagase la prueba de embarazo en la drogueria antes de cualquier examen."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Si en tres dias no le ha llegado el resultado o se pone peor, dolor que no cede, vomito, no ve bien, se va de una para urgencias; no espere la cita."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Me entendio todo?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Si, mas o menos doctora, pero ¿la tomografia me la hago hoy?"
+            }
+          ]
+        }
+      ]
+    },
+    "reference_mentions": {
+      "mentions": []
+    }
+  },
+  {
+    "id": "eval_doc_clinica_002",
+    "notes": "Importado desde evals/document_generation/cases.json.",
+    "transcript_json": {
+      "session_id": "eval_doc_clinica_002",
+      "language": "es",
+      "chunks": [
+        {
+          "chunk_id": "section-0",
+          "turns": [
+            {
+              "speaker": "CLINICIAN",
+              "text": "Siga, sientese ahi, don Hernando."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "Buenas doctora, yo soy la hija. Mi papa oye poquito, entonces yo le ayudo."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Bueno, cuenteme como ha seguido."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "No, pues ahi doctora, regular."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "El es diabetico hace anos y la azucar la ha tenido alta. La ultima vez que se la midio en la casa le salio en 260, me parece."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Si, algo asi."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "No fue en ayunas, fue despues de almuerzo."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Y se esta tomando todo?"
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "La metformina si, dos al dia. Y la otra, la glibenclamida... no, esa se la quitaron el ano pasado, ya no la toma, perdon. Ahora es la insulina en la noche, la NPH creo, diez unidades... no espere, eran diez o veinte. Yo creo que diez, no le se decir bien. La enfermera del barrio se la pone."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "De la presion, losartan e hidroclorotiazida."
+            }
+          ]
+        },
+        {
+          "chunk_id": "section-1",
+          "turns": [
+            {
+              "speaker": "COMPANION",
+              "text": "Tiene una herida en el pie que no le cierra. Ya lleva como tres semanas, y desde antier le esta saliendo un liquido feo y huele maluco. El pie lo tiene rojo hasta arriba del tobillo y anoche tenia como calentura."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "Muestrele, papa. A el no le duele casi nada; dice que no siente."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "A veces me cuesta respirar cuando subo las gradas; me toca parar."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Desde cuando?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Hace ratico, unas semanas. Un apreton aqui en el pecho, pero se me pasa sentandome."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Fuma?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "No, ya no. Fume hartos anos, pero lo deje."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "¿Le puedo dar ibuprofeno para el dolor de las rodillas?"
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "No, no le den ibuprofeno por nada. Con el rinon de el eso es peligroso."
+            }
+          ]
+        },
+        {
+          "chunk_id": "section-2",
+          "turns": [
+            {
+              "speaker": "CLINICIAN",
+              "text": "Lo de la herida me preocupa. Eso se ve infectado y con la fiebre y el pie rojo subiendo no podemos esperar. Le voy a tomar una muestra de la herida y le mando antibiotico, pero esto puede necesitar manejo en urgencias hoy mismo."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "No doctora, nosotros no lo queremos dejar internado; el se pone mal en el hospital, se desorienta."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Entiendo, pero con ese pie asi y la calentura no es opcional quedarse en la casa. Eso se puede complicar rapido. Lo del pecho cuando sube gradas tambien me preocupa; eso toca estudiarlo."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Le voy a ordenar hemoglobina glicosilada, creatinina y otros examenes. Esos resultados no estan todavia. La insulina por ahora dejenla igual; no le suban ni le bajen hasta que vea los examenes y confirme la dosis con la enfermera."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Necesita la vacuna de influenza, pero eso lo dejamos para cuando este estable. Mas adelante, si el azucar sigue asi, de pronto toca ajustar el esquema o mandarlo a endocrino; eso lo vemos despues."
+            }
+          ]
+        },
+        {
+          "chunk_id": "section-3",
+          "turns": [
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Alergias a medicamentos?"
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "No, ninguna... bueno, espere: una vez con una inyeccion le dio brote, pero no sabemos cual era; no quedo anotado."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "¿Y le da la incapacidad?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Yo ya estoy pensionado, mija; no trabajo."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "Ah, verdad."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Entonces queda claro: por la herida lo llevan hoy a urgencias."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "La verdad no se si podamos hoy; vemos como hacemos con el transporte."
+            }
+          ]
+        }
+      ]
+    },
+    "reference_mentions": {
+      "mentions": []
+    }
+  },
+  {
+    "id": "eval_case_001",
+    "notes": "Importado desde evals/document_generation/cases.json. Trampas incluidas: resultados de urocultivo y parcial pendientes; urgencias condicionales; prohibicion de AINES; alergia corregida de penicilina a sulfas; hematuria con coagulos; no inventar signos vitales ni examen completo.",
+    "transcript_json": {
+      "session_id": "eval_case_001",
+      "language": "es",
+      "chunks": [
+        {
+          "chunk_id": "section-0",
+          "turns": [
+            {
+              "speaker": "CLINICIAN",
+              "text": "Buenos dias, cuenteme por que viene hoy."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Ay doctora, llevo como tres dias con un ardor para orinar terrible y un dolor bajito que no se me quita. Ayer por la tarde orine como rojito, como con sangre y unos coagulos chiquitos."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Ha tenido fiebre?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "No me he medido con termometro, pero me he sentido como destemplada en las noches. Fiebre asi de sudar, no creo."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Sufre de alguna enfermedad o toma medicamento diario?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "No senora, yo soy re sana. Bueno, a veces me tomo un losartan de mi esposo cuando me duele mucho la cabeza, pero yo no sufro de la presion."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Es alergica a algo?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Si, a la penicilina me enroncho toda. Ay, espere, no, no es a la penicilina. La vez pasada me mandaron amoxicilina para la muela y no me paso nada. Es a la sulfa, a las sulfas que me dieron para otra infeccion urinaria hace anos y me brote toda."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Listo, sulfas anotado. Venga la examino; recuestese y me avisa si le duele."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Ay si, ahi abajito me duele harto cuando me espicha."
+            }
+          ]
+        },
+        {
+          "chunk_id": "section-1",
+          "turns": [
+            {
+              "speaker": "CLINICIAN",
+              "text": "Le voy a mandar parcial de orina y urocultivo, pero como se los tomo esta manana en el laboratorio no tenemos los resultados todavia; toca esperar."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Por ahora le voy a empezar antibiotico: nitrofurantoina de cien miligramos, una cada doce horas por cinco dias."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "¿Para el dolor me puedo tomar un ibuprofeno que tengo en la casa?"
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "No, por favor no tome ibuprofeno ni diclofenaco ni otros AINES, porque como esta orinando con sangre le puede empeorar eso del rinon. Tomese mas bien acetaminofen si le duele mucho, quinientos miligramos."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Si llega a tener fiebre muy alta o el dolor se vuelve insoportable en la espalda, se va de una vez por urgencias; no espera a la cita de control."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Nos vemos con el resultado del examen."
+            }
+          ]
+        }
+      ]
+    },
+    "reference_mentions": {
+      "mentions": []
+    }
+  },
+  {
+    "id": "eval_case_002",
+    "notes": "Importado desde evals/document_generation/cases.json. Trampas incluidas: ecocardiograma pendiente; insulina condicionada a HbA1c futura; suspender enalapril y no iniciar aspirina; metformina corregida hasta 500 mg dos veces al dia; amaurosis fugax; solo tension arterial medida, sin examen de ojo o rodilla ni incapacidad.",
+    "transcript_json": {
+      "session_id": "eval_case_002",
+      "language": "es",
+      "chunks": [
+        {
+          "chunk_id": "section-0",
+          "turns": [
+            {
+              "speaker": "CLINICIAN",
+              "text": "Don Roberto, siga por favor. Viene con su hija, ¿cierto?"
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "Si doctor. A mi papa se le olvida todo, entonces yo lo acompano hoy."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Don Roberto, ¿como ha estado del pecho y de la presion?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Me he sentido como bien. A veces me canso un poquito cuando subo las lomas, pero de resto bien."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "Papa, digale lo del ojo."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Ayer por la tarde estaba viendo television y de la nada se me oscurecio el ojo derecho, como si me hubieran puesto un telon negro. No veia nada por ese lado."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Cuanto le duro?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Unos cinco minuticos; luego me volvio la vista normal."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Trajo el ecocardiograma?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Se nos quedo en la casa."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "Yo voy en taxi y se lo traigo."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "No, dejelo para la proxima cita. Sin eso no le puedo cambiar la dosis de las pastillas del corazon."
+            }
+          ]
+        },
+        {
+          "chunk_id": "section-1",
+          "turns": [
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Que medicamentos toma?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Metformina de ochocientos cincuenta, una al dia despues del almuerzo."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "No papa, usted se toma dos al dia, una por la manana y otra por la noche."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Ah si, dos al dia."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "En la formula del sistema dice que es de quinientos miligramos, no de ochocientos cincuenta."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Ah verdad, la blanquita redonda chiquita. Esa me tomo dos al dia, quinientos miligramos."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Tambien me tomo losartan y enalapril que me dio otro doctor de la EPS de mi esposa, que me regalo unas cajas."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "No puede tomar losartan y enalapril al mismo tiempo. Suspenda el enalapril de una vez; no lo vuelva a tomar. Solo se queda con losartan de cincuenta."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Listo doctor, no me tomo mas el enalapril."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "La presion esta ciento cuarenta sobre noventa, un poquito alta; puede ser por la caminada."
+            }
+          ]
+        },
+        {
+          "chunk_id": "section-2",
+          "turns": [
+            {
+              "speaker": "CLINICIAN",
+              "text": "¿Como ha estado del azucar?"
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "No me he hecho la prueba en ayunas porque no he tenido plata para las tirillas, pero he sentido mucha sed y orino mucho de noche."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Si para el otro mes la hemoglobina glicosilada no baja de ocho por ciento, nos va a tocar empezar insulina. Por ahora seguimos igual."
+            },
+            {
+              "speaker": "PATIENT",
+              "text": "Ay no doctor, chuzones no. Yo me porto bien."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Entonces dieta estricta. Lo del ojo me preocupa porque puede ser un aviso de un derrame. Le voy a mandar una ecografia de las carotidas. No le mando aspirina todavia hasta no ver la ecografia."
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Quedamos asi: suspende enalapril, sigue con metformina quinientos cada doce horas, losartan cincuenta cada doce, trae el ecocardiograma y se hace la ecografia del cuello."
+            },
+            {
+              "speaker": "COMPANION",
+              "text": "Una cosa final: esta manana le dolia mucho la rodilla izquierda. ¿Le manda una cremita?"
+            },
+            {
+              "speaker": "CLINICIAN",
+              "text": "Echese diclofenaco en gel en la rodilla cuando le duela. Nos vemos en un mes."
+            }
+          ]
+        }
+      ]
+    },
+    "reference_mentions": {
+      "mentions": []
+    }
+  }
+]

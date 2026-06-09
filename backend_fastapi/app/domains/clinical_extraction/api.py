@@ -1,18 +1,28 @@
 from __future__ import annotations
-
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
+from app.core.environment import is_local_environment
 from app.core.service_jwt import decode_callback_token, require_claim_int
+from app.db.models import User
 from app.db.session import get_db_session
+from app.domains.auth.access import require_clinical_access
+from app.domains.auth.service import get_current_user
+from app.domains.clinical_extraction.debug_controller import (
+    run_debug_clinical_extraction,
+)
 from app.domains.clinical_extraction.schemas import (
     ClinicalExtractionResultRequest,
     ClinicalExtractionWorkItemResponse,
+    DebugClinicalExtractionRequest,
+    DebugClinicalExtractionResponse,
+    DebugClinicalExtractionSessionTranscriptResponse,
 )
 from app.domains.clinical_extraction.service import (
     apply_clinical_extraction_result,
     get_clinical_extraction_work_item,
+    get_debug_transcript_session,
 )
 from app.domains.clinical_extraction.worker_auth import (
     verify_clinical_extraction_worker_request,
@@ -80,3 +90,54 @@ async def receive_clinical_extraction_result(
     ):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid callback claims")
     return {"success": True}
+
+
+@router.get(
+    "/clinical-extraction/debug/sessions/{session_id}/transcript",
+    response_model=DebugClinicalExtractionSessionTranscriptResponse,
+)
+async def get_debug_session_transcript(
+    session_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> DebugClinicalExtractionSessionTranscriptResponse:
+    require_clinical_access(user)
+    if not is_local_environment(settings):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+
+    recording_session = await get_debug_transcript_session(
+        session,
+        session_id=session_id,
+    )
+    if not recording_session:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Sesión no encontrada")
+
+    return DebugClinicalExtractionSessionTranscriptResponse(
+        session_id=recording_session.session_id,
+        encounter_id=recording_session.encounter_id,
+        document_id=recording_session.document_id,
+        doctor_id=recording_session.doctor_id,
+        status=recording_session.status,
+        transcript_json=recording_session.transcript_json,
+    )
+
+
+@router.post(
+    "/clinical-extraction/debug/extract",
+    response_model=DebugClinicalExtractionResponse,
+)
+async def debug_clinical_extraction(
+    payload: DebugClinicalExtractionRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> DebugClinicalExtractionResponse:
+    require_clinical_access(user)
+    if not is_local_environment(settings):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+    return await run_debug_clinical_extraction(
+        payload=payload,
+        db_session=session,
+        settings=settings,
+    )

@@ -38,3 +38,7 @@ class LocalSettings(Settings):
             "cors_allowed_origins",
         ),
     )
+    clinical_extraction_worker_base_url: str | None = Field(
+        default="http://localhost:8093",
+        alias="CLINICAL_EXTRACTION_WORKER_BASE_URL",
+    )

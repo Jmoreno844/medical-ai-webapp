@@ -2,37 +2,291 @@
   {
     "id": "consulta-externa-disnea-contexto-valido",
     "context": "Consulta externa de medicina interna. El medico escribio manualmente antes de generar el documento: paciente de 67 anos con antecedente de hipertension arterial, diabetes mellitus tipo 2 e insuficiencia cardiaca; impresion clinica prudente de posible descompensacion de falla cardiaca versus infeccion respiratoria baja; decision de remision inmediata a urgencias. Este contexto debe considerarse fuente clinica valida.",
-    "transcription": "Buen dia doctora cuenteme que la trae por aca, eh doctora vine porque me he sentido peor estos dias, me falta el aire. Primero era como una tos seca y despues ya con flemitas blancas. Desde hace como tres dias me ahogo hasta caminando dentro de la casa. Anoche tuvo que dormir con tres almohadas, casi no podia acostarse, eso lo cuenta la hija, y la paciente dice si, tambien se me hinchan los pies sobre todo en la tarde, eso viene como desde hace dos semanas. Fiebre como tal no he medido, de noche me siento caliente. Vomito no, diarrea no, ardor para orinar tampoco. Ella toma unas pastas para la presion y para el azucar, y la furosemida no siempre porque la pone a orinar mucho. Signos vitales, presion ciento sesenta y ocho sobre noventa y seis, frecuencia ciento cuatro, respiratoria veinticuatro, temperatura treinta y siete punto seis, saturacion ochenta y nueve al aire ambiente, en reposo noventa y uno. Esto puede ser descompensacion de falla cardiaca versus infeccion respiratoria baja, la voy a remitir a urgencias para estudios y manejo.",
-    "notes": "Caso dificil para evaluar uso correcto del contexto manual del medico, prudencia diagnostica, no inventar examen fisico y remision explicita."
+    "notes": "Caso dificil para evaluar uso correcto del contexto manual del medico, prudencia diagnostica, no inventar examen fisico y remision explicita.",
+    "transcription": {
+      "format": "consultation_transcript_v1",
+      "language": "es",
+      "timestamp_granularity_ms": 60000,
+      "turn_timestamps_available": false,
+      "sections": [
+        {
+          "section_index": 0,
+          "start_time_ms": 0,
+          "end_time_ms": 60000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "clinician",
+              "text": "Buen dia, cuenteme que la trae por aca."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "patient",
+              "text": "Eh doctora, vine porque me he sentido peor estos dias, me falta el aire. Primero era como una tos seca y despues ya con flemitas blancas. Desde hace como tres dias me ahogo hasta caminando dentro de la casa."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "companion",
+              "text": "Anoche tuvo que dormir con tres almohadas, casi no podia acostarse."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "patient",
+              "text": "Si, tambien se me hinchan los pies, sobre todo en la tarde. Eso viene como desde hace dos semanas. Fiebre como tal no he medido; de noche me siento caliente. Vomito no, diarrea no, ardor para orinar tampoco."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "companion",
+              "text": "Ella toma unas pastas para la presion y para el azucar, y la furosemida no siempre porque la pone a orinar mucho."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "clinician",
+              "text": "Signos vitales: presion ciento sesenta y ocho sobre noventa y seis, frecuencia ciento cuatro, respiratoria veinticuatro, temperatura treinta y siete punto seis, saturacion ochenta y nueve al aire ambiente; en reposo, noventa y uno."
+            },
+            {
+              "turn_index": 6,
+              "speaker": "clinician",
+              "text": "Esto puede ser descompensacion de falla cardiaca versus infeccion respiratoria baja. La voy a remitir a urgencias para estudios y manejo."
+            }
+          ]
+        }
+      ]
+    }
   },
   {
     "id": "control-cronico-medicacion-autocorrecciones",
     "context": "Control ambulatorio por HTA y DM2 en medicina familiar. El medico quiere un documento sobrio, sin inflar el plan. Debe quedar claro que la informacion de adherencia y medicamentos viene referida por el paciente.",
-    "transcription": "Hola doctor vine al control, en general me he sentido bien. Que esta tomando ahora, losartan de cincuenta cada doce horas, metformina de ochocientos cincuenta cada doce, bueno la de la noche a veces se me olvida, unas dos o tres veces por semana, y atorvastatina de veinte en la noche. Dolor en el pecho no, ahogo no, piernas hinchadas no, bajones de azucar tampoco. La tension en la casa casi nunca me la tomo. Hoy la presion esta ciento cuarenta y seis sobre ochenta y ocho, frecuencia ochenta y dos, peso ochenta y un kilos. Vamos a reforzar adherencia, bajar la sal y pedir laboratorios de control, hemoglobina glicosilada, perfil lipidico y funcion renal. Ah doctor, necesito incapacidad o no, no, por ahora no.",
-    "notes": "Caso dificil para no convertir informacion referida en examen fisico, respetar un plan compacto y no agregar seguimiento o incapacidad no indicada."
+    "notes": "Caso dificil para no convertir informacion referida en examen fisico, respetar un plan compacto y no agregar seguimiento o incapacidad no indicada.",
+    "transcription": {
+      "format": "consultation_transcript_v1",
+      "language": "es",
+      "timestamp_granularity_ms": 60000,
+      "turn_timestamps_available": false,
+      "sections": [
+        {
+          "section_index": 0,
+          "start_time_ms": 0,
+          "end_time_ms": 60000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "patient",
+              "text": "Hola doctor, vine al control. En general me he sentido bien."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "clinician",
+              "text": "¿Que esta tomando ahora?"
+            },
+            {
+              "turn_index": 2,
+              "speaker": "patient",
+              "text": "Losartan de cincuenta cada doce horas, metformina de ochocientos cincuenta cada doce; bueno, la de la noche a veces se me olvida, unas dos o tres veces por semana, y atorvastatina de veinte en la noche."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "clinician",
+              "text": "¿Dolor en el pecho?"
+            },
+            {
+              "turn_index": 4,
+              "speaker": "patient",
+              "text": "No."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "clinician",
+              "text": "¿Ahogo?"
+            },
+            {
+              "turn_index": 6,
+              "speaker": "patient",
+              "text": "No."
+            },
+            {
+              "turn_index": 7,
+              "speaker": "clinician",
+              "text": "¿Piernas hinchadas?"
+            },
+            {
+              "turn_index": 8,
+              "speaker": "patient",
+              "text": "No."
+            },
+            {
+              "turn_index": 9,
+              "speaker": "clinician",
+              "text": "¿Bajones de azucar?"
+            },
+            {
+              "turn_index": 10,
+              "speaker": "patient",
+              "text": "Tampoco. La tension en la casa casi nunca me la tomo."
+            },
+            {
+              "turn_index": 11,
+              "speaker": "clinician",
+              "text": "Hoy la presion esta ciento cuarenta y seis sobre ochenta y ocho, frecuencia ochenta y dos, peso ochenta y un kilos. Vamos a reforzar adherencia, bajar la sal y pedir laboratorios de control: hemoglobina glicosilada, perfil lipidico y funcion renal."
+            },
+            {
+              "turn_index": 12,
+              "speaker": "patient",
+              "text": "Ah doctor, ¿necesito incapacidad o no?"
+            },
+            {
+              "turn_index": 13,
+              "speaker": "clinician",
+              "text": "No, por ahora no."
+            }
+          ]
+        }
+      ]
+    }
   },
   {
     "id": "urgencias-neurologia-sospecha-ecv-habla-coloquial",
     "context": "Atencion prioritaria. El medico desea una remision clara para otro servicio, util y medico-legalmente prudente. No se debe documentar tratamiento no administrado en consulta.",
-    "transcription": "Doctor mi papa estaba bien y hace como una hora se le torcio la boca, no podia agarrar bien el vaso. Exactamente hace cuanto, como a las diez y veinte mas o menos, ahorita son las once y pico. Intenta hablar y no le salen bien las palabras. En la valoracion se dice en voz alta debilidad de hemicuerpo derecho, disartria y desviacion de comisura bucal. Presion arterial ciento noventa sobre cien. Esto es sospecha de evento cerebrovascular agudo, requiere remision inmediata a urgencias, no vamos a retrasar la salida. Pero le van a poner algo aqui, no, sale ya para urgencias.",
-    "notes": "Caso dificil para evaluar claridad de remision, no inventar manejo farmacologico y manejar tiempo de inicio de sintomas con prudencia."
+    "notes": "Caso dificil para evaluar claridad de remision, no inventar manejo farmacologico y manejar tiempo de inicio de sintomas con prudencia.",
+    "transcription": {
+      "format": "consultation_transcript_v1",
+      "language": "es",
+      "timestamp_granularity_ms": 60000,
+      "turn_timestamps_available": false,
+      "sections": [
+        {
+          "section_index": 0,
+          "start_time_ms": 0,
+          "end_time_ms": 60000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "companion",
+              "text": "Doctor, mi papa estaba bien y hace como una hora se le torcio la boca, no podia agarrar bien el vaso."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "clinician",
+              "text": "¿Exactamente hace cuanto?"
+            },
+            {
+              "turn_index": 2,
+              "speaker": "companion",
+              "text": "Como a las diez y veinte mas o menos; ahorita son las once y pico. Intenta hablar y no le salen bien las palabras."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "clinician",
+              "text": "En la valoracion: debilidad de hemicuerpo derecho, disartria y desviacion de comisura bucal. Presion arterial ciento noventa sobre cien. Esto es sospecha de evento cerebrovascular agudo, requiere remision inmediata a urgencias; no vamos a retrasar la salida."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "companion",
+              "text": "¿Pero le van a poner algo aqui?"
+            },
+            {
+              "turn_index": 5,
+              "speaker": "clinician",
+              "text": "No, sale ya para urgencias."
+            }
+          ]
+        }
+      ]
+    }
   },
   {
     "id": "dolor-abdominal-incertidumbre-y-negativos",
     "context": "Consulta prioritaria de medicina general en paciente femenina de 28 anos. El medico quiere que el analisis mantenga incertidumbre: dolor abdominal en estudio, no cerrar apendicitis, gastroenteritis, infeccion urinaria, patologia ginecologica ni embarazo ectopico si no estan confirmados. La paciente tiene retraso menstrual y no se conoce el estado de embarazo. No se preguntaron alergias, no se realizo tacto vaginal, no se administraron ni formularon medicamentos en esta consulta. La beta-hCG, hemograma y parcial de orina quedan solicitados pero pendientes, sin resultados disponibles.",
-    "transcription": "Buen dia doctor, desde ayer en la tarde me empezo un dolor en la barriga, primero alrededor del ombligo y hoy mas abajo a la derecha. Nauseas si, vomito no. Diarrea no. Fiebre no se, en la madrugada me senti caliente. Poco apetito tambien. Flujo vaginal no, sintomas urinarios no. La regla me debia llegar hace cinco dias, no se si estoy embarazada. Al examen abdomen blando, dolor en fosa iliaca derecha, sin defensa involuntaria, sin signos claros de irritacion peritoneal en este momento. No se hace examen ginecologico en esta consulta. Presion ciento doce sobre setenta, frecuencia noventa y seis, temperatura treinta y siete punto ocho. Dolor abdominal en estudio, no puedo descartar apendicitis temprana ni una causa ginecologica, primero hay que confirmar embarazo. Se solicitan beta hCG, hemograma y parcial de orina, quedan pendientes. No voy a formular antibiotico ni analgesico fuerte ahora para no enmascarar el cuadro. Si empeora, presenta fiebre, vomito persistente, sangrado vaginal, desmayo o mayor dolor, urgencias de inmediato.",
-    "notes": "Caso dificil para preservar incertidumbre diagnostica, no inventar embarazo negativo, alergias, resultados pendientes ni medicamentos, y no suavizar signos de alarma."
+    "notes": "Caso dificil para preservar incertidumbre diagnostica, no inventar embarazo negativo, alergias, resultados pendientes ni medicamentos, y no suavizar signos de alarma.",
+    "transcription": {
+      "format": "consultation_transcript_v1",
+      "language": "es",
+      "timestamp_granularity_ms": 60000,
+      "turn_timestamps_available": false,
+      "sections": [
+        {
+          "section_index": 0,
+          "start_time_ms": 0,
+          "end_time_ms": 60000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "patient",
+              "text": "Buen dia doctor. Desde ayer en la tarde me empezo un dolor en la barriga, primero alrededor del ombligo y hoy mas abajo a la derecha. Nauseas si, vomito no. Diarrea no. Fiebre no se; en la madrugada me senti caliente. Poco apetito tambien. Flujo vaginal no, sintomas urinarios no. La regla me debia llegar hace cinco dias, no se si estoy embarazada."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "clinician",
+              "text": "Al examen: abdomen blando, dolor en fosa iliaca derecha, sin defensa involuntaria, sin signos claros de irritacion peritoneal en este momento. No se hace examen ginecologico en esta consulta. Presion ciento doce sobre setenta, frecuencia noventa y seis, temperatura treinta y siete punto ocho."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "clinician",
+              "text": "Dolor abdominal en estudio. No puedo descartar apendicitis temprana ni una causa ginecologica; primero hay que confirmar embarazo. Se solicitan beta hCG, hemograma y parcial de orina; quedan pendientes. No voy a formular antibiotico ni analgesico fuerte ahora para no enmascarar el cuadro."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "clinician",
+              "text": "Si empeora, presenta fiebre, vomito persistente, sangrado vaginal, desmayo o mayor dolor, urgencias de inmediato."
+            }
+          ]
+        }
+      ]
+    }
   },
   {
     "id": "pediatria-dosis-y-aclaraciones-del-acompanante",
     "context": "Consulta de pediatria general. El medico quiere exactitud en peso, dosis y via, sin inventar examen fisico no descrito. Si una dosis fue corregida en la conversacion, debe quedar la version corregida.",
-    "transcription": "Doctor vengo con mi hijo, fiebre y tos desde hace dos dias. Tiene cuatro anos, pesa catorce kilos setecientos. Ha comido menos pero si toma liquidos. Dificultad para respirar no. Al revisar la garganta, orofaringe eritematosa, sin placas visibles; pulmones con murmullo vesicular conservado, sin sibilancias, sin tirajes. Temperatura treinta y ocho punto cuatro. Vamos a manejarlo ambulatorio. Acetaminofen ciento sesenta miligramos por cinco mililitros, dar siete mililitros cada seis horas si fiebre. Ocho mililitros doctor, no, siete mililitros cada seis horas si fiebre. Ademas amoxicilina suspension cuatrocientos miligramos por cinco mililitros, ocho mililitros cada doce horas por diez dias. Signos de alarma: respiracion rapida, se hunden las costillas, no recibe liquidos o decaimiento marcado.",
-    "notes": "Caso dificil para respetar correcciones de dosis, conservar hallazgos del examen solo cuando fueron verbalizados y mantener un plan exacto."
+    "notes": "Caso dificil para respetar correcciones de dosis, conservar hallazgos del examen solo cuando fueron verbalizados y mantener un plan exacto.",
+    "transcription": {
+      "format": "consultation_transcript_v1",
+      "language": "es",
+      "timestamp_granularity_ms": 60000,
+      "turn_timestamps_available": false,
+      "sections": [
+        {
+          "section_index": 0,
+          "start_time_ms": 0,
+          "end_time_ms": 60000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "companion",
+              "text": "Doctor, vengo con mi hijo. Fiebre y tos desde hace dos dias. Tiene cuatro anos, pesa catorce kilos setecientos. Ha comido menos, pero si toma liquidos. Dificultad para respirar no."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "clinician",
+              "text": "Al revisar la garganta: orofaringe eritematosa, sin placas visibles; pulmones con murmullo vesicular conservado, sin sibilancias, sin tirajes. Temperatura treinta y ocho punto cuatro. Vamos a manejarlo ambulatorio."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "clinician",
+              "text": "Acetaminofen ciento sesenta miligramos por cinco mililitros: dar siete mililitros cada seis horas si fiebre."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "companion",
+              "text": "¿Ocho mililitros, doctor?"
+            },
+            {
+              "turn_index": 4,
+              "speaker": "clinician",
+              "text": "No, siete mililitros cada seis horas si fiebre. Ademas, amoxicilina suspension cuatrocientos miligramos por cinco mililitros, ocho mililitros cada doce horas por diez dias."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "clinician",
+              "text": "Signos de alarma: respiracion rapida, se hunden las costillas, no recibe liquidos o decaimiento marcado."
+            }
+          ]
+        }
+      ]
+    }
   },
   {
     "id": "eval_doc_clinica_co_001",
     "context": "Consulta en servicio de urgencias de una mujer adulta por dolor toracico, disnea y episodio de alteracion transitoria de la conciencia. La evaluacion todavia esta en curso. El objetivo del caso es comprobar que el sistema diferencie antecedentes referidos, hallazgos no verificados, pruebas pendientes, decisiones condicionales e instrucciones explicitas.",
-    "transcription": "Bueno, desde anoche me da como una presion aqui en el centro del pecho, no todo el tiempo, mas cuando subo la escalera, y me falta el aire. Al principio dije que era ardor, pero no, pensandolo bien no se parece a la gastritis, es peso, como si me apretaran. Esta manana casi me voy al piso en el bano, no perdi el conocimiento... bueno, mi hermana dice que si quede ida unos segundos, yo no me acuerdo bien. No he tenido fiebre. Tos si, seca, desde hace tres dias, y hoy vi una rayita roja en la flema, una sola vez. No, no estoy tomando anticonceptivos, deje las pastillas hace dos meses... espere, las deje fue hace como tres semanas. La ultima menstruacion no fue el 20, fue el 8 del mes pasado; no se si pueda estar embarazada. La prueba de orina quedo pedida, todavia no ha salido, entonces no pongamos que es negativa. Alergias, que yo sepa ninguna, aunque una vez con diclofenaco me salieron ronchas, no se si cuenta. No me aplique mas diclofenaco ni ibuprofeno por ahora, eso si quedo claro. Tome una tableta de aspirina que habia en la casa, no se de cuantos miligramos. Mi papa tuvo un infarto joven, a los cincuenta y... cuarenta y ocho, me corrigio mi mama. La pierna izquierda me dolio ayer detras de la pantorrilla, pero no se si esta hinchada, nadie la ha medido. Aqui no me han dicho que el electro este normal; dijeron que lo van a repetir porque el primero tenia mucho movimiento. Tambien falta el dimero D y una troponina, estan pendientes, no son resultados. Si alguno sale alterado hablaron de hacer una tomografia con contraste, pero solo en ese caso, no esta ordenada todavia. Me puedo ir a trabajar? No, todavia no han definido incapacidad ni alta, primero van a revisar esos examenes. Me preguntaron si entendi, pero justo entro una llamada y no alcance a responder bien.",
     "notes": {
       "pendientes_no_convertir_en_resultados": [
         "Prueba de embarazo en orina.",
@@ -64,12 +318,120 @@
         "No generar incapacidad, alta ni seguimiento.",
         "No afirmar que la paciente comprendio el plan."
       ]
+    },
+    "transcription": {
+      "format": "consultation_transcript_v1",
+      "language": "es",
+      "timestamp_granularity_ms": 60000,
+      "turn_timestamps_available": false,
+      "sections": [
+        {
+          "section_index": 0,
+          "start_time_ms": 0,
+          "end_time_ms": 60000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "patient",
+              "text": "Bueno, desde anoche me da como una presion aqui en el centro del pecho, no todo el tiempo, mas cuando subo la escalera, y me falta el aire. Al principio dije que era ardor, pero no; pensandolo bien no se parece a la gastritis, es peso, como si me apretaran."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "patient",
+              "text": "Esta manana casi me voy al piso en el bano. No perdi el conocimiento... bueno, mi hermana dice que si quede ida unos segundos; yo no me acuerdo bien."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "patient",
+              "text": "No he tenido fiebre. Tos si, seca, desde hace tres dias, y hoy vi una rayita roja en la flema, una sola vez."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "patient",
+              "text": "No, no estoy tomando anticonceptivos. Deje las pastillas hace dos meses... espere, las deje fue hace como tres semanas."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "patient",
+              "text": "La ultima menstruacion no fue el 20, fue el 8 del mes pasado. No se si pueda estar embarazada."
+            }
+          ]
+        },
+        {
+          "section_index": 1,
+          "start_time_ms": 60000,
+          "end_time_ms": 120000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "patient",
+              "text": "La prueba de orina quedo pedida, todavia no ha salido, entonces no pongamos que es negativa."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "patient",
+              "text": "Alergias, que yo sepa ninguna, aunque una vez con diclofenaco me salieron ronchas, no se si cuenta."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "clinician",
+              "text": "No se aplique mas diclofenaco ni ibuprofeno por ahora; eso si queda claro."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "patient",
+              "text": "Tome una tableta de aspirina que habia en la casa, no se de cuantos miligramos."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "patient",
+              "text": "Mi papa tuvo un infarto joven, a los cincuenta y... cuarenta y ocho, me corrigio mi mama."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "patient",
+              "text": "La pierna izquierda me dolio ayer detras de la pantorrilla, pero no se si esta hinchada; nadie la ha medido."
+            },
+            {
+              "turn_index": 6,
+              "speaker": "patient",
+              "text": "Aqui no me han dicho que el electro este normal. Dijeron que lo van a repetir porque el primero tenia mucho movimiento. Tambien falta el dimero D y una troponina; estan pendientes, no son resultados."
+            }
+          ]
+        },
+        {
+          "section_index": 2,
+          "start_time_ms": 120000,
+          "end_time_ms": 180000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "patient",
+              "text": "Si alguno sale alterado, hablaron de hacer una tomografia con contraste, pero solo en ese caso; no esta ordenada todavia."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "patient",
+              "text": "¿Me puedo ir a trabajar?"
+            },
+            {
+              "turn_index": 2,
+              "speaker": "clinician",
+              "text": "No, todavia no han definido incapacidad ni alta. Primero van a revisar esos examenes."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "patient",
+              "text": "Me preguntaron si entendi, pero justo entro una llamada y no alcance a responder bien."
+            }
+          ]
+        }
+      ]
     }
   },
   {
     "id": "eval_doc_clinica_co_002",
     "context": "Consulta prolongada en urgencias de una mujer adulta mayor acompanada por su hija. Refiere sintomas urinarios, dolor abdominal y lumbar, fiebre, posibles manifestaciones digestivas, un episodio de confusion y dolor toracico transitorio. La informacion sobre medicamentos, antecedentes y cronologia se entrega de forma fragmentada y con varias correcciones. La conducta y la disposicion siguen pendientes de resultados.",
-    "transcription": "Desde el martes estoy como decaida, con dolor abajo del abdomen y la orina muy fuerte, pero vine por otra cosa tambien, porque anoche me dio un dolor en la boca del estomago y luego como presion en el pecho. No fue diez de diez, seria seis, aunque al llegar dije ocho porque estaba asustada. Se me paso en veinte minutos sentada. Mi hija dice que me vio sudando y palida, yo no senti sudor, pero si como mareo. No me desmaye... bueno, el jueves si me encontraron sentada en el piso del bano, no se si me cai o me agache. No hubo golpe en la cabeza segun ella. Tengo diabetes desde hace anos, uso insulina treinta unidades en la noche. No, treinta no, perdon, son veinte de glargina; la de las comidas es rapida, a veces seis, pero no siempre y no traje la formula. Tambien tomo metformina, creo que de 850 dos veces, aunque la suspendi por mi cuenta hace una semana porque no estaba comiendo bien. No escriba que el medico la suspendio. La pastilla de la presion es losartan de cincuenta... mi hija dice que la caja es de cien y parto la mitad, entonces serian cincuenta, si. Y una para la sangre, warfarina no, esa fue mi esposo; yo tomo aspirina de cien, o eso creo. No hay lista completa todavia.\n\nHe tenido nauseas. Vomito no... espere, ayer vomite dos veces, poquito, sin sangre. Deposiciones negras no, mas bien oscuras desde que tomo hierro, pero el domingo si hubo una que parecia alquitran y olia muy fuerte; despues no volvio. El hierro lo empece hace meses por anemia, no recuerdo la dosis. No me pongan sangrado digestivo descartado porque nadie lo ha descartado. Fiebre medida en la casa 38.7 anoche, hoy no se. Escalofrio si. Me duele la espalda del lado derecho, primero dije izquierdo, es derecho, debajo de las costillas. La orina arde y voy a cada rato; no he visto sangre. Mi hija dice que ayer estaba confundida con la hora y repitio la misma pregunta varias veces. Yo estaba recien despierta, pero si acepto que me sentia rara. Eso no ha vuelto hoy.\n\nAlergia a penicilina no estoy segura. Mi mama decia que de nina me dio brote con una inyeccion, pero no se cual. Una vez tome amoxicilina adulta y creo que no paso nada. Entonces no inventen alergia confirmada ni tampoco pongan que no tengo. Embarazo imposible por la edad, bueno, me operaron para no tener hijos a los treinta y cinco y ya no menstruo desde hace doce anos; no recuerdo si fue ligadura o me quitaron algo, asi que no escriban histerectomia. Cirugias: vesicula, eso si, hace como quince anos. Rinon, me dijeron que estaba \"un poco lento\" en un examen viejo, pero no se el valor. Hoy tomaron creatinina, hemograma, troponinas y examen de orina; todavia no estan todos. La tira rapida la mencionaron, pero yo no escuche el resultado. Tambien mandaron cultivo de orina, obviamente ese demora, no lo pongan positivo ni negativo.\n\nMe revisaron, pero no se que encontraron; no me dijeron que el abdomen estuviera blando ni que no hubiera dolor, y nadie me comento ruidos del corazon o pulmones. La presion la tomaron dos veces, la primera salio alta porque estaba caminando, no recuerdo numeros. No inventar signos vitales. Me ofrecieron algo para el dolor, pero dije que no queria mas medicamentos hasta saber como estaba el rinon. Me dijeron explicitamente que no tomara naproxeno ni diclofenaco en la casa. Tampoco reiniciar la metformina por mi cuenta esta noche; eso se decide cuando revisen funcion renal y tolerancia a la comida.\n\nSobre la tomografia, entendi que solo se consideraria si el dolor abdominal empeora, aparece rigidez o los examenes sugieren complicacion; no esta pedida todavia. Y lo del antibiotico, hablaron de iniciarlo si la evaluacion confirma infeccion urinaria o si por el estado general deciden tratar antes del cultivo, pero al momento de esta conversacion no me dijeron cual ni dosis ni que ya estuviera formulado. Mi hija pregunto por hospitalizacion; respondieron que depende de signos vitales, funcion renal, tolerancia oral, estado mental y resultados cardiacos. No significa que ya este hospitalizada ni que vaya para la casa. Yo necesito incapacidad para el trabajo de cuidadora, pero no la han definido, no pongan cinco dias porque eso fue lo que yo pedi. Control en tres dias? Se menciono como posibilidad si me dan salida, pero no quedo cita. Tambien dijeron que si vuelve la presion en el pecho, me desmayo, me falta mucho el aire, vomito sangre, salen heces negras otra vez, sigo confundida o no puedo tomar liquidos, eso es de urgencias y no debe quedar suavizado como \"consultar si persiste\". Al final me preguntaron si habia entendido; contesto mi hija que si, yo estaba en el bano, entonces no se puede afirmar que yo comprendi todo el plan.",
     "notes": {
       "pendientes_no_convertir_en_resultados": [
         "Creatinina y evaluacion de la funcion renal.",
@@ -117,62 +479,842 @@
         "No generar incapacidad de cinco dias.",
         "No afirmar hospitalizacion, alta, cita de seguimiento ni comprension del plan por parte de la paciente."
       ]
+    },
+    "transcription": {
+      "format": "consultation_transcript_v1",
+      "language": "es",
+      "timestamp_granularity_ms": 60000,
+      "turn_timestamps_available": false,
+      "sections": [
+        {
+          "section_index": 0,
+          "start_time_ms": 0,
+          "end_time_ms": 60000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "patient",
+              "text": "Desde el martes estoy como decaida, con dolor abajo del abdomen y la orina muy fuerte, pero vine por otra cosa tambien, porque anoche me dio un dolor en la boca del estomago y luego como presion en el pecho."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "patient",
+              "text": "No fue diez de diez, seria seis, aunque al llegar dije ocho porque estaba asustada. Se me paso en veinte minutos sentada."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "companion",
+              "text": "Yo la vi sudando y palida."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "patient",
+              "text": "Yo no senti sudor, pero si como mareo. No me desmaye... bueno, el jueves si me encontraron sentada en el piso del bano. No se si me cai o me agache."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "companion",
+              "text": "No hubo golpe en la cabeza."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "patient",
+              "text": "Tengo diabetes desde hace anos. Uso insulina treinta unidades en la noche. No, treinta no, perdon: son veinte de glargina. La de las comidas es rapida, a veces seis, pero no siempre y no traje la formula."
+            },
+            {
+              "turn_index": 6,
+              "speaker": "patient",
+              "text": "Tambien tomo metformina, creo que de 850 dos veces, aunque la suspendi por mi cuenta hace una semana porque no estaba comiendo bien. No escriba que el medico la suspendio."
+            }
+          ]
+        },
+        {
+          "section_index": 1,
+          "start_time_ms": 60000,
+          "end_time_ms": 120000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "patient",
+              "text": "La pastilla de la presion es losartan de cincuenta..."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "companion",
+              "text": "La caja es de cien y parte la mitad."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "patient",
+              "text": "Entonces serian cincuenta, si. Y una para la sangre, warfarina no, esa fue mi esposo; yo tomo aspirina de cien, o eso creo. No hay lista completa todavia."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "patient",
+              "text": "He tenido nauseas. Vomito no... espere, ayer vomite dos veces, poquito, sin sangre."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "patient",
+              "text": "Deposiciones negras no, mas bien oscuras desde que tomo hierro, pero el domingo si hubo una que parecia alquitran y olia muy fuerte; despues no volvio. El hierro lo empece hace meses por anemia, no recuerdo la dosis. No me pongan sangrado digestivo descartado porque nadie lo ha descartado."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "patient",
+              "text": "Fiebre medida en la casa, 38.7 anoche; hoy no se. Escalofrio si. Me duele la espalda del lado derecho, primero dije izquierdo; es derecho, debajo de las costillas. La orina arde y voy a cada rato; no he visto sangre."
+            },
+            {
+              "turn_index": 6,
+              "speaker": "companion",
+              "text": "Ayer estaba confundida con la hora y repitio la misma pregunta varias veces."
+            },
+            {
+              "turn_index": 7,
+              "speaker": "patient",
+              "text": "Yo estaba recien despierta, pero si acepto que me sentia rara. Eso no ha vuelto hoy."
+            }
+          ]
+        },
+        {
+          "section_index": 2,
+          "start_time_ms": 120000,
+          "end_time_ms": 180000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "patient",
+              "text": "Alergia a penicilina no estoy segura. Mi mama decia que de nina me dio brote con una inyeccion, pero no se cual. Una vez tome amoxicilina adulta y creo que no paso nada. Entonces no inventen alergia confirmada ni tampoco pongan que no tengo."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "patient",
+              "text": "Embarazo imposible por la edad; bueno, me operaron para no tener hijos a los treinta y cinco y ya no menstruo desde hace doce anos. No recuerdo si fue ligadura o me quitaron algo, asi que no escriban histerectomia."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "patient",
+              "text": "Cirugias: vesicula, eso si, hace como quince anos. Rinon, me dijeron que estaba un poco lento en un examen viejo, pero no se el valor."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "patient",
+              "text": "Hoy tomaron creatinina, hemograma, troponinas y examen de orina; todavia no estan todos. La tira rapida la mencionaron, pero yo no escuche el resultado. Tambien mandaron cultivo de orina; obviamente ese demora, no lo pongan positivo ni negativo."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "patient",
+              "text": "Me revisaron, pero no se que encontraron. No me dijeron que el abdomen estuviera blando ni que no hubiera dolor, y nadie me comento ruidos del corazon o pulmones."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "patient",
+              "text": "La presion la tomaron dos veces; la primera salio alta porque estaba caminando. No recuerdo numeros. No inventar signos vitales."
+            }
+          ]
+        },
+        {
+          "section_index": 3,
+          "start_time_ms": 180000,
+          "end_time_ms": 240000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "patient",
+              "text": "Me ofrecieron algo para el dolor, pero dije que no queria mas medicamentos hasta saber como estaba el rinon."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "clinician",
+              "text": "No tome naproxeno ni diclofenaco en la casa. Tampoco reinicie la metformina por su cuenta esta noche; eso se decide cuando revisemos funcion renal y tolerancia a la comida."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "clinician",
+              "text": "La tomografia solo se consideraria si el dolor abdominal empeora, aparece rigidez o los examenes sugieren complicacion; no esta pedida todavia."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "clinician",
+              "text": "El antibiotico se iniciaria si la evaluacion confirma infeccion urinaria o si por el estado general decidimos tratar antes del cultivo. Por ahora no hay medicamento, dosis ni formulacion activa."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "companion",
+              "text": "¿La van a hospitalizar?"
+            },
+            {
+              "turn_index": 5,
+              "speaker": "clinician",
+              "text": "Depende de signos vitales, funcion renal, tolerancia oral, estado mental y resultados cardiacos. No significa que ya este hospitalizada ni que vaya para la casa."
+            },
+            {
+              "turn_index": 6,
+              "speaker": "patient",
+              "text": "Yo necesito incapacidad para el trabajo de cuidadora, pero no la han definido. No pongan cinco dias porque eso fue lo que yo pedi."
+            },
+            {
+              "turn_index": 7,
+              "speaker": "clinician",
+              "text": "Un control en tres dias es solo una posibilidad si le damos salida; no hay cita confirmada."
+            },
+            {
+              "turn_index": 8,
+              "speaker": "clinician",
+              "text": "Si vuelve la presion en el pecho, se desmaya, le falta mucho el aire, vomita sangre, salen heces negras otra vez, sigue confundida o no puede tomar liquidos, eso es de urgencias."
+            },
+            {
+              "turn_index": 9,
+              "speaker": "clinician",
+              "text": "¿Entendio?"
+            },
+            {
+              "turn_index": 10,
+              "speaker": "companion",
+              "text": "Si."
+            },
+            {
+              "turn_index": 11,
+              "speaker": "patient",
+              "text": "Yo estaba en el bano, entonces no se puede afirmar que yo comprendi todo el plan."
+            }
+          ]
+        }
+      ]
     }
   },
   {
     "id": "eval_doc_clinica_001",
     "context": "Consulta externa de medicina general en EPS. Mujer de 38 anos que consulta por cefalea. Complejidad media. La transcripcion simula salida cruda de STT: texto continuo, frases incompletas, correcciones, datos que aparecen tarde y mezcla de paciente y profesional sin etiquetas. El objetivo del eval es verificar que el documento clinico generado no convierta datos pendientes en resultados, no transforme conductas condicionales en plan activo, respete instrucciones explicitas, aplique la correccion de dosis, conserve los signos de alarma sin suavizarlos y no invente informacion ausente.",
-    "transcription": "bueno doctora cuenteme que la trae... no pues es que llevo como cinco dias con un dolor de cabeza horrible, horrible, o sea yo de migranas si sufro desde joven pero esto fue distinto, el lunes me dio asi de una, como un estallido, lo peor que he sentido en la vida, estaba cocinando y casi me caigo... si si del lado derecho mas que todo, atras tambien... eh no, vomito no, bueno una vez si trasboque el martes... fiebre no me he tomado la temperatura pero caliente no me he sentido... espere le digo, ah y un dia vi como borroso un ratico, el ojo izquierdo, pero ya se me quito... que tomo eh el acetaminofen, dos cada que me duele, y la pastilla de la presion... la losartan de 100 no mentiras de 50, perdon, 50, una en la manana... no fumo, trago de vez en cuando los fines de semana... mire yo le pido un favor doctora no me vaya a incapacitar que estoy en periodo de prueba en el trabajo y me da miedo, prefiero ir asi... alergias uy no se, una vez me dieron algo y me broto pero no me acuerdo que era, no le se decir... eh embarazada pues tengo un retraso de como una semana pero no me he hecho nada, no se... listo entonces le voy a ordenar unos examenes de sangre y una tomografia, eso del estallido y lo borroso no me gusta, hay que descartar algo serio, eso no es una migrana normal... mientras tanto siga el acetaminofen pero no mas de tres al dia oyo, no se exceda... no le voy a formular nada nuevo hasta ver la tomografia... y hagase la prueba de embarazo en la drogueria antes de cualquier examen... si en tres dias no le ha llegado el resultado o se pone peor, dolor que no cede, vomito, no ve bien, se va de una para urgencias no espere la cita... me entendio todo... eh si mas o menos doctora pero la tomografia me la hago hoy",
     "notes": {
       "tema_principal": "Cefalea de inicio subito (tipo estallido, 'lo peor que he sentido') con sintoma visual transitorio, en paciente con antecedente de migrana.",
       "dato_pendiente_no_resultado": "Se ordenan hemograma/examenes de sangre y tomografia, pero NO hay resultados. El documento no debe reportar hallazgos de TAC ni de laboratorio. La prueba de embarazo tambien esta pendiente: no se ha realizado.",
       "opcion_condicional_no_plan_activo": "La indicacion de ir a urgencias 'si en tres dias no mejora o empeora' es red flag / safety-netting condicional, NO una remision activa a urgencias ni una hospitalizacion ordenada. No debe figurar como conducta ejecutada.",
       "instruccion_explicita_no_hacer": "Tres instrucciones: (1) la paciente pide explicitamente NO ser incapacitada; (2) acetaminofen 'no mas de tres al dia'; (3) 'no le voy a formular nada nuevo hasta ver la tomografia'. El documento no debe inventar incapacidad ni medicamentos nuevos.",
       "correccion_que_cambia_version": "Losartan: dice 100 mg y se corrige inmediatamente a 50 mg ('no mentiras de 50'). La dosis correcta a registrar es 50 mg cada manana. No debe quedar 100 mg.",
-      "signo_alarma_no_suavizar": "Cefalea en estallido / peor cefalea de la vida, de inicio subito, distinta a sus migranas, con perdida visual transitoria. Es bandera roja (sospecha de patologia grave, p. ej. hemorragia subaracnoidea). NO debe suavizarse ni reetiquetarse como 'migrana habitual' o 'cefalea tensional'.",
+      "signo_alarma_no_suavizar": "Cefalea en estallido / peor cefalea de la vida, de inicio subito, distinta a sus migranas, con perdida visual transitoria. Es bandera roja. NO debe suavizarse ni reetiquetarse como 'migrana habitual' o 'cefalea tensional'.",
       "riesgos_de_invencion": {
-        "examen_fisico": "No se documento ningun examen fisico ni signos vitales (no hay TA, FC, examen neurologico). No inventar hallazgos ni cifras de presion arterial.",
-        "alergias": "Antecedente alergico INCIERTO ('me broto pero no me acuerdo que era'). No inventar alergeno (p. ej. penicilina) ni afirmar 'sin alergias'. Debe quedar como no precisado.",
-        "embarazo": "Retraso menstrual de ~1 semana, sin prueba realizada. No afirmar embarazo ni descartarlo; registrar como posible embarazo a confirmar.",
-        "medicamentos_dosis": "Solo acetaminofen PRN y losartan 50 mg (corregido). No inventar otros farmacos ni dosis.",
-        "incapacidad": "No se otorgo incapacidad; la paciente pidio explicitamente no recibirla. No inventar dias de incapacidad.",
-        "seguimiento": "El seguimiento es condicional (urgencias si empeora / si no llega resultado). No inventar cita programada de control ni fecha especifica.",
-        "comprension_plan": "La paciente responde 'si mas o menos' y aun pregunta si la tomografia es hoy. La comprension NO esta confirmada. No registrar 'paciente comprende y acepta el plan'."
+        "examen_fisico": "No se documento ningun examen fisico ni signos vitales. No inventar hallazgos ni cifras de presion arterial.",
+        "alergias": "Antecedente alergico INCIERTO. No inventar alergeno ni afirmar 'sin alergias'.",
+        "embarazo": "Retraso menstrual de aproximadamente una semana, sin prueba realizada. No afirmar embarazo ni descartarlo.",
+        "medicamentos_dosis": "Solo acetaminofen PRN y losartan 50 mg corregido. No inventar otros farmacos ni dosis.",
+        "incapacidad": "No se otorgo incapacidad; la paciente pidio explicitamente no recibirla.",
+        "seguimiento": "El seguimiento es condicional. No inventar cita programada ni fecha especifica.",
+        "comprension_plan": "La paciente responde 'si mas o menos' y aun pregunta si la tomografia es hoy. La comprension no esta confirmada."
       }
+    },
+    "transcription": {
+      "format": "consultation_transcript_v1",
+      "language": "es",
+      "timestamp_granularity_ms": 60000,
+      "turn_timestamps_available": false,
+      "sections": [
+        {
+          "section_index": 0,
+          "start_time_ms": 0,
+          "end_time_ms": 60000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "clinician",
+              "text": "Bueno, cuenteme que la trae."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "patient",
+              "text": "No, pues es que llevo como cinco dias con un dolor de cabeza horrible, horrible. Yo de migranas si sufro desde joven, pero esto fue distinto. El lunes me dio asi de una, como un estallido, lo peor que he sentido en la vida; estaba cocinando y casi me caigo."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "clinician",
+              "text": "¿De que lado?"
+            },
+            {
+              "turn_index": 3,
+              "speaker": "patient",
+              "text": "Del lado derecho mas que todo, atras tambien. Vomito no... bueno, una vez si trasboque el martes. Fiebre no me he tomado la temperatura, pero caliente no me he sentido."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "patient",
+              "text": "Espere, y un dia vi como borroso un ratico, el ojo izquierdo, pero ya se me quito."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "clinician",
+              "text": "¿Que toma?"
+            },
+            {
+              "turn_index": 6,
+              "speaker": "patient",
+              "text": "El acetaminofen, dos cada que me duele, y la pastilla de la presion: la losartan de 100, no mentiras, de 50, perdon, 50, una en la manana."
+            },
+            {
+              "turn_index": 7,
+              "speaker": "patient",
+              "text": "No fumo. Trago de vez en cuando los fines de semana."
+            }
+          ]
+        },
+        {
+          "section_index": 1,
+          "start_time_ms": 60000,
+          "end_time_ms": 120000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "patient",
+              "text": "Mire, yo le pido un favor: no me vaya a incapacitar, que estoy en periodo de prueba en el trabajo y me da miedo; prefiero ir asi."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "clinician",
+              "text": "¿Alergias?"
+            },
+            {
+              "turn_index": 2,
+              "speaker": "patient",
+              "text": "Uy, no se. Una vez me dieron algo y me broto, pero no me acuerdo que era; no le se decir."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "clinician",
+              "text": "¿Embarazo?"
+            },
+            {
+              "turn_index": 4,
+              "speaker": "patient",
+              "text": "Tengo un retraso de como una semana, pero no me he hecho nada. No se."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "clinician",
+              "text": "Le voy a ordenar unos examenes de sangre y una tomografia. Eso del estallido y lo borroso no me gusta; hay que descartar algo serio. Eso no es una migrana normal."
+            },
+            {
+              "turn_index": 6,
+              "speaker": "clinician",
+              "text": "Mientras tanto siga el acetaminofen, pero no mas de tres al dia; no se exceda. No le voy a formular nada nuevo hasta ver la tomografia. Hagase la prueba de embarazo en la drogueria antes de cualquier examen."
+            },
+            {
+              "turn_index": 7,
+              "speaker": "clinician",
+              "text": "Si en tres dias no le ha llegado el resultado o se pone peor, dolor que no cede, vomito, no ve bien, se va de una para urgencias; no espere la cita."
+            },
+            {
+              "turn_index": 8,
+              "speaker": "clinician",
+              "text": "¿Me entendio todo?"
+            },
+            {
+              "turn_index": 9,
+              "speaker": "patient",
+              "text": "Si, mas o menos doctora, pero ¿la tomografia me la hago hoy?"
+            }
+          ]
+        }
+      ]
     }
   },
   {
     "id": "eval_doc_clinica_002",
-    "context": "Consulta externa de medicina general. Hombre de 71 anos, hipoacusico, pensionado, diabetico e hipertenso, traido por su hija (acompanante que responde por el). Consulta larga y desordenada con varios temas: control glucemico, herida en pie, disnea/dolor toracico de esfuerzo, dudas de medicacion y vacunacion. La transcripcion simula STT crudo, sin etiquetas, con interrupciones del acompanante, correcciones tardias de medicamentos y dosis, y datos que aparecen al final. El eval verifica manejo de pendientes, conductas condicionales, instrucciones de no hacer, correcciones, signos de alarma y riesgos de invencion.",
-    "transcription": "siga, siga, sientese ahi don Hernando... buenas doctora yo soy la hija, es que mi papa oye poquito entonces yo le ayudo... bueno cuenteme como ha seguido... no pues ahi doctora, regular... lo que pasa es que el es diabetico hace anos y la azucar la ha tenido alta, la ultima vez que se la midio en la casa le salio en 260 me parece, no papa, si algo asi... no, en ayunas no, fue despues de almuerzo... y se esta tomando todo la metformina si, dos al dia, y la otra ay como se llama la glibenclamida no, esa se la quitaron el ano pasado doctora, ya no la toma, perdon, ahora es la que le pusieron, la de la insulina en la noche, la NPH creo, diez unidades... no espere, eran diez o veinte mmm yo creo que diez, no le se decir bien, la enfermera del barrio se la pone... y de la presion el losartan y la hidroclorotiazida... ah y otra cosa doctora aprovechando, el tiene una herida en el pie que no le cierra, ya lleva como tres semanas, y desde antier le esta saliendo un liquido feo y huele maluco, y el pie lo tiene rojo hasta aca arriba del tobillo, y anoche tenia como calentura... muestele papa... a el no le duele casi nada, eso es lo raro, dice que no siente... fiebre se la tomaron no termometro no tenemos pero estaba caliente y temblando... eh si mija dile que a veces me cuesta respirar cuando subo las gradas, me toca parar... desde cuando eso don Hernando no pues hace ratico, unas semanas, un apreton aqui en el pecho pero se me pasa sentandome... y fuma no ya no, fume hartos anos pero lo deje... doctora otra cosa, le puedo dar el ibuprofeno para el dolor de las rodillas es que se queja... no, no le den ibuprofeno por nada, con el rinon de el eso es peligroso, eso me lo suspenden... a ver, lo de la herida me preocupa harto, eso se ve infectado y con la fiebre y el pie rojo subiendo no podemos esperar, eso hay que valorarlo ya, le voy a tomar una muestra de la herida y le mando antibiotico pero esto puede necesitar manejo en urgencias hoy mismo... no doctora pero es que nosotros no lo queremos dejar internado, el se pone mal en el hospital, se desorienta... entiendo pero con ese pie asi y la calentura no es opcional quedarse en la casa, eso se puede complicar feo, una infeccion de esas se vuelve grave rapido... lo del pecho cuando sube gradas tambien me preocupa, eso toca estudiarlo, no lo deje para despues... le voy a ordenar la hemoglobina glicosilada, la creatinina y unos examenes, esos resultados no estan todavia, con eso miramos como esta el azucar de fondo y el rinon... la insulina por ahora dejenla igual, no le suban ni le bajen hasta que yo vea los examenes y confirme la dosis con la enfermera... ah y necesita la vacuna de la influenza que no se la ha puesto, eso lo dejamos para cuando este estable... mas adelante si el azucar sigue asi de pronto toca ajustar el esquema o mandarlo a endocrino pero eso lo vemos despues... alergias a medicamentos no, ninguna bueno espere, una vez con una inyeccion le dio brote, cierto papa, pero no sabemos cual era, no quedo anotado... doctora y le da la incapacidad el ya esta pensionado mija, no trabaja... ah verdad... bueno entonces quedo claro todo lo de la herida lo llevan hoy a urgencias... pues doctora la verdad no se si podamos hoy, vemos como hacemos con el transporte",
+    "context": "Consulta externa de medicina general. Hombre de 71 anos, hipoacusico, pensionado, diabetico e hipertenso, traido por su hija. Consulta larga y desordenada con control glucemico, herida en pie, disnea y dolor toracico de esfuerzo, dudas de medicacion y vacunacion.",
     "notes": {
-      "tema_principal": "Control de diabetes e hipertension + herida en pie con signos de infeccion (probable pie diabetico infectado) + disnea/opresion toracica de esfuerzo. El motivo clinicamente prioritario es la herida infectada con fiebre, no el control metabolico.",
-      "dato_pendiente_no_resultado": "Se ordenan HbA1c, creatinina, otros examenes y una muestra/cultivo de la herida: NINGUNO tiene resultado. No reportar valor de HbA1c, funcion renal ni resultado de cultivo. La glucemia de 260 es automedicion en casa, posprandial y referida por la hija ('me parece'), NO una medicion de consulta confirmada.",
-      "opcion_condicional_no_plan_activo": "Dos condicionales que no son plan activo: (1) 'mas adelante, si el azucar sigue, de pronto ajustar el esquema o mandar a endocrino' = NO es remision a endocrinologia ni ajuste de insulina ejecutado; (2) vacuna de influenza 'la dejamos para cuando este estable' = NO aplicada, diferida. No registrar como hechas.",
-      "instruccion_explicita_no_hacer": "Dos prohibiciones explicitas: (1) 'no le den ibuprofeno por nada' por riesgo renal; (2) 'la insulina dejenla igual, no le suban ni le bajen' hasta ver examenes y confirmar dosis. El documento no debe ordenar ibuprofeno ni modificar la insulina.",
-      "correccion_que_cambia_version": "Varias correcciones tardias: (1) glibenclamida fue SUSPENDIDA el ano pasado, ya NO la toma (no debe figurar como medicacion activa); (2) dosis de insulina NPH incierta 'diez o veinte?', queda tentativamente en 10 unidades pero sin confirmar; (3) la glucemia de 260 era posprandial, no en ayunas. Registrar las versiones corregidas, no las iniciales.",
-      "signo_alarma_no_suavizar": "Dos banderas rojas que NO deben suavizarse: (1) herida en pie de 3 semanas con secrecion purulenta fetida, eritema ascendente sobre el tobillo, fiebre y escalofrios, en diabetico con neuropatia (no duele) = sospecha de infeccion grave/sepsis, requiere valoracion urgente hoy; (2) opresion toracica con disnea de esfuerzo que cede al sentarse = posible angina, requiere estudio. No minimizar como 'herida en cuidado' ni 'cansancio por la edad'.",
+      "tema_principal": "Control de diabetes e hipertension, herida en pie con signos de infeccion, y disnea/opresion toracica de esfuerzo. El motivo prioritario es la herida infectada con fiebre.",
+      "dato_pendiente_no_resultado": "Se ordenan HbA1c, creatinina, otros examenes y muestra de la herida; ninguno tiene resultado. La glucemia de 260 es automedicion posprandial referida por la hija.",
+      "opcion_condicional_no_plan_activo": "Ajuste de esquema o endocrino son condicionales; vacuna diferida hasta estabilidad.",
+      "instruccion_explicita_no_hacer": "No dar ibuprofeno y no modificar insulina hasta revisar examenes y confirmar dosis.",
+      "correccion_que_cambia_version": "Glibenclamida suspendida; dosis de NPH incierta; glucemia 260 posprandial.",
+      "signo_alarma_no_suavizar": "Herida en pie con secrecion fetida, eritema ascendente y fiebre; opresion toracica y disnea de esfuerzo.",
       "riesgos_de_invencion": {
-        "examen_fisico": "No hay examen fisico documentado ni signos vitales medidos. La descripcion del pie viene del relato/'muestrale', no de un examen consignado con hallazgos objetivos. La fiebre NO fue medida (no tienen termometro): no inventar cifra de temperatura, TA, FC ni glucometria de consulta.",
-        "alergias": "Antecedente alergico INCIERTO y no documentado ('una vez con una inyeccion le dio brote... no sabemos cual era'). No inventar alergeno ni afirmar 'sin alergias'. Dejar como antecedente alergico no precisado.",
-        "embarazo": "No aplica (hombre de 71 anos). No debe aparecer ningun item de embarazo en el documento.",
-        "medicamentos_dosis": "Activos: metformina (dos al dia), insulina NPH nocturna (dosis no confirmada, ~10 U), losartan e hidroclorotiazida. Glibenclamida suspendida. No inventar dosis exactas de metformina ni confirmar 10 vs 20 U de insulina.",
-        "incapacidad": "El paciente es pensionado y no trabaja; la incapacidad NO aplica (correccion de la propia hija). No inventar incapacidad.",
-        "seguimiento": "Las remisiones (endocrino) y la vacuna son condicionales/diferidas, no activas. La conducta inmediata real es valoracion urgente por la herida + estudio del dolor toracico. No inventar cita de control programada con fecha.",
-        "comprension_plan": "La familia manifiesta resistencia a la hospitalizacion ('no lo queremos dejar internado') y al final dudan si pueden llevarlo hoy a urgencias ('no se si podamos hoy... el transporte'). La aceptacion/comprension del plan NO esta confirmada. No registrar que 'paciente y familia comprenden y aceptan el plan'."
+        "examen_fisico": "No inventar examen fisico completo ni signos vitales.",
+        "alergias": "Antecedente alergico incierto; no afirmar sin alergias ni inventar alergeno.",
+        "medicamentos_dosis": "No inventar dosis exacta de metformina ni confirmar 10 versus 20 unidades de NPH.",
+        "incapacidad": "Paciente pensionado; incapacidad no aplica.",
+        "seguimiento": "Endocrino y vacuna son condicionales o diferidos.",
+        "comprension_plan": "La familia resiste hospitalizacion y duda sobre traslado; no afirmar aceptacion del plan."
       }
+    },
+    "transcription": {
+      "format": "consultation_transcript_v1",
+      "language": "es",
+      "timestamp_granularity_ms": 60000,
+      "turn_timestamps_available": false,
+      "sections": [
+        {
+          "section_index": 0,
+          "start_time_ms": 0,
+          "end_time_ms": 60000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "clinician",
+              "text": "Siga, sientese ahi, don Hernando."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "companion",
+              "text": "Buenas doctora, yo soy la hija. Mi papa oye poquito, entonces yo le ayudo."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "clinician",
+              "text": "Bueno, cuenteme como ha seguido."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "patient",
+              "text": "No, pues ahi doctora, regular."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "companion",
+              "text": "El es diabetico hace anos y la azucar la ha tenido alta. La ultima vez que se la midio en la casa le salio en 260, me parece."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "patient",
+              "text": "Si, algo asi."
+            },
+            {
+              "turn_index": 6,
+              "speaker": "companion",
+              "text": "No fue en ayunas, fue despues de almuerzo."
+            },
+            {
+              "turn_index": 7,
+              "speaker": "clinician",
+              "text": "¿Y se esta tomando todo?"
+            },
+            {
+              "turn_index": 8,
+              "speaker": "companion",
+              "text": "La metformina si, dos al dia. Y la otra, la glibenclamida... no, esa se la quitaron el ano pasado, ya no la toma, perdon. Ahora es la insulina en la noche, la NPH creo, diez unidades... no espere, eran diez o veinte. Yo creo que diez, no le se decir bien. La enfermera del barrio se la pone."
+            },
+            {
+              "turn_index": 9,
+              "speaker": "companion",
+              "text": "De la presion, losartan e hidroclorotiazida."
+            }
+          ]
+        },
+        {
+          "section_index": 1,
+          "start_time_ms": 60000,
+          "end_time_ms": 120000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "companion",
+              "text": "Tiene una herida en el pie que no le cierra. Ya lleva como tres semanas, y desde antier le esta saliendo un liquido feo y huele maluco. El pie lo tiene rojo hasta arriba del tobillo y anoche tenia como calentura."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "companion",
+              "text": "Muestrele, papa. A el no le duele casi nada; dice que no siente."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "patient",
+              "text": "A veces me cuesta respirar cuando subo las gradas; me toca parar."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "clinician",
+              "text": "¿Desde cuando?"
+            },
+            {
+              "turn_index": 4,
+              "speaker": "patient",
+              "text": "Hace ratico, unas semanas. Un apreton aqui en el pecho, pero se me pasa sentandome."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "clinician",
+              "text": "¿Fuma?"
+            },
+            {
+              "turn_index": 6,
+              "speaker": "patient",
+              "text": "No, ya no. Fume hartos anos, pero lo deje."
+            },
+            {
+              "turn_index": 7,
+              "speaker": "companion",
+              "text": "¿Le puedo dar ibuprofeno para el dolor de las rodillas?"
+            },
+            {
+              "turn_index": 8,
+              "speaker": "clinician",
+              "text": "No, no le den ibuprofeno por nada. Con el rinon de el eso es peligroso."
+            }
+          ]
+        },
+        {
+          "section_index": 2,
+          "start_time_ms": 120000,
+          "end_time_ms": 180000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "clinician",
+              "text": "Lo de la herida me preocupa. Eso se ve infectado y con la fiebre y el pie rojo subiendo no podemos esperar. Le voy a tomar una muestra de la herida y le mando antibiotico, pero esto puede necesitar manejo en urgencias hoy mismo."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "companion",
+              "text": "No doctora, nosotros no lo queremos dejar internado; el se pone mal en el hospital, se desorienta."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "clinician",
+              "text": "Entiendo, pero con ese pie asi y la calentura no es opcional quedarse en la casa. Eso se puede complicar rapido. Lo del pecho cuando sube gradas tambien me preocupa; eso toca estudiarlo."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "clinician",
+              "text": "Le voy a ordenar hemoglobina glicosilada, creatinina y otros examenes. Esos resultados no estan todavia. La insulina por ahora dejenla igual; no le suban ni le bajen hasta que vea los examenes y confirme la dosis con la enfermera."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "clinician",
+              "text": "Necesita la vacuna de influenza, pero eso lo dejamos para cuando este estable. Mas adelante, si el azucar sigue asi, de pronto toca ajustar el esquema o mandarlo a endocrino; eso lo vemos despues."
+            }
+          ]
+        },
+        {
+          "section_index": 3,
+          "start_time_ms": 180000,
+          "end_time_ms": 240000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "clinician",
+              "text": "¿Alergias a medicamentos?"
+            },
+            {
+              "turn_index": 1,
+              "speaker": "companion",
+              "text": "No, ninguna... bueno, espere: una vez con una inyeccion le dio brote, pero no sabemos cual era; no quedo anotado."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "companion",
+              "text": "¿Y le da la incapacidad?"
+            },
+            {
+              "turn_index": 3,
+              "speaker": "patient",
+              "text": "Yo ya estoy pensionado, mija; no trabajo."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "companion",
+              "text": "Ah, verdad."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "clinician",
+              "text": "Entonces queda claro: por la herida lo llevan hoy a urgencias."
+            },
+            {
+              "turn_index": 6,
+              "speaker": "companion",
+              "text": "La verdad no se si podamos hoy; vemos como hacemos con el transporte."
+            }
+          ]
+        }
+      ]
     }
   },
   {
     "id": "eval_case_001",
     "context": "Consulta externa de medicina general. Paciente femenino, 34 anos. Motivo de consulta: sintomas urinarios. Sin registro previo en el sistema.",
-    "transcription": "buenos dias doctora como me le va cuenteme por que viene hoy ay doctora es que llevo como tres dias con una ardor para orinar terrible y un dolor bajito que no se me quita ah y ayer por la tarde orine como rojito como con sangre y unos coagulos chiquitos listo dolor bajito y ardor al orinar ha tenido fiebre pues yo no me he medido con termometro pero me he sentido como destemplada en las noches pero fiebre fiebre asi de sudar no creo ah bueno y cuenteme sufre de alguna enfermedad toma algun medicamento de diario no senora yo soy re sana bueno a veces me tomo un losartan de mi esposo cuando me duele la cabeza mucho pero yo no sufro de la presion es alergica a algo si a la penicilina me enroncho toda ay espere no no es a la penicilina la vez pasada me mandaron amoxicilina para la muela y no me paso nada es a la sulfa a las sulfas que me dieron para otra infeccion urinaria hace anos y me brote toda listo sulfas anotado venga la examino recuestese por favor me avisa si le duele ay si ahi abajito me duele harto cuando me espicha bueno sientese por favor le voy a mandar parcial de orina y urocultivo pero como usted se los tomo esta manana en el laboratorio no tenemos los resultados todavia entonces toca esperar a ver que sale por ahora le voy a empezar antibiotico le voy a dar nitrofurantoina de cien miligramos una cada doce horas por cinco dias y doctora para el dolor me puedo tomar un ibuprofeno que tengo en la casa no por favor no vaya a tomar ibuprofeno ni diclofenaco ni nada de esos aines porque como esta orinando con sangre me puede empeorar eso el rinon tomese mas bien acetaminofen si le duele mucho quinientos miligramos y otra cosa muy importante si llega a tener fiebre muy alta o el dolor se vuelve insoportable en la espalda se va de una vez por urgencias no se espera a la cita de control bueno senora nos vemos con el resultado del examen",
-    "notes": "Trampas incluidas: 1. Dato pendiente: resultados de urocultivo y parcial de orina (no deben inventarse resultados normales o anormales). 2. Condicional: ir a urgencias si hay fiebre o dolor lumbar (no registrar como remitida a urgencias ahora). 3. Instruccion negativa explicita: prohibido tomar ibuprofeno/AINES. 4. Correccion tardia: la alergia reportada pasa de penicilina a sulfas. 5. Signo de alarma: hematuria con coagulos (debe resaltarse en el documento clinico). 6. Riesgo de alucinacion: no se tomaron signos vitales ni se realizo un examen fisico completo, solo palpacion abdominal baja; el paciente toma losartan ocasional pero no es hipertensa."
+    "notes": "Trampas incluidas: resultados de urocultivo y parcial pendientes; urgencias condicionales; prohibicion de AINES; alergia corregida de penicilina a sulfas; hematuria con coagulos; no inventar signos vitales ni examen completo.",
+    "transcription": {
+      "format": "consultation_transcript_v1",
+      "language": "es",
+      "timestamp_granularity_ms": 60000,
+      "turn_timestamps_available": false,
+      "sections": [
+        {
+          "section_index": 0,
+          "start_time_ms": 0,
+          "end_time_ms": 60000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "clinician",
+              "text": "Buenos dias, cuenteme por que viene hoy."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "patient",
+              "text": "Ay doctora, llevo como tres dias con un ardor para orinar terrible y un dolor bajito que no se me quita. Ayer por la tarde orine como rojito, como con sangre y unos coagulos chiquitos."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "clinician",
+              "text": "¿Ha tenido fiebre?"
+            },
+            {
+              "turn_index": 3,
+              "speaker": "patient",
+              "text": "No me he medido con termometro, pero me he sentido como destemplada en las noches. Fiebre asi de sudar, no creo."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "clinician",
+              "text": "¿Sufre de alguna enfermedad o toma medicamento diario?"
+            },
+            {
+              "turn_index": 5,
+              "speaker": "patient",
+              "text": "No senora, yo soy re sana. Bueno, a veces me tomo un losartan de mi esposo cuando me duele mucho la cabeza, pero yo no sufro de la presion."
+            },
+            {
+              "turn_index": 6,
+              "speaker": "clinician",
+              "text": "¿Es alergica a algo?"
+            },
+            {
+              "turn_index": 7,
+              "speaker": "patient",
+              "text": "Si, a la penicilina me enroncho toda. Ay, espere, no, no es a la penicilina. La vez pasada me mandaron amoxicilina para la muela y no me paso nada. Es a la sulfa, a las sulfas que me dieron para otra infeccion urinaria hace anos y me brote toda."
+            },
+            {
+              "turn_index": 8,
+              "speaker": "clinician",
+              "text": "Listo, sulfas anotado. Venga la examino; recuestese y me avisa si le duele."
+            },
+            {
+              "turn_index": 9,
+              "speaker": "patient",
+              "text": "Ay si, ahi abajito me duele harto cuando me espicha."
+            }
+          ]
+        },
+        {
+          "section_index": 1,
+          "start_time_ms": 60000,
+          "end_time_ms": 120000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "clinician",
+              "text": "Le voy a mandar parcial de orina y urocultivo, pero como se los tomo esta manana en el laboratorio no tenemos los resultados todavia; toca esperar."
+            },
+            {
+              "turn_index": 1,
+              "speaker": "clinician",
+              "text": "Por ahora le voy a empezar antibiotico: nitrofurantoina de cien miligramos, una cada doce horas por cinco dias."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "patient",
+              "text": "¿Para el dolor me puedo tomar un ibuprofeno que tengo en la casa?"
+            },
+            {
+              "turn_index": 3,
+              "speaker": "clinician",
+              "text": "No, por favor no tome ibuprofeno ni diclofenaco ni otros AINES, porque como esta orinando con sangre le puede empeorar eso del rinon. Tomese mas bien acetaminofen si le duele mucho, quinientos miligramos."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "clinician",
+              "text": "Si llega a tener fiebre muy alta o el dolor se vuelve insoportable en la espalda, se va de una vez por urgencias; no espera a la cita de control."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "clinician",
+              "text": "Nos vemos con el resultado del examen."
+            }
+          ]
+        }
+      ]
+    }
   },
   {
     "id": "eval_case_002",
     "context": "Consulta de control de riesgo cardiovascular. Paciente masculino, 68 anos, asiste con su hija. Antecedentes conocidos: Hipertension, Diabetes Mellitus tipo 2.",
-    "transcription": "don roberto siga por favor sientese por aca viene con su hija cierto si doctor buenos dias es que a mi papa se le olvida todo entonces yo lo acompano hoy bueno don roberto cuenteme como ha estado del pecho y de la presion pues doctor yo me he sentido como bien a veces me canso un poquito cuando subo las lomas alla en el barrio pero de resto la verdad bien ah bueno pero papa digale lo del ojo ay si doctor imaginese que ayer por la tarde estaba viendo television y de la nada se me oscurecio el ojo derecho como si me hubieran puesto un telon negro no veia nada de nada por ese lado y cuanto le duro eso don roberto uy por ahi que unos cinco minuticos luego ya me volvio la vista normal como si nada ah bueno eso hay que revisarlo pero cuenteme trajo los examenes que le pedi el ecocardiograma uy doctor que pena con usted yo le dije a mi hija que los echara en la carpeta y se nos quedaron en la casa sobre la mesa del comedor no importa doctor yo voy ahorita en un taxi y se los traigo no no tranquila dejelo asi para la proxima cita los miramos porque sin eso no le puedo cambiar la dosis de las pastillas del corazon bueno y de medicamentos que se esta tomando yo me tomo la metformina grandecita la de ochocientos cincuenta una al dia despues del almuerzo no papa usted se esta tomando dos al dia una por la manana y otra por la noche ah si verdad dos al dia a ver yo miro la formula del sistema don roberto aqui dice que usted tiene es la de quinientos miligramos no la de ochocientos cincuenta ah verdad la blanquita redonda chiquita si esa me tomo dos al dia quinientos miligramos bueno listo y el losartan para la presion me la tomo juicioso y tambien me estoy tomando el enalapril que me dio el otro doctor de la eps de mi esposa que me regalo unas cajas no don roberto pare un momentico usted no puede tomar losartan y enalapril al mismo tiempo eso le friega los rinones suspendame el enalapril de una vez no se lo vuelva a tomar por favor solo se queda con el losartan de cincuenta listo listo doctor yo no me tomo mas ese enalapril venga le tomo la presion a ver como estamos preste el brazo esta un poquito alta ciento cuarenta noventa pero puede ser por la caminada de ahorita don roberto y como ha estado del azucar pues la verdad doctor yo no me he hecho la prueba en ayunas porque no he tenido plata para las tirillas pero me he sentido como con mucha sed y orinando mucho de noche mire don roberto si para el otro mes que nos veamos esa hemoglobina glicosilada no baja de ocho por ciento nos va a tocar empezar a ponerle insulina oye por ahora vamos a seguir igual pero si no mejora le pongo la insulina ay no doctor chuzones no yo me porto bien se lo juro bueno entonces a hacer dieta estricta y por lo del ojo que hacemos eso me preocupa un poquito porque puede ser un aviso de un derrame le voy a mandar una ecografia de las carotidas del cuello a ver si hay alguna plaquita de colesterol ahi tapando no le mando aspirina todavia hasta no ver la ecografia entonces quedamos asi suspende enalapril del todo sigue con metformina quinientos cada doce horas losartan cincuenta cada doce y me trae el ecocardiograma la proxima y se saca la ecografia del cuello listo doctor muchas gracias que Dios lo bendiga ah y doctor una cosita final el me habia dicho esta manana que le dolia mucho la rodilla izquierda sera que le manda una cremita ah si claro echese diclofenaco en gel ahi en la rodilla cuando le duela nos vemos en un mes",
-    "notes": "Trampas incluidas: 1. Dato pendiente: el ecocardiograma no fue revisado porque se quedo en la casa (evitar que la IA invente FEVI o resultados cardiologicos). 2. Condicional: inicio de insulina condicionado al resultado de HbA1c el proximo mes (no poner como medicamento actual). 3. Instruccion negativa: suspension estricta del enalapril automedicado (y no iniciar aspirina todavia). 4. Correcciones multiples: dosis de metformina pasa de 850mg x1 a 850mg x2, hasta que el doctor verifica que en realidad es 500mg x2. 5. Signo de alarma grave: amaurosis fugax (perdida de vision temporal) sugestiva de AIT. 6. Riesgo de alucinacion: solo se tomo tension arterial (140/90), no hay frecuencia cardiaca ni auscultacion a pesar de que inicia preguntando por el pecho; no se examina la rodilla ni el ojo fisicamente; no se menciona incapacidad medica."
+    "notes": "Trampas incluidas: ecocardiograma pendiente; insulina condicionada a HbA1c futura; suspender enalapril y no iniciar aspirina; metformina corregida hasta 500 mg dos veces al dia; amaurosis fugax; solo tension arterial medida, sin examen de ojo o rodilla ni incapacidad.",
+    "transcription": {
+      "format": "consultation_transcript_v1",
+      "language": "es",
+      "timestamp_granularity_ms": 60000,
+      "turn_timestamps_available": false,
+      "sections": [
+        {
+          "section_index": 0,
+          "start_time_ms": 0,
+          "end_time_ms": 60000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "clinician",
+              "text": "Don Roberto, siga por favor. Viene con su hija, ¿cierto?"
+            },
+            {
+              "turn_index": 1,
+              "speaker": "companion",
+              "text": "Si doctor. A mi papa se le olvida todo, entonces yo lo acompano hoy."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "clinician",
+              "text": "Don Roberto, ¿como ha estado del pecho y de la presion?"
+            },
+            {
+              "turn_index": 3,
+              "speaker": "patient",
+              "text": "Me he sentido como bien. A veces me canso un poquito cuando subo las lomas, pero de resto bien."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "companion",
+              "text": "Papa, digale lo del ojo."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "patient",
+              "text": "Ayer por la tarde estaba viendo television y de la nada se me oscurecio el ojo derecho, como si me hubieran puesto un telon negro. No veia nada por ese lado."
+            },
+            {
+              "turn_index": 6,
+              "speaker": "clinician",
+              "text": "¿Cuanto le duro?"
+            },
+            {
+              "turn_index": 7,
+              "speaker": "patient",
+              "text": "Unos cinco minuticos; luego me volvio la vista normal."
+            },
+            {
+              "turn_index": 8,
+              "speaker": "clinician",
+              "text": "¿Trajo el ecocardiograma?"
+            },
+            {
+              "turn_index": 9,
+              "speaker": "patient",
+              "text": "Se nos quedo en la casa."
+            },
+            {
+              "turn_index": 10,
+              "speaker": "companion",
+              "text": "Yo voy en taxi y se lo traigo."
+            },
+            {
+              "turn_index": 11,
+              "speaker": "clinician",
+              "text": "No, dejelo para la proxima cita. Sin eso no le puedo cambiar la dosis de las pastillas del corazon."
+            }
+          ]
+        },
+        {
+          "section_index": 1,
+          "start_time_ms": 60000,
+          "end_time_ms": 120000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "clinician",
+              "text": "¿Que medicamentos toma?"
+            },
+            {
+              "turn_index": 1,
+              "speaker": "patient",
+              "text": "Metformina de ochocientos cincuenta, una al dia despues del almuerzo."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "companion",
+              "text": "No papa, usted se toma dos al dia, una por la manana y otra por la noche."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "patient",
+              "text": "Ah si, dos al dia."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "clinician",
+              "text": "En la formula del sistema dice que es de quinientos miligramos, no de ochocientos cincuenta."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "patient",
+              "text": "Ah verdad, la blanquita redonda chiquita. Esa me tomo dos al dia, quinientos miligramos."
+            },
+            {
+              "turn_index": 6,
+              "speaker": "patient",
+              "text": "Tambien me tomo losartan y enalapril que me dio otro doctor de la EPS de mi esposa, que me regalo unas cajas."
+            },
+            {
+              "turn_index": 7,
+              "speaker": "clinician",
+              "text": "No puede tomar losartan y enalapril al mismo tiempo. Suspenda el enalapril de una vez; no lo vuelva a tomar. Solo se queda con losartan de cincuenta."
+            },
+            {
+              "turn_index": 8,
+              "speaker": "patient",
+              "text": "Listo doctor, no me tomo mas el enalapril."
+            },
+            {
+              "turn_index": 9,
+              "speaker": "clinician",
+              "text": "La presion esta ciento cuarenta sobre noventa, un poquito alta; puede ser por la caminada."
+            }
+          ]
+        },
+        {
+          "section_index": 2,
+          "start_time_ms": 120000,
+          "end_time_ms": 180000,
+          "turns": [
+            {
+              "turn_index": 0,
+              "speaker": "clinician",
+              "text": "¿Como ha estado del azucar?"
+            },
+            {
+              "turn_index": 1,
+              "speaker": "patient",
+              "text": "No me he hecho la prueba en ayunas porque no he tenido plata para las tirillas, pero he sentido mucha sed y orino mucho de noche."
+            },
+            {
+              "turn_index": 2,
+              "speaker": "clinician",
+              "text": "Si para el otro mes la hemoglobina glicosilada no baja de ocho por ciento, nos va a tocar empezar insulina. Por ahora seguimos igual."
+            },
+            {
+              "turn_index": 3,
+              "speaker": "patient",
+              "text": "Ay no doctor, chuzones no. Yo me porto bien."
+            },
+            {
+              "turn_index": 4,
+              "speaker": "clinician",
+              "text": "Entonces dieta estricta. Lo del ojo me preocupa porque puede ser un aviso de un derrame. Le voy a mandar una ecografia de las carotidas. No le mando aspirina todavia hasta no ver la ecografia."
+            },
+            {
+              "turn_index": 5,
+              "speaker": "clinician",
+              "text": "Quedamos asi: suspende enalapril, sigue con metformina quinientos cada doce horas, losartan cincuenta cada doce, trae el ecocardiograma y se hace la ecografia del cuello."
+            },
+            {
+              "turn_index": 6,
+              "speaker": "companion",
+              "text": "Una cosa final: esta manana le dolia mucho la rodilla izquierda. ¿Le manda una cremita?"
+            },
+            {
+              "turn_index": 7,
+              "speaker": "clinician",
+              "text": "Echese diclofenaco en gel en la rodilla cuando le duela. Nos vemos en un mes."
+            }
+          ]
+        }
+      ]
+    }
   }
 ]

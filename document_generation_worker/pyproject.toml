@@ -19,8 +19,12 @@ dependencies = [
   "opentelemetry-instrumentation-httpx>=0.48b0,<0.60",
   "pydantic-settings>=2.8.0,<3",
   "python-dotenv>=1.0.1,<2",
+  "worker-runtime",
   "uvicorn[standard]>=0.34.0,<0.35",
 ]
+
+[tool.uv.sources]
+worker-runtime = { path = "../shared/worker_runtime", editable = true }
 
 [dependency-groups]
 dev = [

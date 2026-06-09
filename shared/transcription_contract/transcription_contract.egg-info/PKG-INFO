@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: transcription-contract
+Version: 0.1.0
+Summary: Shared structured transcription contract for worker and backend
+Requires-Python: >=3.11
+Requires-Dist: pydantic<3,>=2.8.0

@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
+from app.core.environment import is_local_environment
 from app.core.observability import bind_log_context, log_event
 from app.db.models import User
 from app.db.session import AsyncSessionLocal, get_db_session
@@ -69,10 +70,6 @@ router = APIRouter()
 
 # Local dispatch waits for the worker to finish Gemini + callback path.
 LOCAL_TRANSCRIPTION_WORKER_DISPATCH_TIMEOUT_SECONDS = 120
-
-
-def _is_local_environment(settings: Settings) -> bool:
-    return settings.environment.strip().lower() in {"local", "dev", "development", "test", "ci"}
 
 
 async def _consolidate_session_background(session_id: str, settings: Settings) -> None:
@@ -241,7 +238,7 @@ async def debug_transcription_section(
     settings: Settings = Depends(get_settings),
 ) -> DebugTranscriptionBridgeResponse:
     require_clinical_access(user)
-    if not _is_local_environment(settings):
+    if not is_local_environment(settings):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
 
     audio_bytes = await file.read()
@@ -297,7 +294,7 @@ async def debug_transcription_section_trimmed_audio(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     require_clinical_access(user)
-    if not _is_local_environment(settings):
+    if not is_local_environment(settings):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
 
     audio_bytes = await file.read()

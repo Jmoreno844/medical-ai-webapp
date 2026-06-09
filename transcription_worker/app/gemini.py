@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import json
 import logging
-from functools import lru_cache
 
 from app.audio import convert_audio_to_wav
 from app.observability import log_event
 from app.settings import Settings
 from transcription_contract.models import TranscriptionTurn
 from transcription_contract.sanitize import parse_and_sanitize_turns, parse_turns_from_response
+from worker_runtime.llm.google import get_google_genai_client
 
 SECTION_TRANSCRIPTION_SYSTEM_INSTRUCTION = """
 Eres un sistema de transcripción literal y diarización de consultas médicas en español.
@@ -136,11 +136,8 @@ def _log_gemini_response_metadata(response: object) -> None:
     )
 
 
-@lru_cache(maxsize=1)
 def _get_google_client(project_id: str, location: str):
-    from google import genai
-
-    return genai.Client(vertexai=True, project=project_id, location=location)
+    return get_google_genai_client(project_id, location)
 
 
 async def transcribe_audio(

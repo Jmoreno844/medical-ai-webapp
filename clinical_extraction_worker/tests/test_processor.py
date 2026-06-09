@@ -49,7 +49,9 @@ async def test_processor_posts_extracted_result(monkeypatch: pytest.MonkeyPatch)
     )
 
     async def fake_extract(**_kwargs):
-        return {"chief_complaints": []}
+        return {
+            "mentions": [],
+        }
 
     monkeypatch.setattr("app.processor.extract_clinical_facts", fake_extract)
 
