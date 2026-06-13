@@ -1,0 +1,21 @@
+{
+  "session_id": "medication_question_and_avoid",
+  "language": "es",
+  "chunks": [
+    {
+      "chunk_id": "s0",
+      "turns": [
+        {
+          "turn_id": 0,
+          "speaker": "PACIENTE",
+          "text": "Doctora, me puedo tomar ibuprofeno para este dolor?"
+        },
+        {
+          "turn_id": 1,
+          "speaker": "MEDICO",
+          "text": "No, por favor no tome ibuprofeno ni diclofenaco. Si le duele mucho, tome acetaminofen quinientos miligramos."
+        }
+      ]
+    }
+  ]
+}

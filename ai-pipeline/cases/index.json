@@ -1,0 +1,27 @@
+[
+  {
+    "id": "case1",
+    "transcript_file": "transcripts/case1.json",
+    "notes": "Consulta reordenada: minimiza al inicio, contradicciones tardias (presion toracica, heces oscuras, ibuprofeno frecuente) y cierre con sintesis del medico."
+  },
+  {
+    "id": "case2",
+    "transcript_file": "transcripts/case2.json",
+    "notes": "Dolor de rodilla + diabetes + HTA. Incluye backchannels, charla informal, ruido administrativo, saludos y despedidas intercalados para evaluar precision del filtro."
+  },
+  {
+    "id": "case2_filtered",
+    "transcript_file": "transcripts/case2_filtered.json",
+    "notes": "case2 sin los 12 turnos descartados por el filtro (saludos, backchannels, charla informal, ruido admin, despedidas); turn_ids renumerados 0..59 para clustering."
+  },
+  {
+    "id": "medication_question_and_avoid",
+    "transcript_file": "transcripts/medication_question_and_avoid.json",
+    "notes": "Pregunta de medicacion, restriccion explicita de AINEs y una prescripcion simple."
+  },
+  {
+    "id": "eval_doc_clinica_co_001",
+    "transcript_file": "transcripts/eval_doc_clinica_co_001.json",
+    "notes": "Consulta larga con multiples temas: sintomas cardiopulmonares, antecedentes, estudios pendientes."
+  }
+]

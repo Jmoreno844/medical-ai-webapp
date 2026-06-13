@@ -1,0 +1,17 @@
+[
+  {
+    "id": "case1",
+    "transcript_file": "transcripts/case1.json",
+    "notes": "Consulta reordenada: minimiza al inicio, contradicciones tardias (presion toracica, heces oscuras, ibuprofeno frecuente) y cierre con sintesis del medico."
+  },
+  {
+    "id": "medication_question_and_avoid",
+    "transcript_file": "transcripts/medication_question_and_avoid.json",
+    "notes": "Pregunta de medicacion, restriccion explicita de AINEs y una prescripcion simple."
+  },
+  {
+    "id": "eval_doc_clinica_co_001",
+    "transcript_file": "transcripts/eval_doc_clinica_co_001.json",
+    "notes": "Consulta larga con multiples temas: sintomas cardiopulmonares, antecedentes, estudios pendientes."
+  }
+]

@@ -1,0 +1,101 @@
+{
+  "session_id": "eval_doc_clinica_co_001",
+  "language": "es",
+  "chunks": [
+    {
+      "chunk_id": "section-0",
+      "turns": [
+        {
+          "speaker": "PATIENT",
+          "text": "Bueno, desde anoche me da como una presion aqui en el centro del pecho, no todo el tiempo, mas cuando subo la escalera, y me falta el aire. Al principio dije que era ardor, pero no; pensandolo bien no se parece a la gastritis, es peso, como si me apretaran.",
+          "turn_id": 0
+        },
+        {
+          "speaker": "PATIENT",
+          "text": "Esta manana casi me voy al piso en el bano. No perdi el conocimiento... bueno, mi hermana dice que si quede ida unos segundos; yo no me acuerdo bien.",
+          "turn_id": 1
+        },
+        {
+          "speaker": "PATIENT",
+          "text": "No he tenido fiebre. Tos si, seca, desde hace tres dias, y hoy vi una rayita roja en la flema, una sola vez.",
+          "turn_id": 2
+        },
+        {
+          "speaker": "PATIENT",
+          "text": "No, no estoy tomando anticonceptivos. Deje las pastillas hace dos meses... espere, las deje fue hace como tres semanas.",
+          "turn_id": 3
+        },
+        {
+          "speaker": "PATIENT",
+          "text": "La ultima menstruacion no fue el 20, fue el 8 del mes pasado. No se si pueda estar embarazada.",
+          "turn_id": 4
+        }
+      ]
+    },
+    {
+      "chunk_id": "section-1",
+      "turns": [
+        {
+          "speaker": "PATIENT",
+          "text": "La prueba de orina quedo pedida, todavia no ha salido, entonces no pongamos que es negativa.",
+          "turn_id": 5
+        },
+        {
+          "speaker": "PATIENT",
+          "text": "Alergias, que yo sepa ninguna, aunque una vez con diclofenaco me salieron ronchas, no se si cuenta.",
+          "turn_id": 6
+        },
+        {
+          "speaker": "CLINICIAN",
+          "text": "No se aplique mas diclofenaco ni ibuprofeno por ahora; eso si queda claro.",
+          "turn_id": 7
+        },
+        {
+          "speaker": "PATIENT",
+          "text": "Tome una tableta de aspirina que habia en la casa, no se de cuantos miligramos.",
+          "turn_id": 8
+        },
+        {
+          "speaker": "PATIENT",
+          "text": "Mi papa tuvo un infarto joven, a los cincuenta y... cuarenta y ocho, me corrigio mi mama.",
+          "turn_id": 9
+        },
+        {
+          "speaker": "PATIENT",
+          "text": "La pierna izquierda me dolio ayer detras de la pantorrilla, pero no se si esta hinchada; nadie la ha medido.",
+          "turn_id": 10
+        },
+        {
+          "speaker": "PATIENT",
+          "text": "Aqui no me han dicho que el electro este normal. Dijeron que lo van a repetir porque el primero tenia mucho movimiento. Tambien falta el dimero D y una troponina; estan pendientes, no son resultados.",
+          "turn_id": 11
+        }
+      ]
+    },
+    {
+      "chunk_id": "section-2",
+      "turns": [
+        {
+          "speaker": "PATIENT",
+          "text": "Si alguno sale alterado, hablaron de hacer una tomografia con contraste, pero solo en ese caso; no esta ordenada todavia.",
+          "turn_id": 12
+        },
+        {
+          "speaker": "PATIENT",
+          "text": "¿Me puedo ir a trabajar?",
+          "turn_id": 13
+        },
+        {
+          "speaker": "CLINICIAN",
+          "text": "No, todavia no han definido incapacidad ni alta. Primero van a revisar esos examenes.",
+          "turn_id": 14
+        },
+        {
+          "speaker": "PATIENT",
+          "text": "Me preguntaron si entendi, pero justo entro una llamada y no alcance a responder bien.",
+          "turn_id": 15
+        }
+      ]
+    }
+  ]
+}

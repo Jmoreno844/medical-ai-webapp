@@ -1,0 +1,76 @@
+{
+  "session_id": "case1",
+  "topic_label": "presion_pecho_esfuerzo_y_reposo",
+  "turns": [
+    {
+      "turn_id": 8,
+      "speaker": "MEDICO",
+      "text": "¿Dolor en el pecho?"
+    },
+    {
+      "turn_id": 9,
+      "speaker": "PACIENTE",
+      "text": "No, dolor no."
+    },
+    {
+      "turn_id": 36,
+      "speaker": "MEDICO",
+      "text": "Antes dijo que no tenía dolor en el pecho. ¿Ha sentido presión, ardor u opresión?"
+    },
+    {
+      "turn_id": 37,
+      "speaker": "PACIENTE",
+      "text": "Dolor no. Pero presión sí, a veces. Como una pesa pequeña aquí en el centro."
+    },
+    {
+      "turn_id": 38,
+      "speaker": "MEDICO",
+      "text": "¿Cuándo aparece?"
+    },
+    {
+      "turn_id": 39,
+      "speaker": "PACIENTE",
+      "text": "Al subir escaleras algunas veces. Pero no siempre."
+    },
+    {
+      "turn_id": 40,
+      "speaker": "MEDICO",
+      "text": "¿Y en reposo?"
+    },
+    {
+      "turn_id": 41,
+      "speaker": "PACIENTE",
+      "text": "Una noche me despertó algo parecido, pero pensé que era acidez."
+    },
+    {
+      "turn_id": 42,
+      "speaker": "MEDICO",
+      "text": "¿Cuánto duró?"
+    },
+    {
+      "turn_id": 43,
+      "speaker": "PACIENTE",
+      "text": "Tal vez media hora. Me senté y se fue calmando."
+    },
+    {
+      "turn_id": 116,
+      "speaker": "MEDICO",
+      "text": "Ahora mismo, ¿tiene presión en el pecho?"
+    },
+    {
+      "turn_id": 117,
+      "speaker": "PACIENTE",
+      "text": "No presión. Bueno, una incomodidad leve, como tres de diez."
+    },
+    {
+      "turn_id": 118,
+      "speaker": "MEDICO",
+      "text": "¿Se va al brazo, mandíbula o espalda?"
+    },
+    {
+      "turn_id": 119,
+      "speaker": "PACIENTE",
+      "text": "A la mandíbula no. Al hombro izquierdo a veces, pero cargo el bolso de ese lado."
+    }
+  ]
+}

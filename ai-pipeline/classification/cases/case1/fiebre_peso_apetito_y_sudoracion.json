@@ -1,0 +1,86 @@
+{
+  "session_id": "case1",
+  "topic_label": "fiebre_peso_apetito_y_sudoracion",
+  "turns": [
+    {
+      "turn_id": 10,
+      "speaker": "MEDICO",
+      "text": "¿Ha tenido fiebre?"
+    },
+    {
+      "turn_id": 11,
+      "speaker": "PACIENTE",
+      "text": "No."
+    },
+    {
+      "turn_id": 12,
+      "speaker": "MEDICO",
+      "text": "¿Ha bajado de peso?"
+    },
+    {
+      "turn_id": 13,
+      "speaker": "PACIENTE",
+      "text": "No creo. No me he pesado, pero no creo."
+    },
+    {
+      "turn_id": 14,
+      "speaker": "MEDICO",
+      "text": "¿Cómo está el apetito?"
+    },
+    {
+      "turn_id": 15,
+      "speaker": "PACIENTE",
+      "text": "Normal. Bueno, como menos porque me lleno rápido, pero hambre sí me da."
+    },
+    {
+      "turn_id": 64,
+      "speaker": "MEDICO",
+      "text": "¿Sudoración nocturna?"
+    },
+    {
+      "turn_id": 65,
+      "speaker": "PACIENTE",
+      "text": "No. Bueno, me despierto algo húmedo últimamente, pero mi cuarto es caliente."
+    },
+    {
+      "turn_id": 66,
+      "speaker": "MEDICO",
+      "text": "¿Fiebre medida?"
+    },
+    {
+      "turn_id": 67,
+      "speaker": "PACIENTE",
+      "text": "No me la he medido. A veces me siento calentón de noche, pero no sé si cuenta."
+    },
+    {
+      "turn_id": 68,
+      "speaker": "MEDICO",
+      "text": "Antes dijo que no creía haber bajado de peso. ¿La ropa le queda igual?"
+    },
+    {
+      "turn_id": 69,
+      "speaker": "PACIENTE",
+      "text": "Un poco más suelta. Pero pensé que era porque estaba comiendo menos."
+    },
+    {
+      "turn_id": 70,
+      "speaker": "MEDICO",
+      "text": "¿Tos?"
+    },
+    {
+      "turn_id": 71,
+      "speaker": "PACIENTE",
+      "text": "No."
+    },
+    {
+      "turn_id": 72,
+      "speaker": "MEDICO",
+      "text": "¿Flema o sangre al toser?"
+    },
+    {
+      "turn_id": 73,
+      "speaker": "PACIENTE",
+      "text": "No sangre. Solo una vez salió algo rojizo en la mañana, pero acababa de cepillarme los dientes."
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "session_id": "case1",
+  "topic_label": "finca_animales_y_rasguno",
+  "turns": [
+    {
+      "turn_id": 102,
+      "speaker": "MEDICO",
+      "text": "¿Ha viajado recientemente?"
+    },
+    {
+      "turn_id": 103,
+      "speaker": "PACIENTE",
+      "text": "No."
+    },
+    {
+      "turn_id": 104,
+      "speaker": "MEDICO",
+      "text": "¿Fuera de la ciudad, campo, finca?"
+    },
+    {
+      "turn_id": 105,
+      "speaker": "PACIENTE",
+      "text": "Ah, estuve en una finca hace un mes. Pero fue cerca, no lo pensé como viaje."
+    },
+    {
+      "turn_id": 106,
+      "speaker": "MEDICO",
+      "text": "¿Agua de pozo, comida distinta, hielo?"
+    },
+    {
+      "turn_id": 107,
+      "speaker": "PACIENTE",
+      "text": "Agua de botellón. El hielo no sé."
+    },
+    {
+      "turn_id": 108,
+      "speaker": "MEDICO",
+      "text": "¿Animales o picaduras?"
+    },
+    {
+      "turn_id": 109,
+      "speaker": "PACIENTE",
+      "text": "Mosquitos normal. Había gallinas y perros."
+    },
+    {
+      "turn_id": 110,
+      "speaker": "MEDICO",
+      "text": "¿Alguna herida?"
+    },
+    {
+      "turn_id": 111,
+      "speaker": "PACIENTE",
+      "text": "Un rasguño en la pierna que tardó en cerrar, pero ya está mejor."
+    }
+  ]
+}

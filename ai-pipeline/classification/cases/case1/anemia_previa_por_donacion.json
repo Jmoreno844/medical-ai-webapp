@@ -1,0 +1,36 @@
+{
+  "session_id": "case1",
+  "topic_label": "anemia_previa_por_donacion",
+  "turns": [
+    {
+      "turn_id": 92,
+      "speaker": "MEDICO",
+      "text": "¿Antecedentes médicos?"
+    },
+    {
+      "turn_id": 93,
+      "speaker": "PACIENTE",
+      "text": "Ninguno."
+    },
+    {
+      "turn_id": 94,
+      "speaker": "MEDICO",
+      "text": "¿Anemia, hipertensión, diabetes?"
+    },
+    {
+      "turn_id": 95,
+      "speaker": "PACIENTE",
+      "text": "Anemia me dijeron una vez, hace años, pero fue algo leve."
+    },
+    {
+      "turn_id": 96,
+      "speaker": "MEDICO",
+      "text": "¿Cómo se enteró?"
+    },
+    {
+      "turn_id": 97,
+      "speaker": "PACIENTE",
+      "text": "Doné sangre y me dijeron que estaba bajo. Después no volví a revisar."
+    }
+  ]
+}

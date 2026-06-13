@@ -1,0 +1,636 @@
+{
+  "session_id": "case1",
+  "language": "es",
+  "chunks": [
+    {
+      "chunk_id": "s0",
+      "turns": [
+        {
+          "turn_id": 0,
+          "speaker": "MEDICO",
+          "text": "Buenos días. ¿Qué lo trae hoy?"
+        },
+        {
+          "turn_id": 1,
+          "speaker": "PACIENTE",
+          "text": "Cansancio, más que nada. Creo que es por trabajo. No es algo grave."
+        },
+        {
+          "turn_id": 2,
+          "speaker": "MEDICO",
+          "text": "¿Desde cuándo?"
+        },
+        {
+          "turn_id": 3,
+          "speaker": "PACIENTE",
+          "text": "Dos semanas, más o menos."
+        },
+        {
+          "turn_id": 4,
+          "speaker": "MEDICO",
+          "text": "¿Le pasa al caminar, subir escaleras o también en reposo?"
+        },
+        {
+          "turn_id": 5,
+          "speaker": "PACIENTE",
+          "text": "Al subir escaleras, sobre todo. Pero supongo que estoy fuera de forma."
+        },
+        {
+          "turn_id": 6,
+          "speaker": "MEDICO",
+          "text": "¿Falta de aire?"
+        },
+        {
+          "turn_id": 7,
+          "speaker": "PACIENTE",
+          "text": "No, falta de aire no. Solo me canso."
+        },
+        {
+          "turn_id": 8,
+          "speaker": "MEDICO",
+          "text": "¿Dolor en el pecho?"
+        },
+        {
+          "turn_id": 9,
+          "speaker": "PACIENTE",
+          "text": "No, dolor no."
+        },
+        {
+          "turn_id": 10,
+          "speaker": "MEDICO",
+          "text": "¿Ha tenido fiebre?"
+        },
+        {
+          "turn_id": 11,
+          "speaker": "PACIENTE",
+          "text": "No."
+        },
+        {
+          "turn_id": 12,
+          "speaker": "MEDICO",
+          "text": "¿Ha bajado de peso?"
+        },
+        {
+          "turn_id": 13,
+          "speaker": "PACIENTE",
+          "text": "No creo. No me he pesado, pero no creo."
+        },
+        {
+          "turn_id": 14,
+          "speaker": "MEDICO",
+          "text": "¿Cómo está el apetito?"
+        },
+        {
+          "turn_id": 15,
+          "speaker": "PACIENTE",
+          "text": "Normal. Bueno, como menos porque me lleno rápido, pero hambre sí me da."
+        },
+        {
+          "turn_id": 16,
+          "speaker": "MEDICO",
+          "text": "¿Dolor abdominal?"
+        },
+        {
+          "turn_id": 17,
+          "speaker": "PACIENTE",
+          "text": "No. Tal vez una molestia leve, pero no dolor."
+        },
+        {
+          "turn_id": 18,
+          "speaker": "MEDICO",
+          "text": "¿Dónde?"
+        },
+        {
+          "turn_id": 19,
+          "speaker": "PACIENTE",
+          "text": "Como en la boca del estómago. A veces más hacia la izquierda."
+        },
+        {
+          "turn_id": 20,
+          "speaker": "MEDICO",
+          "text": "¿Náuseas o vómito?"
+        },
+        {
+          "turn_id": 21,
+          "speaker": "PACIENTE",
+          "text": "No."
+        },
+        {
+          "turn_id": 22,
+          "speaker": "MEDICO",
+          "text": "¿Cambios en las deposiciones?"
+        },
+        {
+          "turn_id": 23,
+          "speaker": "PACIENTE",
+          "text": "No, normal."
+        },
+        {
+          "turn_id": 24,
+          "speaker": "MEDICO",
+          "text": "¿Ha notado sangre?"
+        },
+        {
+          "turn_id": 25,
+          "speaker": "PACIENTE",
+          "text": "No sangre."
+        },
+        {
+          "turn_id": 26,
+          "speaker": "MEDICO",
+          "text": "¿Medicamentos?"
+        },
+        {
+          "turn_id": 27,
+          "speaker": "PACIENTE",
+          "text": "Nada fijo."
+        },
+        {
+          "turn_id": 28,
+          "speaker": "MEDICO",
+          "text": "¿Antiinflamatorios? Ibuprofeno, naproxeno, aspirina."
+        },
+        {
+          "turn_id": 29,
+          "speaker": "PACIENTE",
+          "text": "Ibuprofeno sí, pero lo normal."
+        },
+        {
+          "turn_id": 30,
+          "speaker": "MEDICO",
+          "text": "¿Qué significa “normal”?"
+        },
+        {
+          "turn_id": 31,
+          "speaker": "PACIENTE",
+          "text": "Dos o tres al día, este mes. A veces cuatro si me duele mucho la espalda."
+        },
+        {
+          "turn_id": 32,
+          "speaker": "MEDICO",
+          "text": "¿Dolor de espalda desde cuándo?"
+        },
+        {
+          "turn_id": 33,
+          "speaker": "PACIENTE",
+          "text": "Como un mes. Pensé que era muscular, por cargar cosas."
+        },
+        {
+          "turn_id": 34,
+          "speaker": "MEDICO",
+          "text": "¿En qué parte?"
+        },
+        {
+          "turn_id": 35,
+          "speaker": "PACIENTE",
+          "text": "En la mitad de la espalda. No es fuerte, pero está ahí."
+        },
+        {
+          "turn_id": 36,
+          "speaker": "MEDICO",
+          "text": "Antes dijo que no tenía dolor en el pecho. ¿Ha sentido presión, ardor u opresión?"
+        },
+        {
+          "turn_id": 37,
+          "speaker": "PACIENTE",
+          "text": "Dolor no. Pero presión sí, a veces. Como una pesa pequeña aquí en el centro."
+        },
+        {
+          "turn_id": 38,
+          "speaker": "MEDICO",
+          "text": "¿Cuándo aparece?"
+        },
+        {
+          "turn_id": 39,
+          "speaker": "PACIENTE",
+          "text": "Al subir escaleras algunas veces. Pero no siempre."
+        },
+        {
+          "turn_id": 40,
+          "speaker": "MEDICO",
+          "text": "¿Y en reposo?"
+        },
+        {
+          "turn_id": 41,
+          "speaker": "PACIENTE",
+          "text": "Una noche me despertó algo parecido, pero pensé que era acidez."
+        },
+        {
+          "turn_id": 42,
+          "speaker": "MEDICO",
+          "text": "¿Cuánto duró?"
+        },
+        {
+          "turn_id": 43,
+          "speaker": "PACIENTE",
+          "text": "Tal vez media hora. Me senté y se fue calmando."
+        },
+        {
+          "turn_id": 44,
+          "speaker": "MEDICO",
+          "text": "¿Tomó algo?"
+        },
+        {
+          "turn_id": 45,
+          "speaker": "PACIENTE",
+          "text": "Un antiácido. Y una aspirina, por si acaso."
+        },
+        {
+          "turn_id": 46,
+          "speaker": "MEDICO",
+          "text": "¿Suele tomar aspirina?"
+        },
+        {
+          "turn_id": 47,
+          "speaker": "PACIENTE",
+          "text": "No. Bueno, una vez más esta semana porque pensé que me iba a dar gripa."
+        },
+        {
+          "turn_id": 48,
+          "speaker": "MEDICO",
+          "text": "Volvamos a las deposiciones. Dijo que estaban normales. ¿Color normal también?"
+        },
+        {
+          "turn_id": 49,
+          "speaker": "PACIENTE",
+          "text": "Ahora que lo dice, han estado más oscuras. Pero pensé que era por vitaminas."
+        },
+        {
+          "turn_id": 50,
+          "speaker": "MEDICO",
+          "text": "¿Vitaminas con hierro?"
+        },
+        {
+          "turn_id": 51,
+          "speaker": "PACIENTE",
+          "text": "Creo que sí. Mi esposa me dio unas."
+        },
+        {
+          "turn_id": 52,
+          "speaker": "MEDICO",
+          "text": "¿Se las formularon?"
+        },
+        {
+          "turn_id": 53,
+          "speaker": "PACIENTE",
+          "text": "No, eran de ella."
+        },
+        {
+          "turn_id": 54,
+          "speaker": "MEDICO",
+          "text": "¿Las heces eran oscuras antes de esas vitaminas o después?"
+        },
+        {
+          "turn_id": 55,
+          "speaker": "PACIENTE",
+          "text": "No estoy seguro. Tal vez antes. No le puse mucha atención."
+        },
+        {
+          "turn_id": 56,
+          "speaker": "MEDICO",
+          "text": "¿Se ha sentido mareado?"
+        },
+        {
+          "turn_id": 57,
+          "speaker": "PACIENTE",
+          "text": "No mareado como tal."
+        },
+        {
+          "turn_id": 58,
+          "speaker": "MEDICO",
+          "text": "¿Alguna vez visión borrosa, debilidad súbita o sensación de desmayo?"
+        },
+        {
+          "turn_id": 59,
+          "speaker": "PACIENTE",
+          "text": "Hace tres días en el baño se me puso todo gris. Me senté y se pasó."
+        },
+        {
+          "turn_id": 60,
+          "speaker": "MEDICO",
+          "text": "¿Después de levantarse?"
+        },
+        {
+          "turn_id": 61,
+          "speaker": "PACIENTE",
+          "text": "Sí, me levanté rápido."
+        },
+        {
+          "turn_id": 62,
+          "speaker": "MEDICO",
+          "text": "¿Ha tenido palpitaciones?"
+        },
+        {
+          "turn_id": 63,
+          "speaker": "PACIENTE",
+          "text": "No. Solo el corazón rápido cuando subo escaleras."
+        },
+        {
+          "turn_id": 64,
+          "speaker": "MEDICO",
+          "text": "¿Sudoración nocturna?"
+        },
+        {
+          "turn_id": 65,
+          "speaker": "PACIENTE",
+          "text": "No. Bueno, me despierto algo húmedo últimamente, pero mi cuarto es caliente."
+        },
+        {
+          "turn_id": 66,
+          "speaker": "MEDICO",
+          "text": "¿Fiebre medida?"
+        },
+        {
+          "turn_id": 67,
+          "speaker": "PACIENTE",
+          "text": "No me la he medido. A veces me siento calentón de noche, pero no sé si cuenta."
+        },
+        {
+          "turn_id": 68,
+          "speaker": "MEDICO",
+          "text": "Antes dijo que no creía haber bajado de peso. ¿La ropa le queda igual?"
+        },
+        {
+          "turn_id": 69,
+          "speaker": "PACIENTE",
+          "text": "Un poco más suelta. Pero pensé que era porque estaba comiendo menos."
+        },
+        {
+          "turn_id": 70,
+          "speaker": "MEDICO",
+          "text": "¿Tos?"
+        },
+        {
+          "turn_id": 71,
+          "speaker": "PACIENTE",
+          "text": "No."
+        },
+        {
+          "turn_id": 72,
+          "speaker": "MEDICO",
+          "text": "¿Flema o sangre al toser?"
+        },
+        {
+          "turn_id": 73,
+          "speaker": "PACIENTE",
+          "text": "No sangre. Solo una vez salió algo rojizo en la mañana, pero acababa de cepillarme los dientes."
+        },
+        {
+          "turn_id": 74,
+          "speaker": "MEDICO",
+          "text": "¿Fuma?"
+        },
+        {
+          "turn_id": 75,
+          "speaker": "PACIENTE",
+          "text": "No."
+        },
+        {
+          "turn_id": 76,
+          "speaker": "MEDICO",
+          "text": "¿Nunca?"
+        },
+        {
+          "turn_id": 77,
+          "speaker": "PACIENTE",
+          "text": "Antes, socialmente. Ahora casi nada."
+        },
+        {
+          "turn_id": 78,
+          "speaker": "MEDICO",
+          "text": "¿Cuánto es casi nada?"
+        },
+        {
+          "turn_id": 79,
+          "speaker": "PACIENTE",
+          "text": "Uno o dos cigarrillos algunos fines de semana."
+        },
+        {
+          "turn_id": 80,
+          "speaker": "MEDICO",
+          "text": "¿Alcohol?"
+        },
+        {
+          "turn_id": 81,
+          "speaker": "PACIENTE",
+          "text": "Poco. Reuniones."
+        },
+        {
+          "turn_id": 82,
+          "speaker": "MEDICO",
+          "text": "¿Cuántas bebidas por semana?"
+        },
+        {
+          "turn_id": 83,
+          "speaker": "PACIENTE",
+          "text": "Depende. Esta semana nada. La anterior hubo un cumpleaños y sí tomé varias."
+        },
+        {
+          "turn_id": 84,
+          "speaker": "MEDICO",
+          "text": "¿Otras sustancias o medicamentos para dormir?"
+        },
+        {
+          "turn_id": 85,
+          "speaker": "PACIENTE",
+          "text": "No."
+        },
+        {
+          "turn_id": 86,
+          "speaker": "MEDICO",
+          "text": "¿Nada para ansiedad, sueño o energía?"
+        },
+        {
+          "turn_id": 87,
+          "speaker": "PACIENTE",
+          "text": "Unas gotas para dormir a veces. Son naturales, creo."
+        },
+        {
+          "turn_id": 88,
+          "speaker": "MEDICO",
+          "text": "¿Nombre?"
+        },
+        {
+          "turn_id": 89,
+          "speaker": "PACIENTE",
+          "text": "No sé. Me las pasó un compañero. Dice que son para la ansiedad."
+        },
+        {
+          "turn_id": 90,
+          "speaker": "MEDICO",
+          "text": "¿Ha estado ansioso?"
+        },
+        {
+          "turn_id": 91,
+          "speaker": "PACIENTE",
+          "text": "Un poco, por trabajo. Nada raro."
+        },
+        {
+          "turn_id": 92,
+          "speaker": "MEDICO",
+          "text": "¿Antecedentes médicos?"
+        },
+        {
+          "turn_id": 93,
+          "speaker": "PACIENTE",
+          "text": "Ninguno."
+        },
+        {
+          "turn_id": 94,
+          "speaker": "MEDICO",
+          "text": "¿Anemia, hipertensión, diabetes?"
+        },
+        {
+          "turn_id": 95,
+          "speaker": "PACIENTE",
+          "text": "Anemia me dijeron una vez, hace años, pero fue algo leve."
+        },
+        {
+          "turn_id": 96,
+          "speaker": "MEDICO",
+          "text": "¿Cómo se enteró?"
+        },
+        {
+          "turn_id": 97,
+          "speaker": "PACIENTE",
+          "text": "Doné sangre y me dijeron que estaba bajo. Después no volví a revisar."
+        },
+        {
+          "turn_id": 98,
+          "speaker": "MEDICO",
+          "text": "¿Antecedentes familiares?"
+        },
+        {
+          "turn_id": 99,
+          "speaker": "PACIENTE",
+          "text": "Nada importante."
+        },
+        {
+          "turn_id": 100,
+          "speaker": "MEDICO",
+          "text": "¿Infartos, trombosis, cáncer?"
+        },
+        {
+          "turn_id": 101,
+          "speaker": "PACIENTE",
+          "text": "Mi papá tuvo un coágulo en la pierna, pero después de una cirugía. Mi mamá tiene tiroides."
+        },
+        {
+          "turn_id": 102,
+          "speaker": "MEDICO",
+          "text": "¿Ha viajado recientemente?"
+        },
+        {
+          "turn_id": 103,
+          "speaker": "PACIENTE",
+          "text": "No."
+        },
+        {
+          "turn_id": 104,
+          "speaker": "MEDICO",
+          "text": "¿Fuera de la ciudad, campo, finca?"
+        },
+        {
+          "turn_id": 105,
+          "speaker": "PACIENTE",
+          "text": "Ah, estuve en una finca hace un mes. Pero fue cerca, no lo pensé como viaje."
+        },
+        {
+          "turn_id": 106,
+          "speaker": "MEDICO",
+          "text": "¿Agua de pozo, comida distinta, hielo?"
+        },
+        {
+          "turn_id": 107,
+          "speaker": "PACIENTE",
+          "text": "Agua de botellón. El hielo no sé."
+        },
+        {
+          "turn_id": 108,
+          "speaker": "MEDICO",
+          "text": "¿Animales o picaduras?"
+        },
+        {
+          "turn_id": 109,
+          "speaker": "PACIENTE",
+          "text": "Mosquitos normal. Había gallinas y perros."
+        },
+        {
+          "turn_id": 110,
+          "speaker": "MEDICO",
+          "text": "¿Alguna herida?"
+        },
+        {
+          "turn_id": 111,
+          "speaker": "PACIENTE",
+          "text": "Un rasguño en la pierna que tardó en cerrar, pero ya está mejor."
+        },
+        {
+          "turn_id": 112,
+          "speaker": "MEDICO",
+          "text": "¿Qué lo hizo venir hoy si pensaba que era estrés?"
+        },
+        {
+          "turn_id": 113,
+          "speaker": "PACIENTE",
+          "text": "Mi esposa insistió. Dice que estoy pálido y que me canso hablando."
+        },
+        {
+          "turn_id": 114,
+          "speaker": "MEDICO",
+          "text": "¿Usted lo nota?"
+        },
+        {
+          "turn_id": 115,
+          "speaker": "PACIENTE",
+          "text": "No mucho. Aunque en reuniones me toca hablar más lento."
+        },
+        {
+          "turn_id": 116,
+          "speaker": "MEDICO",
+          "text": "Ahora mismo, ¿tiene presión en el pecho?"
+        },
+        {
+          "turn_id": 117,
+          "speaker": "PACIENTE",
+          "text": "No presión. Bueno, una incomodidad leve, como tres de diez."
+        },
+        {
+          "turn_id": 118,
+          "speaker": "MEDICO",
+          "text": "¿Se va al brazo, mandíbula o espalda?"
+        },
+        {
+          "turn_id": 119,
+          "speaker": "PACIENTE",
+          "text": "A la mandíbula no. Al hombro izquierdo a veces, pero cargo el bolso de ese lado."
+        },
+        {
+          "turn_id": 120,
+          "speaker": "MEDICO",
+          "text": "Voy a examinarlo y tomar signos vitales. También quiero hacer un electrocardiograma y análisis hoy."
+        },
+        {
+          "turn_id": 121,
+          "speaker": "PACIENTE",
+          "text": "¿Cree que puede ser el corazón?"
+        },
+        {
+          "turn_id": 122,
+          "speaker": "MEDICO",
+          "text": "Puede ser el corazón, pero también puede haber anemia o irritación digestiva con sangrado, especialmente por el ibuprofeno frecuente y las heces oscuras. Lo importante es que varios detalles que al principio sonaban aislados ahora encajan mejor juntos."
+        },
+        {
+          "turn_id": 123,
+          "speaker": "PACIENTE",
+          "text": "Pensé que exageraba."
+        },
+        {
+          "turn_id": 124,
+          "speaker": "MEDICO",
+          "text": "No. Lo que cambió no fue solo la cantidad de síntomas, sino el significado de cada uno cuando los conectamos."
+        }
+      ]
+    }
+  ]
+}

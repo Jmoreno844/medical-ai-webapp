@@ -1,0 +1,56 @@
+{
+  "session_id": "case1",
+  "topic_label": "ibuprofeno_y_aspirina_ocasional",
+  "turns": [
+    {
+      "turn_id": 26,
+      "speaker": "MEDICO",
+      "text": "¿Medicamentos?"
+    },
+    {
+      "turn_id": 27,
+      "speaker": "PACIENTE",
+      "text": "Nada fijo."
+    },
+    {
+      "turn_id": 28,
+      "speaker": "MEDICO",
+      "text": "¿Antiinflamatorios? Ibuprofeno, naproxeno, aspirina."
+    },
+    {
+      "turn_id": 29,
+      "speaker": "PACIENTE",
+      "text": "Ibuprofeno sí, pero lo normal."
+    },
+    {
+      "turn_id": 30,
+      "speaker": "MEDICO",
+      "text": "¿Qué significa “normal”?"
+    },
+    {
+      "turn_id": 31,
+      "speaker": "PACIENTE",
+      "text": "Dos o tres al día, este mes. A veces cuatro si me duele mucho la espalda."
+    },
+    {
+      "turn_id": 44,
+      "speaker": "MEDICO",
+      "text": "¿Tomó algo?"
+    },
+    {
+      "turn_id": 45,
+      "speaker": "PACIENTE",
+      "text": "Un antiácido. Y una aspirina, por si acaso."
+    },
+    {
+      "turn_id": 46,
+      "speaker": "MEDICO",
+      "text": "¿Suele tomar aspirina?"
+    },
+    {
+      "turn_id": 47,
+      "speaker": "PACIENTE",
+      "text": "No. Bueno, una vez más esta semana porque pensé que me iba a dar gripa."
+    }
+  ]
+}

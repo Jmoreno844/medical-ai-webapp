@@ -1,0 +1,136 @@
+{
+  "session_id": "case2_filtered",
+  "topic_label": "examen_plan_laboratorios_seguimiento",
+  "turns": [
+    {
+      "turn_id": 34,
+      "speaker": "MEDICO",
+      "text": "Voy a examinarlo. Párese aquí por favor."
+    },
+    {
+      "turn_id": 35,
+      "speaker": "PACIENTE",
+      "text": "Está bien."
+    },
+    {
+      "turn_id": 36,
+      "speaker": "MEDICO",
+      "text": "Tiene inflamación leve en la cara interna de la rodilla. No hay derrame articular evidente. Dolor a la palpación en el compartimento medial. El McMurray es negativo."
+    },
+    {
+      "turn_id": 37,
+      "speaker": "PACIENTE",
+      "text": "¿Qué significa eso?"
+    },
+    {
+      "turn_id": 38,
+      "speaker": "MEDICO",
+      "text": "Que no hay señal de lesión de menisco por ahora, pero sí hay inflamación en la articulación. Puede ser inicio de artrosis o un proceso inflamatorio relacionado con sus antecedentes."
+    },
+    {
+      "turn_id": 39,
+      "speaker": "PACIENTE",
+      "text": "¿Puede ser por la diabetes?"
+    },
+    {
+      "turn_id": 40,
+      "speaker": "MEDICO",
+      "text": "Posiblemente. La diabetes y el sobrepeso aumentan el riesgo de artrosis y también de gota. Por eso quiero pedir laboratorios."
+    },
+    {
+      "turn_id": 41,
+      "speaker": "MEDICO",
+      "text": "Le pido hemograma, ácido úrico, PCR, VSG, factor reumatoide y una radiografía de rodilla derecha en carga."
+    },
+    {
+      "turn_id": 42,
+      "speaker": "PACIENTE",
+      "text": "¿Me toca ir al laboratorio hoy?"
+    },
+    {
+      "turn_id": 43,
+      "speaker": "MEDICO",
+      "text": "Sí, hoy si puede. Para estos no necesita ayuno, puede ir cuando quiera."
+    },
+    {
+      "turn_id": 44,
+      "speaker": "MEDICO",
+      "text": "Si el ácido úrico sale alto o el factor reumatoide positivo, lo mando a reumatología."
+    },
+    {
+      "turn_id": 45,
+      "speaker": "PACIENTE",
+      "text": "¿Y mientras tanto sigo con el ibuprofeno?"
+    },
+    {
+      "turn_id": 46,
+      "speaker": "MEDICO",
+      "text": "Sí, pero con cuidado por la hipertensión. No más de cinco días seguidos. Agréguele protector gástrico: omeprazol 20 miligramos antes del desayuno."
+    },
+    {
+      "turn_id": 47,
+      "speaker": "PACIENTE",
+      "text": "¿El omeprazol se vende sin fórmula?"
+    },
+    {
+      "turn_id": 48,
+      "speaker": "MEDICO",
+      "text": "Sí, puede comprarlo directo. Si en tres días no mejora o empeora la rodilla, no espere la cita, venga antes."
+    },
+    {
+      "turn_id": 49,
+      "speaker": "MEDICO",
+      "text": "Para la diabetes necesito ver hemoglobina glicosilada. ¿Cuándo fue el último control con endocrinología?"
+    },
+    {
+      "turn_id": 50,
+      "speaker": "PACIENTE",
+      "text": "Hace como ocho meses. No he vuelto."
+    },
+    {
+      "turn_id": 51,
+      "speaker": "MEDICO",
+      "text": "¿Algo más que le esté molestando?"
+    },
+    {
+      "turn_id": 52,
+      "speaker": "PACIENTE",
+      "text": "A veces me duele la cabeza, dos o tres veces a la semana, al final del día."
+    },
+    {
+      "turn_id": 53,
+      "speaker": "MEDICO",
+      "text": "Dado que lleva tiempo sin medir la presión y viene tomando el enalapril de forma irregular, ese dolor de cabeza puede ser hipertensivo. Le voy a tomar la presión ahora."
+    },
+    {
+      "turn_id": 54,
+      "speaker": "MEDICO",
+      "text": "146 sobre 94."
+    },
+    {
+      "turn_id": 55,
+      "speaker": "PACIENTE",
+      "text": "¿Está alta?"
+    },
+    {
+      "turn_id": 56,
+      "speaker": "MEDICO",
+      "text": "Un poco por encima de lo ideal. Con la irregularidad del enalapril tiene sentido. Necesita tomarlo todos los días, sin falta."
+    },
+    {
+      "turn_id": 57,
+      "speaker": "MEDICO",
+      "text": "¿Tiene la dirección del laboratorio?"
+    },
+    {
+      "turn_id": 58,
+      "speaker": "PACIENTE",
+      "text": "Sí, ya sé dónde queda."
+    },
+    {
+      "turn_id": 59,
+      "speaker": "MEDICO",
+      "text": "Perfecto. Nos vemos en diez días con los resultados. Si antes hay algo, llame."
+    }
+  ]
+}

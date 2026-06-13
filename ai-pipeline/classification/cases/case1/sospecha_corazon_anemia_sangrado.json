@@ -1,0 +1,31 @@
+{
+  "session_id": "case1",
+  "topic_label": "sospecha_corazon_anemia_sangrado",
+  "turns": [
+    {
+      "turn_id": 120,
+      "speaker": "MEDICO",
+      "text": "Voy a examinarlo y tomar signos vitales. También quiero hacer un electrocardiograma y análisis hoy."
+    },
+    {
+      "turn_id": 121,
+      "speaker": "PACIENTE",
+      "text": "¿Cree que puede ser el corazón?"
+    },
+    {
+      "turn_id": 122,
+      "speaker": "MEDICO",
+      "text": "Puede ser el corazón, pero también puede haber anemia o irritación digestiva con sangrado, especialmente por el ibuprofeno frecuente y las heces oscuras. Lo importante es que varios detalles que al principio sonaban aislados ahora encajan mejor juntos."
+    },
+    {
+      "turn_id": 123,
+      "speaker": "PACIENTE",
+      "text": "Pensé que exageraba."
+    },
+    {
+      "turn_id": 124,
+      "speaker": "MEDICO",
+      "text": "No. Lo que cambió no fue solo la cantidad de síntomas, sino el significado de cada uno cuando los conectamos."
+    }
+  ]
+}

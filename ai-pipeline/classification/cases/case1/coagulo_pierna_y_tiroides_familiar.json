@@ -1,0 +1,26 @@
+{
+  "session_id": "case1",
+  "topic_label": "coagulo_pierna_y_tiroides_familiar",
+  "turns": [
+    {
+      "turn_id": 98,
+      "speaker": "MEDICO",
+      "text": "¿Antecedentes familiares?"
+    },
+    {
+      "turn_id": 99,
+      "speaker": "PACIENTE",
+      "text": "Nada importante."
+    },
+    {
+      "turn_id": 100,
+      "speaker": "MEDICO",
+      "text": "¿Infartos, trombosis, cáncer?"
+    },
+    {
+      "turn_id": 101,
+      "speaker": "PACIENTE",
+      "text": "Mi papá tuvo un coágulo en la pierna, pero después de una cirugía. Mi mamá tiene tiroides."
+    }
+  ]
+}

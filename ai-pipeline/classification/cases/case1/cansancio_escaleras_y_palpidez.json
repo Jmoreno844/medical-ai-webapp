@@ -1,0 +1,66 @@
+{
+  "session_id": "case1",
+  "topic_label": "cansancio_escaleras_y_palpidez",
+  "turns": [
+    {
+      "turn_id": 0,
+      "speaker": "MEDICO",
+      "text": "Buenos días. ¿Qué lo trae hoy?"
+    },
+    {
+      "turn_id": 1,
+      "speaker": "PACIENTE",
+      "text": "Cansancio, más que nada. Creo que es por trabajo. No es algo grave."
+    },
+    {
+      "turn_id": 2,
+      "speaker": "MEDICO",
+      "text": "¿Desde cuándo?"
+    },
+    {
+      "turn_id": 3,
+      "speaker": "PACIENTE",
+      "text": "Dos semanas, más o menos."
+    },
+    {
+      "turn_id": 4,
+      "speaker": "MEDICO",
+      "text": "¿Le pasa al caminar, subir escaleras o también en reposo?"
+    },
+    {
+      "turn_id": 5,
+      "speaker": "PACIENTE",
+      "text": "Al subir escaleras, sobre todo. Pero supongo que estoy fuera de forma."
+    },
+    {
+      "turn_id": 6,
+      "speaker": "MEDICO",
+      "text": "¿Falta de aire?"
+    },
+    {
+      "turn_id": 7,
+      "speaker": "PACIENTE",
+      "text": "No, falta de aire no. Solo me canso."
+    },
+    {
+      "turn_id": 112,
+      "speaker": "MEDICO",
+      "text": "¿Qué lo hizo venir hoy si pensaba que era estrés?"
+    },
+    {
+      "turn_id": 113,
+      "speaker": "PACIENTE",
+      "text": "Mi esposa insistió. Dice que estoy pálido y que me canso hablando."
+    },
+    {
+      "turn_id": 114,
+      "speaker": "MEDICO",
+      "text": "¿Usted lo nota?"
+    },
+    {
+      "turn_id": 115,
+      "speaker": "PACIENTE",
+      "text": "No mucho. Aunque en reuniones me toca hablar más lento."
+    }
+  ]
+}

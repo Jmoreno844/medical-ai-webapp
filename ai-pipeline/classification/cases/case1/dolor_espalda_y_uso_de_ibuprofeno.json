@@ -1,0 +1,26 @@
+{
+  "session_id": "case1",
+  "topic_label": "dolor_espalda_y_uso_de_ibuprofeno",
+  "turns": [
+    {
+      "turn_id": 32,
+      "speaker": "MEDICO",
+      "text": "¿Dolor de espalda desde cuándo?"
+    },
+    {
+      "turn_id": 33,
+      "speaker": "PACIENTE",
+      "text": "Como un mes. Pensé que era muscular, por cargar cosas."
+    },
+    {
+      "turn_id": 34,
+      "speaker": "MEDICO",
+      "text": "¿En qué parte?"
+    },
+    {
+      "turn_id": 35,
+      "speaker": "PACIENTE",
+      "text": "En la mitad de la espalda. No es fuerte, pero está ahí."
+    }
+  ]
+}

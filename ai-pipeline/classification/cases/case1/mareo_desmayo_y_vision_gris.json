@@ -1,0 +1,36 @@
+{
+  "session_id": "case1",
+  "topic_label": "mareo_desmayo_y_vision_gris",
+  "turns": [
+    {
+      "turn_id": 56,
+      "speaker": "MEDICO",
+      "text": "¿Se ha sentido mareado?"
+    },
+    {
+      "turn_id": 57,
+      "speaker": "PACIENTE",
+      "text": "No mareado como tal."
+    },
+    {
+      "turn_id": 58,
+      "speaker": "MEDICO",
+      "text": "¿Alguna vez visión borrosa, debilidad súbita o sensación de desmayo?"
+    },
+    {
+      "turn_id": 59,
+      "speaker": "PACIENTE",
+      "text": "Hace tres días en el baño se me puso todo gris. Me senté y se pasó."
+    },
+    {
+      "turn_id": 60,
+      "speaker": "MEDICO",
+      "text": "¿Después de levantarse?"
+    },
+    {
+      "turn_id": 61,
+      "speaker": "PACIENTE",
+      "text": "Sí, me levanté rápido."
+    }
+  ]
+}

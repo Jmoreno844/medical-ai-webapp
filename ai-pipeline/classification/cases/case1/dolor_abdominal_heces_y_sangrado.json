@@ -1,0 +1,96 @@
+{
+  "session_id": "case1",
+  "topic_label": "dolor_abdominal_heces_y_sangrado",
+  "turns": [
+    {
+      "turn_id": 16,
+      "speaker": "MEDICO",
+      "text": "¿Dolor abdominal?"
+    },
+    {
+      "turn_id": 17,
+      "speaker": "PACIENTE",
+      "text": "No. Tal vez una molestia leve, pero no dolor."
+    },
+    {
+      "turn_id": 18,
+      "speaker": "MEDICO",
+      "text": "¿Dónde?"
+    },
+    {
+      "turn_id": 19,
+      "speaker": "PACIENTE",
+      "text": "Como en la boca del estómago. A veces más hacia la izquierda."
+    },
+    {
+      "turn_id": 20,
+      "speaker": "MEDICO",
+      "text": "¿Náuseas o vómito?"
+    },
+    {
+      "turn_id": 21,
+      "speaker": "PACIENTE",
+      "text": "No."
+    },
+    {
+      "turn_id": 22,
+      "speaker": "MEDICO",
+      "text": "¿Cambios en las deposiciones?"
+    },
+    {
+      "turn_id": 23,
+      "speaker": "PACIENTE",
+      "text": "No, normal."
+    },
+    {
+      "turn_id": 24,
+      "speaker": "MEDICO",
+      "text": "¿Ha notado sangre?"
+    },
+    {
+      "turn_id": 25,
+      "speaker": "PACIENTE",
+      "text": "No sangre."
+    },
+    {
+      "turn_id": 48,
+      "speaker": "MEDICO",
+      "text": "Volvamos a las deposiciones. Dijo que estaban normales. ¿Color normal también?"
+    },
+    {
+      "turn_id": 49,
+      "speaker": "PACIENTE",
+      "text": "Ahora que lo dice, han estado más oscuras. Pero pensé que era por vitaminas."
+    },
+    {
+      "turn_id": 50,
+      "speaker": "MEDICO",
+      "text": "¿Vitaminas con hierro?"
+    },
+    {
+      "turn_id": 51,
+      "speaker": "PACIENTE",
+      "text": "Creo que sí. Mi esposa me dio unas."
+    },
+    {
+      "turn_id": 52,
+      "speaker": "MEDICO",
+      "text": "¿Se las formularon?"
+    },
+    {
+      "turn_id": 53,
+      "speaker": "PACIENTE",
+      "text": "No, eran de ella."
+    },
+    {
+      "turn_id": 54,
+      "speaker": "MEDICO",
+      "text": "¿Las heces eran oscuras antes de esas vitaminas o después?"
+    },
+    {
+      "turn_id": 55,
+      "speaker": "PACIENTE",
+      "text": "No estoy seguro. Tal vez antes. No le puse mucha atención."
+    }
+  ]
+}

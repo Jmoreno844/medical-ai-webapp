@@ -1,0 +1,86 @@
+{
+  "session_id": "case2_filtered",
+  "topic_label": "dolor_rodilla_derecha_evolucion",
+  "turns": [
+    {
+      "turn_id": 0,
+      "speaker": "MEDICO",
+      "text": "¿Qué lo trae hoy?"
+    },
+    {
+      "turn_id": 1,
+      "speaker": "PACIENTE",
+      "text": "La rodilla derecha, doctor. Me duele desde hace como tres semanas."
+    },
+    {
+      "turn_id": 2,
+      "speaker": "MEDICO",
+      "text": "¿Cómo empezó? ¿Tuvo algún golpe o movimiento brusco?"
+    },
+    {
+      "turn_id": 3,
+      "speaker": "PACIENTE",
+      "text": "No, apareció de la nada. Un día me levanté y ya me dolía."
+    },
+    {
+      "turn_id": 4,
+      "speaker": "MEDICO",
+      "text": "¿El dolor es constante o solo al caminar o doblar la rodilla?"
+    },
+    {
+      "turn_id": 5,
+      "speaker": "PACIENTE",
+      "text": "Más al caminar y bajar escaleras. En reposo está bien."
+    },
+    {
+      "turn_id": 6,
+      "speaker": "MEDICO",
+      "text": "¿Ha habido inflamación o enrojecimiento?"
+    },
+    {
+      "turn_id": 7,
+      "speaker": "PACIENTE",
+      "text": "Inflamación sí, bastante. El miércoles amaneció muy hinchada."
+    },
+    {
+      "turn_id": 8,
+      "speaker": "MEDICO",
+      "text": "¿Fiebre?"
+    },
+    {
+      "turn_id": 9,
+      "speaker": "PACIENTE",
+      "text": "No, fiebre no."
+    },
+    {
+      "turn_id": 10,
+      "speaker": "MEDICO",
+      "text": "¿Ha tomado algo para el dolor?"
+    },
+    {
+      "turn_id": 11,
+      "speaker": "PACIENTE",
+      "text": "Ibuprofeno 400 miligramos. A veces dos al día."
+    },
+    {
+      "turn_id": 12,
+      "speaker": "MEDICO",
+      "text": "¿Le ayuda?"
+    },
+    {
+      "turn_id": 13,
+      "speaker": "PACIENTE",
+      "text": "Un poco, pero no del todo."
+    },
+    {
+      "turn_id": 14,
+      "speaker": "MEDICO",
+      "text": "¿Ha tenido este tipo de dolor antes, en esa rodilla o en otras articulaciones?"
+    },
+    {
+      "turn_id": 15,
+      "speaker": "PACIENTE",
+      "text": "Una vez, hace dos años, en la rodilla izquierda. Se fue solo en unos días."
+    }
+  ]
+}

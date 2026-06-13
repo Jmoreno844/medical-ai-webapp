@@ -1,0 +1,92 @@
+[
+  {
+    "id": "case1_cansancio_escaleras_y_palpidez",
+    "cluster_file": "case1/cansancio_escaleras_y_palpidez.json",
+    "template_id": "minimal_outpatient_v001",
+    "notes": "Extraído de clustering/results/20260612T213837Z_debug_case1_openai.json — cansancio_escaleras_y_palpidez (12 turnos)."
+  },
+  {
+    "id": "case1_presion_pecho_esfuerzo_y_reposo",
+    "cluster_file": "case1/presion_pecho_esfuerzo_y_reposo.json",
+    "template_id": "minimal_outpatient_v001",
+    "notes": "Extraído de clustering/results/20260612T213837Z_debug_case1_openai.json — presion_pecho_esfuerzo_y_reposo (14 turnos)."
+  },
+  {
+    "id": "case1_fiebre_peso_apetito_y_sudoracion",
+    "cluster_file": "case1/fiebre_peso_apetito_y_sudoracion.json",
+    "template_id": "minimal_outpatient_v001",
+    "notes": "Extraído de clustering/results/20260612T213837Z_debug_case1_openai.json — fiebre_peso_apetito_y_sudoracion (16 turnos)."
+  },
+  {
+    "id": "case1_dolor_abdominal_heces_y_sangrado",
+    "cluster_file": "case1/dolor_abdominal_heces_y_sangrado.json",
+    "template_id": "minimal_outpatient_v001",
+    "notes": "Extraído de clustering/results/20260612T213837Z_debug_case1_openai.json — dolor_abdominal_heces_y_sangrado (18 turnos)."
+  },
+  {
+    "id": "case1_ibuprofeno_y_aspirina_ocasional",
+    "cluster_file": "case1/ibuprofeno_y_aspirina_ocasional.json",
+    "template_id": "minimal_outpatient_v001",
+    "notes": "Extraído de clustering/results/20260612T213837Z_debug_case1_openai.json — ibuprofeno_y_aspirina_ocasional (10 turnos)."
+  },
+  {
+    "id": "case1_dolor_espalda_y_uso_de_ibuprofeno",
+    "cluster_file": "case1/dolor_espalda_y_uso_de_ibuprofeno.json",
+    "template_id": "minimal_outpatient_v001",
+    "notes": "Extraído de clustering/results/20260612T213837Z_debug_case1_openai.json — dolor_espalda_y_uso_de_ibuprofeno (4 turnos)."
+  },
+  {
+    "id": "case1_mareo_desmayo_y_vision_gris",
+    "cluster_file": "case1/mareo_desmayo_y_vision_gris.json",
+    "template_id": "minimal_outpatient_v001",
+    "notes": "Extraído de clustering/results/20260612T213837Z_debug_case1_openai.json — mareo_desmayo_y_vision_gris (6 turnos)."
+  },
+  {
+    "id": "case1_tabaco_alcohol_y_gotas_dormir",
+    "cluster_file": "case1/tabaco_alcohol_y_gotas_dormir.json",
+    "template_id": "minimal_outpatient_v001",
+    "notes": "Extraído de clustering/results/20260612T213837Z_debug_case1_openai.json — tabaco_alcohol_y_gotas_dormir (18 turnos)."
+  },
+  {
+    "id": "case1_anemia_previa_por_donacion",
+    "cluster_file": "case1/anemia_previa_por_donacion.json",
+    "template_id": "minimal_outpatient_v001",
+    "notes": "Extraído de clustering/results/20260612T213837Z_debug_case1_openai.json — anemia_previa_por_donacion (6 turnos)."
+  },
+  {
+    "id": "case1_coagulo_pierna_y_tiroides_familiar",
+    "cluster_file": "case1/coagulo_pierna_y_tiroides_familiar.json",
+    "template_id": "minimal_outpatient_v001",
+    "notes": "Extraído de clustering/results/20260612T213837Z_debug_case1_openai.json — coagulo_pierna_y_tiroides_familiar (4 turnos)."
+  },
+  {
+    "id": "case1_finca_animales_y_rasguno",
+    "cluster_file": "case1/finca_animales_y_rasguno.json",
+    "template_id": "minimal_outpatient_v001",
+    "notes": "Extraído de clustering/results/20260612T213837Z_debug_case1_openai.json — finca_animales_y_rasguno (10 turnos)."
+  },
+  {
+    "id": "case1_sospecha_corazon_anemia_sangrado",
+    "cluster_file": "case1/sospecha_corazon_anemia_sangrado.json",
+    "template_id": "minimal_outpatient_v001",
+    "notes": "Extraído de clustering/results/20260612T213837Z_debug_case1_openai.json — sospecha_corazon_anemia_sangrado (5 turnos)."
+  },
+  {
+    "id": "case2_dolor_rodilla",
+    "cluster_file": "case2/dolor_rodilla.json",
+    "template_id": "minimal_outpatient_v001",
+    "notes": "Cluster extraído de case2_filtered (turnos 0-15): motivo y evolución del dolor de rodilla."
+  },
+  {
+    "id": "case2_diabetes_hta_meds",
+    "cluster_file": "case2/diabetes_hta_meds.json",
+    "template_id": "minimal_outpatient_v001",
+    "notes": "Cluster extraído de case2_filtered (turnos 16-33): antecedentes, medicación, hábitos y familiares."
+  },
+  {
+    "id": "case2_plan_labs",
+    "cluster_file": "case2/plan_labs.json",
+    "template_id": "minimal_outpatient_v001",
+    "notes": "Cluster extraído de case2_filtered (turnos 34-59): examen físico, plan, laboratorios y seguimiento."
+  }
+]

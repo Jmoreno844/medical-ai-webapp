@@ -1,0 +1,96 @@
+{
+  "session_id": "case2_filtered",
+  "topic_label": "diabetes_hta_medicacion_habitos",
+  "turns": [
+    {
+      "turn_id": 16,
+      "speaker": "MEDICO",
+      "text": "¿Antecedentes médicos?"
+    },
+    {
+      "turn_id": 17,
+      "speaker": "PACIENTE",
+      "text": "Diabetes tipo dos, diagnosticada hace cinco años. E hipertensión, esa más reciente."
+    },
+    {
+      "turn_id": 18,
+      "speaker": "MEDICO",
+      "text": "¿Medicamentos?"
+    },
+    {
+      "turn_id": 19,
+      "speaker": "PACIENTE",
+      "text": "Metformina 850 dos veces al día y enalapril 10 miligramos. A veces olvido el enalapril."
+    },
+    {
+      "turn_id": 20,
+      "speaker": "MEDICO",
+      "text": "¿Cómo van sus glucosas últimamente?"
+    },
+    {
+      "turn_id": 21,
+      "speaker": "PACIENTE",
+      "text": "La semana pasada me medí en la farmacia y salió 180 en ayunas."
+    },
+    {
+      "turn_id": 22,
+      "speaker": "MEDICO",
+      "text": "¿Y la presión?"
+    },
+    {
+      "turn_id": 23,
+      "speaker": "PACIENTE",
+      "text": "No me la he medido en un tiempo. En casa no tengo tensiómetro."
+    },
+    {
+      "turn_id": 24,
+      "speaker": "MEDICO",
+      "text": "Listo. ¿Hace ejercicio actualmente?"
+    },
+    {
+      "turn_id": 25,
+      "speaker": "PACIENTE",
+      "text": "Casi nada. Antes caminaba, pero con la rodilla ya lo dejé."
+    },
+    {
+      "turn_id": 26,
+      "speaker": "MEDICO",
+      "text": "¿Cuánto pesa aproximadamente?"
+    },
+    {
+      "turn_id": 27,
+      "speaker": "PACIENTE",
+      "text": "Ando en unos 95 kilos. Subí como cinco kilos este año."
+    },
+    {
+      "turn_id": 28,
+      "speaker": "MEDICO",
+      "text": "¿Cuánto mide?"
+    },
+    {
+      "turn_id": 29,
+      "speaker": "PACIENTE",
+      "text": "Un metro setenta y dos."
+    },
+    {
+      "turn_id": 30,
+      "speaker": "MEDICO",
+      "text": "¿Alcohol o tabaco?"
+    },
+    {
+      "turn_id": 31,
+      "speaker": "PACIENTE",
+      "text": "Tabaco no. Alcohol poco, cerveza los fines de semana. Una o dos."
+    },
+    {
+      "turn_id": 32,
+      "speaker": "MEDICO",
+      "text": "¿Antecedentes familiares de artritis, gota o enfermedades autoinmunes?"
+    },
+    {
+      "turn_id": 33,
+      "speaker": "PACIENTE",
+      "text": "Mi mamá tiene artritis reumatoide."
+    }
+  ]
+}

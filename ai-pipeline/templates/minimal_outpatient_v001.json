@@ -1,0 +1,79 @@
+{
+  "id": "minimal_outpatient_v001",
+  "name": "Consulta ambulatoria (R&D)",
+  "document_kind": "document",
+  "classification": {
+    "guidelines": "Ante la duda, asigna a la sección más específica soportada por el texto. Un cluster puede mapear a varias secciones si el contenido es transversal. No inventes secciones fuera de la plantilla."
+  },
+  "generation": {
+    "guidelines": "Redacta solo con evidencia de los turns asignados. No inventes datos clínicos. Usa español clínico en Markdown. Si no hay evidencia suficiente para la sección, devuelve content vacío."
+  },
+  "sections": [
+    {
+      "section_id": "motivo_consulta",
+      "heading": "Motivo de consulta",
+      "description": "Razón principal de la visita o síntoma que motiva la consulta.",
+      "classification": {
+        "guidelines": "Clusters con apertura del problema o motivo explícito de consulta del paciente."
+      },
+      "generation": {
+        "guidelines": "Motivo o síntoma expresado por el paciente; no convertir en diagnóstico."
+      }
+    },
+    {
+      "section_id": "enfermedad_actual",
+      "heading": "Enfermedad actual",
+      "description": "Narrativa del problema activo en curso.",
+      "classification": {
+        "guidelines": "Evolución del problema activo: inicio, curso, síntomas asociados y contexto del cuadro actual."
+      },
+      "generation": {
+        "guidelines": "Inicio, evolución, localización, características, factores agravantes o atenuantes, tratamientos probados y respuesta."
+      }
+    },
+    {
+      "section_id": "antecedentes",
+      "heading": "Antecedentes",
+      "description": "Antecedentes personales, familiares, medicación habitual, hábitos y exposiciones.",
+      "classification": {
+        "guidelines": "Hábitos, medicación habitual, antecedentes patológicos o familiares, exposiciones y datos personales no ligados al cuadro agudo."
+      },
+      "generation": {
+        "guidelines": "Incluye patológicos, quirúrgicos, alérgicos, farmacológicos, familiares, tóxicos y datos antropométricos cuando aparezcan."
+      }
+    },
+    {
+      "section_id": "revision_sistemas",
+      "heading": "Revisión por sistemas",
+      "description": "Síntomas o negaciones exploradas de forma sistemática fuera del problema principal.",
+      "classification": {
+        "guidelines": "Síntomas adicionales o negaciones exploradas fuera del problema principal, sin ser evolución central del cuadro."
+      },
+      "generation": {
+        "guidelines": "Solo síntomas o negaciones explícitas que no pertenezcan claramente a la enfermedad actual."
+      }
+    },
+    {
+      "section_id": "examen_fisico",
+      "heading": "Examen físico",
+      "description": "Hallazgos objetivos del profesional durante la exploración.",
+      "classification": {
+        "guidelines": "Hallazgos objetivos medidos u observados por el médico durante la exploración."
+      },
+      "generation": {
+        "guidelines": "Signos vitales medidos en consulta, hallazgos de inspección, palpación, maniobras y medidas objetivas."
+      }
+    },
+    {
+      "section_id": "plan_y_seguimiento",
+      "heading": "Plan y seguimiento",
+      "description": "Órdenes, estudios, tratamiento, educación al paciente y control.",
+      "classification": {
+        "guidelines": "Órdenes, estudios, tratamiento, educación, seguimiento o decisiones del plan discutidas en consulta."
+      },
+      "generation": {
+        "guidelines": "Laboratorios, imágenes, referencias, medicación formulada o ajustada, signos de alarma y fecha de seguimiento."
+      }
+    }
+  ]
+}

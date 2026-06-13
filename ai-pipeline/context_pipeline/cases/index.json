@@ -1,0 +1,12 @@
+{
+  "cases": [
+    {
+      "id": "case1",
+      "session_id": "case1",
+      "doctor_note_file": "case1_doctor_note.json",
+      "document_files": ["case1_lab_anemia.json"],
+      "template_id": "minimal_outpatient_v001",
+      "notes": "Synthetic case aligned with transcript case1"
+    }
+  ]
+}

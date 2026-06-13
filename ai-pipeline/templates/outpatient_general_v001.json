@@ -1,0 +1,200 @@
+{
+  "id": "outpatient_general_v001",
+  "name": "Consulta externa general (R&D)",
+  "document_kind": "document",
+  "classification": {
+    "guidelines": "Plantilla completa de consulta externa (basada en clinical_document_template_v004 y Historia clínica de consulta externa - primera vez). Ante la duda, asigna a la sección más específica soportada por el texto. Un cluster puede mapear a varias secciones si el contenido es transversal. Distingue medicación habitual (antecedentes) de medicamentos formulados en esta consulta. Distingue valores medidos en consulta (signos_vitales) de valores referidos por el paciente (enfermedad_actual). Distingue estudios solicitados o pendientes de resultados ya disponibles (estudios_y_resultados). No inventes secciones fuera de la plantilla."
+  },
+  "generation": {
+    "guidelines": "Redacta en Markdown clínico con encabezado ## y campos en formato Etiqueta: valor. No uses listas con viñetas. Incluye solo campos sustentados por los turns asignados. Omite campos sin contenido; no escribas marcadores como no disponible o sin información. No inventes ni completes signos vitales, diagnósticos, antecedentes, medicamentos, frecuencias, resultados, órdenes, incapacidades ni hallazgos físicos. Diferencia información referida por paciente o acompañante, hallazgos del profesional, interpretación explícita del profesional y decisiones tomadas. Conserva el estado de cada elemento: referido, incierto, pendiente, solicitado, realizado, condicionado, formulado o no definido. Si un dato puede ubicarse en una sección general o en una sección más específica como Examen físico, Signos vitales, Antecedentes, Análisis clínico, Diagnósticos o Control, prioriza la sección más específica y evita duplicarlo en la sección más general. Si no hay evidencia suficiente para la sección, devuelve content vacío."
+  },
+  "sections": [
+    {
+      "section_id": "datos_documento_encuentro",
+      "heading": "Datos del documento y del encuentro",
+      "description": "Metadatos administrativos del documento y del encuentro clínico.",
+      "classification": {
+        "guidelines": "Tipo de documento, tipo de atención (consulta externa u otro), fecha/hora, modalidad, sede/IPS/consultorio, servicio o especialidad mencionados al inicio o como contexto administrativo."
+      },
+      "generation": {
+        "guidelines": "Campos posibles: Tipo de documento clínico, Tipo de atención, Fecha y hora de atención, Modalidad, Sede / IPS / consultorio, Servicio / especialidad. Solo incluir campos explícitos en la fuente."
+      }
+    },
+    {
+      "section_id": "identificacion_paciente",
+      "heading": "Identificación del paciente",
+      "description": "Datos demográficos y de contacto del paciente y acompañante.",
+      "classification": {
+        "guidelines": "Nombre, documento, edad, fecha de nacimiento, sexo, teléfono, asegurador/EAPB, acompañante y relación; datos de identificación no ligados al cuadro clínico."
+      },
+      "generation": {
+        "guidelines": "Campos posibles: Nombre completo, Tipo y número de documento, Fecha de nacimiento / edad, Sexo, Teléfono / contacto, Asegurador / EAPB / régimen, Acompañante. No reemplazar nombre por edad o sexo."
+      }
+    },
+    {
+      "section_id": "motivo_consulta",
+      "heading": "Motivo de consulta",
+      "description": "Razón principal de la visita o síntomas que motivan la consulta.",
+      "classification": {
+        "guidelines": "Apertura del problema, motivo explícito de consulta o síntoma principal sin narrativa extensa de evolución."
+      },
+      "generation": {
+        "guidelines": "Campo Motivo de consulta: síntomas o motivo expresado, sin transformar en diagnóstico."
+      }
+    },
+    {
+      "section_id": "enfermedad_actual",
+      "heading": "Enfermedad actual",
+      "description": "Narrativa cronológica del problema activo en curso.",
+      "classification": {
+        "guidelines": "Evolución del cuadro actual: inicio, duración, localización, características, intensidad, factores relacionados, síntomas asociados, tratamientos previos, respuesta y correcciones del relato. Incluir valores medidos en casa referidos por el paciente."
+      },
+      "generation": {
+        "guidelines": "Campo Enfermedad actual: redactar únicamente la narrativa cronológica del problema activo referido por paciente o acompañante: inicio, duración, localización, características, intensidad, factores relacionados, síntomas asociados, tratamientos previos y respuesta. Incluir valores medidos en casa referidos por el paciente. Aplicar correcciones posteriores del relato. No incluir hallazgos del examen físico, signos vitales medidos en consulta, antecedentes crónicos no directamente narrativos, medicación habitual, interpretación médica, diagnósticos, plan, órdenes, recomendaciones ni seguimiento. No repetir el motivo de consulta como subtítulo. Si un dato tiene una sección más específica, excluirlo de enfermedad actual."
+      }
+    },
+    {
+      "section_id": "antecedentes",
+      "heading": "Antecedentes",
+      "description": "Antecedentes personales, familiares, medicación habitual, alergias y hábitos.",
+      "classification": {
+        "guidelines": "Antecedentes patológicos, quirúrgicos, traumáticos, alérgicos, medicación habitual o actual (no formulada hoy), familiares, gineco-obstétricos, tóxicos, exposiciones y otros relevantes no ligados al cuadro agudo."
+      },
+      "generation": {
+        "guidelines": "Subcampos posibles: Patológicos, Quirúrgicos, Traumáticos, Alérgicos, Farmacológicos / medicamentos actuales, Familiares, Gineco-obstétricos, Tóxicos / exposiciones / sociales, Otros relevantes. En medicación habitual incluir solo componentes explícitos (nombre, dosis, vía, frecuencia, duración); conservar dudas y suspensiones."
+      }
+    },
+    {
+      "section_id": "revision_sistemas",
+      "heading": "Revisión por sistemas",
+      "description": "Síntomas o negaciones exploradas fuera del problema principal.",
+      "classification": {
+        "guidelines": "Síntomas adicionales o negaciones sistemáticas que no son la evolución central del cuadro actual."
+      },
+      "generation": {
+        "guidelines": "Campo Revisión por sistemas: solo síntomas o negaciones explícitas no ya cubiertas en enfermedad actual. No crear revisión completa por sistemas."
+      }
+    },
+    {
+      "section_id": "signos_vitales",
+      "heading": "Signos vitales y medidas antropométricas",
+      "description": "Mediciones objetivas tomadas durante la atención presencial.",
+      "classification": {
+        "guidelines": "PA, FC, FR, temperatura, SpO2, peso, talla, IMC o escala de dolor medidos por el profesional durante la consulta."
+      },
+      "generation": {
+        "guidelines": "Campos posibles: Presión arterial, Frecuencia cardíaca, Frecuencia respiratoria, Temperatura, Saturación de oxígeno, Peso, Talla, IMC, Dolor. Solo mediciones documentadas durante la atención. No incluir valores referidos por el paciente medidos en casa."
+      }
+    },
+    {
+      "section_id": "examen_fisico",
+      "heading": "Examen físico",
+      "description": "Hallazgos objetivos de la exploración física.",
+      "classification": {
+        "guidelines": "Hallazgos concretos de inspección, palpación, auscultación u otras maniobras descritos por el médico."
+      },
+      "generation": {
+        "guidelines": "Campo Examen físico: solo hallazgos concretos atribuibles al profesional. No crear hallazgos negativos. Si solo se menciona que fue examinado sin hallazgos, dejar content vacío."
+      }
+    },
+    {
+      "section_id": "estudios_y_resultados",
+      "heading": "Estudios y resultados",
+      "description": "Exámenes solicitados, realizados, resultados disponibles o pendientes, procedimientos e interconsultas.",
+      "classification": {
+        "guidelines": "Laboratorios, imágenes, procedimientos, muestras tomadas, resultados con valores, estudios pendientes, interconsultas o remisiones solicitadas, realizadas o condicionadas."
+      },
+      "generation": {
+        "guidelines": "Campos posibles: Exámenes solicitados, Exámenes realizados / muestras tomadas, Resultados disponibles, Resultados pendientes, Procedimientos, Interconsultas / remisiones. Indicar claramente si fueron solicitados, realizados, pendientes o condicionados."
+      }
+    },
+    {
+      "section_id": "analisis_clinico",
+      "heading": "Análisis clínico",
+      "description": "Interpretación explícita del profesional sobre el caso.",
+      "classification": {
+        "guidelines": "Impresión, interpretación o razonamiento clínico expresado por el médico, con su grado de certeza."
+      },
+      "generation": {
+        "guidelines": "Campo Análisis clínico: solo interpretación explícita del profesional. No construir análisis a partir de síntomas o resultados. Si no hay análisis explícito, content vacío."
+      }
+    },
+    {
+      "section_id": "diagnosticos",
+      "heading": "Diagnósticos",
+      "description": "Diagnósticos o diferenciales expresados por el profesional.",
+      "classification": {
+        "guidelines": "Diagnóstico principal, otros diagnósticos o diferenciales nombrados explícitamente por el médico."
+      },
+      "generation": {
+        "guidelines": "Campos posibles: Diagnóstico principal, Otros diagnósticos, Diagnósticos diferenciales. Solo diagnósticos expresados por el profesional; no convertir síntomas en diagnósticos. Código solo si fue mencionado."
+      }
+    },
+    {
+      "section_id": "medicamentos_formulados",
+      "heading": "Medicamentos formulados",
+      "description": "Medicamentos efectivamente formulados en esta consulta.",
+      "classification": {
+        "guidelines": "Medicamentos nuevos o ajustados que el médico formula o prescribe en la consulta actual."
+      },
+      "generation": {
+        "guidelines": "Campo Medicamentos formulados: solo medicamentos efectivamente formulados. Incluir solo componentes explícitos de nombre, dosis, vía, frecuencia y duración. No incluir medicamentos solo considerados."
+      }
+    },
+    {
+      "section_id": "recomendaciones_alarma",
+      "heading": "Recomendaciones, educación y signos de alarma",
+      "description": "Conductas no farmacológicas, educación al paciente y signos de alarma.",
+      "classification": {
+        "guidelines": "Recomendaciones de estilo de vida, educación, cuidados en casa y signos de alarma explicados al paciente."
+      },
+      "generation": {
+        "guidelines": "Campos posibles: Recomendaciones no farmacológicas, Educación al paciente, Signos de alarma. Conservar exactamente los signos y umbrales explicados, sin suavizarlos."
+      }
+    },
+    {
+      "section_id": "incapacidad",
+      "heading": "Incapacidad",
+      "description": "Incapacidad médica emitida, solicitada o discutida.",
+      "classification": {
+        "guidelines": "Menciones de incapacidad médica, reposo laboral o certificado de incapacidad."
+      },
+      "generation": {
+        "guidelines": "Campo Incapacidad médica: registrar si fue emitida, solicitada, considerada o quedó no definida. No generar días ni condiciones no mencionadas."
+      }
+    },
+    {
+      "section_id": "control_seguimiento",
+      "heading": "Control y seguimiento",
+      "description": "Citas de control, seguimiento o criterios de reconsulta.",
+      "classification": {
+        "guidelines": "Control programado, seguimiento, cita de retorno o criterios de reconsulta discutidos."
+      },
+      "generation": {
+        "guidelines": "Campo Control / seguimiento: conservar si fue programado, recomendado, condicionado o pendiente. Una posibilidad condicional no es cita confirmada."
+      }
+    },
+    {
+      "section_id": "comprension_plan",
+      "heading": "Comprensión y aceptación del plan",
+      "description": "Comprensión y aceptación del plan por paciente o acompañante.",
+      "classification": {
+        "guidelines": "Respuestas sobre si entendió el plan, dudas, aceptación o rechazo del plan."
+      },
+      "generation": {
+        "guidelines": "Campos posibles: Comprensión del plan, Aceptación del plan. Registrar lo expresado por quien respondió; no atribuir al paciente la respuesta del acompañante. No deducir aceptación de respuestas ambiguas."
+      }
+    },
+    {
+      "section_id": "profesional_responsable",
+      "heading": "Profesional responsable",
+      "description": "Identificación del profesional que atiende.",
+      "classification": {
+        "guidelines": "Nombre del médico, especialidad, registro profesional o identificación del profesional tratante."
+      },
+      "generation": {
+        "guidelines": "Campos posibles: Profesional tratante, Profesión / especialidad, Registro profesional. Solo información explícita."
+      }
+    }
+  ]
+}
