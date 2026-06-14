@@ -37,7 +37,7 @@ from generation.lib import (  # noqa: E402
     format_generation_output_for_detail,
     format_section_output_for_detail,
     format_session_debug_output,
-    load_claims_from_classification_record,
+    load_section_context_from_record,
     load_classification_assignments,
     load_prompt,
     prompt_file_path,
@@ -136,10 +136,9 @@ def main() -> int:
     classification_result_path = Path(args.classification_result)
     assignments = load_classification_assignments(classification_result_path)
     clusters = load_session_clusters(Path(args.cases), args.session_id)
-    claim_assignments = None
-    claims_by_id = None
+    section_context = None
     if args.claim_classification_result:
-        claim_assignments, claims_by_id = load_claims_from_classification_record(
+        section_context = load_section_context_from_record(
             Path(args.claim_classification_result)
         )
     template_id = (
@@ -169,8 +168,7 @@ def main() -> int:
             model_spec=model_spec,
             system_prompt=system_prompt,
             section_concurrency=args.section_concurrency,
-            claim_assignments=claim_assignments,
-            claims_by_id=claims_by_id,
+            section_context=section_context,
         )
     except Exception as exc:
         print(f"\nerror: {exc}")

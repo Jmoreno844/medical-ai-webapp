@@ -3,10 +3,29 @@
     {
       "id": "case1",
       "session_id": "case1",
+      "encounter_date": "2026-06-14",
       "doctor_note_file": "case1_doctor_note.json",
-      "document_files": ["case1_lab_anemia.json"],
+      "document_files": ["case1_lab_results.json"],
       "template_id": "minimal_outpatient_v001",
       "notes": "Synthetic case aligned with transcript case1"
+    },
+    {
+      "id": "case2_directives_epicrisis",
+      "session_id": "case2",
+      "encounter_date": "2026-06-14",
+      "doctor_note_file": "case2_doctor_note.json",
+      "document_files": ["case2_epicrisis.json", "case2_labs.json"],
+      "template_id": "minimal_outpatient_v001",
+      "notes": "Directivas + epicrisis; alergia a penicilina debe sobrevivir filter"
+    },
+    {
+      "id": "case3_pasted_long",
+      "session_id": "case3",
+      "encounter_date": "2026-06-14",
+      "doctor_note_file": "case3_pasted_note.json",
+      "document_files": [],
+      "template_id": "minimal_outpatient_v001",
+      "notes": "Nota larga pegada para is_pasted → build_spans"
     }
   ]
 }

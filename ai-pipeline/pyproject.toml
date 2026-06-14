@@ -11,13 +11,14 @@ dependencies = [
   "pydantic>=2.10.0,<3",
   "python-dotenv>=1.0.1,<2",
   "tiktoken>=0.9.0,<1",
-  "pypdf>=5.4.0,<6",
+  "pdfplumber>=0.11.0,<1",
 ]
 
 [dependency-groups]
 dev = [
   "pytest>=8.3.4,<9",
   "ruff>=0.9.6,<0.10",
+  "reportlab>=4.2.0,<5",
 ]
 ui = [
   "streamlit>=1.41.0,<2",
@@ -40,9 +41,12 @@ testpaths = [
   "filtering/tests",
   "classification/tests",
   "generation/tests",
-  "context_pipeline/decompose/tests",
-  "context_pipeline/extract/tests",
-  "context_pipeline/classify_claims/tests",
+  "context_pipeline/triage/tests",
+  "context_pipeline/filter_spans/tests",
+  "context_pipeline/cluster_spans/tests",
+  "context_pipeline/classify_clusters/tests",
+  "context_pipeline/section_adapter/tests",
+  "context_pipeline/spans/tests",
   "ui/tests",
 ]
 pythonpath = ["."]

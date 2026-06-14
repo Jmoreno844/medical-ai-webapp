@@ -39,12 +39,18 @@ from ui.e2e_runs import (  # noqa: E402
 from ui.latency import format_latency_ms, primary_latency_ms  # noqa: E402
 from ui.discovery import (  # noqa: E402
     list_classification_sessions,
+    list_context_case_document_files,
     list_context_cases,
     list_templates,
     list_transcript_cases,
     load_result_json,
     load_transcript_case,
     parse_transcript_case_from_json,
+)
+from ui.context_pages import (  # noqa: E402
+    render_context_ad_hoc_e2e_page,
+    render_context_branch_page,
+    render_context_stepper_nav,
 )
 from ui.runner import (  # noqa: E402
     PipelineRunOutput,
@@ -66,7 +72,6 @@ st.set_page_config(
 )
 
 PIPELINE_STEPS = ("filtering", "clustering", "classification", "generation")
-
 _STEP_META = {
     "filtering":      {"icon": "🔍", "color": "#2196F3", "label": "Filtering"},
     "clustering":     {"icon": "🗂",  "color": "#FF9800", "label": "Clustering"},
@@ -721,6 +726,25 @@ def _render_generation_page() -> None:
                         clusters = manual_clusters
                         clustering_result_path = str(cluster_meta.path)
 
+        context_result_path = None
+        with st.expander("Contexto externo (opcional)", expanded=False):
+            context_meta = render_result_picker(
+                step="context_pipeline",
+                key="gen_context_pipeline",
+                label="Resultado context pipeline (section_context)",
+                allow_none=True,
+            )
+            if context_meta is None:
+                context_meta = render_result_picker(
+                    step="context_section_adapter",
+                    key="gen_context_adapter",
+                    label="O resultado section_adapter",
+                    allow_none=True,
+                )
+            context_result_path = (
+                str(context_meta.path) if context_meta is not None else None
+            )
+
         config = _step_config_from_form("generation", "generation_run")
         if st.button("▶ Ejecutar generation", type="primary", key="run_generation"):
             if (
@@ -741,6 +765,7 @@ def _render_generation_page() -> None:
                         config=config,
                         classification_result_file=classification_path,
                         clustering_result_file=clustering_result_path or None,
+                        claim_classification_result_file=context_result_path,
                     )
                     _persist_step_result("generation", output.result_record)
                     _persist_step_output_path("generation", str(output.output_path))
@@ -748,6 +773,7 @@ def _render_generation_page() -> None:
                     st.error(str(exc))
 
         _render_persisted_step_result("generation")
+
 
 
 def _render_e2e_page() -> None:
@@ -906,19 +932,29 @@ def _render_e2e_run_tab() -> None:
         with st.expander("📄 Generation", expanded=False):
             generation_config = _step_config_from_form("generation", "e2e_generation")
 
-    with st.expander("📝 Context pipeline (opcional)", expanded=False):
-        include_context = st.checkbox(
-            "Incluir contexto médico + documentos",
-            value=False,
-            key="e2e_include_context",
+    with st.expander("📝 Contexto externo (opcional)", expanded=False):
+        st.caption(
+            "Información fuera del audio: nota libre del médico y/o documentos "
+            "previos del paciente. Se enruta a secciones antes de generation."
         )
+        include_doctor_note = st.checkbox(
+            "Nota libre del médico",
+            value=False,
+            key="e2e_include_doctor_note",
+        )
+        include_documents = st.checkbox(
+            "Documentos previos del paciente (PDF, labs…)",
+            value=False,
+            key="e2e_include_documents",
+        )
+        include_context = include_doctor_note or include_documents
         context_case_id = case_id
-        context_config = _step_config_from_form("context_decompose", "e2e_context")
+        context_config = _step_config_from_form("context_pipeline", "e2e_context")
         if include_context:
             context_cases = list_context_cases()
             if context_cases:
                 context_case_id = st.selectbox(
-                    "Context case",
+                    "Case de contexto",
                     context_cases,
                     index=context_cases.index(case_id)
                     if case_id in context_cases
@@ -926,7 +962,7 @@ def _render_e2e_run_tab() -> None:
                     key="e2e_context_case",
                 )
             else:
-                st.warning("No hay context cases en cases/context/")
+                st.warning("No hay cases de contexto en cases/context/")
 
     st.markdown("")
     if st.button("▶ Ejecutar pipeline completo", type="primary", key="run_e2e"):
@@ -961,6 +997,8 @@ def _render_e2e_run_tab() -> None:
                     base_case=pasted_case,
                     context_case_id=context_case_id if include_context else None,
                     context_config=context_config if include_context else None,
+                    include_doctor_note=include_doctor_note,
+                    include_documents=include_documents,
                 )
                 for output in outputs:
                     latency = primary_latency_ms(
@@ -1008,6 +1046,35 @@ def main() -> None:
 
     if mode == "End-to-end":
         _render_e2e_page()
+        return
+
+    branch = st.sidebar.radio(
+        "Rama",
+        ["Transcript", "Contexto externo"],
+        key="nav_branch",
+    )
+
+    if branch == "Contexto externo":
+        context_mode = st.sidebar.radio(
+            "Modo contexto",
+            ["Mini E2E ad-hoc", "Pasos individuales"],
+            key="nav_context_mode",
+        )
+
+        if context_mode == "Mini E2E ad-hoc":
+            render_context_ad_hoc_e2e_page()
+            return
+
+        if "nav_context_step_id" not in st.session_state:
+            from ui.context_pages import CONTEXT_PIPELINE_STEPS
+
+            st.session_state.nav_context_step_id = CONTEXT_PIPELINE_STEPS[0]
+
+        context_step_id = render_context_stepper_nav(
+            st.session_state.nav_context_step_id
+        )
+        st.session_state.nav_context_step_id = context_step_id
+        render_context_branch_page(context_step_id)
         return
 
     if "nav_step_id" not in st.session_state:

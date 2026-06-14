@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
 from classification.lib import ClusterCase
-from common.context_claims import ClaimAssignment, ClinicalClaim
+from common.context_spans import SectionContext
 from common.llm_response import LlmResponse, summarize_llm_responses
 from common.providers import ModelSpec, call_llm_detailed
 from common.templates import ClinicalTemplate
@@ -27,7 +27,8 @@ from generation.lib import (
 class SectionGenerationRun:
     section_id: str
     cluster_ids: list[str]
-    claim_ids: list[str]
+    context_present: bool
+    context_chars: int
     result: SectionGenerationResult
     llm_response: LlmResponse
     raw_response: str
@@ -85,7 +86,7 @@ def run_section_generation(
     user_payload = render_section_user_payload(
         section=job.section,
         clusters=job.clusters,
-        enrichment_claims=job.enrichment_claims,
+        context=job.context,
         template=template,
     )
     started_at = time.perf_counter()
@@ -119,7 +120,8 @@ def _run_section_generation_job(
     return SectionGenerationRun(
         section_id=job.section_id,
         cluster_ids=job.cluster_ids,
-        claim_ids=job.claim_ids,
+        context_present=job.context_present,
+        context_chars=job.context_chars,
         result=result,
         llm_response=llm_response,
         raw_response=llm_response.content,
@@ -184,12 +186,11 @@ def run_generation_session(
     model_spec: ModelSpec,
     system_prompt: str,
     section_concurrency: int | None = None,
-    claim_assignments: list[ClaimAssignment] | None = None,
-    claims_by_id: dict[str, ClinicalClaim] | None = None,
+    section_context: SectionContext | None = None,
 ) -> GenerationSessionRun:
-    if not clusters and not (claim_assignments and claims_by_id):
+    if not clusters and not section_context:
         raise ValueError(
-            "generation_session_requires_clusters_or_claim_assignments"
+            "generation_session_requires_clusters_or_section_context"
         )
 
     resolved_concurrency = resolve_section_concurrency(section_concurrency)
@@ -198,8 +199,7 @@ def run_generation_session(
         assignments,
         clusters_by_id,
         template,
-        claim_assignments=claim_assignments,
-        claims_by_id=claims_by_id,
+        section_context=section_context,
     )
 
     if not section_plan.jobs:

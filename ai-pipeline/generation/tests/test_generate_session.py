@@ -60,7 +60,8 @@ def test_run_generation_session_runs_sections_in_parallel(
         return SectionGenerationRun(
             section_id=job.section_id,
             cluster_ids=job.cluster_ids,
-            claim_ids=job.claim_ids,
+            context_present=job.context_present,
+            context_chars=job.context_chars,
             result=SectionGenerationResult(
                 section_id=job.section_id,
                 content=f"contenido {job.section_id}",
@@ -109,7 +110,8 @@ def test_run_generation_session_skips_sections_without_clusters(
         return SectionGenerationRun(
             section_id=job.section_id,
             cluster_ids=job.cluster_ids,
-            claim_ids=job.claim_ids,
+            context_present=job.context_present,
+            context_chars=job.context_chars,
             result=SectionGenerationResult(
                 section_id=job.section_id,
                 content="texto",

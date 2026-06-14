@@ -293,6 +293,8 @@ async def delete_encounter(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> SuccessResponse:
+    # Deuda: no emite audit events por documentos/encuentro borrados en cascada.
+    # Ver docs/debt/encounter-delete-audit-trail.md
     encounter = await _get_encounter_or_404(
         session,
         encounter_id=encounter_id,

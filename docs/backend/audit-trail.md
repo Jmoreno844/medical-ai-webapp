@@ -76,6 +76,14 @@ Razón operativa y de compliance:
 - `audit.audit_log_viewed`
 - `user.created`
 
+Al borrar un documento, la fila clínica desaparece pero los eventos previos
+permanecen. `audit_event.document_id` usa `ON DELETE SET NULL`; el ID
+histórico queda en `resource_id` cuando el evento lo registró. El delete
+explícito emite `document.deleted` **antes** del borrado físico.
+
+El borrado de encuentro completo aún no emite eventos equivalentes; ver
+[`../debt/encounter-delete-audit-trail.md`](../debt/encounter-delete-audit-trail.md).
+
 Algunos eventos del plan original siguen pendientes de que exista el flujo de
 producto correspondiente, por ejemplo `document.exported` o
 `support.customer_data_accessed`. Eventos de cuenta ya emitidos:

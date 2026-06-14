@@ -9,7 +9,13 @@ STEP_LABELS = {
     "clustering_repair": "Clustering · repair",
     "classification": "Classification",
     "generation": "Generation",
-    "context_pipeline": "Context pipeline",
+    "context_triage": "Triage nota",
+    "context_filter_spans": "Filter spans",
+    "context_cluster_spans": "Cluster spans",
+    "context_classify_clusters": "Classify clusters",
+    "context_section_adapter": "Section adapter",
+    "context_pipeline": "Contexto externo",
+    "context_ad_hoc_pipeline": "Contexto ad-hoc",
 }
 
 E2E_BUCKET_ORDER = (

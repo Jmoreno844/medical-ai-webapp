@@ -35,8 +35,9 @@ REGLAS CLÍNICAS
 
 FORMATO
 
-- Markdown clínico en español.
-- Encabezado `##` opcional con el heading de la sección.
+- Markdown clínico en español, solo el cuerpo de la sección.
+- NO incluyas encabezados `##` ni repitas el nombre de la sección como título; el sistema los agrega al ensamblar el documento.
+- Usa líneas `Etiqueta: valor` cuando las guidelines de la sección lo indiquen.
 - Sin bloques de código ni HTML.
 - Sin marcadores "información no disponible".
 
@@ -44,7 +45,7 @@ SALIDA
 
 {
   "section_id": "enfermedad_actual",
-  "content": "## Enfermedad actual\n\n..."
+  "content": "Enfermedad actual: refiere cuadro de 3 días..."
 }
 
 section_id debe coincidir exactamente con section.section_id del input.

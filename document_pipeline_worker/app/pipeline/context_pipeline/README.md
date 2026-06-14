@@ -21,7 +21,7 @@ filtering → clustering → classification → generation
 | Path | Role |
 |---|---|
 | [`decompose/`](decompose/) | Free-text doctor note → `ClinicalClaim[]` |
-| [`extract/`](extract/) | PDF → text (`pypdf`) → facts → claims |
+| [`extract/`](extract/) | PDF → text (`pdfplumber`) → facts → claims |
 | [`classify_claims/`](classify_claims/) | Claims → template `section_ids` |
 | [`session.py`](session.py) | Orchestrates all three steps |
 | [`../cases/context/`](../cases/context/) | Synthetic fixtures (no PHI) |

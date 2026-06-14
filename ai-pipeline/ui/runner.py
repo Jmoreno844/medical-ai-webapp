@@ -10,7 +10,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from common.case_paths import TRANSCRIPT_CASES_INDEX
 from classification.batching import (
     DEFAULT_INPUT_TOKEN_BUDGET,
     DEFAULT_TOKEN_ENCODING,
@@ -27,13 +26,7 @@ from classification.lib import (
 from classification.lib import load_prompt as load_classification_prompt
 from classification.lib import prompt_file_path as classification_prompt_file_path
 from classification.templates import load_template
-from clustering.cluster import run_clustering, run_clustering_with_repair
-from clustering.repair import (
-    DEFAULT_REPAIR_PROMPT_VERSION,
-    IncompleteTurnCoverageError,
-    clustering_repair_prompt_file_path,
-    load_clustering_repair_prompt,
-)
+from clustering.cluster import run_clustering_with_repair
 from clustering.lib import (
     MODULE_ROOT as CLUSTERING_MODULE_ROOT,
 )
@@ -48,6 +41,12 @@ from clustering.lib import (
 from clustering.lib import (
     prompt_file_path as clustering_prompt_file_path,
 )
+from clustering.repair import (
+    DEFAULT_REPAIR_PROMPT_VERSION,
+    IncompleteTurnCoverageError,
+    clustering_repair_prompt_file_path,
+)
+from common.case_paths import CONTEXT_CASES_INDEX, TRANSCRIPT_CASES_INDEX
 from common.output_detail import normalize_output_detail
 from common.prompts import normalize_prompt_version
 from common.providers import (
@@ -82,7 +81,7 @@ from generation.lib import (
     enrich_section_generation_result_for_export,
     format_generation_output_for_detail,
     format_section_output_for_detail,
-    load_claims_from_classification_record,
+    load_section_context_from_record,
 )
 from generation.lib import (
     load_prompt as load_generation_prompt,
@@ -457,10 +456,9 @@ def run_generation_step(
         f"{run_started_at.strftime('%Y%m%dT%H%M%SZ')}_session_{session_id}_{provider}.json"
     )
 
-    claim_assignments = None
-    claims_by_id = None
+    section_context = None
     if claim_classification_result_file:
-        claim_assignments, claims_by_id = load_claims_from_classification_record(
+        section_context = load_section_context_from_record(
             Path(claim_classification_result_file)
         )
 
@@ -473,16 +471,19 @@ def run_generation_step(
             model_spec=model_spec,
             system_prompt=system_prompt,
             section_concurrency=DEFAULT_SECTION_CONCURRENCY,
-            claim_assignments=claim_assignments,
-            claims_by_id=claims_by_id,
+            section_context=section_context,
         )
 
     cluster_ids_by_section = {
         section_run.section_id: section_run.cluster_ids
         for section_run in session_run.section_runs
     }
-    claim_ids_by_section = {
-        section_run.section_id: section_run.claim_ids
+    context_present_by_section = {
+        section_run.section_id: section_run.context_present
+        for section_run in session_run.section_runs
+    }
+    context_chars_by_section = {
+        section_run.section_id: section_run.context_chars
         for section_run in session_run.section_runs
     }
     section_outputs: list[dict[str, object]] = []
@@ -495,13 +496,15 @@ def run_generation_step(
         section_entry: dict[str, object] = {
             "section_id": section_run.section_id,
             "cluster_ids": section_run.cluster_ids,
-            "claim_ids": section_run.claim_ids,
+            "context_present": section_run.context_present,
+            "context_chars": section_run.context_chars,
             "response_time_ms": section_run.response_time_ms,
             "generation_result": enrich_section_generation_result_for_export(
                 section_run.result,
                 heading=section.heading,
                 cluster_ids=section_run.cluster_ids,
-                claim_ids=section_run.claim_ids,
+                context_present=section_run.context_present,
+                context_chars=section_run.context_chars,
             ),
             "raw_response": section_run.raw_response,
             "thinking": section_run.thinking,
@@ -517,7 +520,8 @@ def run_generation_step(
         session_run.session_result,
         template,
         cluster_ids_by_section=cluster_ids_by_section,
-        claim_ids_by_section=claim_ids_by_section,
+        context_present_by_section=context_present_by_section,
+        context_chars_by_section=context_chars_by_section,
     )
     output_payload = format_generation_output_for_detail(
         {
@@ -605,116 +609,15 @@ def transcript_case_from_filtering_result(
     )
 
 
-def run_context_pipeline_step(
-    *,
-    context_case_id: str,
-    config: StepConfig,
-) -> PipelineRunOutput:
-    import os
-
-    from context_pipeline.classify_claims.lib import (
-        enrich_claim_classification_session_result_for_export,
-        load_prompt as load_classify_prompt,
-        prompt_file_path as classify_prompt_file_path,
-    )
-    from context_pipeline.decompose.lib import (
-        enrich_decompose_result_for_export,
-        load_prompt as load_decompose_prompt,
-        prompt_file_path as decompose_prompt_file_path,
-    )
-    from context_pipeline.extract.lib import DEFAULT_EXTRACT_TOKEN_BUDGET
-    from context_pipeline.session import run_context_pipeline_session
-
-    output_detail = normalize_output_detail(OUTPUT_DETAIL)
-    model_spec = build_model_spec(config.provider, config.model)
-    provider = model_spec.provider
-    model = model_spec.model
-    cases_index = AI_PIPELINE_ROOT / "context_pipeline" / "cases" / "index.json"
-    decompose_prompt_version = normalize_prompt_version(config.prompt_version)
-    extract_prompt_version = decompose_prompt_version
-    classify_prompt_version = decompose_prompt_version
-    token_budget = int(
-        os.environ.get(
-            "CONTEXT_EXTRACT_TOKEN_BUDGET",
-            str(DEFAULT_EXTRACT_TOKEN_BUDGET),
-        )
-    )
-    run_started_at = datetime.now(UTC)
-    results_dir = AI_PIPELINE_ROOT / "context_pipeline" / "classify_claims" / "results"
-    output_path = results_dir / (
-        f"{run_started_at.strftime('%Y%m%dT%H%M%SZ')}_context_{context_case_id}_{provider}.json"
-    )
-
-    with apply_step_config_env(config):
-        context_run = run_context_pipeline_session(
-            case_id=context_case_id,
-            cases_index=cases_index,
-            templates_dir=DEFAULT_TEMPLATES_DIR,
-            model_spec=model_spec,
-            decompose_prompt=load_decompose_prompt(decompose_prompt_version),
-            extract_prompt=__import__(
-                "context_pipeline.extract.lib", fromlist=["load_prompt"]
-            ).load_prompt(extract_prompt_version),
-            classify_prompt=load_classify_prompt(classify_prompt_version),
-            token_budget=token_budget,
-        )
-
-    template = load_template(
-        context_run.template_id,
-        templates_dir=DEFAULT_TEMPLATES_DIR,
-    )
-    claims_by_id = {claim.claim_id: claim for claim in context_run.all_claims}
-    session_export = enrich_claim_classification_session_result_for_export(
-        context_run.classification_result,
-        template,
-        claims_by_id=claims_by_id,
-    )
-    result_record: dict[str, object] = {
-        "run_mode": "context_pipeline_session",
-        "run_started_at": run_started_at.isoformat(),
-        "run_finished_at": datetime.now(UTC).isoformat(),
-        "output_path": str(output_path),
-        "case_id": context_case_id,
-        "session_id": context_run.session_id,
-        "template_id": context_run.template_id,
-        "provider": provider,
-        "model": model,
-        "decompose_result": enrich_decompose_result_for_export(
-            context_run.doctor_claims
-        ),
-        "document_claim_count": len(context_run.document_claims),
-        "claim_count": len(context_run.all_claims),
-        "claims": [claim.model_dump(mode="json") for claim in context_run.all_claims],
-        "claim_classification_session_result": session_export,
-        "llm_calls": [
-            {
-                "label": call.label,
-                "provider": call.provider,
-                "model": call.model,
-                "llm_usage": call.llm_response.usage,
-            }
-            for call in context_run.llm_calls
-        ],
-        "prompt_file": str(
-            classify_prompt_file_path(classify_prompt_version).relative_to(
-                AI_PIPELINE_ROOT / "context_pipeline" / "classify_claims"
-            )
-        ),
-        "decompose_prompt_file": str(
-            decompose_prompt_file_path(decompose_prompt_version).relative_to(
-                AI_PIPELINE_ROOT / "context_pipeline" / "decompose"
-            )
-        ),
-        "output_detail": output_detail,
-        **_step_config_metadata(config),
-    }
-    _persist_results(output_path, result_record)
-    return PipelineRunOutput(
-        step="context_pipeline",
-        result_record=result_record,
-        output_path=output_path,
-    )
-
+from ui.context_runner import (
+    run_context_ad_hoc_pipeline_step,
+    run_context_classify_clusters_step,
+    run_context_cluster_spans_step,
+    run_context_filter_spans_step,
+    run_context_pipeline_step,
+    run_context_section_adapter_step,
+    run_context_triage_step,
+)
 
 def run_e2e_pipeline(
     *,
@@ -728,6 +631,8 @@ def run_e2e_pipeline(
     base_case: TranscriptCase | None = None,
     context_case_id: str | None = None,
     context_config: StepConfig | None = None,
+    include_doctor_note: bool = True,
+    include_documents: bool = True,
 ) -> list[PipelineRunOutput]:
     from ui.discovery import load_transcript_case
 
@@ -771,6 +676,8 @@ def run_e2e_pipeline(
         context_output = run_context_pipeline_step(
             context_case_id=context_case_id,
             config=context_config,
+            include_doctor_note=include_doctor_note,
+            include_documents=include_documents,
         )
         outputs.append(context_output)
         claim_classification_result_file = str(context_output.output_path)
@@ -798,7 +705,13 @@ __all__ = [
     "load_env",
     "run_classification_step",
     "run_clustering_step",
+    "run_context_ad_hoc_pipeline_step",
+    "run_context_classify_clusters_step",
+    "run_context_cluster_spans_step",
+    "run_context_filter_spans_step",
     "run_context_pipeline_step",
+    "run_context_section_adapter_step",
+    "run_context_triage_step",
     "run_e2e_pipeline",
     "run_generation_step",
     "run_filtering_step",

@@ -19,6 +19,7 @@ from filtering.filter import run_filtering
 from filtering.lib import FilteringResult, load_prompt as load_filtering_prompt
 from generation.generate import run_generation_session
 from generation.lib import load_prompt as load_generation_prompt
+from generation.lib import render_generated_section_markdown
 
 from app.pipeline.bridge import (
     apply_filtering_to_transcript,
@@ -267,7 +268,12 @@ def run_document_pipeline(
     markdown_parts: list[str] = []
     for section_result in generation_run.session_result.sections:
         heading = headings.get(section_result.section_id, section_result.section_id)
-        section_md = f"## {heading}\n\n{section_result.content.strip()}\n"
+        section_md = render_generated_section_markdown(
+            section_result.content,
+            heading=heading,
+        )
+        if section_md is None:
+            continue
         markdown_parts.append(section_md)
         if on_section_complete is not None:
             on_section_complete(section_result.section_id, heading, section_md)

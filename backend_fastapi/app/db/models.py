@@ -280,7 +280,7 @@ class AuditEvent(Base):
         index=True,
     )
     document_id: Mapped[int | None] = mapped_column(
-        ForeignKey("documents_document.id"),
+        ForeignKey("documents_document.id", ondelete="SET NULL"),
         index=True,
     )
     resource_type: Mapped[str | None] = mapped_column(String(64))

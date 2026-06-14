@@ -6,20 +6,16 @@ import pytest
 
 from classification.lib import ClusterCase
 from classification.templates import load_template
-from common.context_claims import (
-    ClaimAssignment,
-    ClaimSourceType,
-    ClaimType,
-    ClinicalClaim,
-)
 from generation.lib import (
     ClusterAssignmentInput,
     enrich_generation_session_result_for_export,
     format_generation_output_for_detail,
     group_clusters_by_section,
     load_classification_assignments,
+    normalize_section_generation_content,
     parse_section_generation_result,
     plan_section_generation,
+    render_generated_section_markdown,
     render_section_user_payload,
     template_id_from_classification_result,
 )
@@ -38,59 +34,44 @@ def _cluster(case_id: str) -> ClusterCase:
     )
 
 
-def test_plan_section_generation_includes_claim_only_section() -> None:
+def test_plan_section_generation_includes_context_only_section() -> None:
     template = load_template("minimal_outpatient_v001")
     clusters_by_id = {"case1_a": _cluster("case1_a")}
     assignments = [
         ClusterAssignmentInput(cluster_id="case1_a", section_ids=["motivo_consulta"])
     ]
-    claim = ClinicalClaim(
-        claim_id="dn_01",
-        text="TA 138/88 al llegar.",
-        source_type=ClaimSourceType.DOCTOR_NOTE,
-        claim_type=ClaimType.MEASUREMENT,
-    )
     plan = plan_section_generation(
         assignments,
         clusters_by_id,
         template,
-        claim_assignments=[
-            ClaimAssignment(
-                claim_id="dn_01",
-                section_ids=["examen_fisico"],
-            )
-        ],
-        claims_by_id={"dn_01": claim},
+        section_context={"antecedentes": "Alergia a penicilina."},
     )
     section_ids = {job.section_id for job in plan.jobs}
     assert "motivo_consulta" in section_ids
-    assert "examen_fisico" in section_ids
-    examen_job = next(job for job in plan.jobs if job.section_id == "examen_fisico")
-    assert examen_job.clusters == []
-    assert examen_job.enrichment_claims == [claim]
+    assert "antecedentes" in section_ids
+    antecedentes_job = next(
+        job for job in plan.jobs if job.section_id == "antecedentes"
+    )
+    assert antecedentes_job.clusters == []
+    assert antecedentes_job.context_present is True
 
 
-def test_render_section_user_payload_includes_enrichment_claims() -> None:
+def test_render_section_user_payload_emits_context() -> None:
     template = load_template("minimal_outpatient_v001")
     section = next(
-        section for section in template.sections if section.section_id == "examen_fisico"
-    )
-    claim = ClinicalClaim(
-        claim_id="dn_01",
-        text="Paciente pálido.",
-        source_type=ClaimSourceType.DOCTOR_NOTE,
-        claim_type=ClaimType.OBSERVATION,
+        section for section in template.sections if section.section_id == "antecedentes"
     )
     payload = json.loads(
         render_section_user_payload(
             section=section,
             clusters=[],
-            enrichment_claims=[claim],
+            context="Según epicrisis previa: neumonía resuelta.",
             template=template,
         )
     )
     assert payload["clusters"] == []
-    assert payload["enrichment_claims"][0]["claim_id"] == "dn_01"
+    assert payload["context"].startswith("Según epicrisis")
+    assert "enrichment_claims" not in payload
 
 
 def test_group_clusters_by_section_supports_multi_section_cluster() -> None:
@@ -157,6 +138,29 @@ def test_load_classification_assignments_from_result_shape(tmp_path) -> None:
     assert (
         template_id_from_classification_result(result_path)
         == "minimal_outpatient_v001"
+    )
+
+
+def test_normalize_section_generation_content_strips_duplicate_heading() -> None:
+    content = "## Motivo de consulta\n\nMotivo de consulta: cefalea"
+    assert (
+        normalize_section_generation_content(content, heading="Motivo de consulta")
+        == "Motivo de consulta: cefalea"
+    )
+
+
+def test_render_generated_section_markdown_skips_empty_sections() -> None:
+    assert (
+        render_generated_section_markdown(
+            "## Motivo de consulta\n\n", heading="Motivo de consulta"
+        )
+        is None
+    )
+    assert (
+        render_generated_section_markdown(
+            "Motivo de consulta: cefalea", heading="Motivo de consulta"
+        )
+        == "## Motivo de consulta\n\nMotivo de consulta: cefalea\n"
     )
 
 

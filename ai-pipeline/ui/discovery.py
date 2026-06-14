@@ -21,11 +21,17 @@ MODULE_DIRS = {
     "clustering": AI_PIPELINE_ROOT / "clustering",
     "classification": AI_PIPELINE_ROOT / "classification",
     "generation": AI_PIPELINE_ROOT / "generation",
-    "context_decompose": AI_PIPELINE_ROOT / "context_pipeline" / "decompose",
-    "context_extract": AI_PIPELINE_ROOT / "context_pipeline" / "extract",
-    "context_classify_claims": (
-        AI_PIPELINE_ROOT / "context_pipeline" / "classify_claims"
+    "context_triage": AI_PIPELINE_ROOT / "context_pipeline" / "triage",
+    "context_filter_spans": AI_PIPELINE_ROOT / "context_pipeline" / "filter_spans",
+    "context_cluster_spans": AI_PIPELINE_ROOT / "context_pipeline" / "cluster_spans",
+    "context_classify_clusters": (
+        AI_PIPELINE_ROOT / "context_pipeline" / "classify_clusters"
     ),
+    "context_section_adapter": (
+        AI_PIPELINE_ROOT / "context_pipeline" / "section_adapter"
+    ),
+    "context_pipeline": AI_PIPELINE_ROOT / "context_pipeline" / "section_adapter",
+    "context_ad_hoc_pipeline": AI_PIPELINE_ROOT / "context_pipeline" / "section_adapter",
 }
 
 PROMPT_STEMS = {
@@ -33,19 +39,27 @@ PROMPT_STEMS = {
     "clustering": "clustering",
     "classification": "classification",
     "generation": "generation",
-    "context_decompose": "decompose",
-    "context_extract": "extract",
-    "context_classify_claims": "classify_claims",
+    "context_triage": "triage",
+    "context_filter_spans": "filter_spans",
+    "context_cluster_spans": "cluster_spans",
+    "context_classify_clusters": "classify_clusters",
+    "context_section_adapter": "section_adapter",
+    "context_pipeline": "section_adapter",
+    "context_ad_hoc_pipeline": "section_adapter",
 }
 
 DEFAULT_PROMPT_VERSIONS = {
     "filtering": "v001",
     "clustering": "v001",
     "classification": "v003",
-    "generation": "v001",
-    "context_decompose": "v001",
-    "context_extract": "v001",
-    "context_classify_claims": "v001",
+    "generation": "v003",
+    "context_triage": "v001",
+    "context_filter_spans": "v001",
+    "context_cluster_spans": "v001",
+    "context_classify_clusters": "v001",
+    "context_section_adapter": "v001",
+    "context_pipeline": "v001",
+    "context_ad_hoc_pipeline": "v001",
 }
 
 PROMPT_VERSION_PATTERN = re.compile(r"^v\d{3}$")
@@ -183,10 +197,20 @@ def list_templates() -> list[str]:
 
 
 def list_context_cases() -> list[str]:
-    from context_pipeline.decompose.lib import load_context_cases
+    from context_pipeline.cases.lib import load_context_cases
 
     index_path = CONTEXT_CASES_INDEX
     return [case.id for case in load_context_cases(index_path)]
+
+
+def list_context_case_document_files(context_case_id: str) -> list[str]:
+    from context_pipeline.cases.lib import load_context_cases, select_context_case
+
+    case_meta = select_context_case(
+        load_context_cases(CONTEXT_CASES_INDEX),
+        case_id=context_case_id,
+    )
+    return list(case_meta.document_files)
 
 
 def list_prompt_versions(step: str) -> list[str]:

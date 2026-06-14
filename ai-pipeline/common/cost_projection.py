@@ -169,19 +169,26 @@ def estimate_cacheable_input_tokens(
 
     if step == "context_pipeline":
         context_label = label.removeprefix("Context · ").strip()
-        if context_label.startswith("extract:"):
-            from context_pipeline.extract.lib import extract_prompt_file_path
+        prompt_loaders = {
+            "triage": "context_pipeline.triage.lib.triage_prompt_file_path",
+            "filter_spans": "context_pipeline.filter_spans.lib.filter_spans_prompt_file_path",
+            "cluster_spans": "context_pipeline.cluster_spans.lib.cluster_spans_prompt_file_path",
+            "classify_clusters": "context_pipeline.classify_clusters.lib.classify_clusters_prompt_file_path",
+            "section_adapter": "context_pipeline.section_adapter.lib.section_adapter_prompt_file_path",
+        }
+        for key, import_path in prompt_loaders.items():
+            if context_label.startswith(key):
+                module_name, func_name = import_path.rsplit(".", 1)
+                import importlib
 
-            return _count_prompt_file_tokens(str(extract_prompt_file_path(prompt_version)))
-        if context_label == "classify_claims":
-            from context_pipeline.classify_claims.lib import classify_claims_prompt_file_path
+                module = importlib.import_module(module_name)
+                prompt_file_path = getattr(module, func_name)
+                return _count_prompt_file_tokens(str(prompt_file_path(prompt_version)))
+        from context_pipeline.section_adapter.lib import section_adapter_prompt_file_path
 
-            return _count_prompt_file_tokens(
-                str(classify_claims_prompt_file_path(prompt_version))
-            )
-        from context_pipeline.decompose.lib import decompose_prompt_file_path
-
-        return _count_prompt_file_tokens(str(decompose_prompt_file_path(prompt_version)))
+        return _count_prompt_file_tokens(
+            str(section_adapter_prompt_file_path(prompt_version))
+        )
 
     return 0
 

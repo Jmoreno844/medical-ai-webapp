@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -34,6 +36,34 @@ PROMPT_FILENAME_STEM = "generation"
 DEFAULT_CLASSIFICATION_CASES_INDEX = CLUSTER_CASES_INDEX
 DEFAULT_TEMPLATES_DIR = AI_PIPELINE_ROOT / "templates"
 DEFAULT_SECTION_CONCURRENCY = 0
+
+_HEADING_LINE_RE = re.compile(r"^(#{1,6})\s+(.+)$")
+
+
+def _normalize_heading_text(text: str) -> str:
+    normalized = unicodedata.normalize("NFKD", text.strip().lower())
+    return normalized.encode("ascii", "ignore").decode("ascii")
+
+
+def normalize_section_generation_content(content: str, *, heading: str) -> str:
+    normalized_heading = _normalize_heading_text(heading)
+    lines = content.strip().splitlines()
+    while lines:
+        match = _HEADING_LINE_RE.match(lines[0].strip())
+        if match and _normalize_heading_text(match.group(2)) == normalized_heading:
+            lines.pop(0)
+            while lines and not lines[0].strip():
+                lines.pop(0)
+            continue
+        break
+    return "\n".join(lines).strip()
+
+
+def render_generated_section_markdown(content: str, *, heading: str) -> str | None:
+    body = normalize_section_generation_content(content, heading=heading)
+    if not body:
+        return None
+    return f"## {heading}\n\n{body}\n"
 
 
 class ClusterAssignmentInput(BaseModel):
@@ -496,7 +526,8 @@ __all__ = [
     "format_section_output_for_detail",
     "format_session_debug_output",
     "generation_prompt_file_path",
-    "group_clusters_by_section",
+    "normalize_section_generation_content",
+    "render_generated_section_markdown",
     "load_claim_classification_assignments",
     "load_claims_from_classification_record",
     "load_classification_assignments",

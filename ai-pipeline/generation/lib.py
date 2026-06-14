@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -8,12 +10,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from classification.lib import ClusterCase, cluster_to_payload_item
 from common.case_paths import CLUSTER_CASES_INDEX
-from common.context_claims import (
-    ClaimAssignment,
-    ClinicalClaim,
-    claim_to_payload_item,
-    group_claims_by_section,
-)
+from common.context_spans import SectionContext
 from common.json_utils import extract_json_object
 from common.output_detail import DEFAULT_OUTPUT_DETAIL
 from common.prompts import (
@@ -34,6 +31,34 @@ PROMPT_FILENAME_STEM = "generation"
 DEFAULT_CLASSIFICATION_CASES_INDEX = CLUSTER_CASES_INDEX
 DEFAULT_TEMPLATES_DIR = AI_PIPELINE_ROOT / "templates"
 DEFAULT_SECTION_CONCURRENCY = 0
+
+_HEADING_LINE_RE = re.compile(r"^(#{1,6})\s+(.+)$")
+
+
+def _normalize_heading_text(text: str) -> str:
+    normalized = unicodedata.normalize("NFKD", text.strip().lower())
+    return normalized.encode("ascii", "ignore").decode("ascii")
+
+
+def normalize_section_generation_content(content: str, *, heading: str) -> str:
+    normalized_heading = _normalize_heading_text(heading)
+    lines = content.strip().splitlines()
+    while lines:
+        match = _HEADING_LINE_RE.match(lines[0].strip())
+        if match and _normalize_heading_text(match.group(2)) == normalized_heading:
+            lines.pop(0)
+            while lines and not lines[0].strip():
+                lines.pop(0)
+            continue
+        break
+    return "\n".join(lines).strip()
+
+
+def render_generated_section_markdown(content: str, *, heading: str) -> str | None:
+    body = normalize_section_generation_content(content, heading=heading)
+    if not body:
+        return None
+    return f"## {heading}\n\n{body}\n"
 
 
 class ClusterAssignmentInput(BaseModel):
@@ -56,15 +81,19 @@ class SectionGenerationJob:
     section_id: str
     section: TemplateSection
     clusters: list[ClusterCase]
-    enrichment_claims: list[ClinicalClaim]
+    context: str = ""
 
     @property
     def cluster_ids(self) -> list[str]:
         return [cluster.id for cluster in self.clusters]
 
     @property
-    def claim_ids(self) -> list[str]:
-        return [claim.claim_id for claim in self.enrichment_claims]
+    def context_present(self) -> bool:
+        return bool(self.context.strip())
+
+    @property
+    def context_chars(self) -> int:
+        return len(self.context)
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,32 +185,23 @@ def plan_section_generation(
     clusters_by_id: dict[str, ClusterCase],
     template: ClinicalTemplate,
     *,
-    claim_assignments: list[ClaimAssignment] | None = None,
-    claims_by_id: dict[str, ClinicalClaim] | None = None,
+    section_context: SectionContext | None = None,
 ) -> SectionGenerationPlan:
     grouped = group_clusters_by_section(assignments, clusters_by_id, template)
-    claims_grouped: dict[str, list[ClinicalClaim]] = {
-        section_id: [] for section_id in template.section_id_set()
-    }
-    if claim_assignments is not None and claims_by_id is not None:
-        claims_grouped = group_claims_by_section(
-            claim_assignments,
-            claims_by_id,
-            template.section_id_set(),
-        )
+    context_map = section_context or {}
     jobs: list[SectionGenerationJob] = []
     skipped_sections: list[dict[str, str]] = []
 
     for section in template.sections:
         clusters = grouped.get(section.section_id, [])
-        enrichment_claims = claims_grouped.get(section.section_id, [])
-        if clusters or enrichment_claims:
+        context = context_map.get(section.section_id, "")
+        if clusters or context.strip():
             jobs.append(
                 SectionGenerationJob(
                     section_id=section.section_id,
                     section=section,
                     clusters=clusters,
-                    enrichment_claims=enrichment_claims,
+                    context=context,
                 )
             )
             continue
@@ -198,105 +218,46 @@ def render_section_user_payload(
     *,
     section: TemplateSection,
     clusters: list[ClusterCase],
-    enrichment_claims: list[ClinicalClaim] | None = None,
+    context: str = "",
     template: ClinicalTemplate,
 ) -> str:
-    claims = enrichment_claims or []
-    if not clusters and not claims:
+    if not clusters and not context.strip():
         raise ValueError(
-            "generation_section_payload_requires_at_least_one_cluster_or_claim"
+            "generation_section_payload_requires_at_least_one_cluster_or_context"
         )
     payload = {
         "section": section.to_generation_payload(),
         "template_guidelines": template.generation.guidelines,
         "clusters": [cluster_to_payload_item(cluster) for cluster in clusters],
-        "enrichment_claims": [claim_to_payload_item(claim) for claim in claims],
+        "context": context,
     }
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
-def load_claim_classification_assignments(path: Path) -> list[ClaimAssignment]:
+def load_section_context_from_record(path: Path) -> SectionContext:
     payload = json.loads(path.read_text(encoding="utf-8"))
-    session_result = payload.get("claim_classification_session_result")
-    if not isinstance(session_result, dict):
-        raise ValueError("generation_claim_classification_session_result_missing")
-    assignments_raw = session_result.get("assignments")
-    if not isinstance(assignments_raw, list):
-        raise ValueError("generation_claim_classification_assignments_missing")
-    assignments: list[ClaimAssignment] = []
-    for index, item in enumerate(assignments_raw):
-        if not isinstance(item, dict):
-            raise ValueError(f"generation_claim_assignment_{index}_must_be_object")
-        try:
-            assignments.append(ClaimAssignment.model_validate(item))
-        except ValidationError as exc:
-            raise ValueError(
-                f"generation_claim_assignment_{index}_invalid: {exc}"
-            ) from exc
-    return assignments
+    section_context_raw = payload.get("section_context")
+    if isinstance(section_context_raw, dict):
+        section_context: SectionContext = {}
+        for section_id, content in section_context_raw.items():
+            if isinstance(section_id, str) and isinstance(content, str):
+                section_context[section_id] = content
+        if section_context:
+            return section_context
 
+    adapter_export = payload.get("section_adapter_result")
+    if isinstance(adapter_export, dict):
+        nested = adapter_export.get("section_context")
+        if isinstance(nested, dict):
+            section_context = {
+                str(section_id): str(content)
+                for section_id, content in nested.items()
+                if isinstance(section_id, str) and isinstance(content, str)
+            }
+            if section_context:
+                return section_context
 
-def load_claims_from_context_record(path: Path) -> list[ClinicalClaim]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    claims: list[ClinicalClaim] = []
-    for key in ("decompose_result", "extract_result"):
-        block = payload.get(key)
-        if not isinstance(block, dict):
-            continue
-        claims_raw = block.get("claims")
-        if not isinstance(claims_raw, list):
-            continue
-        for index, item in enumerate(claims_raw):
-            if not isinstance(item, dict):
-                raise ValueError(f"context_claim_{key}_{index}_must_be_object")
-            claims.append(ClinicalClaim.model_validate(item))
-    if not claims:
-        raise ValueError("generation_context_record_has_no_claims")
-    return claims
-
-
-def load_claims_from_classification_record(
-    path: Path,
-) -> tuple[list[ClaimAssignment], dict[str, ClinicalClaim]]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    claims_by_id: dict[str, ClinicalClaim] = {}
-    claims_raw = payload.get("claims")
-    if isinstance(claims_raw, list):
-        for index, item in enumerate(claims_raw):
-            if not isinstance(item, dict):
-                raise ValueError(f"generation_context_claim_{index}_must_be_object")
-            claim = ClinicalClaim.model_validate(item)
-            claims_by_id[claim.claim_id] = claim
-    assignments = load_claim_classification_assignments(path)
-    if not claims_by_id:
-        session_result = payload.get("claim_classification_session_result")
-        if isinstance(session_result, dict):
-            assignments_raw = session_result.get("assignments")
-            if isinstance(assignments_raw, list):
-                for index, item in enumerate(assignments_raw):
-                    if not isinstance(item, dict):
-                        continue
-                    claim_id = item.get("claim_id")
-                    claim_text = item.get("claim_text")
-                    source_type = item.get("source_type")
-                    claim_type = item.get("claim_type")
-                    if (
-                        isinstance(claim_id, str)
-                        and isinstance(claim_text, str)
-                        and isinstance(source_type, str)
-                        and isinstance(claim_type, str)
-                    ):
-                        from common.context_claims import ClaimSourceType, ClaimType
-
-                        claims_by_id[claim_id] = ClinicalClaim(
-                            claim_id=claim_id,
-                            text=claim_text,
-                            source_type=ClaimSourceType(source_type),
-                            claim_type=ClaimType(claim_type),
-                        )
-    if not claims_by_id:
-        raise ValueError("generation_claim_classification_record_has_no_claims")
-    return assignments, claims_by_id
+    raise ValueError("generation_context_record_has_no_section_context")
 
 
 def generation_prompt_file_path(version: str) -> Path:
@@ -346,13 +307,15 @@ def enrich_section_generation_result_for_export(
     *,
     heading: str,
     cluster_ids: list[str],
-    claim_ids: list[str] | None = None,
+    context_present: bool = False,
+    context_chars: int = 0,
 ) -> dict[str, object]:
     return {
         "section_id": result.section_id,
         "heading": heading,
         "cluster_ids": list(cluster_ids),
-        "claim_ids": list(claim_ids or []),
+        "context_present": context_present,
+        "context_chars": context_chars,
         "content": result.content,
         "content_chars": len(result.content),
     }
@@ -363,10 +326,12 @@ def enrich_generation_session_result_for_export(
     template: ClinicalTemplate,
     *,
     cluster_ids_by_section: dict[str, list[str]],
-    claim_ids_by_section: dict[str, list[str]] | None = None,
+    context_present_by_section: dict[str, bool] | None = None,
+    context_chars_by_section: dict[str, int] | None = None,
 ) -> dict[str, object]:
     headings_by_id = template.headings_by_section_id()
-    claim_ids_map = claim_ids_by_section or {}
+    context_present_map = context_present_by_section or {}
+    context_chars_map = context_chars_by_section or {}
     sections: list[dict[str, object]] = []
     for section_result in result.sections:
         sections.append(
@@ -377,7 +342,11 @@ def enrich_generation_session_result_for_export(
                     section_result.section_id,
                 ),
                 cluster_ids=cluster_ids_by_section.get(section_result.section_id, []),
-                claim_ids=claim_ids_map.get(section_result.section_id, []),
+                context_present=context_present_map.get(
+                    section_result.section_id,
+                    False,
+                ),
+                context_chars=context_chars_map.get(section_result.section_id, 0),
             )
         )
     return {
@@ -496,10 +465,10 @@ __all__ = [
     "format_section_output_for_detail",
     "format_session_debug_output",
     "generation_prompt_file_path",
-    "group_clusters_by_section",
-    "load_claim_classification_assignments",
-    "load_claims_from_classification_record",
+    "normalize_section_generation_content",
+    "render_generated_section_markdown",
     "load_classification_assignments",
+    "load_section_context_from_record",
     "load_classification_result",
     "load_generation_prompt",
     "load_prompt",

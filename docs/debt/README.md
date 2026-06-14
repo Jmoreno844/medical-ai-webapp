@@ -29,3 +29,4 @@ Deudas actuales:
 - [`copilot-agent-runtime.md`](copilot-agent-runtime.md) — deuda temporal del runtime y auth interna del copiloto.
 - [`cloud-sql-production-hardening.md`](cloud-sql-production-hardening.md) — endurecimiento pendiente de Cloud SQL para produccion con datos medicos reales.
 - [`transcription-local-diarization.md`](transcription-local-diarization.md) — diarizacion local ligera pendiente para identidad consistente de hablantes y overlap.
+- [`encounter-delete-audit-trail.md`](encounter-delete-audit-trail.md) — borrado de encuentro sin eventos de auditoria en cascada.

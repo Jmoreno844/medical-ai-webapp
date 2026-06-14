@@ -823,6 +823,440 @@ def render_e2e_document(generation_record: dict[str, object]) -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+def _render_doctor_items_table(items_raw: object) -> None:
+    if not isinstance(items_raw, list) or not items_raw:
+        st.info("Sin items.")
+        return
+    rows: list[dict[str, object]] = []
+    for item in items_raw:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text", ""))
+        if len(text) > 120:
+            text = text[:117] + "..."
+        rows.append({"id": item.get("id"), "text": text})
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+
+
+def _render_spans_table(spans_raw: object) -> None:
+    if not isinstance(spans_raw, list) or not spans_raw:
+        st.info("Sin spans.")
+        return
+    rows: list[dict[str, object]] = []
+    for span in spans_raw:
+        if not isinstance(span, dict):
+            continue
+        text = str(span.get("text", ""))
+        if len(text) > 100:
+            text = text[:97] + "..."
+        rows.append(
+            {
+                "id": span.get("id"),
+                "doc": span.get("doc"),
+                "kind": span.get("kind"),
+                "text": text,
+            }
+        )
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+
+
+def _render_clusters_table(clusters_raw: object) -> None:
+    if not isinstance(clusters_raw, list) or not clusters_raw:
+        st.info("Sin clusters.")
+        return
+    rows: list[dict[str, object]] = []
+    for cluster in clusters_raw:
+        if not isinstance(cluster, dict):
+            continue
+        span_ids = cluster.get("span_ids", [])
+        rows.append(
+            {
+                "id": cluster.get("id"),
+                "title": cluster.get("title"),
+                "span_count": len(span_ids) if isinstance(span_ids, list) else 0,
+                "span_ids": ", ".join(span_ids) if isinstance(span_ids, list) else "",
+            }
+        )
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+
+
+def render_context_triage_result(payload: dict[str, object]) -> None:
+    is_pasted = payload.get("is_pasted")
+    if isinstance(is_pasted, bool):
+        st.metric("is_pasted", "sí" if is_pasted else "no")
+    triage_result = payload.get("triage_result")
+    if isinstance(triage_result, dict):
+        directives = triage_result.get("directives")
+        if isinstance(directives, list):
+            st.markdown("**Directivas**")
+            st.dataframe(directives, use_container_width=True, hide_index=True)
+        st.caption(
+            f"content_ids: {triage_result.get('content_ids', [])} · "
+            f"drop_ids: {triage_result.get('drop_ids', [])}"
+        )
+    _render_doctor_items_table(payload.get("doctor_items"))
+    render_json_expander(payload)
+
+
+def render_context_filter_spans_result(payload: dict[str, object]) -> None:
+    filter_result = payload.get("filter_spans_result")
+    if isinstance(filter_result, dict):
+        drop_count = filter_result.get("drop_count")
+        kept = filter_result.get("kept_span_count")
+        if isinstance(drop_count, int):
+            st.metric("Spans descartados", drop_count)
+        if isinstance(kept, int):
+            st.metric("Spans conservados", kept)
+    st.markdown("**Spans filtrados**")
+    _render_spans_table(payload.get("filtered_spans"))
+    render_json_expander(payload)
+
+
+def render_context_cluster_spans_result(payload: dict[str, object]) -> None:
+    cluster_result = payload.get("cluster_spans_result")
+    if isinstance(cluster_result, dict):
+        cluster_count = cluster_result.get("cluster_count")
+        if isinstance(cluster_count, int):
+            st.metric("Clusters", cluster_count)
+        _render_clusters_table(cluster_result.get("clusters"))
+    render_json_expander(payload)
+
+
+def render_context_classify_clusters_result(payload: dict[str, object]) -> None:
+    classify_result = payload.get("classify_clusters_result")
+    if isinstance(classify_result, dict):
+        assignments = classify_result.get("assignments")
+        if isinstance(assignments, list) and assignments:
+            st.dataframe(assignments, use_container_width=True, hide_index=True)
+        else:
+            st.info("Sin assignments.")
+    render_json_expander(payload)
+
+
+def render_context_section_adapter_result(payload: dict[str, object]) -> None:
+    adapter_jobs = payload.get("adapter_jobs")
+    if isinstance(adapter_jobs, dict) and adapter_jobs:
+        rows: list[dict[str, object]] = []
+        for section_id, cluster_ids in sorted(adapter_jobs.items()):
+            ids = (
+                [str(cluster_id) for cluster_id in cluster_ids]
+                if isinstance(cluster_ids, list)
+                else []
+            )
+            rows.append(
+                {
+                    "section_id": section_id,
+                    "cluster_count": len(ids),
+                    "cluster_ids": ", ".join(ids),
+                }
+            )
+        st.markdown("**Jobs por sección**")
+        st.dataframe(rows, use_container_width=True, hide_index=True)
+
+    section_context = payload.get("section_context")
+    if isinstance(section_context, dict) and section_context:
+        st.markdown("**section_context**")
+        for section_id, content in section_context.items():
+            text = str(content)
+            label = f"`{section_id}`"
+            if text.strip():
+                label += f" · {len(text)} chars"
+            with st.expander(label, expanded=False):
+                st.markdown(text or "_(vacío)_")
+    else:
+        st.info("section_context vacío.")
+    render_json_expander(payload)
+
+
+def _pipeline_has_doctor_note(payload: dict[str, object]) -> bool:
+    has_note = payload.get("has_doctor_note")
+    if isinstance(has_note, bool):
+        return has_note
+    include_doctor = payload.get("include_doctor_note")
+    if isinstance(include_doctor, bool):
+        return include_doctor
+    doctor_items = payload.get("doctor_items")
+    return isinstance(doctor_items, list) and len(doctor_items) > 0
+
+
+def _pipeline_source_caption(payload: dict[str, object]) -> str | None:
+    has_note = payload.get("has_doctor_note")
+    has_pdf = payload.get("has_document_pdf")
+    include_doctor = payload.get("include_doctor_note")
+    include_docs = payload.get("include_documents")
+
+    if isinstance(has_note, bool) or isinstance(has_pdf, bool):
+        return (
+            "Fuentes: "
+            f"nota del médico={'sí' if has_note else 'no'} · "
+            f"documento PDF={'sí' if has_pdf else 'no'}"
+        )
+    if isinstance(include_doctor, bool) or isinstance(include_docs, bool):
+        return (
+            "Fuentes: "
+            f"nota del médico={'sí' if include_doctor else 'no'} · "
+            f"documentos previos={'sí' if include_docs else 'no'}"
+        )
+    return None
+
+
+def _derive_filter_spans_result(payload: dict[str, object]) -> dict[str, object] | None:
+    existing = payload.get("filter_spans_result")
+    if isinstance(existing, dict):
+        return existing
+    span_pool = payload.get("span_pool")
+    filtered_spans = payload.get("filtered_spans")
+    if not isinstance(span_pool, list) or not isinstance(filtered_spans, list):
+        return None
+    kept_ids = {
+        str(span.get("id"))
+        for span in filtered_spans
+        if isinstance(span, dict) and span.get("id")
+    }
+    drop_ids = [
+        str(span.get("id"))
+        for span in span_pool
+        if isinstance(span, dict) and span.get("id") and str(span.get("id")) not in kept_ids
+    ]
+    return {
+        "drop_ids": drop_ids,
+        "drop_count": len(drop_ids),
+        "kept_span_count": len(kept_ids),
+    }
+
+
+def _filter_spans_step_payload(payload: dict[str, object]) -> dict[str, object]:
+    step_payload = dict(payload)
+    filter_result = _derive_filter_spans_result(payload)
+    if filter_result is not None:
+        step_payload["filter_spans_result"] = filter_result
+    return step_payload
+
+
+PIPELINE_LLM_STEP_ORDER = (
+    "triage",
+    "filter_spans",
+    "cluster_spans",
+    "classify_clusters",
+    "section_adapter",
+)
+
+
+def _pipeline_step_executed(payload: dict[str, object], step: str) -> bool:
+    stopped_after = payload.get("stopped_after_step")
+    if not isinstance(stopped_after, str):
+        return True
+    if step not in PIPELINE_LLM_STEP_ORDER:
+        return True
+    return PIPELINE_LLM_STEP_ORDER.index(step) <= PIPELINE_LLM_STEP_ORDER.index(
+        stopped_after
+    )
+
+
+def _render_pipeline_partial_banner(payload: dict[str, object]) -> None:
+    pipeline_error = payload.get("pipeline_error")
+    if not isinstance(pipeline_error, str) or not pipeline_error:
+        return
+    stopped_after = payload.get("stopped_after_step")
+    stopped_label = stopped_after if isinstance(stopped_after, str) else "?"
+    st.warning(
+        f"Pipeline parcial: se detuvo tras **{stopped_label}**. "
+        f"Los pasos posteriores no se ejecutaron. "
+        f"Motivo: `{pipeline_error}`"
+    )
+
+
+def _render_pipeline_step_tab(
+    payload: dict[str, object],
+    *,
+    step: str,
+    render_fn: object,
+) -> None:
+    if not _pipeline_step_executed(payload, step):
+        st.info("Paso no ejecutado: el pipeline se detuvo antes de llegar aquí.")
+        return
+    if callable(render_fn):
+        render_fn()
+    pipeline_error = payload.get("pipeline_error")
+    stopped_after = payload.get("stopped_after_step")
+    if (
+        isinstance(pipeline_error, str)
+        and pipeline_error
+        and stopped_after == step
+        and step == "filter_spans"
+    ):
+        st.error(pipeline_error)
+
+
+def _render_pipeline_summary(payload: dict[str, object]) -> None:
+    _render_pipeline_partial_banner(payload)
+    source_caption = _pipeline_source_caption(payload)
+    if source_caption:
+        st.caption(source_caption)
+
+    col_session, col_template, col_pasted = st.columns(3)
+    session_id = payload.get("session_id")
+    if isinstance(session_id, str) and session_id:
+        col_session.metric("Session", session_id)
+    template_id = payload.get("template_id")
+    if isinstance(template_id, str) and template_id:
+        col_template.metric("Template", template_id)
+    is_pasted = payload.get("is_pasted")
+    if isinstance(is_pasted, bool):
+        col_pasted.metric("is_pasted", "sí" if is_pasted else "no")
+
+    span_pool = payload.get("span_pool")
+    filtered_spans = payload.get("filtered_spans")
+    cluster_result = payload.get("cluster_spans_result")
+    section_context = payload.get("section_context")
+
+    col_pool, col_filtered, col_clusters, col_sections = st.columns(4)
+    if isinstance(span_pool, list):
+        col_pool.metric("Span pool", len(span_pool))
+    if isinstance(filtered_spans, list):
+        col_filtered.metric("Tras filter", len(filtered_spans))
+    if isinstance(cluster_result, dict):
+        cluster_count = cluster_result.get("cluster_count")
+        if isinstance(cluster_count, int):
+            col_clusters.metric("Clusters", cluster_count)
+    if isinstance(section_context, dict):
+        col_sections.metric("Secciones", len(section_context))
+
+    encounter_date = payload.get("encounter_date")
+    document_date = payload.get("document_date")
+    if isinstance(encounter_date, str) and encounter_date:
+        st.caption(f"Fecha consulta: {encounter_date}")
+    if isinstance(document_date, str) and document_date:
+        st.caption(f"Fecha documento: {document_date}")
+
+    if not _pipeline_has_doctor_note(payload):
+        st.info("Triage omitido: no hubo nota del médico en esta ejecución.")
+
+
+def _render_llm_calls_table(llm_calls_raw: object) -> None:
+    if not isinstance(llm_calls_raw, list) or not llm_calls_raw:
+        st.info("Sin llamadas LLM registradas.")
+        return
+    rows: list[dict[str, object]] = []
+    for call in llm_calls_raw:
+        if not isinstance(call, dict):
+            continue
+        usage = call.get("llm_usage")
+        total_tokens: object = None
+        if isinstance(usage, dict):
+            total_tokens = usage.get("total_tokens")
+        rows.append(
+            {
+                "paso": call.get("label"),
+                "provider": call.get("provider"),
+                "model": call.get("model"),
+                "total_tokens": total_tokens,
+            }
+        )
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+
+
+def render_context_pipeline_result(payload: dict[str, object]) -> None:
+    _render_pipeline_summary(payload)
+
+    tab_labels = ["Resumen"]
+    if _pipeline_has_doctor_note(payload):
+        tab_labels.append("Triage")
+    tab_labels.extend(
+        [
+            "Span pool",
+            "Filter",
+            "Cluster",
+            "Classify",
+            "Adapter",
+            "LLM calls",
+        ]
+    )
+    tabs = st.tabs(tab_labels)
+    tab_index = 0
+
+    with tabs[tab_index]:
+        st.markdown("**Metadatos de ejecución**")
+        meta_rows: list[dict[str, object]] = []
+        for key in (
+            "run_mode",
+            "pipeline_status",
+            "stopped_after_step",
+            "pipeline_error",
+            "case_id",
+            "session_id",
+            "template_id",
+            "document_id",
+            "encounter_date",
+            "document_date",
+            "provider",
+            "model",
+            "output_path",
+        ):
+            value = payload.get(key)
+            if value is not None:
+                meta_rows.append({"campo": key, "valor": value})
+        if meta_rows:
+            st.dataframe(meta_rows, use_container_width=True, hide_index=True)
+        render_json_expander(payload, title="JSON completo del pipeline")
+    tab_index += 1
+
+    if _pipeline_has_doctor_note(payload):
+        with tabs[tab_index]:
+            _render_pipeline_step_tab(
+                payload,
+                step="triage",
+                render_fn=lambda: render_context_triage_result(payload),
+            )
+        tab_index += 1
+
+    with tabs[tab_index]:
+        st.markdown("**Spans antes de filtrar**")
+        _render_spans_table(payload.get("span_pool"))
+        render_json_expander(
+            {"span_pool": payload.get("span_pool", [])},
+            title="JSON span pool",
+        )
+    tab_index += 1
+
+    with tabs[tab_index]:
+        _render_pipeline_step_tab(
+            payload,
+            step="filter_spans",
+            render_fn=lambda: render_context_filter_spans_result(
+                _filter_spans_step_payload(payload)
+            ),
+        )
+    tab_index += 1
+
+    with tabs[tab_index]:
+        _render_pipeline_step_tab(
+            payload,
+            step="cluster_spans",
+            render_fn=lambda: render_context_cluster_spans_result(payload),
+        )
+    tab_index += 1
+
+    with tabs[tab_index]:
+        _render_pipeline_step_tab(
+            payload,
+            step="classify_clusters",
+            render_fn=lambda: render_context_classify_clusters_result(payload),
+        )
+    tab_index += 1
+
+    with tabs[tab_index]:
+        _render_pipeline_step_tab(
+            payload,
+            step="section_adapter",
+            render_fn=lambda: render_context_section_adapter_result(payload),
+        )
+    tab_index += 1
+
+    with tabs[tab_index]:
+        _render_llm_calls_table(payload.get("llm_calls"))
+
+
 def render_step_result(step: str, payload: dict[str, object]) -> None:
     render_step_latency(step, payload)
     if step == "filtering":
@@ -833,5 +1267,19 @@ def render_step_result(step: str, payload: dict[str, object]) -> None:
         render_classification_result(payload)
     elif step == "generation":
         render_generation_result(payload)
+    elif step == "context_triage":
+        render_context_triage_result(payload)
+    elif step == "context_filter_spans":
+        render_context_filter_spans_result(payload)
+    elif step == "context_cluster_spans":
+        render_context_cluster_spans_result(payload)
+    elif step == "context_classify_clusters":
+        render_context_classify_clusters_result(payload)
+    elif step == "context_section_adapter":
+        render_context_section_adapter_result(payload)
+    elif step == "context_pipeline":
+        render_context_pipeline_result(payload)
+    elif step == "context_ad_hoc_pipeline":
+        render_context_pipeline_result(payload)
     else:
         render_json_expander(payload)

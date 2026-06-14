@@ -199,13 +199,6 @@ async def delete_document(
         )
         await session.commit()
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Documento no encontrado")
-    deleted = await delete_document_for_doctor(
-        session,
-        document_id=document_id,
-        doctor_id=user.id,
-    )
-    if not deleted:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Documento no encontrado")
     await record_audit_event(
         session,
         action="document.deleted",
@@ -218,6 +211,13 @@ async def delete_document(
         resource_type="document",
         resource_id=document.id,
     )
+    deleted = await delete_document_for_doctor(
+        session,
+        document_id=document_id,
+        doctor_id=user.id,
+    )
+    if not deleted:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Documento no encontrado")
     await session.commit()
     return SuccessResponse(
         success=True,

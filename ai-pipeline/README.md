@@ -18,7 +18,7 @@ Local R&D harness for experimental AI pipeline steps. Not deployed to production
 
 **Transcript:** `filtering → clustering → classification → generation`
 
-**Context (parallel):** `decompose` + `extract` → `classify_claims` → merge at `generation`
+**Context (parallel):** triage → filter/cluster/classify → section_adapter → `section_context` at generation
 
 See [`context_pipeline/README.md`](context_pipeline/README.md).
 

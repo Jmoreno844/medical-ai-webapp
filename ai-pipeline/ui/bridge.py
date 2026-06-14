@@ -10,7 +10,7 @@ from common.context_claims import (
     group_claims_by_section,
 )
 from common.transcripts import build_turn_catalog
-from generation.lib import load_claims_from_classification_record
+from generation.lib import load_section_context_from_record
 from ui.discovery import load_result_json
 
 
@@ -222,7 +222,7 @@ __all__ = [
     "clusters_from_classification_record",
     "clusters_from_clustering_result",
     "drop_turn_ids_from_filtering_result",
-    "load_claims_from_classification_record",
+    "load_section_context_from_record",
     "missing_assignment_cluster_ids",
     "resolve_clustering_result_path_from_classification_record",
 ]

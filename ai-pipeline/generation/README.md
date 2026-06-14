@@ -5,13 +5,13 @@ Local debug harness to generate clinical document **sections** from classified c
 Pipeline position:
 
 - **Transcript:** `filtering → clustering → classification → generation`
-- **Context (parallel):** `decompose` + `extract` → `classify_claims` → **generation**
+- **Context (parallel):** spans pipeline → `section_context` → **generation**
 
 ## Input
 
 1. Classification session result JSON (`classification_session_result.assignments`)
 2. Cluster fixtures from `../cases/cluster/` for the same `session_id`
-3. *(Optional)* Claim classification result JSON from `../context_pipeline/classify_claims/results/`
+3. *(Optional)* Context pipeline result JSON with `section_context` from `../context_pipeline/section_adapter/results/`
 
 Classification maps **cluster → section_ids**. Claim classification maps **claim → section_ids**. Generation inverts both to **section → clusters[] + enrichment_claims[]** and runs **one LLM call per non-empty section in parallel**.
 
@@ -56,12 +56,12 @@ Sections are generated when they have transcript clusters **or** classified enri
 
 ## Output contract
 
-Per section LLM response:
+Per section LLM response (`content` is body-only; the worker adds `##` headings when assembling the document):
 
 ```json
 {
   "section_id": "enfermedad_actual",
-  "content": "## Enfermedad actual\n\n..."
+  "content": "Enfermedad actual: refiere cuadro de 3 días..."
 }
 ```
 
