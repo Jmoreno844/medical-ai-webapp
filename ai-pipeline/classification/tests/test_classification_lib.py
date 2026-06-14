@@ -17,12 +17,15 @@ from classification.lib import (
     audit_session_result,
     enrich_classification_result_for_export,
     enrich_classification_session_result_for_export,
+    build_classification_system_prompt,
+    format_classification_batch_output_for_detail,
     format_classification_output_for_detail,
     load_session_clusters,
     merge_batch_results,
     parse_classification_batch_result,
     parse_classification_result,
     prompt_file_path,
+    render_classification_batch_payload,
 )
 from classification.templates import load_template
 from common.providers import ModelSpec
@@ -75,6 +78,58 @@ def test_enrich_classification_result_for_export_returns_section_ids() -> None:
     exported = enrich_classification_result_for_export(result, template)
     assert exported["section_ids"] == ["motivo_consulta"]
     assert exported["section_count"] == 1
+
+
+def test_build_classification_system_prompt_includes_template_sections() -> None:
+    template = load_template("consulta_estructurada_v001")
+    base_prompt = "Instrucciones base."
+    system_prompt = build_classification_system_prompt(base_prompt, template)
+    assert "PLANTILLA ACTIVA" in system_prompt
+    assert "consulta_estructurada_v001" in system_prompt
+    assert "### signos_vitales" in system_prompt
+    assert "Instrucciones base." in system_prompt
+
+
+def test_render_batch_payload_v003_uses_template_ref() -> None:
+    template = load_template("consulta_estructurada_v001")
+    cluster = ClusterCase(
+        id="case1_demo",
+        template_id=template.id,
+        cluster_json={
+            "topic_label": "demo",
+            "turns": [{"turn_id": 0, "speaker": "PACIENTE", "text": "hola"}],
+        },
+    )
+    payload = json.loads(
+        render_classification_batch_payload(
+            clusters=[cluster],
+            template=template,
+            prompt_version="v003",
+        )
+    )
+    assert "template_ref" in payload
+    assert payload["template_ref"]["id"] == "consulta_estructurada_v001"
+    assert "signos_vitales" in payload["template_ref"]["allowed_section_ids"]
+    assert "template" not in payload
+
+
+def test_compact_batch_output_keeps_llm_usage() -> None:
+    batch = {
+        "batch_index": 0,
+        "cluster_ids": ["case1_a"],
+        "response_time_ms": 1200,
+        "classification_result": {"assignments": [], "assignment_count": 0},
+        "batch_assignment_audit": {"is_valid": True},
+        "llm_usage": {
+            "input_tokens": 500,
+            "output_tokens": 50,
+        },
+        "raw_response": '{"assignments": []}',
+    }
+    compact = format_classification_batch_output_for_detail(batch, "compact")
+    assert compact["llm_usage"]["input_tokens"] == 500
+    assert compact["batch_index"] == 0
+    assert "raw_response" not in compact
 
 
 def test_compact_output_detail_omits_raw_response() -> None:

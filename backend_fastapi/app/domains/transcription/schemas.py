@@ -136,6 +136,18 @@ class RecordingSessionFinishResponse(BaseModel):
     error: str | None = None
 
 
+class ImportTranscriptCaseRequest(BaseModel):
+    transcript_case: dict[str, Any]
+
+
+class ImportTranscriptCaseResponse(BaseModel):
+    success: bool
+    session_id: str | None = None
+    rendered_text: str | None = None
+    chunks: list[ChunkTranscriptResponse] = Field(default_factory=list)
+    error: str | None = None
+
+
 class RecordingSessionRetryResponse(BaseModel):
     success: bool
     status: str | None = None

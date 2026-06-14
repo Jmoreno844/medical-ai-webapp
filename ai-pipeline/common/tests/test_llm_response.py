@@ -6,6 +6,7 @@ from common.llm_response import (
     LlmResponse,
     build_llm_response_from_message,
     build_llm_response_from_openai_responses,
+    output_token_breakdown_from_usage,
     split_thinking_from_content,
     summarize_llm_responses,
 )
@@ -170,6 +171,20 @@ def test_resolve_openai_reasoning_effort(monkeypatch: pytest.MonkeyPatch) -> Non
     api_kwargs, metadata = _resolve_openai_reasoning_effort("gpt-5.4-mini")
     assert api_kwargs == {"reasoning_effort": "high"}
     assert metadata == {"reasoning_effort": "high"}
+
+
+def test_output_token_breakdown_from_usage_splits_reasoning() -> None:
+    breakdown = output_token_breakdown_from_usage(
+        {
+            "output_tokens": 120,
+            "output_tokens_details": {"reasoning_tokens": 40},
+        }
+    )
+    assert breakdown == {
+        "total_output_tokens": 120,
+        "reasoning_tokens": 40,
+        "visible_output_tokens": 80,
+    }
 
 
 def test_resolve_openai_reasoning_effort_none_skips_kwargs(

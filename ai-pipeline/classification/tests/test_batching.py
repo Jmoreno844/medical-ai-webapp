@@ -68,3 +68,18 @@ def test_effective_budget_subtracts_template_tokens() -> None:
     plan = plan_balanced_batches(clusters, template, budget=4000)
     assert plan.template_token_count > 0
     assert plan.effective_cluster_budget == 4000 - plan.template_token_count
+
+
+def test_estimate_batch_input_tokens_v003_does_not_raise() -> None:
+    from classification.batching import estimate_batch_input_tokens
+    from classification.lib import load_classification_prompt
+
+    template = load_template("consulta_estructurada_v001")
+    clusters = [_cluster("case1_a", "texto " * 20)]
+    tokens = estimate_batch_input_tokens(
+        clusters,
+        template,
+        prompt_version="v003",
+        base_system_prompt=load_classification_prompt("v003"),
+    )
+    assert tokens > 0

@@ -23,6 +23,7 @@ def _resolve_result_file_path(value: object) -> Path | None:
     candidates = [
         Path(value),
         AI_PIPELINE_ROOT / value,
+        AI_PIPELINE_ROOT / "cases" / value,
         AI_PIPELINE_ROOT / "clustering" / value,
         AI_PIPELINE_ROOT / "classification" / value,
         AI_PIPELINE_ROOT / "generation" / value,

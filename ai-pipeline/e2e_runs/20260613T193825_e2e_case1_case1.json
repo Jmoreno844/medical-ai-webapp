@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "run_id": "20260613T193825",
+  "run_started_at": "2026-06-13T19:38:25.754796+00:00",
+  "run_finished_at": "2026-06-13T19:38:50.644001+00:00",
+  "case_id": "case1",
+  "session_id": "case1",
+  "template_id": "consulta_estructurada_v001",
+  "include_context": false,
+  "context_case_id": null,
+  "outputs": [
+    {
+      "step": "filtering",
+      "output_path": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/filtering/results/20260613T193825Z_debug_case1_anthropic.json"
+    },
+    {
+      "step": "clustering",
+      "output_path": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/clustering/results/20260613T193828Z_debug_case1_anthropic.json"
+    },
+    {
+      "step": "classification",
+      "output_path": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/classification/results/20260613T193837Z_session_case1_anthropic.json"
+    },
+    {
+      "step": "generation",
+      "output_path": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/generation/results/20260613T193841Z_session_case1_anthropic.json"
+    }
+  ]
+}

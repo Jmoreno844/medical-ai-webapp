@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ui.latency import (
+    clustering_latency_ms,
     e2e_latency_rows,
     primary_latency_ms,
     secondary_latency_ms,
@@ -42,6 +43,42 @@ def test_secondary_latency_for_classification_and_generation() -> None:
     assert secondary_latency_ms("classification", {"sum_batch_response_time_ms": 4215}) == 4215
     assert secondary_latency_ms("generation", {"sum_section_response_time_ms": 11885}) == 11885
     assert secondary_latency_ms("filtering", {"response_time_ms": 100}) is None
+
+
+def test_clustering_split_latency() -> None:
+    payload = {
+        "initial_response_time_ms": 1500,
+        "repair_response_time_ms": 400,
+        "response_time_ms": 2000,
+    }
+    assert primary_latency_ms("clustering", payload) == 1900
+    assert secondary_latency_ms("clustering", payload) == 400
+    initial_ms, repair_ms = clustering_latency_ms(payload)
+    assert initial_ms == 1500
+    assert repair_ms == 400
+
+
+def test_e2e_latency_rows_splits_clustering_initial_and_repair() -> None:
+    outputs = [
+        {
+            "step": "filtering",
+            "result_record": {"response_time_ms": 1000},
+        },
+        {
+            "step": "clustering",
+            "result_record": {
+                "initial_response_time_ms": 1500,
+                "repair_response_time_ms": 400,
+            },
+        },
+    ]
+    rows = e2e_latency_rows(outputs)
+    assert rows[1]["Paso"] == "Clustering · inicial"
+    assert rows[1]["Latencia"] == "1,500 ms"
+    assert rows[2]["Paso"] == "Clustering · repair"
+    assert rows[2]["Latencia"] == "400 ms"
+    assert rows[-1]["Paso"] == "Total (secuencial)"
+    assert rows[-1]["Latencia"] == "2,900 ms"
 
 
 def test_e2e_latency_rows_sums_step_latencies() -> None:

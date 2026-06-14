@@ -18,7 +18,7 @@ graph LR
             Backend["FastAPI API"]
             Worker["transcription-worker\n(Silero VAD + Gemini STT)"]
             DocWorker["document-generation-worker\n(Configurable LLM streaming)"]
-            ExtractionWorker["clinical-extraction-worker\n(Shadow ClinicalFactsV1)"]
+            ExtractionWorker["clinical-extraction-worker\n(Shadow ClinicalMentionsV2)"]
             Copilot["copilot-agent-service\n(LangGraph)"]
         end
         GCS["Cloud Storage\n(audio clínico)"]
@@ -173,7 +173,7 @@ sequenceDiagram
 Cuando una sesión segmentada llega a `consolidated`, FastAPI puede disparar
 `clinical-extraction-worker` si `CLINICAL_EXTRACTION_ENABLED=true`. El worker
 pide un work item interno con `transcript_json.chunks[].turns[]`, extrae
-`ClinicalFactsV1`, y devuelve el resultado con un callback JWT de propósito
+`ClinicalMentionsV2`, y devuelve el resultado con un callback JWT de propósito
 `clinical_extraction`.
 
 Esta etapa es independiente y silenciosa: no cambia `content_markdown`, no
@@ -191,7 +191,7 @@ métricas de observabilidad para revisión shadow.
 | **API principal** `backend_fastapi/` | FastAPI, SQLAlchemy async, PostgreSQL   | API bajo `/api/v1`, orquestación, JWTs, hub SSE, callbacks y migraciones Alembic.                                          |
 | **Worker transcripción** `transcription_worker/` | FastAPI, ONNX Runtime, Google Gen AI SDK | Recibe Cloud Tasks por sección, corre Silero VAD, transcribe con Gemini en JSON `turns[]` y devuelve callbacks estructurados a FastAPI. Contrato compartido en `shared/transcription_contract/`. |
 | **Worker generación** `document_generation_worker/` | FastAPI, Google Gen AI SDK, Anthropic SDK | Recibe Cloud Tasks con IDs, pide work-items a FastAPI, genera documentos con el provider LLM configurado y devuelve chunks saneados. |
-| **Worker extracción clínica** `clinical_extraction_worker/` | FastAPI, Google Gen AI SDK, OpenAI SDK | Worker shadow que extrae `ClinicalFactsV1` desde la transcripción estructurada y devuelve evidencia/grounding a FastAPI. |
+| **Worker extracción clínica** `clinical_extraction_worker/` | FastAPI, Google Gen AI SDK, OpenAI SDK | Worker shadow que extrae `ClinicalMentionsV2` desde la transcripción estructurada y devuelve evidencia/grounding a FastAPI. |
 | **Runtime compartido de workers** `shared/worker_runtime/` | Python package editable | Auth Cloud Tasks, backend clients internos, observability, tracing y bootstrap de providers Gemini/OpenAI/Claude para los workers privados. |
 | **Copilot Agent** `copilot_agent/`   | Python, FastAPI, LangGraph              | Runtime del copiloto; broker hacia el API principal.                                                                       |
 | **Cloud Storage**                    | GCS                                     | Almacena los audios clínicos. El frontend sube directo vía signed URL.                                                     |

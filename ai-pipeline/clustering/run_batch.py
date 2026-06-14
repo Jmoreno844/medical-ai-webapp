@@ -143,7 +143,7 @@ def main() -> int:
                         system_prompt=system_prompt,
                     )
                     clustering_result = session_run.result
-                    raw_response = session_run.raw_response
+                    raw_response = session_run.llm_response.content
                     catalog = build_turn_catalog(case.transcript_json)
                     coverage = audit_turn_coverage(clustering_result, catalog)
                     output_entry["clustering_result"] = (
@@ -157,6 +157,14 @@ def main() -> int:
                         for repair_pass in session_run.repair_passes
                     ]
                     output_entry["raw_response"] = raw_response
+                    output_entry["thinking"] = session_run.llm_response.thinking
+                    output_entry["thinking_source"] = (
+                        session_run.llm_response.thinking_source
+                    )
+                    output_entry["llm_usage"] = session_run.llm_response.usage
+                    output_entry["llm_request_params"] = (
+                        session_run.llm_response.request_params
+                    )
                     if not coverage.is_complete:
                         model_label = (
                             f"{model_spec.provider}:{model_spec.model}"

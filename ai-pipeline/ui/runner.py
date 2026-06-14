@@ -10,13 +10,18 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from classification.batching import DEFAULT_INPUT_TOKEN_BUDGET, DEFAULT_TOKEN_ENCODING
+from common.case_paths import TRANSCRIPT_CASES_INDEX
+from classification.batching import (
+    DEFAULT_INPUT_TOKEN_BUDGET,
+    DEFAULT_TOKEN_ENCODING,
+)
 from classification.classify import run_classification_session
 from classification.lib import (
     DEFAULT_CASES_INDEX,
     ClusterCase,
     enrich_classification_batch_result_for_export,
     enrich_classification_session_result_for_export,
+    format_classification_batch_output_for_detail,
     format_classification_output_for_detail,
 )
 from classification.lib import load_prompt as load_classification_prompt
@@ -187,7 +192,7 @@ def run_filtering_step(
 
     with apply_step_config_env(config):
         started_at = time.perf_counter()
-        result, raw_response = run_filtering(
+        result, llm_response = run_filtering(
             case=case,
             model_spec=model_spec,
             system_prompt=system_prompt,
@@ -200,7 +205,7 @@ def run_filtering_step(
             "model": model,
             "filtering_result": enrich_filtering_result_for_export(result, catalog),
             "drop_audit": drop_audit.to_dict(),
-            "raw_response": raw_response,
+            "raw_response": llm_response.content,
         },
         output_detail,
     )
@@ -209,10 +214,11 @@ def run_filtering_step(
         "run_started_at": run_started_at.isoformat(),
         "run_finished_at": datetime.now(UTC).isoformat(),
         "response_time_ms": response_time_ms,
+        "llm_usage": llm_response.usage,
         "output_path": str(output_path),
         "case_id": case.id,
         "case_notes": case.notes,
-        "cases_file": str(AI_PIPELINE_ROOT / "cases" / "index.json"),
+        "cases_file": str(TRANSCRIPT_CASES_INDEX),
         "provider": provider,
         "model": model,
         "prompt_version": prompt_version,
@@ -274,7 +280,15 @@ def run_clustering_step(
             "clustering_result": enrich_clustering_result_for_export(result, catalog),
             "turn_coverage": coverage.to_dict(),
             "repair_passes": repair_passes,
-            "raw_response": session_run.raw_response,
+            "raw_response": session_run.llm_response.content,
+            "thinking": session_run.llm_response.thinking,
+            "thinking_source": session_run.llm_response.thinking_source,
+            "llm_request_params": session_run.llm_response.request_params,
+            "llm_timing": (
+                session_run.llm_response.timing.to_dict()
+                if session_run.llm_response.timing is not None
+                else None
+            ),
         },
         output_detail,
     )
@@ -283,6 +297,7 @@ def run_clustering_step(
         "run_started_at": run_started_at.isoformat(),
         "run_finished_at": datetime.now(UTC).isoformat(),
         "response_time_ms": response_time_ms,
+        "llm_usage": session_run.llm_response.usage,
         "initial_response_time_ms": session_run.response_time_ms,
         "repair_response_time_ms": session_run.repair_response_time_ms,
         "repair_pass_count": len(repair_passes),
@@ -293,7 +308,7 @@ def run_clustering_step(
         "output_path": str(output_path),
         "case_id": case.id,
         "case_notes": case.notes,
-        "cases_file": str(AI_PIPELINE_ROOT / "cases" / "index.json"),
+        "cases_file": str(TRANSCRIPT_CASES_INDEX),
         "provider": provider,
         "model": model,
         "prompt_version": prompt_version,
@@ -340,6 +355,7 @@ def run_classification_step(
             template=template,
             model_spec=model_spec,
             system_prompt=system_prompt,
+            prompt_version=prompt_version,
             input_token_budget=DEFAULT_INPUT_TOKEN_BUDGET,
             token_encoding=DEFAULT_TOKEN_ENCODING,
         )
@@ -362,7 +378,7 @@ def run_classification_step(
             "llm_request_params": batch_run.llm_request_params,
         }
         batch_outputs.append(
-            format_classification_output_for_detail(batch_entry, output_detail)
+            format_classification_batch_output_for_detail(batch_entry, output_detail)
         )
 
     session_export = enrich_classification_session_result_for_export(
@@ -670,6 +686,15 @@ def run_context_pipeline_step(
         "claim_count": len(context_run.all_claims),
         "claims": [claim.model_dump(mode="json") for claim in context_run.all_claims],
         "claim_classification_session_result": session_export,
+        "llm_calls": [
+            {
+                "label": call.label,
+                "provider": call.provider,
+                "model": call.model,
+                "llm_usage": call.llm_response.usage,
+            }
+            for call in context_run.llm_calls
+        ],
         "prompt_file": str(
             classify_prompt_file_path(classify_prompt_version).relative_to(
                 AI_PIPELINE_ROOT / "context_pipeline" / "classify_claims"
@@ -700,19 +725,20 @@ def run_e2e_pipeline(
     clustering_config: StepConfig,
     classification_config: StepConfig,
     generation_config: StepConfig,
+    base_case: TranscriptCase | None = None,
     context_case_id: str | None = None,
     context_config: StepConfig | None = None,
 ) -> list[PipelineRunOutput]:
     from ui.discovery import load_transcript_case
 
-    base_case = load_transcript_case(case_id)
+    resolved_case = base_case or load_transcript_case(case_id)
     outputs: list[PipelineRunOutput] = []
 
-    filtering_output = run_filtering_step(case=base_case, config=filtering_config)
+    filtering_output = run_filtering_step(case=resolved_case, config=filtering_config)
     outputs.append(filtering_output)
 
     clustering_case = transcript_case_from_filtering_result(
-        base_case=base_case,
+        base_case=resolved_case,
         filtering_record=filtering_output.result_record,
     )
     clustering_output = run_clustering_step(

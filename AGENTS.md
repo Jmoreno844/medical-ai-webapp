@@ -26,7 +26,7 @@ Priorities, in order:
 
 - `backend_fastapi/` — FastAPI API, SQLAlchemy models, auth, SSE, orchestration, Alembic migrations
 - `transcription_worker/` — Cloud Run worker for section transcription
-- `document_generation_worker/` — Cloud Run worker for document generation
+- `document_pipeline_worker/` — Cloud Run worker for multi-step clinical document pipeline
 - `webapp/` — React + TypeScript SPA for doctors
 - `infra/` — Terraform for GCP resources, IAM, budgets, deploy foundations
 - `landing-page/` — separate marketing site, not part of the clinical flow
@@ -184,7 +184,7 @@ Do not treat these as source of truth unless the task is specifically about gene
 
 - Backend: `uv --project backend_fastapi run ruff check . && ENVIRONMENT=test uv --project backend_fastapi run pytest -q`
 - Frontend: `npm --prefix webapp run lint && npm --prefix webapp run build`
-- Workers: `python -m pytest transcription_worker/tests && python -m pytest document_generation_worker/tests`
+- Workers: `python -m pytest transcription_worker/tests && python -m pytest document_pipeline_worker/tests`
 
 ## Change Notes
 

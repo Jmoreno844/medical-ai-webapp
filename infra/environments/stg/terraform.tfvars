@@ -21,7 +21,7 @@ cloud_run_service_name                  = "vexthealth-backend"
 copilot_agent_service_name              = "vexthealth-copilot-agent"
 frontend_service_name                   = "vexthealth-frontend"
 transcription_worker_service_name       = "vexthealth-transcription-worker"
-document_generation_worker_service_name = "vexthealth-document-generation-worker"
+document_pipeline_worker_service_name = "vexthealth-document-pipeline-worker"
 admin_bootstrap_job_name                = "vexthealth-backend-admin-bootstrap"
 cloudsql_iam_grants_job_name            = "vexthealth-cloudsql-iam-grants"
 # Bootstrap with a public image; CI later replaces it with the app image.
@@ -29,7 +29,7 @@ cloud_run_image                            = "us-docker.pkg.dev/cloudrun/contain
 copilot_agent_image                        = "us-docker.pkg.dev/cloudrun/container/hello"
 frontend_image                             = "us-docker.pkg.dev/cloudrun/container/hello"
 transcription_worker_image                 = "us-docker.pkg.dev/cloudrun/container/hello"
-document_generation_worker_image           = "us-docker.pkg.dev/cloudrun/container/hello"
+document_pipeline_worker_image           = "us-docker.pkg.dev/cloudrun/container/hello"
 cloud_run_max_instances                    = 1
 cloud_run_max_concurrency                  = 250
 copilot_agent_max_instances                = 2
@@ -38,8 +38,8 @@ frontend_max_instances                     = 3
 frontend_max_concurrency                   = 80
 transcription_worker_max_instances         = 5
 transcription_worker_max_concurrency       = 8
-document_generation_worker_max_instances   = 5
-document_generation_worker_max_concurrency = 8
+document_pipeline_worker_max_instances   = 5
+document_pipeline_worker_max_concurrency = 8
 cloud_run_use_secret_manager               = true
 cloud_run_allow_unauthenticated            = true # Set false if org policy blocks allUsers on Cloud Run
 copilot_agent_allow_unauthenticated        = false
@@ -54,7 +54,7 @@ fastapi_cors_allowed_origins = "https://app-stg.notiahealth.com"
 gemini_model                 = "gemini-3.1-flash-lite-preview"
 
 #Document Generation Worker 
-document_generation_provider = "google_vertex"
+document_pipeline_provider = "google_vertex"
 
 # Artifact Registry
 artifact_registry_repo = "vexthealth-containers"

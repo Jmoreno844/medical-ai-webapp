@@ -67,10 +67,10 @@ variable "transcription_worker_service_name" {
   default     = "vexthealth-transcription-worker"
 }
 
-variable "document_generation_worker_service_name" {
+variable "document_pipeline_worker_service_name" {
   description = "Cloud Run document generation worker service name"
   type        = string
-  default     = "vexthealth-document-generation-worker"
+  default     = "vexthealth-document-pipeline-worker"
 }
 
 variable "admin_bootstrap_job_name" {
@@ -105,7 +105,7 @@ variable "transcription_worker_image" {
   type        = string
 }
 
-variable "document_generation_worker_image" {
+variable "document_pipeline_worker_image" {
   description = "Initial Docker image for the document generation worker service (CI/CD updates this)"
   type        = string
 }
@@ -152,7 +152,7 @@ variable "transcription_worker_max_instances" {
   default     = 5
 }
 
-variable "document_generation_worker_max_instances" {
+variable "document_pipeline_worker_max_instances" {
   description = "Maximum document generation worker Cloud Run instances"
   type        = number
   default     = 5
@@ -164,7 +164,7 @@ variable "transcription_worker_max_concurrency" {
   default     = 8
 }
 
-variable "document_generation_worker_max_concurrency" {
+variable "document_pipeline_worker_max_concurrency" {
   description = "Maximum requests per document generation worker Cloud Run instance"
   type        = number
   default     = 8
@@ -211,25 +211,25 @@ variable "gemini_model" {
   default     = "gemini-3.1-flash-lite-preview"
 }
 
-variable "document_generation_provider" {
+variable "document_pipeline_provider" {
   description = "Provider used by the document generation worker"
   type        = string
   default     = "anthropic_api"
 }
 
-variable "document_generation_model" {
+variable "document_pipeline_model" {
   description = "Explicit model override used by the document generation worker"
   type        = string
   default     = "claude-haiku-4-5-20251001"
 }
 
-variable "document_generation_google_model" {
+variable "document_pipeline_google_model" {
   description = "Fallback Google Vertex model used by the document generation worker"
   type        = string
   default     = "gemini-3.1-flash-lite-preview"
 }
 
-variable "document_generation_vertex_ai_location" {
+variable "document_pipeline_vertex_ai_location" {
   description = "Vertex AI location used by the document generation worker when the provider runs on Vertex"
   type        = string
   default     = "global"

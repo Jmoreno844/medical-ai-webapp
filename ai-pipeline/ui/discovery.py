@@ -5,7 +5,12 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from classification.lib import DEFAULT_CASES_INDEX, load_cluster_cases
+from classification.lib import load_cluster_cases
+from common.case_paths import (
+    CLUSTER_CASES_INDEX,
+    CONTEXT_CASES_INDEX,
+    TRANSCRIPT_CASES_INDEX,
+)
 from common.templates import DEFAULT_TEMPLATES_DIR, list_template_ids
 from common.transcripts import TranscriptCase, build_turn_catalog, load_cases
 
@@ -36,7 +41,7 @@ PROMPT_STEMS = {
 DEFAULT_PROMPT_VERSIONS = {
     "filtering": "v001",
     "clustering": "v001",
-    "classification": "v002",
+    "classification": "v003",
     "generation": "v001",
     "context_decompose": "v001",
     "context_extract": "v001",
@@ -57,7 +62,6 @@ class TranscriptCaseMeta:
 class ClassificationSessionMeta:
     session_id: str
     cluster_count: int
-    template_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,7 +80,7 @@ def list_transcript_cases(
     *,
     cases_index: Path | None = None,
 ) -> list[TranscriptCaseMeta]:
-    index_path = cases_index or (AI_PIPELINE_ROOT / "cases" / "index.json")
+    index_path = cases_index or TRANSCRIPT_CASES_INDEX
     cases = load_cases(index_path)
     return [
         TranscriptCaseMeta(
@@ -89,26 +93,86 @@ def list_transcript_cases(
 
 
 def load_transcript_case(case_id: str) -> TranscriptCase:
-    cases = load_cases(AI_PIPELINE_ROOT / "cases" / "index.json")
+    cases = load_cases(TRANSCRIPT_CASES_INDEX)
     for case in cases:
         if case.id == case_id:
             return case
     raise ValueError(f"transcript_case_not_found: {case_id}")
 
 
+def _extract_transcript_payload(payload: dict[str, object]) -> tuple[dict[str, object], str | None, str | None]:
+    if "chunks" in payload:
+        return payload, None, None
+
+    transcript_json = payload.get("transcript_json")
+    if isinstance(transcript_json, dict) and "chunks" in transcript_json:
+        notes = payload.get("notes")
+        index_id = payload.get("id")
+        return (
+            transcript_json,
+            notes.strip() if isinstance(notes, str) and notes.strip() else None,
+            index_id.strip() if isinstance(index_id, str) and index_id.strip() else None,
+        )
+
+    raise ValueError(
+        "Formato no reconocido. Usa un JSON con chunks[] o transcript_json.chunks[] "
+        "(como ai-pipeline/cases/transcripts/)."
+    )
+
+
+def parse_transcript_case_from_json(
+    raw: str | dict[str, object],
+    *,
+    case_id: str | None = None,
+) -> TranscriptCase:
+    if isinstance(raw, str):
+        normalized = raw.strip()
+        if not normalized:
+            raise ValueError("El JSON pegado está vacío.")
+        try:
+            payload = json.loads(normalized)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"JSON inválido: {exc}") from exc
+    else:
+        payload = raw
+
+    if not isinstance(payload, dict):
+        raise ValueError("El case debe ser un objeto JSON.")
+
+    transcript_payload, notes, index_id = _extract_transcript_payload(payload)
+    chunks = transcript_payload.get("chunks")
+    if not isinstance(chunks, list) or not chunks:
+        raise ValueError("El case debe incluir al menos un chunk con turnos.")
+
+    catalog = build_turn_catalog(transcript_payload)
+    if not catalog:
+        raise ValueError("El case no contiene turnos con speaker y text válidos.")
+
+    resolved_id = (case_id or index_id or "").strip()
+    if not resolved_id:
+        session_id = transcript_payload.get("session_id")
+        if isinstance(session_id, str) and session_id.strip():
+            resolved_id = session_id.strip()
+        else:
+            resolved_id = "pasted_transcript"
+
+    return TranscriptCase(
+        id=resolved_id,
+        transcript_json=transcript_payload,
+        notes=notes,
+    )
+
+
 def list_classification_sessions() -> list[ClassificationSessionMeta]:
-    clusters = load_cluster_cases(DEFAULT_CASES_INDEX)
+    clusters = load_cluster_cases(CLUSTER_CASES_INDEX)
     sessions: dict[str, list[str]] = {}
-    templates: dict[str, str] = {}
     for cluster in clusters:
         session_id = cluster.id.split("_", 1)[0]
         sessions.setdefault(session_id, []).append(cluster.id)
-        templates[session_id] = cluster.template_id
     return [
         ClassificationSessionMeta(
             session_id=session_id,
             cluster_count=len(cluster_ids),
-            template_id=templates[session_id],
         )
         for session_id, cluster_ids in sorted(sessions.items())
     ]
@@ -121,7 +185,7 @@ def list_templates() -> list[str]:
 def list_context_cases() -> list[str]:
     from context_pipeline.decompose.lib import load_context_cases
 
-    index_path = AI_PIPELINE_ROOT / "context_pipeline" / "cases" / "index.json"
+    index_path = CONTEXT_CASES_INDEX
     return [case.id for case in load_context_cases(index_path)]
 
 
@@ -242,4 +306,5 @@ __all__ = [
     "list_transcript_cases",
     "load_result_json",
     "load_transcript_case",
+    "parse_transcript_case_from_json",
 ]

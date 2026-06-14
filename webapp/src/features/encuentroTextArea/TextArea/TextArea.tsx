@@ -10,6 +10,7 @@ import { useDocumentContext } from "../../../contexts/DocumentContext";
 import { useContentContext } from "../../../contexts/ContentContext";
 import { useGenerationContext } from "../../../contexts/GenerationContext";
 import { useTranscriptionContext } from "../../../contexts/TranscriptionContext";
+import TranscriptionDevTools from "../components/TranscriptionDevTools";
 import { useDocumentDraftStore } from "@/workspace/stores/documentDraftStore";
 import { useDocumentDerivedStore } from "@/workspace/stores/documentDerivedStore";
 import { usePatchSetStore } from "@/workspace/stores/patchSetStore";
@@ -120,6 +121,7 @@ const TextArea: React.FC = () => {
     transcriptionCompleteTimestamp,
     canRetryTranscription,
     errorMessage: transcriptionErrorMessage,
+    recordingSessionId,
   } = useTranscriptionContext();
   const setDraftContent = useDocumentDraftStore((state) => state.setDraftContent);
   const derivedByDocumentId = useDocumentDerivedStore(
@@ -483,6 +485,8 @@ const TextArea: React.FC = () => {
   const transcriptionBlocks = activeDerivedState?.transcriptionBlocks ?? [];
   const showSegmentedTranscription =
     activeDocument?.kind === "transcription" && transcriptionBlocks.length > 0;
+  const showTranscriptionDevTools =
+    import.meta.env.DEV && activeDocument?.kind === "transcription";
 
   useEffect(() => {
     if (!editor) {
@@ -816,6 +820,14 @@ const TextArea: React.FC = () => {
           </div>
         </div>
       )}
+
+      {showTranscriptionDevTools && activeDocument ? (
+        <TranscriptionDevTools
+          documentId={activeDocument.id}
+          encounterId={Number(activeDocument.encounter_id)}
+          sessionId={recordingSessionId}
+        />
+      ) : null}
 
       {fetchError && (
         <div className="bg-red-100 p-2 text-center text-red-600 text-sm">

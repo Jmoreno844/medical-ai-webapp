@@ -14,7 +14,7 @@ variable "transcription_worker_service_name" {
   default     = ""
 }
 
-variable "document_generation_worker_service_name" {
+variable "document_pipeline_worker_service_name" {
   description = "Document generation worker Cloud Run service name"
   type        = string
   default     = ""

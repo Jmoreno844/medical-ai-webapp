@@ -10,14 +10,17 @@ from common.prompts import normalize_prompt_version
 from common.providers import (
     DEFAULT_ANTHROPIC_MODEL,
     DEFAULT_GEMINI_MODEL,
+    GEMINI_MODEL_CHOICES,
     _completion_limit_kwargs,
     _gemini_location,
     _is_groq_json_validate_error,
+    _raise_gemini_empty_response,
     default_model_for_provider,
     normalize_provider_name,
     parse_model_specs,
     provider_runtime_config,
 )
+from common.case_paths import TRANSCRIPT_CASES_INDEX
 from common.transcripts import (
     build_turn_catalog,
     enumerate_turn_ids,
@@ -25,8 +28,7 @@ from common.transcripts import (
     select_cases,
 )
 
-AI_PIPELINE_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_CASES_INDEX = AI_PIPELINE_ROOT / "cases" / "index.json"
+DEFAULT_CASES_INDEX = TRANSCRIPT_CASES_INDEX
 
 
 def test_load_cases_from_index_and_transcript_files() -> None:
@@ -35,11 +37,13 @@ def test_load_cases_from_index_and_transcript_files() -> None:
         "case1",
         "case2",
         "case2_filtered",
+        "case3",
         "medication_question_and_avoid",
         "eval_doc_clinica_co_001",
     ]
     assert cases[0].transcript_json["session_id"] == "case1"
-    assert len(cases[4].transcript_json.get("chunks", [])) == 3
+    eval_case = next(case for case in cases if case.id == "eval_doc_clinica_co_001")
+    assert len(eval_case.transcript_json.get("chunks", [])) == 3
 
 
 def test_select_cases_by_id() -> None:
@@ -128,8 +132,14 @@ def test_default_models_and_provider_aliases() -> None:
     assert normalize_provider_name("google") == "gemini"
     assert default_model_for_provider("gemini") == DEFAULT_GEMINI_MODEL
     assert default_model_for_provider("anthropic") == DEFAULT_ANTHROPIC_MODEL
+    assert GEMINI_MODEL_CHOICES == (
+        "gemini-2.5-flash",
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash-lite",
+    )
+    assert _gemini_location("gemini-2.5-flash") == "global"
     assert _gemini_location("gemini-3-flash-preview") == "global"
-    assert _gemini_location("gemini-2.5-flash") == "us-east1"
+    assert _gemini_location("gemini-3.1-flash-lite") == "global"
 
 
 def test_is_groq_json_validate_error() -> None:
@@ -137,6 +147,23 @@ def test_is_groq_json_validate_error() -> None:
         body = {"error": {"code": "json_validate_failed"}}
 
     assert _is_groq_json_validate_error(FakeGroqError()) is True
+
+
+def test_raise_gemini_empty_response_includes_finish_reason() -> None:
+    from types import SimpleNamespace
+
+    response = SimpleNamespace(
+        candidates=[
+            SimpleNamespace(finish_reason=SimpleNamespace(name="MAX_TOKENS"))
+        ],
+        usage_metadata=SimpleNamespace(thoughts_token_count=15725),
+    )
+    with pytest.raises(ValueError, match="ai_pipeline_gemini_empty_response"):
+        _raise_gemini_empty_response(response)
+    with pytest.raises(ValueError, match="MAX_TOKENS"):
+        _raise_gemini_empty_response(response)
+    with pytest.raises(ValueError, match="15725"):
+        _raise_gemini_empty_response(response)
 
 
 def test_parse_model_specs_accepts_all_providers() -> None:

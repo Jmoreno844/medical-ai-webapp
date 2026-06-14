@@ -5,6 +5,7 @@ import json
 import pytest
 
 from common.providers import ModelSpec
+from common.llm_response import LlmResponse
 from common.transcripts import TranscriptCase
 from filtering.filter import run_filtering
 from filtering.lib import (
@@ -112,13 +113,13 @@ def test_run_filtering_rejects_unknown_drop_turn_id() -> None:
         },
     )
 
-    def fake_call_llm(**_kwargs: object) -> str:
-        return '{"drop_turn_ids": [99]}'
+    def fake_call_llm_detailed(**_kwargs: object) -> LlmResponse:
+        return LlmResponse(content='{"drop_turn_ids": [99]}')
 
     import filtering.filter as filter_module
 
-    original = filter_module.call_llm
-    filter_module.call_llm = fake_call_llm
+    original = filter_module.call_llm_detailed
+    filter_module.call_llm_detailed = fake_call_llm_detailed
     try:
         with pytest.raises(ValueError, match="unknown_turn_id"):
             run_filtering(
@@ -127,7 +128,7 @@ def test_run_filtering_rejects_unknown_drop_turn_id() -> None:
                 system_prompt="test",
             )
     finally:
-        filter_module.call_llm = original
+        filter_module.call_llm_detailed = original
 
 
 def test_run_filtering_rejects_duplicate_drop_turn_id() -> None:
@@ -144,13 +145,13 @@ def test_run_filtering_rejects_duplicate_drop_turn_id() -> None:
         },
     )
 
-    def fake_call_llm(**_kwargs: object) -> str:
-        return '{"drop_turn_ids": [0, 0]}'
+    def fake_call_llm_detailed(**_kwargs: object) -> LlmResponse:
+        return LlmResponse(content='{"drop_turn_ids": [0, 0]}')
 
     import filtering.filter as filter_module
 
-    original = filter_module.call_llm
-    filter_module.call_llm = fake_call_llm
+    original = filter_module.call_llm_detailed
+    filter_module.call_llm_detailed = fake_call_llm_detailed
     try:
         with pytest.raises(ValueError, match="duplicate_drop_turn_id"):
             run_filtering(
@@ -159,4 +160,4 @@ def test_run_filtering_rejects_duplicate_drop_turn_id() -> None:
                 system_prompt="test",
             )
     finally:
-        filter_module.call_llm = original
+        filter_module.call_llm_detailed = original

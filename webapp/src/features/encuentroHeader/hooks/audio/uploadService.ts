@@ -377,3 +377,30 @@ export const getRecordingSessionStatusForDocument = async (
     return null;
   }
 };
+
+export type ImportTranscriptCaseResponse = {
+  success: boolean;
+  session_id?: string | null;
+  rendered_text?: string | null;
+  chunks?: ChunkTranscript[];
+  error?: string | null;
+};
+
+export const importTranscriptCaseForDocument = async (
+  documentId: number,
+  transcriptCase: Record<string, unknown>,
+): Promise<ImportTranscriptCaseResponse | null> => {
+  try {
+    const response = await axiosInstance.post(
+      `/api/v1/transcription/debug/documents/${documentId}/import-case`,
+      { transcript_case: transcriptCase },
+    );
+    return response.data as ImportTranscriptCaseResponse;
+  } catch (error) {
+    logger.error(
+      "[VOICE_RECORDER] Failed to import transcript case:",
+      getApiErrorMessage(error),
+    );
+    throw new Error(getApiErrorMessage(error));
+  }
+};

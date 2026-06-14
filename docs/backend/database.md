@@ -566,7 +566,7 @@ Notas de operación:
 - **Speakers permitidos:** `MEDICO`, `PACIENTE`, `ACOMPANANTE`, `DESCONOCIDO`.
 - **Dedup:** solo entre chunks vecinos al consolidar; `overlaps_*` del modelo describe solapamiento conversacional, no el overlap técnico de audio.
 
-## Extracción clínica shadow (`clinical_facts_v1`)
+## Extracción clínica shadow (`clinical_mentions_v2`)
 
 - **`clinical_extraction`**: una fila única por
   `transcription_recording_session.session_id`. Guarda estado
@@ -576,18 +576,23 @@ Notas de operación:
   `finalized_at`.
 - **`clinical_fact_evidence`**: una fila por cita emitida por el modelo. Guarda
   `fact_path`, `quote`, `supports_fields`, `chunk_hint`, resultado de matching,
-  chunks localizados, rol diarizado derivado por código y banderas de ambigüedad
-  o mismatch de hablante.
+  chunks localizados, offsets `start_char`/`end_char` cuando hay match exacto en
+  un solo turno, rol diarizado derivado por código y banderas de ambigüedad o
+  mismatch de hablante.
 - **Fuente canónica:** el worker recibe `transcript_json.chunks[].turns[]`; no usa
   `consolidated_transcript` ni `documents_document.content_markdown`.
 - **Grounding:** las citas se matchean contra turnos individuales con IDs
   estables (`chunk_id:turn_index`) y solo usan ventanas de turnos vecinos cuando
-  no hay match suficiente en un turno. El rol `uttered_by_role` se deriva del
-  speaker diarizado del turno localizado.
+  no hay match suficiente en un turno. Scores intermedios se conservan como
+  warnings de fuzzy matching; scores bajos descartan la mención. El rol
+  `uttered_by_role` se deriva del speaker diarizado del turno localizado.
 - **Validación shadow:** errores de contrato clínico se guardan como warnings en
   `facts_json.data_quality.extraction_warnings`; no bloquean el estado
-  `extracted` durante esta fase. `none_reported` requiere negación explícita en
-  la transcripción; ausencia de mención permanece como `null`.
+  `extracted` durante esta fase. Si el worker no devuelve la forma
+  `{"mentions": [...]}`, FastAPI marca el resultado como `failed_validation`.
+  Correcciones con evidencia parcial se preservan con warnings y el resolutor
+  puede remover del JSON canónico menciones previas corregidas dentro de una
+  ventana local, dejando auditoría en `data_quality.superseded_mentions`.
 - **Shadow:** estas tablas no alimentan render, generación documental ni SSE. Su
   propósito es medir calidad de extracción contra transcripciones reales antes
   de construir proyecciones user-facing.

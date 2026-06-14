@@ -2,7 +2,7 @@
 -include .env.local
 
 PYTHON ?= uv --project .. run python
-CASES ?= ../classification/cases/index.json
+CASES ?= ../cases/cluster/index.json
 TEMPLATES_DIR ?= ../templates
 RESULTS_DIR ?= results
 PROMPT_VERSION ?= v001
@@ -10,7 +10,7 @@ OUTPUT_DETAIL ?= compact
 SECTION_CONCURRENCY ?= 0
 OPENAI_MODEL ?= gpt-5.4-mini
 GROQ_MODEL ?= qwen/qwen3-32b
-GEMINI_MODEL ?= gemini-3-flash-preview
+GEMINI_MODEL ?= gemini-2.5-flash
 ANTHROPIC_MODEL ?= claude-haiku-4-5-20251001
 PROVIDER ?= openai
 MODEL ?=

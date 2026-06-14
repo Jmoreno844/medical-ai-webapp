@@ -146,8 +146,8 @@ resource "google_logging_metric" "transcription_worker_vad_fail_open" {
   }
 }
 
-resource "google_monitoring_alert_policy" "document_generation_worker_cloud_run_5xx" {
-  count                 = var.document_generation_worker_service_name == "" ? 0 : 1
+resource "google_monitoring_alert_policy" "document_pipeline_worker_cloud_run_5xx" {
+  count                 = var.document_pipeline_worker_service_name == "" ? 0 : 1
   project               = var.project_id
   display_name          = "stg Cloud Run document generation worker 5xx"
   combiner              = "OR"
@@ -166,7 +166,7 @@ resource "google_monitoring_alert_policy" "document_generation_worker_cloud_run_
       comparison      = "COMPARISON_GT"
       threshold_value = 0
       duration        = "300s"
-      filter          = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.document_generation_worker_service_name}\" AND metric.type=\"run.googleapis.com/request_count\" AND metric.labels.response_code_class=\"5xx\""
+      filter          = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.document_pipeline_worker_service_name}\" AND metric.type=\"run.googleapis.com/request_count\" AND metric.labels.response_code_class=\"5xx\""
 
       aggregations {
         alignment_period     = "300s"
@@ -186,11 +186,11 @@ resource "google_monitoring_alert_policy" "document_generation_worker_cloud_run_
   }
 }
 
-resource "google_logging_metric" "document_generation_worker_errors" {
-  count   = var.document_generation_worker_service_name == "" ? 0 : 1
+resource "google_logging_metric" "document_pipeline_worker_errors" {
+  count   = var.document_pipeline_worker_service_name == "" ? 0 : 1
   project = var.project_id
-  name    = "document_generation_worker_errors"
-  filter  = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.document_generation_worker_service_name}\" AND (textPayload:\"document_generation_retryable_error\" OR textPayload:\"document_generation_stream_error\" OR textPayload:\"document_generation_callback_error\")"
+  name    = "document_pipeline_worker_errors"
+  filter  = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${var.document_pipeline_worker_service_name}\" AND (textPayload:\"document_pipeline_retryable_error\" OR textPayload:\"document_pipeline_stream_error\" OR textPayload:\"document_pipeline_callback_error\")"
 
   metric_descriptor {
     metric_kind = "DELTA"

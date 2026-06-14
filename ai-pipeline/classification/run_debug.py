@@ -133,6 +133,7 @@ def main() -> int:
             template=template,
             model_spec=model_spec,
             system_prompt=system_prompt,
+            prompt_version=prompt_version,
         )
     except Exception as exc:
         if args.dump_raw:
@@ -144,6 +145,7 @@ def main() -> int:
                     user=render_classification_user_payload(
                         cluster_case=cluster_case,
                         template=template,
+                        prompt_version=prompt_version,
                     ),
                 )
                 print("\n--- raw response ---")

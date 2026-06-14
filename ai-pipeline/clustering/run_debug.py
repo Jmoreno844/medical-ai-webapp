@@ -144,7 +144,7 @@ def main() -> int:
         return 1
 
     result = session_run.result
-    raw_response = session_run.raw_response
+    raw_response = session_run.llm_response.content
     repair_passes = [repair_pass.to_dict() for repair_pass in session_run.repair_passes]
     coverage = audit_turn_coverage(result, catalog)
     output_payload = format_clustering_output_for_detail(
@@ -157,6 +157,15 @@ def main() -> int:
             "turn_coverage": coverage.to_dict(),
             "repair_passes": repair_passes,
             "raw_response": raw_response,
+            "thinking": session_run.llm_response.thinking,
+            "thinking_source": session_run.llm_response.thinking_source,
+            "llm_usage": session_run.llm_response.usage,
+            "llm_request_params": session_run.llm_response.request_params,
+            "llm_timing": (
+                session_run.llm_response.timing.to_dict()
+                if session_run.llm_response.timing is not None
+                else None
+            ),
         },
         output_detail,
     )
@@ -164,6 +173,11 @@ def main() -> int:
         "run_mode": "debug",
         "run_started_at": run_started_at.isoformat(),
         "run_finished_at": datetime.now(UTC).isoformat(),
+        "response_time_ms": session_run.response_time_ms
+        + session_run.repair_response_time_ms,
+        "llm_usage": session_run.llm_response.usage,
+        "initial_response_time_ms": session_run.response_time_ms,
+        "repair_response_time_ms": session_run.repair_response_time_ms,
         "repair_pass_count": len(repair_passes),
         "repair_prompt_version": DEFAULT_REPAIR_PROMPT_VERSION,
         "repair_prompt_file": str(repair_prompt_path.relative_to(MODULE_ROOT)),

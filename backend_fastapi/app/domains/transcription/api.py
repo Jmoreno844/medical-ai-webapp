@@ -22,6 +22,8 @@ from app.domains.transcription.schemas import (
     AudioSectionRegisterRequest,
     AudioSectionRegisterResponse,
     DebugTranscriptionBridgeResponse,
+    ImportTranscriptCaseRequest,
+    ImportTranscriptCaseResponse,
     RecordingSessionCreate,
     RecordingSessionFinishResponse,
     RecordingSessionResponse,
@@ -46,6 +48,7 @@ from app.domains.transcription.service import (
     get_canonical_recording_session_for_document,
     get_recording_session_for_doctor,
     get_section_work_item,
+    import_ai_pipeline_transcript_case,
     is_recording_session_ready_for_consolidation,
     publish_transcription_error,
     reconcile_stuck_transcription_sections,
@@ -283,6 +286,62 @@ async def debug_transcription_section(
         overlap_ms,
     )
     return DebugTranscriptionBridgeResponse.model_validate(payload)
+
+
+@router.post(
+    "/transcription/debug/documents/{document_id}/import-case",
+    response_model=ImportTranscriptCaseResponse,
+)
+async def debug_import_transcript_case(
+    document_id: int,
+    payload: ImportTranscriptCaseRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
+) -> ImportTranscriptCaseResponse:
+    require_clinical_access(user)
+    if not is_local_environment(settings):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+
+    document = await get_document_for_doctor(
+        session,
+        document_id=document_id,
+        doctor_id=user.id,
+    )
+    if not document:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Documento no encontrado")
+
+    encounter = await get_encounter_for_doctor(
+        session,
+        encounter_id=document.encounter_id,
+        doctor_id=user.id,
+    )
+    if not encounter:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Encuentro no encontrado")
+
+    try:
+        recording_session = await import_ai_pipeline_transcript_case(
+            session,
+            encounter=encounter,
+            document=document,
+            doctor_id=user.id,
+            transcript_case=payload.transcript_case,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            str(exc),
+        ) from exc
+
+    await session.commit()
+    chunks = serialize_session_chunks(recording_session)
+    rendered_text = recording_session.consolidated_transcript
+    return ImportTranscriptCaseResponse(
+        success=True,
+        session_id=recording_session.session_id,
+        rendered_text=rendered_text,
+        chunks=chunks,
+    )
 
 
 @router.post("/transcription/debug/sections/trimmed-audio")

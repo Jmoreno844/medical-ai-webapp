@@ -21,8 +21,8 @@ from app.db.models import (
 )
 from app.domains.documents.content import set_document_content_fields
 from app.domains.documents.sse_hub import publish_document_event
-from app.domains.clinical_extraction.service import (
-    trigger_clinical_extraction_for_session,
+from app.domains.transcription.ai_pipeline_case import (
+    normalize_ai_pipeline_case_to_consultation,
 )
 from app.domains.transcription.schemas import (
     AudioSectionResponse,
@@ -244,6 +244,49 @@ async def resolve_transcription_content_for_generation(
     return ""
 
 
+async def resolve_structured_transcription_turns_for_generation(
+    session: AsyncSession,
+    *,
+    document_id: int,
+    doctor_id: int,
+    fallback_markdown: str | None,
+) -> list[dict[str, object]]:
+    recording_session = await get_canonical_recording_session_for_document(
+        session,
+        document_id=document_id,
+        doctor_id=doctor_id,
+    )
+    if recording_session and recording_session.transcript_json:
+        consultation = ConsultationTranscript.model_validate(
+            recording_session.transcript_json
+        )
+        turns: list[dict[str, object]] = []
+        turn_id = 0
+        for chunk in consultation.chunks:
+            for turn in chunk.turns:
+                turns.append(
+                    {
+                        "turn_id": turn_id,
+                        "speaker": turn.speaker,
+                        "text": turn.text,
+                    }
+                )
+                turn_id += 1
+        if turns:
+            return turns
+
+    fallback = (fallback_markdown or "").strip()
+    if fallback:
+        return [
+            {
+                "turn_id": 0,
+                "speaker": "DESCONOCIDO",
+                "text": fallback,
+            }
+        ]
+    return []
+
+
 def serialize_session_chunks(
     recording_session: TranscriptionRecordingSession,
 ) -> list[ChunkTranscriptResponse]:
@@ -396,6 +439,51 @@ async def reset_recording_session(
         )
 
     await session.flush()
+
+
+async def import_ai_pipeline_transcript_case(
+    session: AsyncSession,
+    *,
+    encounter: Encounter,
+    document: Document,
+    doctor_id: int,
+    transcript_case: dict[str, object],
+) -> TranscriptionRecordingSession:
+    consultation = normalize_ai_pipeline_case_to_consultation(
+        session_id=str(encounter.id),
+        payload=transcript_case,
+    )
+    recording_session = await create_recording_session(
+        session,
+        encounter=encounter,
+        document=document,
+        doctor_id=doctor_id,
+    )
+    now = datetime.now(timezone.utc)
+    _persist_session_transcript_json(recording_session, consultation.chunks)
+    consolidated = render_turns_to_clinical_text(consultation.chunks)
+    if consolidated.strip():
+        set_document_content_fields(
+            document,
+            content_markdown=consolidated,
+            preferred_source="markdown",
+        )
+    recording_session.consolidated_transcript = consolidated or None
+    recording_session.status = SESSION_STATUS_CONSOLIDATED
+    recording_session.finished_at = recording_session.finished_at or now
+    recording_session.finalized_at = now
+    recording_session.error_code = None
+    encounter.has_been_transcribed = True
+    await session.flush()
+    await publish_document_event(
+        document.id,
+        "transcription_complete",
+        {
+            "chunks": _chunks_to_dict(consultation.chunks),
+            "rendered_text": consolidated,
+        },
+    )
+    return recording_session
 
 
 async def _update_encounter_audio_duration(
@@ -890,19 +978,6 @@ async def consolidate_recording_session(
             "rendered_text": consolidated,
         },
     )
-    if settings:
-        try:
-            await trigger_clinical_extraction_for_session(
-                db_session,
-                recording_session,
-                settings=settings,
-            )
-            await db_session.commit()
-        except Exception:
-            logger.exception(
-                "Clinical extraction shadow dispatch failed for session %s",
-                recording_session.session_id,
-            )
     return recording_session
 
 

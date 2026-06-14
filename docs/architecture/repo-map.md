@@ -8,13 +8,15 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------- |
 | `backend_fastapi/`                                                                                                                            | API central, modelos SQLAlchemy, auth, JWT, SSE, orquestación y migraciones Alembic | Sí                                             |
 | `transcription_worker/`                                                                                                                       | Worker Cloud Run para VAD Silero + Gemini de transcripción por secciones            | Sí                                             |
-| `document_generation_worker/`                                                                                                                 | Worker Cloud Run para generación documental con provider LLM configurable           | Sí                                             |
-| `clinical_extraction_worker/`                                                                                                                 | Worker Cloud Run shadow para extracción `ClinicalFactsV1` desde transcripción estructurada | Sí                                             |
+| `document_pipeline_worker/`                                                                                                                   | Worker Cloud Run: pipeline multi-paso (filtering → clustering → classification → generation) | Sí                                             |
+| `ai-pipeline/`                                                                                                                                | Sandbox R&D del pipeline; lógica productiva portada al worker                    | No (R&D)                                       |
 | `shared/worker_runtime/`                                                                                                                       | Runtime compartido para auth, backend clients, logging, tracing y providers LLM de workers | Sí                                             |
 | `webapp/`                                                                                                                                     | SPA del médico                                                                      | Sí                                             |
 | `infra/`                                                                                                                                      | Infra GCP, IAM, budgets, deploy base                                                | Sí                                             |
 | `landing-page/`                                                                                                                               | Sitio marketing separado                                                            | Sí, pero no es parte del flujo clínico central |
 | `docs/`                                                                                                                                       | Contratos operativos y arquitectura                                                 | Sí                                             |
+| `ai-pipeline/`                                                                                                                                | R&D local de pasos del pipeline IA (clustering, filtering, etc.); no desplegado     | Sí                                             |
+| `evals/`                                                                                                                                      | Comparación local de modelos con judge LLM; no desplegado                           | Sí                                             |
 | `webapp/dist/`, `webapp/node_modules/`, `landing-page/.next/`, `landing-page/node_modules/`, `backend_fastapi/.venv/`, `infra/**/.terraform/` | Artefactos locales o build output                                                   | No                                             |
 
 ## Límites de negocio
@@ -39,12 +41,11 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
     `turns[]` estructurados a FastAPI.
   - No escribe directamente en PostgreSQL ni publica SSE; FastAPI conserva la
     autoridad clínica y transaccional.
-- `document_generation_worker/`
+- `document_pipeline_worker/`
   - Servicio Cloud Run privado para generación documental:
     recibe Cloud Tasks con IDs, pide el work-item clínico a FastAPI, llama
     al provider LLM configurado y devuelve chunks saneados al callback existente.
   - No escribe directamente en PostgreSQL ni publica SSE.
-- `clinical_extraction_worker/`
   - Servicio Cloud Run privado y shadow para extracción estructurada:
     recibe Cloud Tasks con `session_id`, pide `transcript_json.chunks[]` a FastAPI,
     llama Gemini por defecto u OpenAI opcional y devuelve facts/evidencia por callback.
@@ -54,6 +55,18 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
     Cloud Tasks, backend clients internos, logging, observability, tracing y
     factories de providers LLM.
   - No contiene prompts, schemas clínicos ni processors de negocio.
+- `ai-pipeline/`
+  - Sandbox local para iterar pasos del pipeline IA antes de promoverlos a workers.
+  - `common/` — providers LLM, carga de transcripts y utilidades compartidas.
+  - `cases/` — fixtures de transcript compartidos entre módulos.
+  - `clustering/` — agrupación de turnos por tema.
+  - `filtering/` — filtro conservador de turnos no clínicos (`drop_turn_ids`).
+  - `classification/` — asignación de clusters a secciones de plantilla JSON (`section_ids`).
+  - Providers: OpenAI, Groq, Gemini (Vertex AI) y Anthropic API; no es código de producción.
+- `evals/`
+  - Superficie local para comparar modelos con judge LLM (extracción clínica,
+    generación documental, etc.).
+  - Distinto de `ai-pipeline/`: aquí el foco es scoring formal, no R&D de un paso.
 - `backend_fastapi/app/domains/templates/`
   - Dueño de plantillas base y plantillas del médico.
 - `backend_fastapi/app/domains/patients/`
@@ -87,7 +100,7 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 - Generación documental:
   - Kickoff, SSE, callbacks y work-items: `backend_fastapi/app/domains/documents/`
   - Servicios: `backend_fastapi/app/domains/documents/service.py`
-  - Worker: `document_generation_worker/app/`
+  - Worker: `document_pipeline_worker/app/`
 - Estado del encuentro en frontend:
   - `webapp/src/contexts/AppProviders.tsx`
   - `webapp/src/contexts/*.tsx`
@@ -132,7 +145,7 @@ Esta es la guía corta para retomar contexto rápido y editar con menos ambigüe
 - Gemini:
   - transcripción vive en FastAPI con Google Gen AI SDK async sobre Vertex AI;
     la version near realtime ordena y consolida secciones por `section_index`
-  - generación documental vive en `document_generation_worker`
+  - generación documental vive en `document_pipeline_worker`
 - Secret Manager / IAM / budgets:
   - viven en `infra/`, no en lógica de producto
 

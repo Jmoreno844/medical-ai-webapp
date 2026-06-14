@@ -34,7 +34,7 @@ def test_app_usable_routes_are_registered() -> None:
         "/api/v1/documents/by-function/{document_id}",
         "/api/v1/documents/generate",
         "/api/v1/documents/generation-chunk",
-        "/api/v1/internal/document-generation/work-items/{process_id}",
+        "/api/v1/internal/document-pipeline/work-items/{process_id}",
         "/api/v1/documents/{document_id}",
         "/api/v1/documents/{document_id}/sse-token",
         "/api/v1/transcription/start",

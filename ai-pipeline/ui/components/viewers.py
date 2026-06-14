@@ -4,8 +4,15 @@ import json
 
 import streamlit as st
 
+from common.llm_response import (
+    output_token_breakdown_from_usage,
+    reasoning_tokens_from_usage,
+)
+from common.usage_cost import parse_token_usage
 from ui.cluster_lookup import ClusterTurnsView, cluster_turns_from_generation_payload
 from ui.latency import (
+    clustering_has_split_latency,
+    clustering_latency_ms,
     e2e_latency_rows,
     format_latency_ms,
     latency_breakdown_rows,
@@ -52,6 +59,37 @@ def render_json_expander(
 
 
 def render_step_latency(step: str, payload: dict[str, object]) -> None:
+    if step == "clustering" and clustering_has_split_latency(payload):
+        initial_ms, repair_ms = clustering_latency_ms(payload)
+        if initial_ms is None:
+            return
+
+        if repair_ms is not None and repair_ms > 0:
+            col_initial, col_repair, col_total = st.columns(3)
+            col_initial.metric(
+                "Clustering inicial",
+                format_latency_ms(initial_ms),
+            )
+            col_repair.metric(
+                "Repair missing turns",
+                format_latency_ms(repair_ms),
+            )
+            col_total.metric(
+                "Total LLM",
+                format_latency_ms(initial_ms + repair_ms),
+            )
+        else:
+            st.metric(
+                "Clustering inicial",
+                format_latency_ms(initial_ms),
+            )
+
+        breakdown = latency_breakdown_rows(step, payload)
+        if breakdown:
+            with st.expander("Detalle de latencia por repair pass"):
+                st.dataframe(breakdown, use_container_width=True, hide_index=True)
+        return
+
     primary_ms = primary_latency_ms(step, payload)
     if primary_ms is None:
         return
@@ -173,15 +211,150 @@ def _thinking_source_label(
 
 
 def _reasoning_tokens_from_usage(llm_usage: object) -> int | None:
-    if not isinstance(llm_usage, dict):
-        return None
-    completion_details = llm_usage.get("completion_tokens_details")
-    if not isinstance(completion_details, dict):
-        return None
-    reasoning_tokens = completion_details.get("reasoning_tokens")
-    if isinstance(reasoning_tokens, int):
-        return reasoning_tokens
+    return reasoning_tokens_from_usage(llm_usage)
+
+
+def _format_timing_ms(value: object) -> str:
+    if isinstance(value, int):
+        return f"{value:,} ms"
+    return "—"
+
+
+def _timing_from_call_record(call_record: dict[str, object]) -> dict[str, object] | None:
+    timing = call_record.get("llm_timing")
+    if isinstance(timing, dict):
+        return timing
+    timing = call_record.get("timing")
+    if isinstance(timing, dict):
+        return timing
     return None
+
+
+def _render_llm_timing_breakdown(call_record: dict[str, object]) -> None:
+    timing = _timing_from_call_record(call_record)
+    if timing is None:
+        st.caption("Sin desglose de timing (re-ejecuta clustering).")
+        return
+
+    col_ttft, col_thinking, col_output, col_total = st.columns(4)
+    col_ttft.metric(
+        "TTFT",
+        _format_timing_ms(timing.get("time_to_first_token_ms")),
+    )
+    col_thinking.metric(
+        "Thinking time",
+        _format_timing_ms(timing.get("thinking_time_ms")),
+    )
+    col_output.metric(
+        "Output time",
+        _format_timing_ms(timing.get("output_time_ms")),
+    )
+    col_total.metric(
+        "Total stream",
+        _format_timing_ms(timing.get("total_ms")),
+    )
+
+    if timing.get("estimated"):
+        st.caption(
+            "Thinking/output estimados por ratio de tokens (provider sin streaming)."
+        )
+    elif timing.get("streamed"):
+        st.caption("Timing medido con streaming del provider.")
+
+
+def _render_usage_token_breakdown(llm_usage: object) -> None:
+    parsed = parse_token_usage(llm_usage)
+    breakdown = output_token_breakdown_from_usage(llm_usage)
+
+    col_in, col_reason, col_out = st.columns(3)
+    if parsed is not None:
+        col_in.metric("Input tokens", f"{parsed.input_tokens:,}")
+    else:
+        col_in.metric("Input tokens", "—")
+
+    reasoning_tokens = breakdown.get("reasoning_tokens")
+    if reasoning_tokens is not None:
+        col_reason.metric("Reasoning tokens", f"{reasoning_tokens:,}")
+    else:
+        col_reason.metric("Reasoning tokens", "—")
+
+    visible_output = breakdown.get("visible_output_tokens")
+    total_output = breakdown.get("total_output_tokens")
+    if visible_output is not None and (
+        reasoning_tokens is None or visible_output != total_output
+    ):
+        col_out.metric("Output tokens", f"{visible_output:,}")
+    elif total_output is not None:
+        col_out.metric("Output tokens", f"{total_output:,}")
+    else:
+        col_out.metric("Output tokens", "—")
+
+
+def _render_llm_call_thinking_content(
+    *,
+    payload: dict[str, object],
+    call_label: str,
+    call_record: dict[str, object],
+) -> None:
+    provider = payload.get("provider")
+    provider_label = provider if isinstance(provider, str) else "—"
+    model = payload.get("model")
+    model_label = model if isinstance(model, str) else "—"
+    thinking_source = call_record.get("thinking_source")
+    thinking_source_label = _thinking_source_label(
+        thinking_source if isinstance(thinking_source, str) else None,
+        provider=provider_label if isinstance(provider, str) else None,
+    )
+
+    st.markdown(f"**{call_label}**")
+    col_provider, col_source = st.columns(2)
+    col_provider.caption(f"Provider/model: `{provider_label}` / `{model_label}`")
+    col_source.caption(f"Fuente: {thinking_source_label}")
+
+    _render_usage_token_breakdown(call_record.get("llm_usage"))
+    _render_llm_timing_breakdown(call_record)
+
+    thinking = call_record.get("thinking")
+    if isinstance(thinking, str) and thinking.strip():
+        st.text(thinking)
+        return
+
+    thinking_chars = call_record.get("thinking_chars")
+    if isinstance(thinking_chars, int) and thinking_chars > 0:
+        st.info(
+            f"Hay thinking ({thinking_chars} caracteres) pero no se guardó el texto. "
+            "Re-ejecuta clustering con `OUTPUT_DETAIL=full` o una versión reciente del harness."
+        )
+        return
+
+    if _reasoning_tokens_from_usage(call_record.get("llm_usage")) is not None:
+        st.caption(
+            "El provider reportó reasoning tokens pero no hay texto exportado. "
+            "Con Chat Completions el reasoning suele ser interno; en OpenAI usa "
+            "reasoning_effort ≠ none (Responses API captura el resumen)."
+        )
+        return
+
+    st.caption("Sin thinking para esta llamada.")
+
+
+def _render_llm_call_thinking_button(
+    *,
+    payload: dict[str, object],
+    call_label: str,
+    call_record: dict[str, object],
+    key_suffix: str,
+) -> None:
+    with st.popover(
+        "Ver thinking",
+        help=f"Razonamiento del modelo en {call_label}",
+        key=f"clustering_thinking_{key_suffix}",
+    ):
+        _render_llm_call_thinking_content(
+            payload=payload,
+            call_label=call_label,
+            call_record=call_record,
+        )
 
 
 def _render_section_thinking_content(
@@ -311,6 +484,32 @@ def _render_section_source_turns_button(
         )
 
 
+def _render_dropped_turns(decisions: list[dict[str, object]]) -> None:
+    dropped = [
+        decision
+        for decision in decisions
+        if isinstance(decision, dict) and decision.get("keep") == 0
+    ]
+    if not dropped:
+        return
+
+    with st.expander(f"Turnos descartados ({len(dropped)})", expanded=True):
+        for decision in dropped:
+            speaker = decision.get("speaker", "?")
+            text = decision.get("text", "")
+            turn_id = decision.get("turn_id", "")
+            st.markdown(
+                '<div style="border-left:3px solid #F44336;'
+                'padding:2px 10px;margin-top:8px">',
+                unsafe_allow_html=True,
+            )
+            speaker_label = str(speaker)
+            if turn_id != "":
+                speaker_label = f"{speaker_label} · turn {turn_id}"
+            st.markdown(f"**{speaker_label}**")
+            st.write(str(text))
+
+
 def render_filtering_result(payload: dict[str, object]) -> None:
     filtering_result = payload.get("filtering_result")
     if not isinstance(filtering_result, dict):
@@ -336,15 +535,13 @@ def render_filtering_result(payload: dict[str, object]) -> None:
     )
     cols[2].metric("Total", total if total is not None else "—")
 
-    if isinstance(drop_turn_ids, list) and drop_turn_ids:
-        st.caption(f"drop_turn_ids: `{drop_turn_ids}`")
-    else:
-        st.success("No se descartaron turnos.")
-
     decisions = filtering_result.get("decisions")
     if isinstance(decisions, list) and decisions:
+        _render_dropped_turns(decisions)
         with st.expander(f"Decisiones ({len(decisions)})"):
             st.dataframe(decisions, use_container_width=True)
+    elif not (isinstance(drop_turn_ids, list) and drop_turn_ids):
+        st.success("No se descartaron turnos.")
 
     render_json_expander(payload)
 
@@ -387,10 +584,75 @@ def render_clustering_result(payload: dict[str, object]) -> None:
     if missing_turn_ids:
         st.error(f"Turnos missing (no cubiertos por clustering): `{missing_turn_ids}`")
 
+    initial_call: dict[str, object] = {
+        "thinking": payload.get("thinking"),
+        "thinking_source": payload.get("thinking_source"),
+        "thinking_chars": payload.get("thinking_chars"),
+        "llm_usage": payload.get("llm_usage"),
+        "llm_timing": payload.get("llm_timing"),
+    }
+    has_initial_thinking_metadata = any(
+        initial_call.get(key) is not None
+        for key in (
+            "thinking",
+            "thinking_source",
+            "thinking_chars",
+            "llm_usage",
+            "llm_timing",
+        )
+    )
+    if has_initial_thinking_metadata:
+        st.markdown("**Thinking, tokens & timing**")
+        col_tokens, col_thinking = st.columns([3, 1])
+        with col_tokens:
+            _render_usage_token_breakdown(initial_call.get("llm_usage"))
+            _render_llm_timing_breakdown(initial_call)
+        with col_thinking:
+            _render_llm_call_thinking_button(
+                payload=payload,
+                call_label="Clustering · inicial",
+                call_record=initial_call,
+                key_suffix="initial",
+            )
+
     repair_passes = payload.get("repair_passes")
     if isinstance(repair_passes, list) and repair_passes:
         with st.expander(f"Repair passes ({len(repair_passes)})"):
-            st.dataframe(repair_passes, use_container_width=True, hide_index=True)
+            summary_rows: list[dict[str, object]] = []
+            for repair_pass in repair_passes:
+                if not isinstance(repair_pass, dict):
+                    continue
+                pass_index = repair_pass.get("pass_index")
+                call_label = (
+                    f"Clustering · repair {pass_index}"
+                    if pass_index is not None
+                    else "Clustering · repair"
+                )
+                pass_key = (
+                    f"repair_{pass_index}"
+                    if pass_index is not None
+                    else f"repair_{len(summary_rows)}"
+                )
+                col_tokens, col_thinking = st.columns([3, 1])
+                with col_tokens:
+                    _render_usage_token_breakdown(repair_pass.get("llm_usage"))
+                    _render_llm_timing_breakdown(repair_pass)
+                with col_thinking:
+                    _render_llm_call_thinking_button(
+                        payload=payload,
+                        call_label=call_label,
+                        call_record=repair_pass,
+                        key_suffix=pass_key,
+                    )
+                summary_rows.append(
+                    {
+                        key: value
+                        for key, value in repair_pass.items()
+                        if key not in {"thinking", "llm_usage"}
+                    }
+                )
+            if summary_rows:
+                st.dataframe(summary_rows, use_container_width=True, hide_index=True)
 
     for i, cluster in enumerate(clusters):
         if not isinstance(cluster, dict):

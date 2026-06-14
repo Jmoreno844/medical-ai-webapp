@@ -187,6 +187,21 @@ async def receive_generation_chunk(
             error=payload.error or "Error en la generación",
         )
 
+    if payload.is_progress:
+        await publish_document_event(
+            payload.document_id,
+            "generation_progress",
+            {
+                "process_id": payload.process_id,
+                "pipeline_step": payload.pipeline_step,
+                "message": payload.chunk or "",
+            },
+        )
+        return SuccessResponse(
+            success=True,
+            message=f"Progress received for document {payload.document_id}",
+        )
+
     if payload.is_complete:
         if payload.chunk:
             set_document_content_fields(
@@ -232,7 +247,11 @@ async def receive_generation_chunk(
     await publish_document_event(
         payload.document_id,
         "generation_chunk",
-        {"process_id": payload.process_id, "chunk": payload.chunk or ""},
+        {
+            "process_id": payload.process_id,
+            "chunk": payload.chunk or "",
+            "append": payload.append,
+        },
     )
     return SuccessResponse(
         success=True,

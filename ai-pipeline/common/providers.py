@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -34,6 +35,11 @@ ALLOWED_PROVIDERS = ("openai", "groq", "gemini", "anthropic")
 PROVIDER_ALIASES = {"google": "gemini"}
 
 DEFAULT_OPENAI_MODEL = "gpt-5.4-mini"
+OPENAI_MODEL_CHOICES = (
+    "gpt-5.4-nano",
+    "gpt-5.4-mini",
+    "gpt-5.4",
+)
 DEFAULT_GROQ_MODEL = "qwen/qwen3-32b"
 GROQ_MODEL_CHOICES = (
     "qwen/qwen3-32b",
@@ -43,7 +49,12 @@ GROQ_MODEL_CHOICES = (
     "mixtral-8x7b-32768",
 )
 GROQ_CUSTOM_MODEL_LABEL = "Otro (escribir)"
-DEFAULT_GEMINI_MODEL = "gemini-3-flash-preview"
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL_CHOICES = (
+    "gemini-2.5-flash",
+    "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite",
+)
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 
 DEFAULT_MODEL_BY_PROVIDER: dict[str, str] = {
@@ -224,15 +235,12 @@ def _completion_limit_kwargs(config: ProviderRuntimeConfig) -> dict[str, int]:
     return {config.max_output_param: _resolve_max_output_tokens(config)}
 
 
-def _gemini_location(model: str) -> str:
+def _gemini_location(_model: str) -> str:
     for env_name in ("GEMINI_LOCATION", "GCP_REGION", "VERTEX_AI_LOCATION"):
         value = os.environ.get(env_name, "").strip()
         if value:
             return value
-    normalized = model.lower()
-    if "preview" in normalized or normalized.startswith("gemini-3"):
-        return "global"
-    return "us-east1"
+    return "global"
 
 
 @lru_cache(maxsize=4)
@@ -373,6 +381,8 @@ def _call_groq(
     user: str,
     json_mode: bool,
 ) -> LlmResponse:
+    from common.stream_timing import _consume_chat_completion_stream
+
     reasoning_kwargs, request_metadata = _resolve_groq_reasoning_kwargs(model)
     kwargs: dict[str, object] = {
         "model": model,
@@ -386,11 +396,10 @@ def _call_groq(
     }
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
-    response = client.chat.completions.create(**kwargs)
-    return build_llm_response_from_message(
-        message=response.choices[0].message,
-        usage=response.usage,
-        request_params=request_metadata,
+    return _consume_chat_completion_stream(
+        client=client,
+        kwargs=kwargs,
+        request_metadata=request_metadata,
         provider="groq",
     )
 
@@ -411,7 +420,7 @@ def _call_openai_responses(
     json_mode: bool,
     request_metadata: dict[str, object],
 ) -> LlmResponse:
-    from common.llm_response import build_llm_response_from_openai_responses
+    from common.stream_timing import _consume_openai_responses_stream
 
     effort = request_metadata.get("reasoning_effort")
     resolved_user = _ensure_openai_json_input_hint(user) if json_mode else user
@@ -424,10 +433,10 @@ def _call_openai_responses(
     }
     if json_mode:
         kwargs["text"] = {"format": {"type": "json_object"}}
-    response = client.responses.create(**kwargs)
-    return build_llm_response_from_openai_responses(
-        response=response,
-        request_params=request_metadata,
+    return _consume_openai_responses_stream(
+        client=client,
+        kwargs=kwargs,
+        request_metadata=request_metadata,
     )
 
 
@@ -440,6 +449,8 @@ def _call_openai(
     user: str,
     json_mode: bool,
 ) -> LlmResponse:
+    from common.stream_timing import _consume_chat_completion_stream
+
     reasoning_kwargs, request_metadata = _resolve_openai_reasoning_effort(model)
     if reasoning_kwargs:
         return _call_openai_responses(
@@ -465,13 +476,35 @@ def _call_openai(
         kwargs["temperature"] = 0
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
-    response = client.chat.completions.create(**kwargs)
-    return build_llm_response_from_message(
-        message=response.choices[0].message,
-        usage=response.usage,
-        request_params=request_metadata,
+    return _consume_chat_completion_stream(
+        client=client,
+        kwargs=kwargs,
+        request_metadata=request_metadata,
         provider="openai",
     )
+
+
+def _stringify_finish_reason(value: object) -> str | None:
+    if value is None:
+        return None
+    name = getattr(value, "name", None)
+    if isinstance(name, str):
+        return name
+    return str(value)
+
+
+def _raise_gemini_empty_response(response: object) -> None:
+    candidates = getattr(response, "candidates", None) or []
+    candidate = candidates[0] if candidates else None
+    finish_reason = _stringify_finish_reason(
+        getattr(candidate, "finish_reason", None) if candidate else None
+    )
+    usage = getattr(response, "usage_metadata", None)
+    thoughts_token_count = getattr(usage, "thoughts_token_count", None)
+    detail = f" finish_reason={finish_reason}"
+    if thoughts_token_count is not None:
+        detail += f" thoughts_token_count={thoughts_token_count}"
+    raise ValueError(f"ai_pipeline_gemini_empty_response{detail}")
 
 
 def _call_gemini(
@@ -491,6 +524,7 @@ def _call_gemini(
         temperature=0,
         candidate_count=1,
         max_output_tokens=_resolve_max_output_tokens(config),
+        thinking_config=types.ThinkingConfig(thinking_budget=0),
     )
     if json_mode:
         generate_config.response_mime_type = "application/json"
@@ -501,7 +535,7 @@ def _call_gemini(
     )
     content = getattr(response, "text", "") or ""
     if not content.strip():
-        raise ValueError("ai_pipeline_gemini_empty_response")
+        _raise_gemini_empty_response(response)
     return LlmResponse(content=content)
 
 
@@ -529,12 +563,15 @@ def _call_anthropic(
 def call_llm_detailed(
     *, provider: str, model: str, system: str, user: str
 ) -> LlmResponse:
+    from common.llm_timing import attach_timing_if_missing
+
     config = provider_runtime_config(provider)
     json_mode = _json_mode_enabled(config)
+    started_at = time.perf_counter()
 
     if config.provider == "openai":
         client = OpenAI(api_key=_require_api_key("openai"))
-        return _call_openai(
+        response = _call_openai(
             client=client,
             config=config,
             model=model,
@@ -542,27 +579,30 @@ def call_llm_detailed(
             user=user,
             json_mode=json_mode,
         )
+        return attach_timing_if_missing(response, started_at=started_at)
 
     if config.provider == "gemini":
-        return _call_gemini(
+        response = _call_gemini(
             config=config,
             model=model,
             system=system,
             user=user,
             json_mode=json_mode,
         )
+        return attach_timing_if_missing(response, started_at=started_at)
 
     if config.provider == "anthropic":
-        return _call_anthropic(
+        response = _call_anthropic(
             config=config,
             model=model,
             system=system,
             user=user,
         )
+        return attach_timing_if_missing(response, started_at=started_at)
 
     client = Groq(api_key=_require_api_key("groq"))
     if not json_mode:
-        return _call_groq(
+        response = _call_groq(
             client=client,
             config=config,
             model=model,
@@ -570,9 +610,10 @@ def call_llm_detailed(
             user=user,
             json_mode=False,
         )
+        return attach_timing_if_missing(response, started_at=started_at)
 
     try:
-        return _call_groq(
+        response = _call_groq(
             client=client,
             config=config,
             model=model,
@@ -580,6 +621,7 @@ def call_llm_detailed(
             user=user,
             json_mode=True,
         )
+        return attach_timing_if_missing(response, started_at=started_at)
     except BadRequestError as exc:
         if not _is_groq_json_validate_error(exc):
             raise ValueError(
@@ -590,7 +632,7 @@ def call_llm_detailed(
             model,
             _groq_error_detail(exc),
         )
-        return _call_groq(
+        response = _call_groq(
             client=client,
             config=config,
             model=model,
@@ -598,6 +640,7 @@ def call_llm_detailed(
             user=user,
             json_mode=False,
         )
+        return attach_timing_if_missing(response, started_at=started_at)
 
 
 def call_llm(*, provider: str, model: str, system: str, user: str) -> str:
@@ -615,6 +658,8 @@ __all__ = [
     "DEFAULT_MODEL_BY_PROVIDER",
     "GROQ_CUSTOM_MODEL_LABEL",
     "GROQ_MODEL_CHOICES",
+    "GEMINI_MODEL_CHOICES",
+    "OPENAI_MODEL_CHOICES",
     "ModelSpec",
     "OPENAI_REASONING_EFFORT_CHOICES",
     "OPENAI_REASONING_EFFORT_ENV",

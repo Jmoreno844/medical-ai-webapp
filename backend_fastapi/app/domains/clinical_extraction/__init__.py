@@ -1,1 +1,0 @@
-"""Shadow clinical extraction domain."""

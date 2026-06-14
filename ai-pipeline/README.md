@@ -6,7 +6,7 @@ Local R&D harness for experimental AI pipeline steps. Not deployed to production
 |---|---|
 | `common/` | Shared providers, case loading, prompts, JSON utils |
 | `templates/` | Shared clinical document templates (classification + generation) |
-| `cases/` | Shared de-identified transcript fixtures |
+| `cases/` | Shared fixtures: transcripts, cluster classification cases, context docs |
 | `clustering/` | Group turns by clinical topic |
 | `filtering/` | Drop non-clinical turns (sparse `drop_turn_ids`) |
 | `classification/` | Assign pre-clustered turns to template sections |
@@ -34,7 +34,13 @@ uv sync --group dev --group ui
 
 ## Run a module
 
-Shared cases live in `cases/`. From a module directory:
+Shared cases live in `cases/`:
+
+- `cases/index.json` + `cases/transcripts/` — full transcript fixtures (filtering, clustering)
+- `cases/cluster/` — per-cluster fixtures for classification (`case1/<topic_label>.json`)
+- `cases/context/` — doctor notes and PDF fixtures for the context pipeline
+
+From a module directory:
 
 ```bash
 # Clustering
@@ -79,7 +85,7 @@ make ui
 See [`ui/README.md`](ui/README.md) for details.
 
 Default models: OpenAI `gpt-5.4-mini`, Groq `qwen/qwen3-32b`, Gemini
-`gemini-3-flash-preview` (Vertex AI), Anthropic `claude-haiku-4-5-20251001`.
+`gemini-2.5-flash` (Vertex AI), Anthropic `claude-haiku-4-5-20251001`.
 
 Cases must stay dummy or de-identified. Do not commit real clinical data.
 

@@ -28,9 +28,9 @@ output "transcription_worker_cloud_run_url" {
   value       = module.transcription_worker_cloud_run.service_url
 }
 
-output "document_generation_worker_cloud_run_url" {
+output "document_pipeline_worker_cloud_run_url" {
   description = "Document generation worker Cloud Run service URL"
-  value       = module.document_generation_worker_cloud_run.service_url
+  value       = module.document_pipeline_worker_cloud_run.service_url
 }
 
 output "cloud_sql_connection_name" {
@@ -73,7 +73,7 @@ output "transcription_worker_service_account" {
   value       = module.service_accounts.transcription_worker_runner_email
 }
 
-output "document_generation_worker_service_account" {
+output "document_pipeline_worker_service_account" {
   description = "Cloud Run document generation worker service account email"
   value       = module.service_accounts.document_generation_runner_email
 }
@@ -93,9 +93,9 @@ output "cloud_tasks_queue_name" {
   value       = module.cloud_tasks.queue_name
 }
 
-output "document_generation_cloud_tasks_queue_name" {
+output "document_pipeline_cloud_tasks_queue_name" {
   description = "Document generation Cloud Tasks queue name"
-  value       = module.document_generation_cloud_tasks.queue_name
+  value       = module.document_pipeline_cloud_tasks.queue_name
 }
 
 output "workload_identity_provider" {

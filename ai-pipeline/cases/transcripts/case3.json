@@ -1,0 +1,441 @@
+{
+  "session_id": "case3",
+  "language": "es",
+  "chunks": [
+    {
+      "chunk_id": "s0",
+      "turns": [
+        {
+          "turn_id": 0,
+          "speaker": "MEDICO",
+          "text": "Buenos días, señor. Soy el doctor Ramírez. ¿Me confirma su nombre completo y edad?"
+        },
+        {
+          "turn_id": 1,
+          "speaker": "PACIENTE",
+          "text": "Buenos días, doctor. Me llamo Andrés Vargas, tengo 38 años."
+        },
+        {
+          "turn_id": 2,
+          "speaker": "MEDICO",
+          "text": "Perfecto, Andrés. ¿Qué lo trae hoy a consulta?"
+        },
+        {
+          "turn_id": 3,
+          "speaker": "PACIENTE",
+          "text": "Desde hace como tres días tengo tos, fiebre y un dolor en el pecho del lado derecho. Hoy me sentí más cansado y me asusté."
+        },
+        {
+          "turn_id": 4,
+          "speaker": "MEDICO",
+          "text": "Entiendo. Vamos paso a paso. ¿El dolor en el pecho cómo es? ¿Opresivo, punzante, ardoroso?"
+        },
+        {
+          "turn_id": 5,
+          "speaker": "PACIENTE",
+          "text": "Es como una punzada. Me duele más cuando respiro profundo o cuando toso."
+        },
+        {
+          "turn_id": 6,
+          "speaker": "MEDICO",
+          "text": "¿Se irradia hacia el brazo, la mandíbula, la espalda o el cuello?"
+        },
+        {
+          "turn_id": 7,
+          "speaker": "PACIENTE",
+          "text": "No, se queda aquí en el costado derecho."
+        },
+        {
+          "turn_id": 8,
+          "speaker": "MEDICO",
+          "text": "¿Del 1 al 10, cuánto le duele?"
+        },
+        {
+          "turn_id": 9,
+          "speaker": "PACIENTE",
+          "text": "Como 6 cuando toso, pero en reposo como 3."
+        },
+        {
+          "turn_id": 10,
+          "speaker": "MEDICO",
+          "text": "¿Ha tenido falta de aire?"
+        },
+        {
+          "turn_id": 11,
+          "speaker": "PACIENTE",
+          "text": "Un poco, sobre todo al subir escaleras. No siento que me ahogue, pero sí me canso más."
+        },
+        {
+          "turn_id": 12,
+          "speaker": "MEDICO",
+          "text": "¿La tos es seca o con flema?"
+        },
+        {
+          "turn_id": 13,
+          "speaker": "PACIENTE",
+          "text": "Con flema amarilla, espesa."
+        },
+        {
+          "turn_id": 14,
+          "speaker": "MEDICO",
+          "text": "¿Ha medido la fiebre?"
+        },
+        {
+          "turn_id": 15,
+          "speaker": "PACIENTE",
+          "text": "Sí, anoche tenía 38.5 °C."
+        },
+        {
+          "turn_id": 16,
+          "speaker": "MEDICO",
+          "text": "¿Escalofríos, sudoración nocturna o sensación de decaimiento?"
+        },
+        {
+          "turn_id": 17,
+          "speaker": "PACIENTE",
+          "text": "Escalofríos sí. Sudoración un poco, pero creo que era por la fiebre."
+        },
+        {
+          "turn_id": 18,
+          "speaker": "MEDICO",
+          "text": "¿Náuseas, vómito, diarrea, dolor abdominal?"
+        },
+        {
+          "turn_id": 19,
+          "speaker": "PACIENTE",
+          "text": "No."
+        },
+        {
+          "turn_id": 20,
+          "speaker": "MEDICO",
+          "text": "¿Congestión nasal, dolor de garganta o pérdida del olfato?"
+        },
+        {
+          "turn_id": 21,
+          "speaker": "PACIENTE",
+          "text": "Dolor de garganta al principio, pero ya casi nada."
+        },
+        {
+          "turn_id": 22,
+          "speaker": "MEDICO",
+          "text": "¿Ha tenido contacto con personas enfermas recientemente?"
+        },
+        {
+          "turn_id": 23,
+          "speaker": "PACIENTE",
+          "text": "En la oficina varios estaban con gripa. Uno faltó por neumonía, creo."
+        },
+        {
+          "turn_id": 24,
+          "speaker": "MEDICO",
+          "text": "¿Tiene antecedentes médicos importantes? Asma, hipertensión, diabetes, problemas cardíacos?"
+        },
+        {
+          "turn_id": 25,
+          "speaker": "PACIENTE",
+          "text": "No. Solo rinitis alérgica."
+        },
+        {
+          "turn_id": 26,
+          "speaker": "MEDICO",
+          "text": "¿Cirugías previas?"
+        },
+        {
+          "turn_id": 27,
+          "speaker": "PACIENTE",
+          "text": "Apendicitis cuando tenía 20 años."
+        },
+        {
+          "turn_id": 28,
+          "speaker": "MEDICO",
+          "text": "¿Toma medicamentos actualmente?"
+        },
+        {
+          "turn_id": 29,
+          "speaker": "PACIENTE",
+          "text": "Solo loratadina cuando me da alergia. Estos días tomé acetaminofén para la fiebre."
+        },
+        {
+          "turn_id": 30,
+          "speaker": "MEDICO",
+          "text": "¿Alergias a medicamentos?"
+        },
+        {
+          "turn_id": 31,
+          "speaker": "PACIENTE",
+          "text": "No que yo sepa."
+        },
+        {
+          "turn_id": 32,
+          "speaker": "MEDICO",
+          "text": "¿Fuma?"
+        },
+        {
+          "turn_id": 33,
+          "speaker": "PACIENTE",
+          "text": "No. Fumé un poco en la universidad, pero nada desde hace más de diez años."
+        },
+        {
+          "turn_id": 34,
+          "speaker": "MEDICO",
+          "text": "¿Alcohol o sustancias?"
+        },
+        {
+          "turn_id": 35,
+          "speaker": "PACIENTE",
+          "text": "Alcohol social, una o dos cervezas algunos fines de semana. Nada más."
+        },
+        {
+          "turn_id": 36,
+          "speaker": "MEDICO",
+          "text": "¿Antecedentes familiares de infartos, trombosis, enfermedades pulmonares?"
+        },
+        {
+          "turn_id": 37,
+          "speaker": "PACIENTE",
+          "text": "Mi papá es hipertenso. Mi abuelo tuvo un infarto, pero ya era mayor, como de 75."
+        },
+        {
+          "turn_id": 38,
+          "speaker": "MEDICO",
+          "text": "Bien. Por el dolor torácico y la dificultad respiratoria vamos a tomar signos vitales, hacer exploración física y un electrocardiograma. Aunque por lo que cuenta suena más respiratorio, siempre conviene descartar señales cardíacas o de otra causa urgente."
+        },
+        {
+          "turn_id": 39,
+          "speaker": "ENFERMERA",
+          "text": "Señor Andrés, voy a tomarle los signos. Temperatura: 38.2 °C. Presión arterial: 124/78 mmHg. Frecuencia cardíaca: 112 latidos por minuto. Frecuencia respiratoria: 22 respiraciones por minuto. Saturación de oxígeno: 94% al aire ambiente. Peso: 82 kg. Talla: 1.76 m."
+        },
+        {
+          "turn_id": 40,
+          "speaker": "MEDICO",
+          "text": "Gracias. Andrés, tiene fiebre, la frecuencia cardíaca está algo elevada y la saturación está un poco baja, aunque no críticamente. Ahora voy a examinarlo. Avíseme si algo le duele."
+        },
+        {
+          "turn_id": 41,
+          "speaker": "PACIENTE",
+          "text": "Está bien."
+        },
+        {
+          "turn_id": 42,
+          "speaker": "MEDICO",
+          "text": "Primero lo observo: está consciente, orientado, habla en frases completas, se ve algo cansado pero no está en dificultad respiratoria severa. Voy a revisar mucosas. Abra la boca, por favor. Mucosas ligeramente secas, garganta con leve enrojecimiento, sin placas. Ahora palparé el cuello. No noto ganglios grandes ni dolorosos. No hay ingurgitación yugular."
+        },
+        {
+          "turn_id": 43,
+          "speaker": "PACIENTE",
+          "text": "Bien."
+        },
+        {
+          "turn_id": 44,
+          "speaker": "MEDICO",
+          "text": "Voy a auscultar el corazón. Respire normal. Ruidos cardíacos rítmicos, taquicárdicos, sin soplos evidentes. Ahora los pulmones. Respire profundo por la boca."
+        },
+        {
+          "turn_id": 45,
+          "speaker": "PACIENTE",
+          "text": "Me duele un poco cuando respiro hondo."
+        },
+        {
+          "turn_id": 46,
+          "speaker": "MEDICO",
+          "text": "Lo noto. En la base del pulmón derecho escucho crepitantes, como pequeños crujidos, y algo de disminución del murmullo vesicular. En el pulmón izquierdo se escucha mejor. Voy a percutir la espalda. Hay una zona con sonido un poco más mate en la base derecha. Ahora palparé el tórax: ¿duele aquí?"
+        },
+        {
+          "turn_id": 47,
+          "speaker": "PACIENTE",
+          "text": "Sí, ahí mismo me molesta."
+        },
+        {
+          "turn_id": 48,
+          "speaker": "MEDICO",
+          "text": "El dolor aumenta con la respiración y la tos, lo cual orienta a dolor pleurítico, frecuente cuando hay inflamación pulmonar o de la pleura. Voy a revisar abdomen: blando, sin dolor, sin masas. Extremidades: no hay edema, no hay dolor en pantorrillas, pulsos presentes y simétricos. Esto hace menos probable una trombosis en piernas, aunque no la descarta por completo si hubiera otros datos."
+        },
+        {
+          "turn_id": 49,
+          "speaker": "PACIENTE",
+          "text": "¿Puede ser algo del corazón?"
+        },
+        {
+          "turn_id": 50,
+          "speaker": "MEDICO",
+          "text": "Lo vamos a evaluar. Su dolor no tiene las características más típicas de infarto, porque no es opresivo, no se irradia y empeora al respirar. Pero como hay dolor torácico, taquicardia y cansancio, haremos electrocardiograma."
+        },
+        {
+          "turn_id": 51,
+          "speaker": "TECNICO",
+          "text": "Señor Andrés, acuéstese en la camilla. Le colocaré electrodos en pecho, brazos y piernas. No duele, solo debe quedarse quieto unos segundos."
+        },
+        {
+          "turn_id": 52,
+          "speaker": "PACIENTE",
+          "text": "Listo."
+        },
+        {
+          "turn_id": 53,
+          "speaker": "MEDICO",
+          "text": "Ya tengo el ECG. Lo reviso: ritmo sinusal, frecuencia aproximada de 110 latidos por minuto. Eje normal. Intervalo PR de 160 ms, QRS estrecho de 90 ms, QTc dentro de límites normales. No observo elevación del ST ni depresión significativa del ST. No hay ondas Q patológicas. En resumen, el ECG muestra taquicardia sinusal, probablemente secundaria a fiebre, dolor o infección, sin datos claros de infarto agudo en este trazado."
+        },
+        {
+          "turn_id": 54,
+          "speaker": "PACIENTE",
+          "text": "Eso me tranquiliza."
+        },
+        {
+          "turn_id": 55,
+          "speaker": "MEDICO",
+          "text": "Es una buena señal, pero no nos quedamos solo con eso. Por la fiebre, la tos con flema, la saturación de 94%, el dolor pleurítico y los hallazgos en la base pulmonar derecha, mi principal sospecha es una neumonía adquirida en la comunidad, probablemente en el lóbulo inferior derecho."
+        },
+        {
+          "turn_id": 56,
+          "speaker": "PACIENTE",
+          "text": "¿Neumonía? ¿Eso es grave?"
+        },
+        {
+          "turn_id": 57,
+          "speaker": "MEDICO",
+          "text": "Puede variar. En su caso, de entrada parece una neumonía leve a moderada, porque está estable, puede hablar, la presión está normal y no hay confusión. Pero sí requiere estudio y tratamiento. También debemos considerar diagnósticos diferenciales: bronquitis aguda, infección viral, pleuritis, COVID o influenza, y menos probable pero importante, embolia pulmonar. Por ahora, sus datos clínicos apoyan más neumonía."
+        },
+        {
+          "turn_id": 58,
+          "speaker": "PACIENTE",
+          "text": "¿Qué exámenes necesito?"
+        },
+        {
+          "turn_id": 59,
+          "speaker": "MEDICO",
+          "text": "Solicitaría una radiografía de tórax para confirmar si hay infiltrado en la base derecha. También un hemograma para ver leucocitos, proteína C reactiva si está disponible, y prueba para influenza/COVID según disponibilidad y circulación local. Si la saturación bajara más, si el dolor cambiara o si aparecieran signos de alarma, ampliaríamos estudios, incluso gases arteriales o pruebas para tromboembolismo."
+        },
+        {
+          "turn_id": 60,
+          "speaker": "PACIENTE",
+          "text": "¿Y tratamiento?"
+        },
+        {
+          "turn_id": 61,
+          "speaker": "MEDICO",
+          "text": "Si la radiografía confirma neumonía y no hay criterios de hospitalización, puede manejarse ambulatoriamente con antibiótico indicado según guías locales y su perfil clínico, además de hidratación, control de fiebre y reposo relativo. No voy a usar antitusivos fuertes si hay mucha flema, porque conviene movilizar secreciones. Sí podemos manejar el dolor y la fiebre con un antipirético/analgésico adecuado, evitando exceder dosis."
+        },
+        {
+          "turn_id": 62,
+          "speaker": "PACIENTE",
+          "text": "¿Tengo que ir a urgencias?"
+        },
+        {
+          "turn_id": 63,
+          "speaker": "MEDICO",
+          "text": "En este momento no parece requerir traslado inmediato si se mantiene estable, pero hay signos de alarma claros: dificultad respiratoria progresiva, labios morados, confusión, dolor torácico opresivo o que se irradie, desmayo, fiebre persistente pese a tratamiento, saturación menor de 92%, vómito que impida tomar líquidos, o empeoramiento general. Si aparece cualquiera de esos, debe consultar por urgencias."
+        },
+        {
+          "turn_id": 64,
+          "speaker": "PACIENTE",
+          "text": "¿Puedo ir a trabajar?"
+        },
+        {
+          "turn_id": 65,
+          "speaker": "MEDICO",
+          "text": "Recomiendo incapacidad o reposo al menos durante los primeros días, especialmente mientras tenga fiebre y tos productiva. Además, si es infeccioso, puede contagiar a otras personas. Use mascarilla si convive con alguien vulnerable, ventile los espacios y lávese las manos."
+        },
+        {
+          "turn_id": 66,
+          "speaker": "PACIENTE",
+          "text": "Vivo con mi mamá, tiene 68 años y es diabética."
+        },
+        {
+          "turn_id": 67,
+          "speaker": "MEDICO",
+          "text": "Entonces conviene ser más cuidadoso. Mantenga distancia en lo posible, no comparta vasos ni cubiertos, use mascarilla en espacios cerrados y limpie superficies. Si ella desarrolla fiebre, tos o dificultad respiratoria, debe valorarse pronto."
+        },
+        {
+          "turn_id": 68,
+          "speaker": "PACIENTE",
+          "text": "¿Cuándo sabré si estoy mejorando?"
+        },
+        {
+          "turn_id": 69,
+          "speaker": "MEDICO",
+          "text": "Normalmente esperamos que la fiebre empiece a ceder en 48 a 72 horas después de iniciar el tratamiento correcto. La tos puede durar más, incluso varias semanas, pero debe ir disminuyendo la intensidad. El cansancio también puede persistir unos días. Lo importante es que no empeore la respiración y que la fiebre no siga alta."
+        },
+        {
+          "turn_id": 70,
+          "speaker": "PACIENTE",
+          "text": "¿La taquicardia se me va a quitar?"
+        },
+        {
+          "turn_id": 71,
+          "speaker": "MEDICO",
+          "text": "Probablemente sí. Su frecuencia cardíaca elevada parece una respuesta al proceso infeccioso, fiebre y dolor. Al bajar la fiebre, hidratarse y tratar la causa, debería disminuir. De todos modos, si presenta palpitaciones intensas, dolor opresivo, desmayo o sensación de latidos irregulares, hay que reevaluar."
+        },
+        {
+          "turn_id": 72,
+          "speaker": "PACIENTE",
+          "text": "¿El ECG entonces salió normal?"
+        },
+        {
+          "turn_id": 73,
+          "speaker": "MEDICO",
+          "text": "Salió sin signos de isquemia aguda ni arritmia peligrosa. No diría \"perfectamente normal\" porque muestra taquicardia sinusal, pero esa taquicardia tiene una explicación probable en su cuadro actual."
+        },
+        {
+          "turn_id": 74,
+          "speaker": "PACIENTE",
+          "text": "Entiendo."
+        },
+        {
+          "turn_id": 75,
+          "speaker": "MEDICO",
+          "text": "Voy a dejar registrado: paciente masculino de 38 años, consulta por tres días de fiebre, tos productiva amarillenta, dolor torácico pleurítico derecho y disnea leve de esfuerzo. Signos vitales: TA 124/78, FC 112, FR 22, T 38.2, SatO₂ 94% ambiente. Examen físico con crepitantes y disminución del murmullo vesicular en base pulmonar derecha, matidez leve a la percusión, sin edemas ni signos de trombosis venosa profunda. ECG: taquicardia sinusal, sin cambios isquémicos agudos. Impresión diagnóstica: neumonía adquirida en la comunidad, probable lóbulo inferior derecho."
+        },
+        {
+          "turn_id": 76,
+          "speaker": "PACIENTE",
+          "text": "¿Me harán la radiografía hoy?"
+        },
+        {
+          "turn_id": 77,
+          "speaker": "MEDICO",
+          "text": "Sí, idealmente hoy. Con el resultado ajustamos la conducta. Si muestra consolidación compatible y usted sigue estable, el manejo ambulatorio es razonable. Si hubiera derrame pleural importante, compromiso extenso o saturación más baja, podríamos considerar manejo hospitalario."
+        },
+        {
+          "turn_id": 78,
+          "speaker": "PACIENTE",
+          "text": "¿Hay algo que no deba hacer?"
+        },
+        {
+          "turn_id": 79,
+          "speaker": "MEDICO",
+          "text": "Evite ejercicio intenso, alcohol y automedicarse con antibióticos sobrantes. Tome líquidos, descanse y controle la temperatura. Si le formulan antibiótico, complete el esquema aunque se sienta mejor, salvo que aparezca reacción adversa y se le indique suspenderlo."
+        },
+        {
+          "turn_id": 80,
+          "speaker": "PACIENTE",
+          "text": "¿Qué reacción adversa sería preocupante?"
+        },
+        {
+          "turn_id": 81,
+          "speaker": "MEDICO",
+          "text": "Ronchas generalizadas, hinchazón de labios o cara, dificultad para respirar, diarrea intensa con sangre, vómitos persistentes o sensación de desmayo. También si el dolor torácico cambia a presión fuerte en el centro del pecho, eso no se debe atribuir automáticamente a la neumonía."
+        },
+        {
+          "turn_id": 82,
+          "speaker": "PACIENTE",
+          "text": "Listo, doctor. Me queda claro."
+        },
+        {
+          "turn_id": 83,
+          "speaker": "MEDICO",
+          "text": "Bien. Le entregaré la orden de radiografía y laboratorios. Mientras tanto, manejo sintomático para fiebre y dolor. Cuando tengamos la radiografía, confirmamos diagnóstico y definimos tratamiento antibiótico específico. Quiero control en 48 a 72 horas, o antes si aparece algún signo de alarma."
+        },
+        {
+          "turn_id": 84,
+          "speaker": "PACIENTE",
+          "text": "Muchas gracias."
+        },
+        {
+          "turn_id": 85,
+          "speaker": "MEDICO",
+          "text": "Con gusto, Andrés. Lo importante es vigilar la respiración y no dejar avanzar el cuadro. Pase a radiología y luego regresamos a revisar el resultado."
+        }
+      ]
+    }
+  ]
+}

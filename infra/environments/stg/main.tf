@@ -174,7 +174,7 @@ module "workload_identity" {
     ".github/workflows/backend-fastapi-deployment-stg.yaml",
     ".github/workflows/copilot-agent-deployment-stg.yaml",
     ".github/workflows/transcription-worker-deployment-stg.yaml",
-    ".github/workflows/document-generation-worker-deployment-stg.yaml",
+    ".github/workflows/document-pipeline-worker-deployment-stg.yaml",
     ".github/workflows/frontend-deployment-stg.yaml",
     ".github/workflows/landing-page-deployment-stg.yaml",
   ]
@@ -228,12 +228,12 @@ module "cloud_tasks" {
   depends_on = [module.project_services]
 }
 
-module "document_generation_cloud_tasks" {
+module "document_pipeline_cloud_tasks" {
   source     = "../../modules/cloud_tasks"
   project_id = var.project_id
   region     = var.region
 
-  queue_name                = "document-generation-queue-stg"
+  queue_name                = "document-pipeline-queue-stg"
   max_attempts              = 3
   max_concurrent_dispatches = 5
   min_backoff_seconds       = 10
@@ -276,17 +276,14 @@ module "cloud_run" {
     DB_USER                                    = trimsuffix(module.service_accounts.backend_runner_email, ".gserviceaccount.com")
     CLOUD_TASKS_REGION                         = var.region
     TRANSCRIPTION_QUEUE_NAME                   = module.cloud_tasks.queue_name
-    DOCUMENT_GENERATION_QUEUE_NAME             = module.document_generation_cloud_tasks.queue_name
+    DOCUMENT_PIPELINE_QUEUE_NAME             = module.document_pipeline_cloud_tasks.queue_name
     CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT        = module.service_accounts.cloud_tasks_invoker_email
     TRANSCRIPTION_WORKER_SERVICE_ACCOUNT       = module.service_accounts.transcription_worker_runner_email
     TRANSCRIPTION_TASK_TARGET_URL              = "${module.transcription_worker_cloud_run.service_url}/api/v1/internal/transcription/tasks"
-    DOCUMENT_GENERATION_WORKER_SERVICE_ACCOUNT = module.service_accounts.document_generation_runner_email
-    DOCUMENT_GENERATION_TASK_TARGET_URL        = "${module.document_generation_worker_cloud_run.service_url}/api/v1/internal/document-generation/tasks"
+    DOCUMENT_PIPELINE_WORKER_SERVICE_ACCOUNT = module.service_accounts.document_generation_runner_email
+    DOCUMENT_PIPELINE_TASK_TARGET_URL        = "${module.document_pipeline_worker_cloud_run.service_url}/api/v1/internal/document-pipeline/tasks"
     COPILOT_AGENT_BASE_URL                     = module.copilot_agent_cloud_run.service_url
     GEMINI_MODEL                               = var.gemini_model
-    DOCUMENT_GENERATION_PROVIDER               = var.document_generation_provider
-    DOCUMENT_GENERATION_MODEL                  = var.document_generation_model
-    DOCUMENT_GENERATION_GOOGLE_MODEL           = var.document_generation_google_model
     VERTEX_AI_LOCATION                         = "global"
   }
 
@@ -629,19 +626,19 @@ module "transcription_worker_cloud_run" {
 # 10e. Cloud Run (document generation worker)
 # ---------------------------------------------------------------------------
 
-module "document_generation_worker_cloud_run" {
+module "document_pipeline_worker_cloud_run" {
   source     = "../../modules/cloud_run"
   project_id = var.project_id
   region     = var.region
 
-  service_name             = var.document_generation_worker_service_name
-  image                    = var.document_generation_worker_image
+  service_name             = var.document_pipeline_worker_service_name
+  image                    = var.document_pipeline_worker_image
   service_account_email    = module.service_accounts.document_generation_runner_email
   cloud_sql_volume_enabled = false
 
   min_instances    = 0
-  max_instances    = var.document_generation_worker_max_instances
-  max_concurrency  = var.document_generation_worker_max_concurrency
+  max_instances    = var.document_pipeline_worker_max_instances
+  max_concurrency  = var.document_pipeline_worker_max_concurrency
   session_affinity = false
   container_port   = 8092
   timeout          = "300s"
@@ -656,14 +653,14 @@ module "document_generation_worker_cloud_run" {
     GCP_REGION                          = var.region
     BACKEND_INTERNAL_BASE_URL           = local.backend_internal_base_url
     CLOUD_TASKS_INVOKER_SERVICE_ACCOUNT = module.service_accounts.cloud_tasks_invoker_email
-    DOCUMENT_GENERATION_PROVIDER        = var.document_generation_provider
-    DOCUMENT_GENERATION_MODEL           = var.document_generation_model
-    DOCUMENT_GENERATION_GOOGLE_MODEL    = var.document_generation_google_model
-    VERTEX_AI_LOCATION                  = var.document_generation_vertex_ai_location
+    DOCUMENT_GENERATION_PROVIDER        = var.document_pipeline_provider
+    DOCUMENT_GENERATION_MODEL           = var.document_pipeline_model
+    DOCUMENT_GENERATION_GOOGLE_MODEL    = var.document_pipeline_google_model
+    VERTEX_AI_LOCATION                  = var.document_pipeline_vertex_ai_location
     LLM_MAX_CONCURRENT                  = "4"
   }
 
-  secret_env_vars = var.cloud_run_use_secret_manager && var.document_generation_provider == "anthropic_api" ? [
+  secret_env_vars = var.cloud_run_use_secret_manager && var.document_pipeline_provider == "anthropic_api" ? [
     { name = "ANTHROPIC_API_KEY", secret_id = "anthropic-api-key" },
   ] : []
 
@@ -724,7 +721,7 @@ module "monitoring" {
   billing_account_name                    = var.billing_account_name
   cloud_run_service_name                  = var.cloud_run_service_name
   transcription_worker_service_name       = var.transcription_worker_service_name
-  document_generation_worker_service_name = var.document_generation_worker_service_name
+  document_pipeline_worker_service_name = var.document_pipeline_worker_service_name
   cloud_function_service_names            = []
   cloud_sql_instance_name                 = var.db_instance_name
   monthly_budget_amount_usd               = var.monthly_budget_amount_usd
@@ -733,7 +730,7 @@ module "monitoring" {
     module.project_services,
     module.cloud_run,
     module.transcription_worker_cloud_run,
-    module.document_generation_worker_cloud_run,
+    module.document_pipeline_worker_cloud_run,
     module.copilot_agent_cloud_run,
     module.cloud_sql,
   ]

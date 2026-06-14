@@ -28,6 +28,8 @@ interface GenerationStatus {
   content: string;
   error: string | null;
   isComplete: boolean;
+  pipelineStep: string | null;
+  pipelineMessage: string | null;
 }
 
 interface Plantilla {
@@ -116,6 +118,8 @@ export function GenerationProvider({
     null
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [pipelineStep, setPipelineStep] = useState<string | null>(null);
+  const [pipelineMessage, setPipelineMessage] = useState<string | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const streamedContentRef = useRef("");
@@ -135,8 +139,10 @@ export function GenerationProvider({
       content: generationDerivedState?.streamingContent ?? "",
       error: generationDerivedState?.error ?? error,
       isComplete: Boolean(generationDerivedState?.isComplete),
+      pipelineStep,
+      pipelineMessage,
     }),
-    [activeGenerationDocumentId, error, generationDerivedState]
+    [activeGenerationDocumentId, error, generationDerivedState, pipelineMessage, pipelineStep]
   );
 
   const isGenerating = generationStatus.inProgress;
@@ -279,14 +285,25 @@ export function GenerationProvider({
               case "connected":
                 return;
 
+              case "generation_progress": {
+                setPipelineStep(data.pipeline_step ?? null);
+                setPipelineMessage(data.message ?? null);
+                return;
+              }
+
               case "generation_chunk": {
                 const newChunk = data.chunk || "";
+                const shouldAppend = Boolean(data.append);
                 const shouldSkipStatusChunk =
+                  !shouldAppend &&
                   streamedContentRef.current.length === 0 &&
                   newChunk.trim() === INITIAL_GENERATION_STATUS_CHUNK;
-                const updatedContent = shouldSkipStatusChunk
-                  ? streamedContentRef.current
-                  : streamedContentRef.current + newChunk;
+                let updatedContent = streamedContentRef.current;
+                if (!shouldSkipStatusChunk && newChunk) {
+                  updatedContent = shouldAppend
+                    ? `${streamedContentRef.current}${streamedContentRef.current ? "\n\n" : ""}${newChunk}`
+                    : streamedContentRef.current + newChunk;
+                }
                 streamedContentRef.current = updatedContent;
                 updateGenerationContent(String(documentId), updatedContent);
                 return;

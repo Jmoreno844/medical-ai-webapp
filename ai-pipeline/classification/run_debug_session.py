@@ -26,6 +26,7 @@ from classification.lib import (  # noqa: E402
     enrich_classification_batch_result_for_export,
     enrich_classification_session_result_for_export,
     format_batch_assignment_audit,
+    format_classification_batch_output_for_detail,
     format_classification_output_for_detail,
     format_session_debug_output,
     load_prompt,
@@ -164,6 +165,7 @@ def main() -> int:
             template=template,
             model_spec=model_spec,
             system_prompt=system_prompt,
+            prompt_version=prompt_version,
             input_token_budget=args.input_token_budget,
             token_encoding=args.token_encoding,
         )
@@ -189,7 +191,7 @@ def main() -> int:
             "llm_request_params": batch_run.llm_request_params,
         }
         batch_outputs.append(
-            format_classification_output_for_detail(batch_entry, output_detail)
+            format_classification_batch_output_for_detail(batch_entry, output_detail)
         )
 
     session_export = enrich_classification_session_result_for_export(

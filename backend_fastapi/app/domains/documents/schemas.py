@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DocumentCreate(BaseModel):
@@ -63,6 +63,36 @@ class GenerationChunkIn(BaseModel):
     is_complete: bool = False
     is_error: bool = False
     error: str | None = None
+    is_progress: bool = False
+    pipeline_step: str | None = None
+    append: bool = False
+
+
+class TranscriptionTurnWithId(BaseModel):
+    turn_id: int
+    speaker: str
+    text: str
+
+
+class StepGuidelinesOut(BaseModel):
+    guidelines: str = ""
+
+
+class TemplateSectionOut(BaseModel):
+    section_id: str
+    heading: str
+    description: str = ""
+    classification: StepGuidelinesOut = Field(default_factory=StepGuidelinesOut)
+    generation: StepGuidelinesOut = Field(default_factory=StepGuidelinesOut)
+
+
+class ClinicalTemplateOut(BaseModel):
+    id: str
+    name: str
+    document_kind: str = "document"
+    classification: StepGuidelinesOut = Field(default_factory=StepGuidelinesOut)
+    generation: StepGuidelinesOut = Field(default_factory=StepGuidelinesOut)
+    sections: list[TemplateSectionOut] = Field(default_factory=list)
 
 
 class DocumentGenerationTaskPayload(BaseModel):
@@ -85,6 +115,8 @@ class DocumentGenerationWorkItemResponse(BaseModel):
     context_content: str
     transcription_content: str
     template_content: str
+    transcription_turns: list[TranscriptionTurnWithId]
+    template: ClinicalTemplateOut
     callback_token: str
 
 

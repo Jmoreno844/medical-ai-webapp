@@ -7,7 +7,7 @@ Pipeline position: **filtering → clustering → classification**.
 
 ## Input contract
 
-Each case references one cluster fixture under `cases/<session_id>/`:
+Each case references one cluster fixture under `cases/cluster/<session_id>/`:
 
 ```json
 {
@@ -22,7 +22,7 @@ Each case references one cluster fixture under `cases/<session_id>/`:
 Layout:
 
 ```
-cases/
+cases/cluster/
 ├── index.json
 ├── case1/
 │   ├── cansancio_escaleras_y_palpidez.json
@@ -32,7 +32,7 @@ cases/
     └── ...
 ```
 
-Cases manifest (`cases/index.json`):
+Cases manifest (`cases/cluster/index.json`):
 
 ```json
 {
@@ -79,10 +79,24 @@ make debug CASE_ID=case2_dolor_rodilla PROVIDER=openai PROMPT_VERSION=v001
 make debug-session SESSION_ID=case1 PROVIDER=openai PROMPT_VERSION=v002
 INPUT_TOKEN_BUDGET=4000 make debug-session SESSION_ID=case1 PROMPT_VERSION=v002
 
+# v003 (default in UI): template-aware system prompt + compact user payload
+make debug-session SESSION_ID=case1 PROVIDER=openai PROMPT_VERSION=v003 TEMPLATE_ID=consulta_estructurada_v001
+
 make batch MODELS=openai:gpt-5.4-mini,groq:qwen/qwen3-32b
 ```
 
-### Token batching (v002)
+### Template-aware prompts (v003)
+
+`v003` builds the **system** prompt from the base file plus a `PLANTILLA ACTIVA`
+block (id, global classification guidelines, and every section's description +
+`classification.guidelines`). The **user** JSON carries only `clusters[]` and a
+compact `template_ref` (`id` + `allowed_section_ids`). Heuristics in the base
+prompt are generic; section-specific routing comes from the template JSON, so
+custom templates work without hardcoded `section_id` examples.
+
+`v001`/`v002` keep the legacy shape: full `template` object in the user payload.
+
+### Token batching (v002+)
 
 Clusters of a session are packed by **tiktoken** weight, not by fixed count:
 
@@ -127,8 +141,8 @@ template and validates that every `section_id` exists in the template.
 
 1. Run clustering on a filtered transcript, e.g. `case2_filtered`.
 2. Open `clustering/results/*_debug_*.json`.
-3. Copy one cluster (`topic_label` + `turns`) into `cases/<session_id>/<topic_label>.json`.
-4. Register it in `cases/index.json` with `id` like `case1_<topic_label>`.
+3. Copy one cluster (`topic_label` + `turns`) into `cases/cluster/<session_id>/<topic_label>.json`.
+4. Register it in `cases/cluster/index.json` with `id` like `case1_<topic_label>`.
 
 ## Prompts
 

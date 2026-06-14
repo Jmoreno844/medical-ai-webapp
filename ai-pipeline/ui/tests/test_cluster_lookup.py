@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from common.case_paths import CLUSTER_CASES_INDEX
+
 from ui.cluster_lookup import (
     cluster_turns_for_ids,
     cluster_turns_from_generation_payload,
@@ -11,23 +13,13 @@ from ui.cluster_lookup import (
 
 
 def test_resolve_cases_index_path_absolute() -> None:
-    cases_index = (
-        Path(__file__).resolve().parents[2]
-        / "classification"
-        / "cases"
-        / "index.json"
-    )
+    cases_index = CLUSTER_CASES_INDEX
     payload = {"cases_file": str(cases_index)}
     assert resolve_cases_index_path(payload) == cases_index.resolve()
 
 
 def test_cluster_turns_for_ids_loads_turn_text() -> None:
-    cases_index = (
-        Path(__file__).resolve().parents[2]
-        / "classification"
-        / "cases"
-        / "index.json"
-    )
+    cases_index = CLUSTER_CASES_INDEX
     views = cluster_turns_for_ids(
         cases_index=cases_index,
         cluster_ids=["case1_cansancio_escaleras_y_palpidez"],
@@ -39,12 +31,7 @@ def test_cluster_turns_for_ids_loads_turn_text() -> None:
 
 
 def test_cluster_turns_from_generation_payload() -> None:
-    cases_index = (
-        Path(__file__).resolve().parents[2]
-        / "classification"
-        / "cases"
-        / "index.json"
-    )
+    cases_index = CLUSTER_CASES_INDEX
     payload = {
         "cases_file": str(cases_index),
         "generation_session_result": {
@@ -74,7 +61,7 @@ def test_cluster_turns_fallback_to_clustering_result() -> None:
 
     payload = {
         "session_id": "case1",
-        "cases_file": str(root / "classification" / "cases" / "index.json"),
+        "cases_file": str(CLUSTER_CASES_INDEX),
         "clustering_result_file": str(clustering_path),
     }
     views = cluster_turns_from_generation_payload(

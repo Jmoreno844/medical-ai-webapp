@@ -115,7 +115,7 @@ def main() -> int:
         f"prompt_version={prompt_version} turns={len(catalog)}"
     )
     try:
-        result, raw_response = run_filtering(
+        result, llm_response = run_filtering(
             case=case,
             model_spec=model_spec,
             system_prompt=system_prompt,
@@ -145,7 +145,7 @@ def main() -> int:
                 result, catalog
             ),
             "drop_audit": drop_audit.to_dict(),
-            "raw_response": raw_response,
+            "raw_response": llm_response.content,
         },
         output_detail,
     )
@@ -172,7 +172,7 @@ def main() -> int:
     print(f"\nWrote {output_path}")
     if args.dump_raw:
         print("\n--- raw response ---")
-        print(raw_response)
+        print(llm_response.content)
     return 0
 
 

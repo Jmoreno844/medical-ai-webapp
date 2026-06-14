@@ -11,7 +11,6 @@ import EncuentroPage from "./features/encuentro/EncuentroPage";
 import EncuentroDetailPage from "./features/encuentro/EncuentroDetailPage";
 import DebugTranscriptionPage from "./features/debugTranscription/DebugTranscriptionPage";
 import DebugAudioRecordingPage from "./features/debugAudioRecording/DebugAudioRecordingPage";
-import DebugClinicalExtractionPage from "./features/debugClinicalExtraction/DebugClinicalExtractionPage";
 import AdminRoute from "./features/admin/AdminRoute";
 import AdminAuditPage from "./features/admin/AdminAuditPage";
 import AdminUsersPage from "./features/admin/AdminUsersPage";
@@ -84,14 +83,6 @@ const routes: RouteObject[] = [
         element: (
           <SpecialLayout>
             <DebugAudioRecordingPage />
-          </SpecialLayout>
-        ),
-      },
-      {
-        path: "debug/extraccion",
-        element: (
-          <SpecialLayout>
-            <DebugClinicalExtractionPage />
           </SpecialLayout>
         ),
       },

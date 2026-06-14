@@ -48,32 +48,6 @@ def issue_generation_callback_token(
     return token
 
 
-def issue_clinical_extraction_callback_token(
-    *,
-    user_id: int,
-    session_id: str,
-    encounter_id: int,
-    document_id: int,
-    settings: Settings,
-) -> str:
-    token, _ = create_token(
-        subject=str(user_id),
-        purpose="clinical_extraction",
-        audience=settings.callback_jwt_audience,
-        expires_delta=timedelta(
-            minutes=settings.clinical_extraction_callback_token_minutes
-        ),
-        extra_claims={
-            "user_id": user_id,
-            "session_id": session_id,
-            "encounter_id": encounter_id,
-            "document_id": document_id,
-        },
-        settings=settings,
-    )
-    return token
-
-
 def extract_bearer_token(request: Request) -> str:
     authorization = request.headers.get("authorization", "")
     scheme, _, token = authorization.partition(" ")

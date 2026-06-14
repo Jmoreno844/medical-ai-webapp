@@ -10,7 +10,7 @@ Pipeline position:
 ## Input
 
 1. Classification session result JSON (`classification_session_result.assignments`)
-2. Cluster fixtures from `../classification/cases/` for the same `session_id`
+2. Cluster fixtures from `../cases/cluster/` for the same `session_id`
 3. *(Optional)* Claim classification result JSON from `../context_pipeline/classify_claims/results/`
 
 Classification maps **cluster → section_ids**. Claim classification maps **claim → section_ids**. Generation inverts both to **section → clusters[] + enrichment_claims[]** and runs **one LLM call per non-empty section in parallel**.

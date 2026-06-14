@@ -37,7 +37,7 @@ def verify_document_generation_worker_request(
             "Invalid worker token",
         ) from exc
 
-    expected_email = (settings.document_generation_worker_service_account or "").strip()
+    expected_email = (settings.document_pipeline_worker_service_account or "").strip()
     if expected_email and payload.get("email") != expected_email:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid worker invoker")
     return payload

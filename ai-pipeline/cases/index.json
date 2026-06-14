@@ -15,6 +15,11 @@
     "notes": "case2 sin los 12 turnos descartados por el filtro (saludos, backchannels, charla informal, ruido admin, despedidas); turn_ids renumerados 0..59 para clustering."
   },
   {
+    "id": "case3",
+    "transcript_file": "transcripts/case3.json",
+    "notes": "Consulta ficticia por dolor torácico pleurítico, fiebre y disnea leve; incluye signos vitales (enfermera), examen físico, ECG (técnico), sospecha de neumonía y plan ambulatorio."
+  },
+  {
     "id": "medication_question_and_avoid",
     "transcript_file": "transcripts/medication_question_and_avoid.json",
     "notes": "Pregunta de medicacion, restriccion explicita de AINEs y una prescripcion simple."

@@ -250,6 +250,8 @@ const DocumentArea: React.FC<DocumentAreaProps> = ({
               content={generationStatus.content}
               isComplete={generationStatus.isComplete}
               error={generationStatus.error}
+              pipelineStep={generationStatus.pipelineStep}
+              pipelineMessage={generationStatus.pipelineMessage}
               onViewDocument={
                 generationTargetDocumentId
                   ? () => handleSelectDocument(generationTargetDocumentId)

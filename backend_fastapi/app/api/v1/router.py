@@ -3,7 +3,6 @@ from fastapi import APIRouter
 from app.domains.admin_users import api as admin_users_api
 from app.domains.audit import api as audit_api
 from app.domains.auth import api as auth_api
-from app.domains.clinical_extraction import api as clinical_extraction_api
 from app.domains.copilot import api as copilot_api
 from app.domains.copilot import internal_tools_api as copilot_internal_tools_api
 from app.domains.documents import api as documents_api
@@ -28,7 +27,6 @@ api_v1_router.include_router(documents_api.router, tags=["documents"])
 api_v1_router.include_router(document_generation_api.router, tags=["documents"])
 api_v1_router.include_router(document_callbacks_api.router, tags=["documents"])
 api_v1_router.include_router(transcription_api.router, tags=["transcription"])
-api_v1_router.include_router(clinical_extraction_api.router, tags=["clinical-extraction"])
 api_v1_router.include_router(transcription_api_test.router, tags=["transcription-test"])
 api_v1_router.include_router(patients_api.router, tags=["patients"])
 api_v1_router.include_router(templates_api.router, tags=["templates"])

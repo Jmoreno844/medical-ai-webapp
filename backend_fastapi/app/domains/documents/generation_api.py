@@ -20,19 +20,24 @@ from app.domains.documents.schemas import (
     DocumentGenerationWorkItemResponse,
     DocumentGenerationWorkflowRequest,
     DocumentGenerationWorkflowResponse,
+    TranscriptionTurnWithId,
 )
 from app.domains.documents.service import (
     get_doctor_template_for_doctor,
     get_document_for_doctor,
     get_effective_template_content,
 )
-from app.domains.transcription.service import resolve_transcription_content_for_generation
 from app.domains.documents.sse_hub import get_processing_id, publish_document_event
+from app.domains.documents.structured_template import default_clinical_template_out
 from app.domains.documents.worker_auth import verify_document_generation_worker_request
-from app.integrations.document_generation_tasks import (
-    DocumentGenerationTaskConfigurationError,
-    enqueue_document_generation_task,
-    should_use_document_generation_cloud_tasks,
+from app.domains.transcription.service import (
+    resolve_structured_transcription_turns_for_generation,
+    resolve_transcription_content_for_generation,
+)
+from app.integrations.document_pipeline_tasks import (
+    DocumentPipelineTaskConfigurationError,
+    enqueue_document_pipeline_task,
+    should_use_document_pipeline_cloud_tasks,
 )
 from app.integrations.http_json import post_json_async
 
@@ -45,21 +50,21 @@ async def _post_document_worker_task_background(
     payload: dict,
     settings: Settings,
 ) -> None:
-    if not settings.document_generation_worker_base_url:
+    if not settings.document_pipeline_worker_base_url:
         return
-    url = f"{settings.document_generation_worker_base_url.rstrip('/')}{path}"
+    url = f"{settings.document_pipeline_worker_base_url.rstrip('/')}{path}"
     try:
         with bind_log_context(
             process_id=payload.get("process_id"),
             document_id=payload.get("new_document_id"),
         ):
-            await post_json_async(url, payload, timeout=600)
+            await post_json_async(url, payload, timeout=900)
     except Exception:
         log_event(
             logger,
             logging.ERROR,
-            "Local document generation worker dispatch failed",
-            event="document_generation_worker_dispatch_failed",
+            "Local document pipeline worker dispatch failed",
+            event="document_pipeline_worker_dispatch_failed",
             process_id=payload.get("process_id"),
             document_id=payload.get("new_document_id"),
         )
@@ -124,13 +129,13 @@ async def generate_document_endpoint(
             status.HTTP_403_FORBIDDEN,
             "No tienes permiso para acceder a uno o más documentos requeridos",
         )
-    transcription_content = await resolve_transcription_content_for_generation(
+    transcription_turns = await resolve_structured_transcription_turns_for_generation(
         session,
         document_id=doc_transcription.id,
         doctor_id=user.id,
         fallback_markdown=doc_transcription.content_markdown,
     )
-    if not transcription_content.strip():
+    if not transcription_turns:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "El documento de transcripción está vacío. Se requiere contenido para generar el documento.",
@@ -151,20 +156,20 @@ async def generate_document_endpoint(
             "La plantilla seleccionada está vacía. Se requiere contenido para generar el documento.",
         )
     if (
-        should_use_document_generation_cloud_tasks(settings)
-        and not settings.document_generation_task_target_url
+        should_use_document_pipeline_cloud_tasks(settings)
+        and not settings.document_pipeline_task_target_url
     ):
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "DOCUMENT_GENERATION_TASK_TARGET_URL setting is not configured",
+            "DOCUMENT_PIPELINE_TASK_TARGET_URL setting is not configured",
         )
     if (
-        not should_use_document_generation_cloud_tasks(settings)
-        and not settings.document_generation_worker_base_url
+        not should_use_document_pipeline_cloud_tasks(settings)
+        and not settings.document_pipeline_worker_base_url
     ):
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "DOCUMENT_GENERATION_WORKER_BASE_URL setting is not configured",
+            "DOCUMENT_PIPELINE_WORKER_BASE_URL setting is not configured",
         )
 
     doc_new.doctor_template_id = doctor_template.id
@@ -206,23 +211,23 @@ async def generate_document_endpoint(
     await session.commit()
 
     try:
-        if should_use_document_generation_cloud_tasks(settings):
-            enqueue_document_generation_task(task_payload_dict, settings=settings)
+        if should_use_document_pipeline_cloud_tasks(settings):
+            enqueue_document_pipeline_task(task_payload_dict, settings=settings)
         else:
             background_tasks.add_task(
                 _post_document_worker_task_background,
                 (
-                    f"{settings.api_v1_prefix}/internal/document-generation/tasks/"
+                    f"{settings.api_v1_prefix}/internal/document-pipeline/tasks/"
                     f"{process_id}"
                 ),
                 task_payload_dict,
                 settings,
             )
-    except DocumentGenerationTaskConfigurationError as exc:
-        logger.error("Document generation task misconfigured: %s", exc)
+    except DocumentPipelineTaskConfigurationError as exc:
+        logger.error("Document pipeline task misconfigured: %s", exc)
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, str(exc)) from exc
     except Exception as exc:
-        logger.exception("Failed to enqueue document generation task")
+        logger.exception("Failed to enqueue document pipeline task")
         await publish_document_event(
             doc_new.id,
             "generation_error",
@@ -252,10 +257,10 @@ async def generate_document_endpoint(
 
 
 @router.post(
-    "/internal/document-generation/work-items/{process_id}",
+    "/internal/document-pipeline/work-items/{process_id}",
     response_model=DocumentGenerationWorkItemResponse,
 )
-async def get_document_generation_work_item(
+async def get_document_pipeline_work_item(
     process_id: str,
     payload: DocumentGenerationTaskPayload,
     request: Request,
@@ -293,15 +298,24 @@ async def get_document_generation_work_item(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Plantilla no encontrada")
 
     template_content = get_effective_template_content(doctor_template)
+    transcription_turns_raw = await resolve_structured_transcription_turns_for_generation(
+        session,
+        document_id=doc_transcription.id,
+        doctor_id=payload.doctor_id,
+        fallback_markdown=doc_transcription.content_markdown,
+    )
     transcription_content = await resolve_transcription_content_for_generation(
         session,
         document_id=doc_transcription.id,
         doctor_id=payload.doctor_id,
         fallback_markdown=doc_transcription.content_markdown,
     )
-    if not transcription_content.strip() or not template_content.strip():
+    if not transcription_turns_raw or not template_content.strip():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Work item inválido")
 
+    template_structured = default_clinical_template_out(
+        template_name=doctor_template.name,
+    )
     context_content = doc_context.content_markdown.strip() or "No se agregó contexto."
     callback_token = issue_generation_callback_token(
         user_id=payload.doctor_id,
@@ -309,6 +323,14 @@ async def get_document_generation_work_item(
         process_id=process_id,
         settings=settings,
     )
+    transcription_turns = [
+        TranscriptionTurnWithId(
+            turn_id=int(turn["turn_id"]),
+            speaker=str(turn["speaker"]),
+            text=str(turn["text"]),
+        )
+        for turn in transcription_turns_raw
+    ]
     return DocumentGenerationWorkItemResponse(
         process_id=process_id,
         doctor_id=payload.doctor_id,
@@ -320,5 +342,7 @@ async def get_document_generation_work_item(
         context_content=context_content,
         transcription_content=transcription_content,
         template_content=template_content,
+        transcription_turns=transcription_turns,
+        template=template_structured,
         callback_token=callback_token,
     )

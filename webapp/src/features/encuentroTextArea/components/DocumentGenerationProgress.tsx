@@ -1,16 +1,34 @@
 import React from "react";
 
+const PIPELINE_STEP_LABELS: Record<string, string> = {
+  filtering: "Filtrando turnos de la transcripción",
+  clustering: "Agrupando temas clínicos",
+  classification: "Clasificando clusters en secciones",
+  context: "Procesando contexto clínico",
+  generation: "Generando documento por secciones",
+};
+
 interface DocumentGenerationProgressProps {
   isGenerating: boolean;
   content: string;
   isComplete: boolean;
   error: string | null;
+  pipelineStep?: string | null;
+  pipelineMessage?: string | null;
   onViewDocument?: () => void;
 }
 
 export const DocumentGenerationProgress: React.FC<
   DocumentGenerationProgressProps
-> = ({ isGenerating, content, isComplete, error, onViewDocument }) => {
+> = ({
+  isGenerating,
+  content,
+  isComplete,
+  error,
+  pipelineStep,
+  pipelineMessage,
+  onViewDocument,
+}) => {
   if (!isGenerating && !content && !error && !isComplete) {
     return null;
   }
@@ -21,11 +39,16 @@ export const DocumentGenerationProgress: React.FC<
       ? "Falló la generación"
       : "Generando nota clínica en otro documento…";
 
+  const stepLabel =
+    pipelineMessage ||
+    (pipelineStep ? PIPELINE_STEP_LABELS[pipelineStep] : null);
+
   const detail = error
     ? error
     : isComplete
       ? "La nota ya está lista para revisión."
-      : "Puedes seguir escribiendo aquí mientras se completa en segundo plano.";
+      : stepLabel ||
+        "Puedes seguir escribiendo aquí mientras se completa en segundo plano.";
 
   return (
     <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 shadow-sm">

@@ -137,7 +137,7 @@ def main() -> int:
                     "model": model_spec.model,
                 }
                 try:
-                    filtering_result, raw_response = run_filtering(
+                    filtering_result, llm_response = run_filtering(
                         case=case,
                         model_spec=model_spec,
                         system_prompt=system_prompt,
@@ -150,7 +150,7 @@ def main() -> int:
                         )
                     )
                     output_entry["drop_audit"] = drop_audit.to_dict()
-                    output_entry["raw_response"] = raw_response
+                    output_entry["raw_response"] = llm_response.content
                     if not drop_audit.is_valid:
                         model_label = (
                             f"{model_spec.provider}:{model_spec.model}"

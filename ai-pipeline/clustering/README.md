@@ -22,7 +22,7 @@ From this directory:
 make debug CASE_ID=case1 PROVIDER=openai
 make debug CASE_ID=case1 PROVIDER=gemini
 make debug CASE_ID=case1 PROVIDER=anthropic
-make batch MODELS=openai:gpt-5.4-mini,gemini:gemini-3-flash-preview
+make batch MODELS=openai:gpt-5.4-mini,gemini:gemini-2.5-flash
 make batch CASE_ID=eval_doc_clinica_co_001
 ```
 
@@ -40,7 +40,7 @@ Default models:
 |---|---|
 | OpenAI | `gpt-5.4-mini` |
 | Groq | `qwen/qwen3-32b` |
-| Gemini | `gemini-3-flash-preview` |
+| Gemini | `gemini-2.5-flash` |
 | Anthropic | `claude-haiku-4-5-20251001` |
 
 Provider-specific LLM config (`../common/providers.py`):
@@ -52,8 +52,10 @@ Provider-specific LLM config (`../common/providers.py`):
 | Gemini | `GEMINI_MAX_OUTPUT_TOKENS` | `GEMINI_JSON_MODE` |
 | Anthropic | `ANTHROPIC_MAX_TOKENS` | prompt-only JSON |
 
-Gemini uses `GEMINI_LOCATION` or `GCP_REGION` (defaults to `global` for Gemini 3
-preview models). Alias `google:model` is accepted as `gemini:model`.
+Gemini uses `GEMINI_LOCATION` or `GCP_REGION` (default `global` for all models).
+Alias `google:model` is accepted as `gemini:model`. Gemini 3 models disable
+models disable internal thinking (`thinking_budget=0`) so JSON output is not
+consumed by reasoning tokens on large prompts.
 
 ## Cases
 
