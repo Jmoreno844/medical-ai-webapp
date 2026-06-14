@@ -6,11 +6,16 @@ from clustering.lib import (
     DEFAULT_CASES_INDEX,
     ClusteringResult,
     audit_turn_coverage,
+    clustering_output_schema,
+    clustering_prompt_reference,
     enrich_clustering_result_for_export,
     format_clustering_output_for_detail,
+    load_clustering_prompt,
     parse_clustering_result,
     prompt_file_path,
+    render_clustering_user_payload,
 )
+from common.transcripts import TranscriptCase
 
 
 def test_parse_clustering_result() -> None:
@@ -106,3 +111,45 @@ def test_default_cases_index_points_to_shared_cases() -> None:
     assert DEFAULT_CASES_INDEX.name == "index.json"
     assert DEFAULT_CASES_INDEX.parent.name == "cases"
     assert DEFAULT_CASES_INDEX.is_file()
+
+
+def test_load_clustering_prompt_v002_returns_py_system_prompt() -> None:
+    from clustering.prompts.clustering_prompt_v001 import SYSTEM_PROMPT
+
+    assert load_clustering_prompt("v002") == SYSTEM_PROMPT.strip()
+
+
+def test_render_clustering_user_payload_v002_uses_transcript_block() -> None:
+    case = TranscriptCase(
+        id="case_test",
+        notes="",
+        transcript_json={
+            "chunks": [
+                {
+                    "turns": [
+                        {"speaker": "medico", "text": "Hola"},
+                    ]
+                }
+            ]
+        },
+    )
+    payload = render_clustering_user_payload(case=case, prompt_version="v002")
+    assert payload.startswith("<transcript>")
+    assert '"turn_id": 0' in payload
+
+
+def test_clustering_output_schema_v002_restricts_turn_ids() -> None:
+    catalog = [
+        {"turn_id": 0, "speaker": "medico", "text": "hola"},
+        {"turn_id": 1, "speaker": "paciente", "text": "cansancio"},
+    ]
+    schema = clustering_output_schema(catalog, prompt_version="v002")
+    assert schema is not None
+    turn_id_item = schema["properties"]["clusters"]["items"]["properties"]["turn_ids"][
+        "items"
+    ]
+    assert turn_id_item["enum"] == [0, 1]
+
+
+def test_clustering_prompt_reference_v002_points_to_py_module() -> None:
+    assert clustering_prompt_reference("v002") == "clustering/prompts/clustering_prompt_v001.py"

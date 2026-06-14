@@ -11,6 +11,7 @@ from common.case_paths import (
     CONTEXT_CASES_INDEX,
     TRANSCRIPT_CASES_INDEX,
 )
+from common.prompt_registry import py_prompt_versions
 from common.templates import DEFAULT_TEMPLATES_DIR, list_template_ids
 from common.transcripts import TranscriptCase, build_turn_catalog, load_cases
 
@@ -49,15 +50,15 @@ PROMPT_STEMS = {
 }
 
 DEFAULT_PROMPT_VERSIONS = {
-    "filtering": "v001",
-    "clustering": "v001",
-    "classification": "v003",
+    "filtering": "v002",
+    "clustering": "v002",
+    "classification": "v004",
     "generation": "v003",
     "context_triage": "v001",
-    "context_filter_spans": "v001",
-    "context_cluster_spans": "v001",
-    "context_classify_clusters": "v001",
-    "context_section_adapter": "v001",
+    "context_filter_spans": "v002",
+    "context_cluster_spans": "v002",
+    "context_classify_clusters": "v002",
+    "context_section_adapter": "v003",
     "context_pipeline": "v001",
     "context_ad_hoc_pipeline": "v001",
 }
@@ -222,9 +223,12 @@ def list_prompt_versions(step: str) -> list[str]:
     if not prompts_dir.is_dir():
         return [DEFAULT_PROMPT_VERSIONS[step]]
     versions = sorted(
-        path.stem.removeprefix(f"{stem}_")
-        for path in prompts_dir.glob(f"{stem}_v*.txt")
-        if PROMPT_VERSION_PATTERN.fullmatch(path.stem.removeprefix(f"{stem}_"))
+        set(
+            path.stem.removeprefix(f"{stem}_")
+            for path in prompts_dir.glob(f"{stem}_v*.txt")
+            if PROMPT_VERSION_PATTERN.fullmatch(path.stem.removeprefix(f"{stem}_"))
+        )
+        | set(py_prompt_versions(step))
     )
     return versions or [DEFAULT_PROMPT_VERSIONS[step]]
 

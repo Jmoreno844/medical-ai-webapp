@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from common.llm_response import LlmResponse
 from common.providers import ModelSpec, call_llm_detailed
-from common.transcripts import TranscriptCase, build_turn_catalog, render_user_payload
-from filtering.lib import FilteringResult, parse_filtering_result
+from common.transcripts import TranscriptCase, build_turn_catalog
+from filtering.lib import (
+    FilteringResult,
+    filtering_output_schema,
+    parse_filtering_result,
+    render_filtering_user_payload,
+)
 
 
 def run_filtering(
@@ -11,13 +16,23 @@ def run_filtering(
     case: TranscriptCase,
     model_spec: ModelSpec,
     system_prompt: str,
+    prompt_version: str = "v001",
 ) -> tuple[FilteringResult, LlmResponse]:
-    user_payload = render_user_payload(case)
+    catalog = build_turn_catalog(case.transcript_json)
+    user_payload = render_filtering_user_payload(
+        case=case,
+        prompt_version=prompt_version,
+    )
+    output_schema = filtering_output_schema(
+        catalog,
+        prompt_version=prompt_version,
+    )
     llm_response = call_llm_detailed(
         provider=model_spec.provider,
         model=model_spec.model,
         system=system_prompt,
         user=user_payload,
+        output_schema=output_schema,
     )
     result = parse_filtering_result(llm_response.content)
     catalog = build_turn_catalog(case.transcript_json)

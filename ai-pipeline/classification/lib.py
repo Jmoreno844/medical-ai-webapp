@@ -18,7 +18,9 @@ from common.prompts import (
     prompt_file_path as resolve_prompt_file_path,
 )
 from common.case_paths import CLUSTER_CASES_INDEX
+from common.prompt_registry import is_py_prompt_version, load_py_prompt_module, py_system_prompt
 from common.templates import ClinicalTemplate as ClassificationTemplate
+from common.templates import compose_section_guidelines
 
 AI_PIPELINE_ROOT = Path(__file__).resolve().parents[1]
 MODULE_ROOT = Path(__file__).resolve().parent
@@ -264,7 +266,11 @@ def format_template_for_classification_system(
         lines.append(f"### {section.section_id}")
         lines.append(f"heading: {section.heading}")
         lines.append(f"description: {section.description}")
-        section_guidelines = section.classification.guidelines.strip()
+        section_guidelines = compose_section_guidelines(
+            section.classification.guidelines,
+            section.include,
+            section.boundaries,
+        ).strip()
         if section_guidelines:
             lines.append(f"classification_guidelines: {section_guidelines}")
     return "\n".join(lines)
@@ -279,10 +285,38 @@ def build_classification_system_prompt(
 
 
 ENRICHED_CLASSIFICATION_PROMPT_VERSIONS = frozenset({"v003"})
+PY_CLASSIFICATION_PROMPT_VERSIONS = frozenset({"v004"})
+
+
+def classification_uses_py_prompt(prompt_version: str) -> bool:
+    return is_py_prompt_version("classification", prompt_version)
+
+
+def classification_structured_output_enabled(prompt_version: str) -> bool:
+    return prompt_version.strip().lower() in PY_CLASSIFICATION_PROMPT_VERSIONS
 
 
 def classification_uses_enriched_system_prompt(prompt_version: str) -> bool:
     return prompt_version.strip().lower() in ENRICHED_CLASSIFICATION_PROMPT_VERSIONS
+
+
+def classification_output_schema(
+    template: ClassificationTemplate,
+    *,
+    prompt_version: str,
+) -> dict[str, object] | None:
+    if not classification_structured_output_enabled(prompt_version):
+        return None
+    module = load_py_prompt_module("classification", prompt_version)
+    output_schema_fn = getattr(module, "output_schema", None)
+    if not callable(output_schema_fn):
+        raise ValueError(
+            f"classification_py_prompt_missing_output_schema: {prompt_version}"
+        )
+    schema = output_schema_fn(template)
+    if not isinstance(schema, dict):
+        raise ValueError(f"classification_py_prompt_invalid_output_schema: {prompt_version}")
+    return schema
 
 
 def prepare_classification_prompts(
@@ -305,6 +339,12 @@ def render_classification_user_payload(
     template: ClassificationTemplate,
     prompt_version: str = "v002",
 ) -> str:
+    if classification_uses_py_prompt(prompt_version):
+        module = load_py_prompt_module("classification", prompt_version)
+        return module.render_user_payload(
+            template=template,
+            clusters=[cluster_to_payload_item(cluster_case)],
+        )
     cluster_json = cluster_case.cluster_json
     topic_label = cluster_json.get("topic_label")
     if not isinstance(topic_label, str) or not topic_label.strip():
@@ -334,6 +374,13 @@ def render_classification_batch_payload(
 ) -> str:
     if not clusters:
         raise ValueError("classification_batch_payload_requires_at_least_one_cluster")
+    if classification_uses_py_prompt(prompt_version):
+        module = load_py_prompt_module("classification", prompt_version)
+        clusters_payload = [cluster_to_payload_item(cluster) for cluster in clusters]
+        return module.render_user_payload(
+            template=template,
+            clusters=clusters_payload,
+        )
     template_payload: dict[str, object]
     if classification_uses_enriched_system_prompt(prompt_version):
         template_payload = {
@@ -357,6 +404,8 @@ def classification_prompt_file_path(version: str) -> Path:
 
 
 def load_classification_prompt(version: str) -> str:
+    if classification_uses_py_prompt(version):
+        return py_system_prompt("classification", version)
     return load_prompt_from_file(
         prompts_dir=PROMPTS_DIR,
         filename_stem=PROMPT_FILENAME_STEM,
@@ -681,7 +730,10 @@ __all__ = [
     "ClusterCase",
     "SectionAudit",
     "build_classification_system_prompt",
+    "classification_output_schema",
+    "classification_structured_output_enabled",
     "classification_uses_enriched_system_prompt",
+    "classification_uses_py_prompt",
     "format_template_for_classification_system",
     "prepare_classification_prompts",
     "template_ref_for_classification_user",

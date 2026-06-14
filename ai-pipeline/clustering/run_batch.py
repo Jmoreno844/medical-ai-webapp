@@ -29,10 +29,10 @@ from clustering.lib import (  # noqa: E402
     DEFAULT_PROMPT_VERSION,
     MODULE_ROOT,
     audit_turn_coverage,
+    clustering_prompt_reference,
     enrich_clustering_result_for_export,
     format_clustering_output_for_detail,
     load_prompt,
-    prompt_file_path,
 )
 
 DEFAULT_RESULTS_DIR = MODULE_ROOT / "results"
@@ -82,7 +82,7 @@ def main() -> int:
     prompt_version = normalize_prompt_version(args.prompt_version)
     model_specs = parse_model_specs(args.models)
     system_prompt = load_prompt(prompt_version)
-    prompt_path = prompt_file_path(prompt_version)
+    prompt_path = clustering_prompt_reference(prompt_version)
 
     cases = select_cases(
         load_cases(Path(args.cases)),
@@ -109,7 +109,7 @@ def main() -> int:
         "completed_case_count": 0,
         "models": [asdict(spec) for spec in model_specs],
         "prompt_version": prompt_version,
-        "prompt_file": str(prompt_path.relative_to(MODULE_ROOT)),
+        "prompt_file": prompt_path,
         "prompt_preview": system_prompt[:80],
         "output_detail": output_detail,
         "case_results": [],
@@ -141,6 +141,7 @@ def main() -> int:
                         case=case,
                         model_spec=model_spec,
                         system_prompt=system_prompt,
+                        prompt_version=prompt_version,
                     )
                     clustering_result = session_run.result
                     raw_response = session_run.llm_response.content

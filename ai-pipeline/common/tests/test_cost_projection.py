@@ -23,6 +23,26 @@ def test_effective_cached_uses_max_of_reported_and_projected() -> None:
     ) == 2_000
 
 
+def test_estimate_clustering_cache_uses_py_prompt_for_v002() -> None:
+    tokens = estimate_cacheable_input_tokens(
+        step="clustering",
+        label="Clustering",
+        result_record={"prompt_version": "v002"},
+        settings=CostProjectionSettings(use_cache_pricing=True),
+    )
+    assert tokens > 0
+
+
+def test_estimate_clustering_repair_cache_uses_py_prompt_for_v002() -> None:
+    tokens = estimate_cacheable_input_tokens(
+        step="clustering",
+        label="Clustering · repair 1",
+        result_record={"repair_prompt_version": "v002"},
+        settings=CostProjectionSettings(use_cache_pricing=True),
+    )
+    assert tokens > 0
+
+
 def test_estimate_generation_cache_includes_section_when_template_enabled() -> None:
     result_record = {
         "prompt_version": "v001",

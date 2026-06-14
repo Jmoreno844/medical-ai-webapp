@@ -15,11 +15,14 @@ from classification.lib import (
     audit_batch_assignments,
     audit_section_ids,
     audit_session_result,
+    classification_uses_enriched_system_prompt,
+    classification_uses_py_prompt,
     enrich_classification_result_for_export,
     enrich_classification_session_result_for_export,
     build_classification_system_prompt,
     format_classification_batch_output_for_detail,
     format_classification_output_for_detail,
+    load_classification_prompt,
     load_session_clusters,
     merge_batch_results,
     parse_classification_batch_result,
@@ -87,7 +90,18 @@ def test_build_classification_system_prompt_includes_template_sections() -> None
     assert "PLANTILLA ACTIVA" in system_prompt
     assert "consulta_estructurada_v001" in system_prompt
     assert "### signos_vitales" in system_prompt
+    assert "Presión arterial" in system_prompt
     assert "Instrucciones base." in system_prompt
+
+
+def test_build_classification_system_prompt_v002_composes_include_boundaries() -> None:
+    template = load_template("consulta_estructurada_v002")
+    system_prompt = build_classification_system_prompt("Instrucciones base.", template)
+    assert "### signos_vitales" in system_prompt
+    assert "Incluye:" in system_prompt
+    assert "Límites:" in system_prompt
+    assert "casa" in system_prompt
+    assert "### antecedentes_gineco_obstetricos" in system_prompt
 
 
 def test_render_batch_payload_v003_uses_template_ref() -> None:
@@ -111,6 +125,39 @@ def test_render_batch_payload_v003_uses_template_ref() -> None:
     assert payload["template_ref"]["id"] == "consulta_estructurada_v001"
     assert "signos_vitales" in payload["template_ref"]["allowed_section_ids"]
     assert "template" not in payload
+
+
+def test_load_classification_prompt_v004_returns_py_system_prompt() -> None:
+    from classification.prompts.classification_prompt_v001 import SYSTEM_PROMPT
+
+    assert load_classification_prompt("v004") == SYSTEM_PROMPT.strip()
+
+
+def test_classification_v004_uses_py_prompt_not_enriched_system() -> None:
+    assert classification_uses_py_prompt("v004")
+    assert not classification_uses_enriched_system_prompt("v004")
+
+
+def test_render_batch_payload_v004_uses_model_facing_blocks() -> None:
+    template = load_template("consulta_estructurada_v002")
+    cluster = ClusterCase(
+        id="case1_demo",
+        template_id=template.id,
+        cluster_json={
+            "topic_label": "demo",
+            "turns": [{"turn_id": 0, "speaker": "PACIENTE", "text": "hola"}],
+        },
+    )
+    payload = render_classification_batch_payload(
+        clusters=[cluster],
+        template=template,
+        prompt_version="v004",
+    )
+    assert "<template_ref>" in payload
+    assert "<allowed_sections>" in payload
+    assert "<clusters>" in payload
+    assert '"template_ref":' not in payload
+    assert '"template":' not in payload
 
 
 def test_compact_batch_output_keeps_llm_usage() -> None:

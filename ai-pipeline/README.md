@@ -22,6 +22,10 @@ Local R&D harness for experimental AI pipeline steps. Not deployed to production
 
 See [`context_pipeline/README.md`](context_pipeline/README.md).
 
+**Contrato completo (I/O, prompts, plantillas):** [`docs/pipeline-contract.md`](docs/pipeline-contract.md).
+
+**Contrato completo (I/O, prompts, plantillas):** [`docs/pipeline-contract.md`](docs/pipeline-contract.md).
+
 ## Setup
 
 ```bash

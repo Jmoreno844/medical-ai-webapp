@@ -13,10 +13,32 @@ class StepGuidelines(BaseModel):
     guidelines: str = ""
 
 
+def compose_section_guidelines(
+    raw: str,
+    include: str,
+    boundaries: str,
+) -> str:
+    include_text = include.strip()
+    boundaries_text = boundaries.strip()
+    raw_text = raw.strip()
+    if not include_text and not boundaries_text:
+        return raw
+    parts: list[str] = []
+    if include_text:
+        parts.append(f"Incluye:\n{include_text}")
+    if boundaries_text:
+        parts.append(f"Límites:\n{boundaries_text}")
+    if raw_text:
+        parts.append(raw_text)
+    return "\n\n".join(parts)
+
+
 class TemplateSection(BaseModel):
     section_id: str
     heading: str
     description: str
+    include: str = ""
+    boundaries: str = ""
     classification: StepGuidelines = Field(default_factory=StepGuidelines)
     generation: StepGuidelines = Field(default_factory=StepGuidelines)
 
@@ -25,7 +47,11 @@ class TemplateSection(BaseModel):
             "section_id": self.section_id,
             "heading": self.heading,
             "description": self.description,
-            "guidelines": self.classification.guidelines,
+            "guidelines": compose_section_guidelines(
+                self.classification.guidelines,
+                self.include,
+                self.boundaries,
+            ),
         }
 
     def to_generation_payload(self) -> dict[str, object]:
@@ -33,7 +59,11 @@ class TemplateSection(BaseModel):
             "section_id": self.section_id,
             "heading": self.heading,
             "description": self.description,
-            "guidelines": self.generation.guidelines,
+            "guidelines": compose_section_guidelines(
+                self.generation.guidelines,
+                self.include,
+                self.boundaries,
+            ),
         }
 
 
@@ -116,6 +146,7 @@ __all__ = [
     "DEFAULT_TEMPLATES_DIR",
     "StepGuidelines",
     "TemplateSection",
+    "compose_section_guidelines",
     "list_template_ids",
     "load_template",
     "template_file_path",

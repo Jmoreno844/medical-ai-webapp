@@ -32,19 +32,17 @@ from clustering.lib import (
 )
 from clustering.lib import (
     audit_turn_coverage,
+    clustering_prompt_reference,
     enrich_clustering_result_for_export,
     format_clustering_output_for_detail,
 )
 from clustering.lib import (
     load_prompt as load_clustering_prompt,
 )
-from clustering.lib import (
-    prompt_file_path as clustering_prompt_file_path,
-)
 from clustering.repair import (
     DEFAULT_REPAIR_PROMPT_VERSION,
     IncompleteTurnCoverageError,
-    clustering_repair_prompt_file_path,
+    clustering_repair_prompt_reference,
 )
 from common.case_paths import CONTEXT_CASES_INDEX, TRANSCRIPT_CASES_INDEX
 from common.output_detail import normalize_output_detail
@@ -65,13 +63,11 @@ from filtering.lib import (
 from filtering.lib import (
     audit_drop_turn_ids,
     enrich_filtering_result_for_export,
+    filtering_prompt_reference,
     format_filtering_output_for_detail,
 )
 from filtering.lib import (
     load_prompt as load_filtering_prompt,
-)
-from filtering.lib import (
-    prompt_file_path as filtering_prompt_file_path,
 )
 from generation.generate import run_generation_session
 from generation.lib import (
@@ -180,7 +176,7 @@ def run_filtering_step(
     provider = model_spec.provider
     model = model_spec.model
     system_prompt = load_filtering_prompt(prompt_version)
-    prompt_path = filtering_prompt_file_path(prompt_version)
+    prompt_path = filtering_prompt_reference(prompt_version)
     catalog = build_turn_catalog(case.transcript_json)
     run_started_at = datetime.now(UTC)
     results_dir = FILTERING_MODULE_ROOT / "results"
@@ -195,6 +191,7 @@ def run_filtering_step(
             case=case,
             model_spec=model_spec,
             system_prompt=system_prompt,
+            prompt_version=prompt_version,
         )
         response_time_ms = int((time.perf_counter() - started_at) * 1000)
     drop_audit = audit_drop_turn_ids(result, catalog)
@@ -221,7 +218,7 @@ def run_filtering_step(
         "provider": provider,
         "model": model,
         "prompt_version": prompt_version,
-        "prompt_file": str(prompt_path.relative_to(FILTERING_MODULE_ROOT)),
+        "prompt_file": prompt_path,
         "output_detail": output_detail,
         "turn_count": len(catalog),
         **_step_config_metadata(config),
@@ -247,7 +244,7 @@ def run_clustering_step(
     provider = model_spec.provider
     model = model_spec.model
     system_prompt = load_clustering_prompt(prompt_version)
-    prompt_path = clustering_prompt_file_path(prompt_version)
+    prompt_path = clustering_prompt_reference(prompt_version)
     catalog = build_turn_catalog(case.transcript_json)
     run_started_at = datetime.now(UTC)
     results_dir = CLUSTERING_MODULE_ROOT / "results"
@@ -256,7 +253,7 @@ def run_clustering_step(
         / f"{run_started_at.strftime('%Y%m%dT%H%M%SZ')}_debug_{case.id}_{provider}.json"
     )
 
-    repair_prompt_path = clustering_repair_prompt_file_path(
+    repair_prompt_path = clustering_repair_prompt_reference(
         DEFAULT_REPAIR_PROMPT_VERSION
     )
 
@@ -266,6 +263,7 @@ def run_clustering_step(
             case=case,
             model_spec=model_spec,
             system_prompt=system_prompt,
+            prompt_version=prompt_version,
             require_complete_coverage=require_complete_coverage,
         )
         response_time_ms = int((time.perf_counter() - started_at) * 1000)
@@ -301,9 +299,7 @@ def run_clustering_step(
         "repair_response_time_ms": session_run.repair_response_time_ms,
         "repair_pass_count": len(repair_passes),
         "repair_prompt_version": DEFAULT_REPAIR_PROMPT_VERSION,
-        "repair_prompt_file": str(
-            repair_prompt_path.relative_to(CLUSTERING_MODULE_ROOT)
-        ),
+        "repair_prompt_file": repair_prompt_path,
         "output_path": str(output_path),
         "case_id": case.id,
         "case_notes": case.notes,
@@ -311,7 +307,7 @@ def run_clustering_step(
         "provider": provider,
         "model": model,
         "prompt_version": prompt_version,
-        "prompt_file": str(prompt_path.relative_to(CLUSTERING_MODULE_ROOT)),
+        "prompt_file": prompt_path,
         "output_detail": output_detail,
         "turn_count": len(catalog),
         **_step_config_metadata(config),

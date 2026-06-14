@@ -11,8 +11,10 @@ from common.json_utils import extract_json_object
 from common.prompts import load_prompt as load_prompt_from_file
 from common.prompts import prompt_file_path as resolve_prompt_file_path
 from common.llm_response import LlmResponse
+from common.prompt_registry import is_py_prompt_version, load_py_prompt_module, py_system_prompt
 from common.providers import ModelSpec, call_llm_detailed
 from clustering.lib import (
+    MODULE_ROOT,
     PROMPTS_DIR,
     ClusteringResult,
     TopicCluster,
@@ -21,9 +23,50 @@ from clustering.lib import (
 )
 
 REPAIR_PROMPT_FILENAME_STEM = "clustering_repair"
-DEFAULT_REPAIR_PROMPT_VERSION = "v001"
+DEFAULT_REPAIR_PROMPT_VERSION = "v002"
 DEFAULT_MAX_REPAIR_PASSES = 2
 DEFAULT_REPAIR_CONTEXT_WINDOW = 2
+PY_CLUSTERING_REPAIR_PROMPT_VERSIONS = frozenset({"v002"})
+
+
+def clustering_repair_uses_py_prompt(prompt_version: str) -> bool:
+    return is_py_prompt_version("clustering_repair", prompt_version)
+
+
+def clustering_repair_structured_output_enabled(prompt_version: str) -> bool:
+    return prompt_version.strip().lower() in PY_CLUSTERING_REPAIR_PROMPT_VERSIONS
+
+
+def clustering_repair_output_schema(
+    *,
+    missing_turn_ids: list[int],
+    topic_labels: list[str],
+    prompt_version: str,
+) -> dict[str, object] | None:
+    if not clustering_repair_structured_output_enabled(prompt_version):
+        return None
+    module = load_py_prompt_module("clustering_repair", prompt_version)
+    output_schema_fn = getattr(module, "output_schema", None)
+    if not callable(output_schema_fn):
+        raise ValueError(
+            f"clustering_repair_py_prompt_missing_output_schema: {prompt_version}"
+        )
+    schema = output_schema_fn(
+        missing_turn_ids=missing_turn_ids,
+        topic_labels=topic_labels,
+    )
+    if not isinstance(schema, dict):
+        raise ValueError(
+            f"clustering_repair_py_prompt_invalid_output_schema: {prompt_version}"
+        )
+    return schema
+
+
+def clustering_repair_prompt_reference(version: str) -> str:
+    if clustering_repair_uses_py_prompt(version):
+        module_path = load_py_prompt_module("clustering_repair", version).__name__
+        return f"{module_path.replace('.', '/')}.py"
+    return str(clustering_repair_prompt_file_path(version).relative_to(MODULE_ROOT))
 
 
 class ClusteringRepairAssignment(BaseModel):
@@ -89,6 +132,8 @@ def clustering_repair_prompt_file_path(version: str) -> Path:
 
 
 def load_clustering_repair_prompt(version: str = DEFAULT_REPAIR_PROMPT_VERSION) -> str:
+    if clustering_repair_uses_py_prompt(version):
+        return py_system_prompt("clustering_repair", version)
     return load_prompt_from_file(
         prompts_dir=PROMPTS_DIR,
         filename_stem=REPAIR_PROMPT_FILENAME_STEM,
@@ -137,13 +182,13 @@ def _context_turns_for_missing(
     return context_turns
 
 
-def build_repair_user_payload(
+def build_repair_payload_data(
     *,
     result: ClusteringResult,
     catalog: list[dict[str, object]],
     missing_turn_ids: list[int],
     context_window: int = DEFAULT_REPAIR_CONTEXT_WINDOW,
-) -> str:
+) -> dict[str, object]:
     catalog_by_id = _catalog_by_id(catalog)
     existing_clusters: list[dict[str, object]] = []
     for cluster in result.clusters:
@@ -180,11 +225,48 @@ def build_repair_user_payload(
             }
         )
 
-    payload = {
+    return {
         "existing_clusters": existing_clusters,
         "missing_turns": missing_turns,
     }
+
+
+def render_clustering_repair_user_payload(
+    *,
+    payload: dict[str, object],
+    prompt_version: str,
+) -> str:
+    if clustering_repair_uses_py_prompt(prompt_version):
+        module = load_py_prompt_module("clustering_repair", prompt_version)
+        existing_clusters = payload.get("existing_clusters")
+        missing_turns = payload.get("missing_turns")
+        if not isinstance(existing_clusters, list) or not isinstance(missing_turns, list):
+            raise ValueError("clustering_repair_payload_invalid_shape")
+        return module.render_user_payload(
+            existing_clusters=existing_clusters,
+            missing_turns=missing_turns,
+        )
     return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def build_repair_user_payload(
+    *,
+    result: ClusteringResult,
+    catalog: list[dict[str, object]],
+    missing_turn_ids: list[int],
+    context_window: int = DEFAULT_REPAIR_CONTEXT_WINDOW,
+    prompt_version: str = DEFAULT_REPAIR_PROMPT_VERSION,
+) -> str:
+    payload = build_repair_payload_data(
+        result=result,
+        catalog=catalog,
+        missing_turn_ids=missing_turn_ids,
+        context_window=context_window,
+    )
+    return render_clustering_repair_user_payload(
+        payload=payload,
+        prompt_version=prompt_version,
+    )
 
 
 def apply_repair_assignments(
@@ -250,15 +332,30 @@ def run_clustering_repair(
     missing_turn_ids: list[int],
     model_spec: ModelSpec,
     system_prompt: str,
+    prompt_version: str = DEFAULT_REPAIR_PROMPT_VERSION,
     context_window: int = DEFAULT_REPAIR_CONTEXT_WINDOW,
 ) -> tuple[ClusteringRepairResult, LlmResponse, int]:
     if not missing_turn_ids:
         raise ValueError("clustering_repair_requires_missing_turn_ids")
-    user_payload = build_repair_user_payload(
+    payload_data = build_repair_payload_data(
         result=result,
         catalog=catalog,
         missing_turn_ids=missing_turn_ids,
         context_window=context_window,
+    )
+    user_payload = render_clustering_repair_user_payload(
+        payload=payload_data,
+        prompt_version=prompt_version,
+    )
+    topic_labels = [
+        str(cluster["topic_label"])
+        for cluster in payload_data["existing_clusters"]
+        if isinstance(cluster, dict) and isinstance(cluster.get("topic_label"), str)
+    ]
+    output_schema = clustering_repair_output_schema(
+        missing_turn_ids=missing_turn_ids,
+        topic_labels=topic_labels,
+        prompt_version=prompt_version,
     )
     started_at = time.perf_counter()
     llm_response = call_llm_detailed(
@@ -266,6 +363,7 @@ def run_clustering_repair(
         model=model_spec.model,
         system=system_prompt,
         user=user_payload,
+        output_schema=output_schema,
     )
     response_time_ms = int((time.perf_counter() - started_at) * 1000)
     repair_result = parse_clustering_repair_result(llm_response.content)
@@ -278,6 +376,7 @@ def repair_clustering_coverage(
     catalog: list[dict[str, object]],
     model_spec: ModelSpec,
     repair_system_prompt: str,
+    repair_prompt_version: str = DEFAULT_REPAIR_PROMPT_VERSION,
     max_repair_passes: int = DEFAULT_MAX_REPAIR_PASSES,
     context_window: int = DEFAULT_REPAIR_CONTEXT_WINDOW,
 ) -> tuple[ClusteringResult, list[ClusteringRepairPassRecord]]:
@@ -296,6 +395,7 @@ def repair_clustering_coverage(
             missing_turn_ids=missing_before,
             model_spec=model_spec,
             system_prompt=repair_system_prompt,
+            prompt_version=repair_prompt_version,
             context_window=context_window,
         )
         repaired_result = apply_repair_assignments(
@@ -356,11 +456,17 @@ __all__ = [
     "ClusteringRepairResult",
     "IncompleteTurnCoverageError",
     "apply_repair_assignments",
+    "build_repair_payload_data",
     "build_repair_user_payload",
+    "clustering_repair_output_schema",
     "clustering_repair_prompt_file_path",
+    "clustering_repair_prompt_reference",
+    "clustering_repair_structured_output_enabled",
+    "clustering_repair_uses_py_prompt",
     "ensure_complete_turn_coverage",
     "load_clustering_repair_prompt",
     "parse_clustering_repair_result",
+    "render_clustering_repair_user_payload",
     "repair_clustering_coverage",
     "run_clustering_repair",
 ]

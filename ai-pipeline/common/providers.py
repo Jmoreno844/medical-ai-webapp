@@ -545,23 +545,37 @@ def _call_anthropic(
     model: str,
     system: str,
     user: str,
+    output_schema: dict[str, object] | None = None,
 ) -> LlmResponse:
     from anthropic import Anthropic
 
     client = Anthropic(api_key=_require_api_key("anthropic"))
-    response = client.messages.create(
-        model=model,
-        max_tokens=_resolve_max_output_tokens(config),
-        temperature=0,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-    )
+    request_kwargs: dict[str, object] = {
+        "model": model,
+        "max_tokens": _resolve_max_output_tokens(config),
+        "temperature": 0,
+        "system": system,
+        "messages": [{"role": "user", "content": user}],
+    }
+    if output_schema is not None:
+        request_kwargs["output_config"] = {
+            "format": {
+                "type": "json_schema",
+                "schema": output_schema,
+            }
+        }
+    response = client.messages.create(**request_kwargs)
     content = _anthropic_message_text(response)
     return LlmResponse(content=content)
 
 
 def call_llm_detailed(
-    *, provider: str, model: str, system: str, user: str
+    *,
+    provider: str,
+    model: str,
+    system: str,
+    user: str,
+    output_schema: dict[str, object] | None = None,
 ) -> LlmResponse:
     from common.llm_timing import attach_timing_if_missing
 
@@ -597,6 +611,7 @@ def call_llm_detailed(
             model=model,
             system=system,
             user=user,
+            output_schema=output_schema,
         )
         return attach_timing_if_missing(response, started_at=started_at)
 
@@ -643,12 +658,20 @@ def call_llm_detailed(
         return attach_timing_if_missing(response, started_at=started_at)
 
 
-def call_llm(*, provider: str, model: str, system: str, user: str) -> str:
+def call_llm(
+    *,
+    provider: str,
+    model: str,
+    system: str,
+    user: str,
+    output_schema: dict[str, object] | None = None,
+) -> str:
     return call_llm_detailed(
         provider=provider,
         model=model,
         system=system,
         user=user,
+        output_schema=output_schema,
     ).content
 
 

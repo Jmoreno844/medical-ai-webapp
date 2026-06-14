@@ -22,6 +22,7 @@ from classification.lib import (
     audit_batch_assignments,
     audit_section_ids,
     audit_session_result,
+    classification_output_schema,
     merge_batch_results,
     parse_classification_batch_result,
     parse_classification_result,
@@ -105,11 +106,16 @@ def run_classification(
         template=template,
         prompt_version=prompt_version,
     )
+    output_schema = classification_output_schema(
+        template,
+        prompt_version=prompt_version,
+    )
     raw_response = call_llm(
         provider=model_spec.provider,
         model=model_spec.model,
         system=resolved_system_prompt,
         user=user_payload,
+        output_schema=output_schema,
     )
     result = parse_classification_result(raw_response)
     section_audit = audit_section_ids(result, template)
@@ -143,12 +149,17 @@ def run_classification_batch(
         template=template,
         prompt_version=prompt_version,
     )
+    output_schema = classification_output_schema(
+        template,
+        prompt_version=prompt_version,
+    )
     started_at = time.perf_counter()
     llm_response = call_llm_detailed(
         provider=model_spec.provider,
         model=model_spec.model,
         system=resolved_system_prompt,
         user=user_payload,
+        output_schema=output_schema,
     )
     response_time_ms = int((time.perf_counter() - started_at) * 1000)
     result = parse_classification_batch_result(llm_response.content)

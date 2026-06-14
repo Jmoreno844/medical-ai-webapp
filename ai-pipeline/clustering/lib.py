@@ -17,7 +17,8 @@ from common.prompts import (
     prompt_file_path as resolve_prompt_file_path,
 )
 from common.case_paths import TRANSCRIPT_CASES_INDEX
-from common.transcripts import TranscriptCase, build_turn_catalog
+from common.prompt_registry import is_py_prompt_version, load_py_prompt_module, py_system_prompt
+from common.transcripts import TranscriptCase, build_turn_catalog, render_user_payload
 
 AI_PIPELINE_ROOT = Path(__file__).resolve().parents[1]
 MODULE_ROOT = Path(__file__).resolve().parent
@@ -26,6 +27,53 @@ PROMPT_FILENAME_STEM = "clustering"
 DEFAULT_CASES_INDEX = TRANSCRIPT_CASES_INDEX
 
 ClusteringCase = TranscriptCase
+
+PY_CLUSTERING_PROMPT_VERSIONS = frozenset({"v002"})
+
+
+def clustering_uses_py_prompt(prompt_version: str) -> bool:
+    return is_py_prompt_version("clustering", prompt_version)
+
+
+def clustering_structured_output_enabled(prompt_version: str) -> bool:
+    return prompt_version.strip().lower() in PY_CLUSTERING_PROMPT_VERSIONS
+
+
+def clustering_output_schema(
+    catalog: list[dict[str, object]],
+    *,
+    prompt_version: str,
+) -> dict[str, object] | None:
+    if not clustering_structured_output_enabled(prompt_version):
+        return None
+    module = load_py_prompt_module("clustering", prompt_version)
+    output_schema_fn = getattr(module, "output_schema", None)
+    if not callable(output_schema_fn):
+        raise ValueError(f"clustering_py_prompt_missing_output_schema: {prompt_version}")
+    turn_ids = [int(item["turn_id"]) for item in catalog]
+    schema = output_schema_fn(turn_ids=turn_ids)
+    if not isinstance(schema, dict):
+        raise ValueError(f"clustering_py_prompt_invalid_output_schema: {prompt_version}")
+    return schema
+
+
+def render_clustering_user_payload(
+    *,
+    case: TranscriptCase,
+    prompt_version: str,
+) -> str:
+    catalog = build_turn_catalog(case.transcript_json)
+    if clustering_uses_py_prompt(prompt_version):
+        module = load_py_prompt_module("clustering", prompt_version)
+        return module.render_user_payload(turns=catalog)
+    return render_user_payload(case)
+
+
+def clustering_prompt_reference(version: str) -> str:
+    if clustering_uses_py_prompt(version):
+        module_path = load_py_prompt_module("clustering", version).__name__
+        return f"{module_path.replace('.', '/')}.py"
+    return str(clustering_prompt_file_path(version).relative_to(MODULE_ROOT))
 
 
 class TopicCluster(BaseModel):
@@ -74,6 +122,8 @@ def clustering_prompt_file_path(version: str) -> Path:
 
 
 def load_clustering_prompt(version: str) -> str:
+    if clustering_uses_py_prompt(version):
+        return py_system_prompt("clustering", version)
     return load_prompt_from_file(
         prompts_dir=PROMPTS_DIR,
         filename_stem=PROMPT_FILENAME_STEM,
@@ -332,12 +382,18 @@ __all__ = [
     "TurnCoverageAudit",
     "audit_turn_coverage",
     "build_turn_catalog",
+    "clustering_output_schema",
+    "clustering_prompt_reference",
+    "clustering_structured_output_enabled",
+    "clustering_uses_py_prompt",
     "enrich_clustering_result_for_export",
     "format_clustering_output_for_detail",
     "format_clustering_repair_pass_for_detail",
     "format_debug_output",
     "format_turn_coverage_audit",
+    "load_clustering_prompt",
     "load_prompt",
     "parse_clustering_result",
     "prompt_file_path",
+    "render_clustering_user_payload",
 ]

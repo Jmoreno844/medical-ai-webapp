@@ -24,7 +24,6 @@ from common.providers import (  # noqa: E402
 from common.transcripts import (  # noqa: E402
     build_turn_catalog,
     load_cases,
-    render_user_payload,
     select_cases,
 )
 from clustering.cluster import run_clustering_with_repair  # noqa: E402
@@ -34,16 +33,17 @@ from clustering.lib import (  # noqa: E402
     DEFAULT_PROMPT_VERSION,
     MODULE_ROOT,
     audit_turn_coverage,
+    clustering_prompt_reference,
     enrich_clustering_result_for_export,
     format_clustering_output_for_detail,
     format_debug_output,
     format_turn_coverage_audit,
     load_prompt,
-    prompt_file_path,
+    render_clustering_user_payload,
 )
 from clustering.repair import (  # noqa: E402
     DEFAULT_REPAIR_PROMPT_VERSION,
-    clustering_repair_prompt_file_path,
+    clustering_repair_prompt_reference,
 )
 
 DEFAULT_RESULTS_DIR = MODULE_ROOT / "results"
@@ -97,7 +97,7 @@ def main() -> int:
     provider = normalize_provider_name(args.provider)
     model = (args.model or default_model_for_provider(provider)).strip()
     model_spec = ModelSpec(alias=provider, provider=provider, model=model)
-    prompt_path = prompt_file_path(prompt_version)
+    prompt_path = clustering_prompt_reference(prompt_version)
     results_dir = Path(args.results_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
 
@@ -118,7 +118,7 @@ def main() -> int:
         f"case={case.id} provider={provider} model={model} "
         f"prompt_version={prompt_version} turns={len(catalog)}"
     )
-    repair_prompt_path = clustering_repair_prompt_file_path(
+    repair_prompt_path = clustering_repair_prompt_reference(
         DEFAULT_REPAIR_PROMPT_VERSION
     )
     try:
@@ -126,6 +126,7 @@ def main() -> int:
             case=case,
             model_spec=model_spec,
             system_prompt=system_prompt,
+            prompt_version=prompt_version,
         )
     except Exception as exc:
         if args.dump_raw:
@@ -134,7 +135,10 @@ def main() -> int:
                     provider=provider,
                     model=model,
                     system=system_prompt,
-                    user=render_user_payload(case),
+                    user=render_clustering_user_payload(
+                        case=case,
+                        prompt_version=prompt_version,
+                    ),
                 )
                 print("\n--- raw response ---")
                 print(raw_response)
@@ -180,7 +184,7 @@ def main() -> int:
         "repair_response_time_ms": session_run.repair_response_time_ms,
         "repair_pass_count": len(repair_passes),
         "repair_prompt_version": DEFAULT_REPAIR_PROMPT_VERSION,
-        "repair_prompt_file": str(repair_prompt_path.relative_to(MODULE_ROOT)),
+        "repair_prompt_file": repair_prompt_path,
         "output_path": str(output_path),
         "case_id": case.id,
         "case_notes": case.notes,
@@ -188,7 +192,7 @@ def main() -> int:
         "provider": provider,
         "model": model,
         "prompt_version": prompt_version,
-        "prompt_file": str(prompt_path.relative_to(MODULE_ROOT)),
+        "prompt_file": prompt_path,
         "output_detail": output_detail,
         "turn_count": len(catalog),
         **output_payload,

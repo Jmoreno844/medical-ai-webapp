@@ -838,6 +838,60 @@ def _render_doctor_items_table(items_raw: object) -> None:
     st.dataframe(rows, use_container_width=True, hide_index=True)
 
 
+def _normalize_spans_list(spans_raw: object) -> list[dict[str, object]]:
+    if not isinstance(spans_raw, list):
+        return []
+    return [span for span in spans_raw if isinstance(span, dict)]
+
+
+def _spans_by_id(spans_raw: object) -> dict[str, dict[str, object]]:
+    lookup: dict[str, dict[str, object]] = {}
+    for span in _normalize_spans_list(spans_raw):
+        span_id = span.get("id")
+        if isinstance(span_id, str) and span_id:
+            lookup[span_id] = span
+    return lookup
+
+
+def _spans_for_ids(
+    span_ids: object,
+    spans_by_id: dict[str, dict[str, object]],
+) -> list[dict[str, object]]:
+    if not isinstance(span_ids, list):
+        return []
+    spans: list[dict[str, object]] = []
+    for span_id in span_ids:
+        if not isinstance(span_id, str):
+            continue
+        span = spans_by_id.get(span_id)
+        if span is not None:
+            spans.append(span)
+    return spans
+
+
+def _dropped_spans_from_payload(payload: dict[str, object]) -> list[dict[str, object]]:
+    filter_result = payload.get("filter_spans_result")
+    drop_ids: list[str] = []
+    if isinstance(filter_result, dict):
+        raw_drop_ids = filter_result.get("drop_ids")
+        if isinstance(raw_drop_ids, list):
+            drop_ids = [str(span_id) for span_id in raw_drop_ids if span_id]
+    if drop_ids:
+        return _spans_for_ids(drop_ids, _spans_by_id(payload.get("span_pool")))
+
+    span_pool = _normalize_spans_list(payload.get("span_pool"))
+    kept_ids = {
+        str(span.get("id"))
+        for span in _normalize_spans_list(payload.get("filtered_spans"))
+        if span.get("id")
+    }
+    return [
+        span
+        for span in span_pool
+        if str(span.get("id", "")) and str(span.get("id")) not in kept_ids
+    ]
+
+
 def _render_spans_table(spans_raw: object) -> None:
     if not isinstance(spans_raw, list) or not spans_raw:
         st.info("Sin spans.")
@@ -907,18 +961,48 @@ def render_context_filter_spans_result(payload: dict[str, object]) -> None:
             st.metric("Spans descartados", drop_count)
         if isinstance(kept, int):
             st.metric("Spans conservados", kept)
-    st.markdown("**Spans filtrados**")
-    _render_spans_table(payload.get("filtered_spans"))
+
+    dropped_spans = _dropped_spans_from_payload(payload)
+    kept_spans = _normalize_spans_list(payload.get("filtered_spans"))
+
+    st.markdown("**Spans descartados**")
+    _render_spans_table(dropped_spans)
+
+    st.markdown("**Spans conservados**")
+    _render_spans_table(kept_spans)
     render_json_expander(payload)
 
 
 def render_context_cluster_spans_result(payload: dict[str, object]) -> None:
     cluster_result = payload.get("cluster_spans_result")
+    clusters_raw: object = None
     if isinstance(cluster_result, dict):
         cluster_count = cluster_result.get("cluster_count")
         if isinstance(cluster_count, int):
             st.metric("Clusters", cluster_count)
-        _render_clusters_table(cluster_result.get("clusters"))
+        clusters_raw = cluster_result.get("clusters")
+        st.markdown("**Resumen de clusters**")
+        _render_clusters_table(clusters_raw)
+
+    spans_by_id = _spans_by_id(payload.get("filtered_spans"))
+    if isinstance(clusters_raw, list) and clusters_raw:
+        st.markdown("**Contenido por cluster**")
+        for cluster in clusters_raw:
+            if not isinstance(cluster, dict):
+                continue
+            cluster_id = str(cluster.get("id", "?"))
+            title = cluster.get("title")
+            span_ids = cluster.get("span_ids", [])
+            span_count = len(span_ids) if isinstance(span_ids, list) else 0
+            label = f"`{cluster_id}`"
+            if isinstance(title, str) and title.strip():
+                label += f" — {title}"
+            label += f" ({span_count} spans)"
+            with st.expander(label, expanded=False):
+                cluster_spans = _spans_for_ids(span_ids, spans_by_id)
+                if not cluster_spans and span_count > 0:
+                    st.warning("No se encontró el texto de los spans en el payload.")
+                _render_spans_table(cluster_spans)
     render_json_expander(payload)
 
 

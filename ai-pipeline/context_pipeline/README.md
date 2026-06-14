@@ -12,7 +12,7 @@ spans pool → filter_spans → cluster_spans → classify_clusters → section_
 generation (per section) → transcript clusters + section_context[section_id]
 ```
 
-Only `section_adapter` generates clinical text. Intermediate LLM steps return IDs/mappings only.
+Only `generation` produces final clinical prose. The adapter prepares compact external context (`brief`) per section. Intermediate LLM steps return IDs/mappings only.
 
 ## Modules
 
@@ -24,7 +24,7 @@ Only `section_adapter` generates clinical text. Intermediate LLM steps return ID
 | [`filter_spans/`](filter_spans/) | Drop irrelevant spans (conservative) |
 | [`cluster_spans/`](cluster_spans/) | Group related span IDs |
 | [`classify_clusters/`](classify_clusters/) | Route clusters to template sections |
-| [`section_adapter/`](section_adapter/) | Produce `section_context` text per section |
+| [`section_adapter/`](section_adapter/) | Produce `section_context` briefs per section |
 | [`session.py`](session.py) | End-to-end orchestration |
 
 Shared models/helpers: [`../common/context_spans.py`](../common/context_spans.py).

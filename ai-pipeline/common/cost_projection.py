@@ -135,21 +135,36 @@ def estimate_cacheable_input_tokens(
     prompt_version = _prompt_version_from_record(result_record)
 
     if step == "filtering":
+        from filtering.lib import filtering_uses_py_prompt, load_filtering_prompt
         from filtering.lib import filtering_prompt_file_path
 
+        if filtering_uses_py_prompt(prompt_version):
+            return count_text_tokens(load_filtering_prompt(prompt_version))
         return _count_prompt_file_tokens(
             str(filtering_prompt_file_path(prompt_version))
         )
 
     if step == "clustering":
-        if "repair" in label.lower():
-            from clustering.repair import clustering_repair_prompt_file_path
-
-            return _count_prompt_file_tokens(
-                str(clustering_repair_prompt_file_path("v001"))
-            )
+        from clustering.lib import clustering_uses_py_prompt, load_clustering_prompt
         from clustering.lib import clustering_prompt_file_path
+        from clustering.repair import (
+            clustering_repair_uses_py_prompt,
+            load_clustering_repair_prompt,
+            clustering_repair_prompt_file_path,
+        )
 
+        if "repair" in label.lower():
+            repair_version = result_record.get("repair_prompt_version", "v001")
+            if not isinstance(repair_version, str):
+                repair_version = "v001"
+            if clustering_repair_uses_py_prompt(repair_version):
+                return count_text_tokens(load_clustering_repair_prompt(repair_version))
+            return _count_prompt_file_tokens(
+                str(clustering_repair_prompt_file_path(repair_version))
+            )
+
+        if clustering_uses_py_prompt(prompt_version):
+            return count_text_tokens(load_clustering_prompt(prompt_version))
         return _count_prompt_file_tokens(
             str(clustering_prompt_file_path(prompt_version))
         )
@@ -178,6 +193,32 @@ def estimate_cacheable_input_tokens(
         }
         for key, import_path in prompt_loaders.items():
             if context_label.startswith(key):
+                if key == "filter_spans":
+                    from context_pipeline.filter_spans.lib import (
+                        filter_spans_uses_py_prompt,
+                        load_filter_spans_prompt,
+                        filter_spans_prompt_file_path,
+                    )
+
+                    if filter_spans_uses_py_prompt(prompt_version):
+                        return count_text_tokens(load_filter_spans_prompt(prompt_version))
+                    return _count_prompt_file_tokens(
+                        str(filter_spans_prompt_file_path(prompt_version))
+                    )
+                if key == "classify_clusters":
+                    from context_pipeline.classify_clusters.lib import (
+                        classify_clusters_uses_py_prompt,
+                        load_classify_clusters_prompt,
+                        classify_clusters_prompt_file_path,
+                    )
+
+                    if classify_clusters_uses_py_prompt(prompt_version):
+                        return count_text_tokens(
+                            load_classify_clusters_prompt(prompt_version)
+                        )
+                    return _count_prompt_file_tokens(
+                        str(classify_clusters_prompt_file_path(prompt_version))
+                    )
                 module_name, func_name = import_path.rsplit(".", 1)
                 import importlib
 

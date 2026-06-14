@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from common.templates import load_template
+from common.templates import compose_section_guidelines, load_template
 
 
 def test_load_template_splits_classification_and_generation_guidelines() -> None:
@@ -75,6 +75,37 @@ def test_consulta_estructurada_template_loads_with_nine_sections() -> None:
     signos = template.section_by_id("signos_vitales")
     assert signos is not None
     assert "Presión arterial sistólica" in signos.generation.guidelines
+    assert signos.to_generation_payload()["guidelines"] == signos.generation.guidelines
+
+
+def test_consulta_estructurada_v002_loads_with_ten_sections() -> None:
+    template = load_template("consulta_estructurada_v002")
+    assert template.id == "consulta_estructurada_v002"
+    assert template.name == "Consulta estructurada (R&D) v2"
+    assert len(template.sections) == 10
+    assert template.section_by_id("antecedentes_gineco_obstetricos") is not None
+    estudios = template.section_by_id("estudios_y_resultados")
+    assert estudios is not None
+    assert "ECG" in estudios.include
+    assert "biopsia" in estudios.include
+
+
+def test_compose_section_guidelines_with_include_and_boundaries() -> None:
+    section = load_template("consulta_estructurada_v002").section_by_id("signos_vitales")
+    assert section is not None
+    guidelines = section.to_generation_payload()["guidelines"]
+    assert isinstance(guidelines, str)
+    assert "Incluye:" in guidelines
+    assert "Límites:" in guidelines
+    assert "casa" in guidelines
+
+
+def test_compose_section_guidelines_empty_returns_raw() -> None:
+    assert compose_section_guidelines("raw guideline", "", "") == "raw guideline"
+    section = load_template("minimal_outpatient_v001").section_by_id("motivo_consulta")
+    assert section is not None
+    assert section.to_generation_payload()["guidelines"] == section.generation.guidelines
+    assert section.to_classification_payload()["guidelines"] == section.classification.guidelines
 
 
 def test_template_rejects_duplicate_section_ids(tmp_path) -> None:

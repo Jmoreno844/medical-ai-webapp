@@ -18,6 +18,7 @@ from common.context_spans import (
     build_spans_from_text,
     doctor_items_to_spans,
     merge_spans,
+    propagate_cluster_date_hints,
     split_doctor_items,
 )
 from common.llm_response import LlmResponse
@@ -211,9 +212,13 @@ def _run_context_pipeline_core(
     span_pool: list[Span],
     model_spec: ModelSpec,
     filter_spans_prompt: str,
+    filter_spans_prompt_version: str = "v001",
     cluster_spans_prompt: str,
+    cluster_spans_prompt_version: str = "v001",
     classify_clusters_prompt: str,
+    classify_clusters_prompt_version: str = "v001",
     section_adapter_prompt: str,
+    section_adapter_prompt_version: str = "v001",
     llm_calls: list[ContextLlmCall],
 ) -> ContextPipelineRun:
     if not span_pool:
@@ -229,6 +234,7 @@ def _run_context_pipeline_core(
         spans=span_pool,
         model_spec=model_spec,
         system_prompt=filter_spans_prompt,
+        prompt_version=filter_spans_prompt_version,
     )
     llm_calls.append(
         ContextLlmCall(
@@ -259,6 +265,7 @@ def _run_context_pipeline_core(
         spans=filtered_spans,
         model_spec=model_spec,
         system_prompt=cluster_spans_prompt,
+        prompt_version=cluster_spans_prompt_version,
     )
     llm_calls.append(
         ContextLlmCall(
@@ -268,6 +275,7 @@ def _run_context_pipeline_core(
             llm_response=cluster_response,
         )
     )
+    clusters = propagate_cluster_date_hints(clusters, filtered_spans)
 
     classify_result, classify_response = run_classify_clusters(
         template=template,
@@ -275,6 +283,9 @@ def _run_context_pipeline_core(
         spans=filtered_spans,
         model_spec=model_spec,
         system_prompt=classify_clusters_prompt,
+        encounter_date=encounter_date,
+        document_date=document_date,
+        prompt_version=classify_clusters_prompt_version,
     )
     llm_calls.append(
         ContextLlmCall(
@@ -292,9 +303,11 @@ def _run_context_pipeline_core(
         spans=filtered_spans,
         template=template,
         encounter_date=encounter_date,
+        document_date=document_date,
         directives=triage_result.directives,
         model_spec=model_spec,
         system_prompt=section_adapter_prompt,
+        prompt_version=section_adapter_prompt_version,
     )
     for section_run in adapter_session.section_runs:
         llm_calls.append(
@@ -333,9 +346,13 @@ def run_context_pipeline_ad_hoc(
     model_spec: ModelSpec,
     triage_prompt: str,
     filter_spans_prompt: str,
+    filter_spans_prompt_version: str = "v001",
     cluster_spans_prompt: str,
+    cluster_spans_prompt_version: str = "v001",
     classify_clusters_prompt: str,
+    classify_clusters_prompt_version: str = "v001",
     section_adapter_prompt: str,
+    section_adapter_prompt_version: str = "v001",
     doctor_note: str | None = None,
     document_pdf_path: Path | None = None,
     document_id: str = "uploaded_document",
@@ -399,9 +416,13 @@ def run_context_pipeline_ad_hoc(
         span_pool=span_pool,
         model_spec=model_spec,
         filter_spans_prompt=filter_spans_prompt,
+        filter_spans_prompt_version=filter_spans_prompt_version,
         cluster_spans_prompt=cluster_spans_prompt,
+        cluster_spans_prompt_version=cluster_spans_prompt_version,
         classify_clusters_prompt=classify_clusters_prompt,
+        classify_clusters_prompt_version=classify_clusters_prompt_version,
         section_adapter_prompt=section_adapter_prompt,
+        section_adapter_prompt_version=section_adapter_prompt_version,
         llm_calls=llm_calls,
     )
 
@@ -414,9 +435,13 @@ def run_context_pipeline_session(
     model_spec: ModelSpec,
     triage_prompt: str,
     filter_spans_prompt: str,
+    filter_spans_prompt_version: str = "v001",
     cluster_spans_prompt: str,
+    cluster_spans_prompt_version: str = "v001",
     classify_clusters_prompt: str,
+    classify_clusters_prompt_version: str = "v001",
     section_adapter_prompt: str,
+    section_adapter_prompt_version: str = "v001",
     include_doctor_note: bool = True,
     include_documents: bool = True,
 ) -> ContextPipelineRun:
@@ -471,9 +496,13 @@ def run_context_pipeline_session(
         span_pool=span_pool,
         model_spec=model_spec,
         filter_spans_prompt=filter_spans_prompt,
+        filter_spans_prompt_version=filter_spans_prompt_version,
         cluster_spans_prompt=cluster_spans_prompt,
+        cluster_spans_prompt_version=cluster_spans_prompt_version,
         classify_clusters_prompt=classify_clusters_prompt,
+        classify_clusters_prompt_version=classify_clusters_prompt_version,
         section_adapter_prompt=section_adapter_prompt,
+        section_adapter_prompt_version=section_adapter_prompt_version,
         llm_calls=llm_calls,
     )
 

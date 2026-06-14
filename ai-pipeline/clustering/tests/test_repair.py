@@ -9,6 +9,9 @@ from clustering.lib import ClusteringResult, audit_turn_coverage
 from clustering.repair import (
     apply_repair_assignments,
     build_repair_user_payload,
+    clustering_repair_output_schema,
+    clustering_repair_prompt_reference,
+    load_clustering_repair_prompt,
     parse_clustering_repair_result,
     repair_clustering_coverage,
 )
@@ -38,6 +41,32 @@ def test_build_repair_user_payload_includes_missing_turn_text_and_context() -> N
     assert payload["existing_clusters"][0]["topic_label"] == "motivo_consulta"
     assert payload["missing_turns"][0]["text"] == "¿Presión?"
     assert payload["missing_turns"][0]["context_turns"][0]["turn_id"] == 1
+
+
+def test_load_clustering_repair_prompt_v002_returns_py_system_prompt() -> None:
+    from clustering.prompts.clustering_repair_prompt_v001 import SYSTEM_PROMPT
+
+    assert load_clustering_repair_prompt("v002") == SYSTEM_PROMPT.strip()
+
+
+def test_clustering_repair_output_schema_v002_restricts_labels() -> None:
+    schema = clustering_repair_output_schema(
+        missing_turn_ids=[2],
+        topic_labels=["motivo_consulta"],
+        prompt_version="v002",
+    )
+    assert schema is not None
+    topic_label_item = schema["properties"]["assignments"]["items"]["properties"][
+        "topic_label"
+    ]
+    assert topic_label_item["enum"] == ["motivo_consulta"]
+
+
+def test_clustering_repair_prompt_reference_v002_points_to_py_module() -> None:
+    assert (
+        clustering_repair_prompt_reference("v002")
+        == "clustering/prompts/clustering_repair_prompt_v001.py"
+    )
 
 
 def test_apply_repair_assignments_merges_missing_turns() -> None:

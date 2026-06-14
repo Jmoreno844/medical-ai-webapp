@@ -108,9 +108,21 @@ def weigh_classification_request_context(
 ) -> int:
     from classification.lib import (
         classification_uses_enriched_system_prompt,
+        classification_uses_py_prompt,
+        load_classification_prompt,
         prepare_classification_prompts,
         template_ref_for_classification_user,
     )
+
+    if classification_uses_py_prompt(prompt_version):
+        from classification.prompts.classification_prompt_v001 import render_template_context
+
+        resolved_system_prompt = load_classification_prompt(prompt_version)
+        template_context = render_template_context(template=template)
+        return count_text_tokens(
+            resolved_system_prompt,
+            encoding_name=encoding_name,
+        ) + count_text_tokens(template_context, encoding_name=encoding_name)
 
     if not classification_uses_enriched_system_prompt(prompt_version):
         return weigh_template(template, encoding_name=encoding_name)
@@ -141,37 +153,25 @@ def estimate_batch_input_tokens(
     base_system_prompt: str = "",
 ) -> int:
     from classification.lib import (
-        classification_uses_enriched_system_prompt,
+        load_classification_prompt,
         prepare_classification_prompts,
-        template_ref_for_classification_user,
+        render_classification_batch_payload,
     )
 
-    cluster_items = [cluster_to_payload_item(cluster) for cluster in clusters]
-    if classification_uses_enriched_system_prompt(prompt_version):
-        payload = {
-            "clusters": cluster_items,
-            "template_ref": template_ref_for_classification_user(template),
-        }
-        user_tokens = count_text_tokens(
-            json.dumps(payload, ensure_ascii=False, indent=2),
-            encoding_name=encoding_name,
-        )
-        return user_tokens + count_text_tokens(
-            prepare_classification_prompts(
-                base_system_prompt,
-                template,
-                prompt_version=prompt_version,
-            )[0],
-            encoding_name=encoding_name,
-        )
-    payload = {
-        "clusters": cluster_items,
-        "template": template.to_prompt_payload(),
-    }
-    return count_text_tokens(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding_name=encoding_name,
+    resolved_system_prompt, _ = prepare_classification_prompts(
+        base_system_prompt or load_classification_prompt(prompt_version),
+        template,
+        prompt_version=prompt_version,
     )
+    user_payload = render_classification_batch_payload(
+        clusters=clusters,
+        template=template,
+        prompt_version=prompt_version,
+    )
+    return count_text_tokens(
+        resolved_system_prompt,
+        encoding_name=encoding_name,
+    ) + count_text_tokens(user_payload, encoding_name=encoding_name)
 
 
 def _partition_lpt(

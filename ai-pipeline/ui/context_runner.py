@@ -30,19 +30,19 @@ from context_pipeline.classify_clusters.classify_clusters import run_classify_cl
 from context_pipeline.classify_clusters.lib import enrich_classify_clusters_result_for_export
 from context_pipeline.classify_clusters.lib import load_prompt as load_classify_clusters_prompt
 from context_pipeline.classify_clusters.lib import (
-    prompt_file_path as classify_clusters_prompt_file_path,
+    classify_clusters_prompt_reference,
 )
 from context_pipeline.cluster_spans.cluster_spans import run_cluster_spans
 from context_pipeline.cluster_spans.lib import enrich_cluster_spans_result_for_export
 from context_pipeline.cluster_spans.lib import load_prompt as load_cluster_spans_prompt
 from context_pipeline.cluster_spans.lib import (
-    prompt_file_path as cluster_spans_prompt_file_path,
+    cluster_spans_prompt_reference,
 )
 from context_pipeline.filter_spans.filter_spans import run_filter_spans
 from context_pipeline.filter_spans.lib import enrich_filter_spans_result_for_export
 from context_pipeline.filter_spans.lib import load_prompt as load_filter_spans_prompt
 from context_pipeline.filter_spans.lib import (
-    prompt_file_path as filter_spans_prompt_file_path,
+    filter_spans_prompt_reference,
 )
 from context_pipeline.section_adapter.lib import (
     enrich_section_adapter_session_for_export,
@@ -50,7 +50,7 @@ from context_pipeline.section_adapter.lib import (
 )
 from context_pipeline.section_adapter.lib import load_prompt as load_section_adapter_prompt
 from context_pipeline.section_adapter.lib import (
-    prompt_file_path as section_adapter_prompt_file_path,
+    section_adapter_prompt_reference,
 )
 from context_pipeline.session import run_context_pipeline_ad_hoc, run_context_pipeline_session
 from context_pipeline.triage.lib import enrich_triage_result_for_export
@@ -378,6 +378,7 @@ def run_context_filter_spans_step(
             spans=spans,
             model_spec=model_spec,
             system_prompt=load_filter_spans_prompt(prompt_version),
+            prompt_version=prompt_version,
         )
         response_time_ms = int((time.perf_counter() - started_at) * 1000)
 
@@ -401,11 +402,7 @@ def run_context_filter_spans_step(
         ),
         "filtered_spans": [span_to_payload_item(span) for span in filtered_spans],
         "triage_result_file": str(triage_result_path),
-        "prompt_file": str(
-            filter_spans_prompt_file_path(prompt_version).relative_to(
-                AI_PIPELINE_ROOT / "context_pipeline" / "filter_spans"
-            )
-        ),
+        "prompt_file": filter_spans_prompt_reference(prompt_version),
         "output_detail": output_detail,
         **_step_config_metadata(config),
     }
@@ -453,6 +450,7 @@ def run_context_cluster_spans_step(
             spans=spans,
             model_spec=model_spec,
             system_prompt=load_cluster_spans_prompt(prompt_version),
+            prompt_version=prompt_version,
         )
         response_time_ms = int((time.perf_counter() - started_at) * 1000)
 
@@ -470,11 +468,7 @@ def run_context_cluster_spans_step(
         "filtered_spans": [span_to_payload_item(span) for span in spans],
         "cluster_spans_result": enrich_cluster_spans_result_for_export(clusters),
         "filter_spans_result_file": str(filter_spans_result_path),
-        "prompt_file": str(
-            cluster_spans_prompt_file_path(prompt_version).relative_to(
-                AI_PIPELINE_ROOT / "context_pipeline" / "cluster_spans"
-            )
-        ),
+        "prompt_file": cluster_spans_prompt_reference(prompt_version),
         "output_detail": output_detail,
         **_step_config_metadata(config),
     }
@@ -515,13 +509,20 @@ def run_context_classify_clusters_step(
         clusters_list = clusters_raw.get("clusters", [])
     else:
         clusters_list = []
-    from common.context_spans import SpanCluster
+    from common.context_spans import SpanCluster, propagate_cluster_date_hints
 
     clusters = [
         SpanCluster.model_validate(item)
         for item in clusters_list
         if isinstance(item, dict)
     ]
+    clusters = propagate_cluster_date_hints(clusters, spans)
+    context_case = load_context_case(case_meta, cases_dir=CONTEXT_CASES_INDEX.parent)
+    document_date = None
+    for fixture in context_case.document_fixtures:
+        if fixture.document_date:
+            document_date = fixture.document_date
+            break
 
     run_started_at = datetime.now(UTC)
     results_dir = AI_PIPELINE_ROOT / "context_pipeline" / "classify_clusters" / "results"
@@ -537,6 +538,9 @@ def run_context_classify_clusters_step(
             spans=spans,
             model_spec=model_spec,
             system_prompt=load_classify_clusters_prompt(prompt_version),
+            encounter_date=case_meta.encounter_date,
+            document_date=document_date,
+            prompt_version=prompt_version,
         )
         response_time_ms = int((time.perf_counter() - started_at) * 1000)
 
@@ -558,13 +562,12 @@ def run_context_classify_clusters_step(
             classify_result,
             template=template,
         ),
-        "classify_clusters_assignments": classify_result.assignments,
+        "classify_clusters_assignments": [
+            assignment.model_dump(mode="json")
+            for assignment in classify_result.assignments
+        ],
         "cluster_spans_result_file": str(cluster_spans_result_path),
-        "prompt_file": str(
-            classify_clusters_prompt_file_path(prompt_version).relative_to(
-                AI_PIPELINE_ROOT / "context_pipeline" / "classify_clusters"
-            )
-        ),
+        "prompt_file": classify_clusters_prompt_reference(prompt_version),
         "output_detail": output_detail,
         **_step_config_metadata(config),
     }
@@ -618,10 +621,18 @@ def run_context_section_adapter_step(
     assignments_raw = classify_record.get("classify_clusters_assignments")
     if isinstance(assignments_raw, dict):
         classify_result = ClassifyClustersResult(assignments=assignments_raw)
+    elif isinstance(assignments_raw, list):
+        classify_result = ClassifyClustersResult(assignments=assignments_raw)
     else:
         raise ValueError("context_section_adapter_requires_classify_assignments")
     directives = _directives_from_prior_record(classify_record)
     adapter_jobs = build_adapter_jobs(classify_result, template.section_id_set())
+    context_case = load_context_case(case_meta, cases_dir=CONTEXT_CASES_INDEX.parent)
+    document_date = None
+    for fixture in context_case.document_fixtures:
+        if fixture.document_date:
+            document_date = fixture.document_date
+            break
 
     run_started_at = datetime.now(UTC)
     results_dir = AI_PIPELINE_ROOT / "context_pipeline" / "section_adapter" / "results"
@@ -636,9 +647,11 @@ def run_context_section_adapter_step(
             spans=spans,
             template=template,
             encounter_date=case_meta.encounter_date,
+            document_date=case_meta.document_date,
             directives=directives,
             model_spec=model_spec,
             system_prompt=load_section_adapter_prompt(prompt_version),
+            prompt_version=prompt_version,
         )
 
     result_record: dict[str, object] = {
@@ -659,11 +672,7 @@ def run_context_section_adapter_step(
         ),
         "section_context": adapter_session.section_context,
         "classify_clusters_result_file": str(classify_clusters_result_path),
-        "prompt_file": str(
-            section_adapter_prompt_file_path(prompt_version).relative_to(
-                AI_PIPELINE_ROOT / "context_pipeline" / "section_adapter"
-            )
-        ),
+        "prompt_file": section_adapter_prompt_reference(prompt_version),
         "output_detail": output_detail,
         **_step_config_metadata(config),
     }
@@ -708,9 +717,13 @@ def run_context_pipeline_step(
             model_spec=model_spec,
             triage_prompt=load_triage_prompt(prompt_version),
             filter_spans_prompt=load_filter_spans_prompt(prompt_version),
+            filter_spans_prompt_version=prompt_version,
             cluster_spans_prompt=load_cluster_spans_prompt(prompt_version),
+            cluster_spans_prompt_version=prompt_version,
             classify_clusters_prompt=load_classify_clusters_prompt(prompt_version),
+            classify_clusters_prompt_version=prompt_version,
             section_adapter_prompt=load_section_adapter_prompt(prompt_version),
+            section_adapter_prompt_version=prompt_version,
             include_doctor_note=include_doctor_note,
             include_documents=include_documents,
         )
@@ -754,7 +767,10 @@ def run_context_pipeline_step(
             context_run.classify_result,
             template=template,
         ),
-        "classify_clusters_assignments": context_run.classify_result.assignments,
+        "classify_clusters_assignments": [
+            assignment.model_dump(mode="json")
+            for assignment in context_run.classify_result.assignments
+        ],
         "adapter_jobs": context_run.adapter_jobs,
         "section_adapter_result": enrich_section_adapter_session_for_export(
             context_run.section_context
@@ -769,11 +785,7 @@ def run_context_pipeline_step(
             }
             for call in context_run.llm_calls
         ],
-        "prompt_file": str(
-            section_adapter_prompt_file_path(prompt_version).relative_to(
-                AI_PIPELINE_ROOT / "context_pipeline" / "section_adapter"
-            )
-        ),
+        "prompt_file": section_adapter_prompt_reference(prompt_version),
         "output_detail": output_detail,
         **_pipeline_status_fields(context_run),
         **_step_config_metadata(config),
@@ -823,9 +835,13 @@ def run_context_ad_hoc_pipeline_step(
             model_spec=model_spec,
             triage_prompt=load_triage_prompt(prompt_version),
             filter_spans_prompt=load_filter_spans_prompt(prompt_version),
+            filter_spans_prompt_version=prompt_version,
             cluster_spans_prompt=load_cluster_spans_prompt(prompt_version),
+            cluster_spans_prompt_version=prompt_version,
             classify_clusters_prompt=load_classify_clusters_prompt(prompt_version),
+            classify_clusters_prompt_version=prompt_version,
             section_adapter_prompt=load_section_adapter_prompt(prompt_version),
+            section_adapter_prompt_version=prompt_version,
             doctor_note=doctor_note,
             document_pdf_path=document_pdf_path,
             document_id=document_id,
@@ -870,7 +886,10 @@ def run_context_ad_hoc_pipeline_step(
             context_run.classify_result,
             template=template,
         ),
-        "classify_clusters_assignments": context_run.classify_result.assignments,
+        "classify_clusters_assignments": [
+            assignment.model_dump(mode="json")
+            for assignment in context_run.classify_result.assignments
+        ],
         "adapter_jobs": context_run.adapter_jobs,
         "section_adapter_result": enrich_section_adapter_session_for_export(
             context_run.section_context
@@ -885,11 +904,7 @@ def run_context_ad_hoc_pipeline_step(
             }
             for call in context_run.llm_calls
         ],
-        "prompt_file": str(
-            section_adapter_prompt_file_path(prompt_version).relative_to(
-                AI_PIPELINE_ROOT / "context_pipeline" / "section_adapter"
-            )
-        ),
+        "prompt_file": section_adapter_prompt_reference(prompt_version),
         "output_detail": output_detail,
         **_pipeline_status_fields(context_run),
         **_step_config_metadata(config),

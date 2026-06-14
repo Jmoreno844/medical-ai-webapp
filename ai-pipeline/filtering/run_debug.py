@@ -24,7 +24,6 @@ from common.providers import (  # noqa: E402
 from common.transcripts import (  # noqa: E402
     build_turn_catalog,
     load_cases,
-    render_user_payload,
     select_cases,
 )
 from filtering.filter import run_filtering  # noqa: E402
@@ -35,11 +34,12 @@ from filtering.lib import (  # noqa: E402
     MODULE_ROOT,
     audit_drop_turn_ids,
     enrich_filtering_result_for_export,
+    filtering_prompt_reference,
     format_debug_output,
     format_drop_audit,
     format_filtering_output_for_detail,
     load_prompt,
-    prompt_file_path,
+    render_filtering_user_payload,
 )
 
 DEFAULT_RESULTS_DIR = MODULE_ROOT / "results"
@@ -93,7 +93,7 @@ def main() -> int:
     provider = normalize_provider_name(args.provider)
     model = (args.model or default_model_for_provider(provider)).strip()
     model_spec = ModelSpec(alias=provider, provider=provider, model=model)
-    prompt_path = prompt_file_path(prompt_version)
+    prompt_path = filtering_prompt_reference(prompt_version)
     results_dir = Path(args.results_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
 
@@ -119,6 +119,7 @@ def main() -> int:
             case=case,
             model_spec=model_spec,
             system_prompt=system_prompt,
+            prompt_version=prompt_version,
         )
     except Exception as exc:
         if args.dump_raw:
@@ -127,7 +128,10 @@ def main() -> int:
                     provider=provider,
                     model=model,
                     system=system_prompt,
-                    user=render_user_payload(case),
+                    user=render_filtering_user_payload(
+                        case=case,
+                        prompt_version=prompt_version,
+                    ),
                 )
                 print("\n--- raw response ---")
                 print(raw_response)
@@ -160,7 +164,7 @@ def main() -> int:
         "provider": provider,
         "model": model,
         "prompt_version": prompt_version,
-        "prompt_file": str(prompt_path.relative_to(MODULE_ROOT)),
+        "prompt_file": prompt_path,
         "output_detail": output_detail,
         "turn_count": len(catalog),
         **output_payload,

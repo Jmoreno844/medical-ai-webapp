@@ -1,0 +1,143 @@
+{
+  "id": "consulta_estructurada_v002",
+  "name": "Consulta estructurada (R&D) v2",
+  "document_kind": "document",
+  "classification": {
+    "guidelines": "Plantilla de consulta ambulatoria con campos estructurados por sección. Ante la duda, asigna a la sección más específica soportada por el texto. Un cluster puede mapear a varias secciones si el contenido es transversal. Distingue: síntomas referidos o negados fuera del cuadro principal (revision_sistemas) vs evolución del problema activo (enfermedad_actual); antecedentes crónicos o hábitos (antecedentes) vs antecedentes ginecológicos u obstétricos (antecedentes_gineco_obstetricos) vs hallazgos objetivos del médico en exploración (examen_fisico); mediciones tomadas en consulta (signos_vitales) vs valores referidos por el paciente en casa (enfermedad_actual); resultados o estudios de laboratorio, imagen, ECG, ecografía, radiografía, TAC/RM, endoscopia, biopsia, cultivos o pruebas rápidas con fecha o valor (estudios_y_resultados) vs interpretación, diagnósticos, plan terapéutico u órdenes (analisis_y_plan). No inventes secciones fuera de la plantilla."
+  },
+  "generation": {
+    "guidelines": "Redacta en Markdown clínico con encabezado ## y subcampos en formato Etiqueta: valor. No uses listas con viñetas. Incluye solo campos sustentados por la fuente asignada. Omite subcampos sin contenido; no escribas marcadores como no disponible o sin información. No inventes datos clínicos. Diferencia información referida por paciente o acompañante, hallazgos del profesional, interpretación explícita del profesional y decisiones tomadas. Si un dato tiene una sección más específica, no lo dupliques en una sección general. Los antecedentes gineco-obstétricos van en su sección dedicada, no en antecedentes generales. Los resultados de estudios ginecológicos con fecha o valor van en estudios_y_resultados. Si no hay evidencia suficiente para la sección, devuelve content vacío."
+  },
+  "sections": [
+    {
+      "section_id": "identificacion",
+      "heading": "Identificación",
+      "description": "Datos demográficos y de contacto del paciente.",
+      "include": "Nombre, documento de identidad, edad, fecha de nacimiento, sexo, teléfono, asegurador, acompañante y datos administrativos de identificación no ligados al cuadro clínico.",
+      "boundaries": "",
+      "classification": {
+        "guidelines": ""
+      },
+      "generation": {
+        "guidelines": ""
+      }
+    },
+    {
+      "section_id": "motivo_consulta",
+      "heading": "Motivo de consulta",
+      "description": "Razón principal de la visita.",
+      "include": "Apertura del problema, motivo explícito de consulta o síntoma principal sin narrativa extensa de evolución. Campo Motivo de consulta: síntomas o motivo expresado, sin transformar en diagnóstico.",
+      "boundaries": "",
+      "classification": {
+        "guidelines": ""
+      },
+      "generation": {
+        "guidelines": ""
+      }
+    },
+    {
+      "section_id": "enfermedad_actual",
+      "heading": "Enfermedad actual",
+      "description": "Narrativa cronológica del problema activo en curso.",
+      "include": "Evolución del cuadro actual: inicio, duración, localización, características, intensidad, factores relacionados, síntomas asociados, tratamientos previos, respuesta y correcciones del relato. Incluir valores medidos en casa referidos por el paciente. Campo Enfermedad actual: narrativa cronológica del problema activo referido por paciente o acompañante.",
+      "boundaries": "No incluir hallazgos de examen físico, signos vitales medidos en consulta, antecedentes crónicos, interpretación médica ni plan. No repetir el motivo de consulta como subtítulo.",
+      "classification": {
+        "guidelines": ""
+      },
+      "generation": {
+        "guidelines": ""
+      }
+    },
+    {
+      "section_id": "revision_sistemas",
+      "heading": "Revisión por sistemas",
+      "description": "Síntomas o negaciones exploradas por sistemas, fuera del problema principal.",
+      "include": "Síntomas adicionales o negaciones sistemáticas por aparato o sistema que no son la evolución central del cuadro actual. Incluir solo subcampos con contenido explícito, en formato Etiqueta: valor. Subcampos posibles: Cabeza y cuello, Órganos de los sentidos, Cardiopulmonar, Abdominal, Genitourinario, Osteomuscular, Piel y anexos, Neurológico.",
+      "boundaries": "No crear revisión completa por sistemas ni negativos no mencionados.",
+      "classification": {
+        "guidelines": ""
+      },
+      "generation": {
+        "guidelines": ""
+      }
+    },
+    {
+      "section_id": "antecedentes",
+      "heading": "Antecedentes",
+      "description": "Antecedentes personales, hábitos, medicación habitual y familiares.",
+      "include": "Hábitos de sueño, alimentación y actividad física; antecedentes patológicos, farmacológicos, alérgicos, quirúrgicos, familiares y toxicológicos; medicación habitual no formulada en esta consulta. Incluir solo subcampos con contenido explícito, en formato Etiqueta: valor. Subcampos posibles: Hábitos de sueño, Hábitos alimentarios, Hábitos de actividad física, Antecedentes patológicos, Antecedentes farmacológicos, Antecedentes alérgicos, Antecedentes quirúrgicos, Antecedentes familiares, Antecedentes toxicológicos. En medicación incluir solo componentes explícitos (nombre, dosis, vía, frecuencia).",
+      "boundaries": "Los antecedentes ginecológicos u obstétricos van en antecedentes_gineco_obstetricos. No incluir motivo de consulta ni plan terapéutico actual.",
+      "classification": {
+        "guidelines": ""
+      },
+      "generation": {
+        "guidelines": ""
+      }
+    },
+    {
+      "section_id": "antecedentes_gineco_obstetricos",
+      "heading": "Antecedentes ginecológico y obstétrico",
+      "description": "Antecedentes ginecológicos y obstétricos del paciente.",
+      "include": "Menarquia, características del ciclo menstrual, fecha de última menstruación (FUM), gestaciones (G/P/A/C), partos y cesáreas, método anticonceptivo, menopausia, tamizajes referidos como antecedente (sin resultado con fecha-valor). Incluir solo subcampos con contenido explícito, en formato Etiqueta: valor.",
+      "boundaries": "Los resultados de estudios ginecológicos con fecha o valor (ecografía, citología, mamografía, biopsia) van en estudios_y_resultados. No incluir conducta ni plan terapéutico actual.",
+      "classification": {
+        "guidelines": ""
+      },
+      "generation": {
+        "guidelines": ""
+      }
+    },
+    {
+      "section_id": "signos_vitales",
+      "heading": "Signos vitales",
+      "description": "Mediciones objetivas tomadas durante la atención.",
+      "include": "Presión arterial, frecuencia cardíaca, frecuencia respiratoria, saturación de oxígeno, temperatura, peso, talla u otras medidas antropométricas tomadas por el profesional en consulta. Incluir solo subcampos documentados en consulta, en formato Etiqueta: valor. Subcampos posibles: Presión arterial sistólica, Presión arterial diastólica, Presión arterial, Frecuencia cardíaca, Frecuencia respiratoria, Saturación de oxígeno, Temperatura, Peso, Talla.",
+      "boundaries": "No incluir valores referidos por el paciente medidos en casa.",
+      "classification": {
+        "guidelines": ""
+      },
+      "generation": {
+        "guidelines": ""
+      }
+    },
+    {
+      "section_id": "examen_fisico",
+      "heading": "Examen físico",
+      "description": "Hallazgos objetivos de la exploración física por regiones.",
+      "include": "Hallazgos concretos de inspección, palpación, auscultación u otras maniobras descritos por el médico durante la exploración. Incluir solo subcampos con hallazgos explícitos del profesional, en formato Etiqueta: valor. Subcampos posibles: Órganos sensoriales, Otros, Apariencia general, Cabeza y cuello, Tórax, Abdomen, Genitourinario, Musculoesquelético, Neurológico, Vascular periférico, Piel y anexos.",
+      "boundaries": "No inventar hallazgos negativos. Si solo se menciona que fue examinado sin detalle, dejar content vacío.",
+      "classification": {
+        "guidelines": ""
+      },
+      "generation": {
+        "guidelines": ""
+      }
+    },
+    {
+      "section_id": "estudios_y_resultados",
+      "heading": "Resultados de laboratorio y pruebas diagnósticas",
+      "description": "Exámenes de laboratorio, imágenes y pruebas con resultados o estado.",
+      "include": "Laboratorios, imágenes, ECG, ecografía, radiografía, TAC/RM, endoscopia, biopsia/patología, cultivos, pruebas rápidas, procedimientos diagnósticos, resultados con valores, estudios pendientes o resultados de registros previos discutidos en la consulta. Campos posibles: Exámenes solicitados, Exámenes realizados, Resultados disponibles, Resultados pendientes, Procedimientos diagnósticos. Indicar valores literales cuando consten.",
+      "boundaries": "Distinguir solicitado, realizado, pendiente o condicionado. La interpretación clínica de resultados va en analisis_y_plan, no aquí.",
+      "classification": {
+        "guidelines": ""
+      },
+      "generation": {
+        "guidelines": ""
+      }
+    },
+    {
+      "section_id": "analisis_y_plan",
+      "heading": "Análisis y plan",
+      "description": "Interpretación clínica, diagnósticos, conducta terapéutica y seguimiento.",
+      "include": "Impresión o análisis del médico, diagnósticos o diferenciales, medicamentos formulados, órdenes de laboratorio o imagen, recomendaciones, educación al paciente, signos de alarma y seguimiento. Subcampos posibles: Análisis clínico, Diagnósticos, Plan terapéutico, Medicamentos formulados, Exámenes / órdenes, Recomendaciones y educación, Signos de alarma, Control y seguimiento. Solo interpretación, diagnósticos y decisiones expresadas por el profesional.",
+      "boundaries": "No convertir síntomas en diagnósticos. Una opción condicional no es plan activo.",
+      "classification": {
+        "guidelines": ""
+      },
+      "generation": {
+        "guidelines": ""
+      }
+    }
+  ]
+}

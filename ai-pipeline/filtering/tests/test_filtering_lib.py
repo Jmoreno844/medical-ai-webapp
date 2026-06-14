@@ -14,8 +14,10 @@ from filtering.lib import (
     enrich_filtering_result_for_export,
     expand_filtering_decisions,
     format_filtering_output_for_detail,
+    load_filtering_prompt,
     parse_filtering_result,
     prompt_file_path,
+    render_filtering_user_payload,
 )
 
 
@@ -35,6 +37,30 @@ def test_prompt_file_path() -> None:
     path = prompt_file_path("v001")
     assert path.name == "filtering_v001.txt"
     assert path.is_file()
+
+
+def test_load_filtering_prompt_v002_returns_py_system_prompt() -> None:
+    from filtering.prompts.filtering_prompt_v001 import SYSTEM_PROMPT
+
+    assert load_filtering_prompt("v002") == SYSTEM_PROMPT.strip()
+
+
+def test_render_filtering_user_payload_v002_uses_transcript_block() -> None:
+    case = TranscriptCase(
+        id="tiny",
+        transcript_json={
+            "chunks": [
+                {
+                    "turns": [
+                        {"turn_id": 0, "speaker": "MEDICO", "text": "Hola"},
+                    ]
+                }
+            ]
+        },
+    )
+    payload = render_filtering_user_payload(case=case, prompt_version="v002")
+    assert "<transcript>" in payload
+    assert '"turns"' in payload
 
 
 def test_expand_filtering_decisions_materializes_full_map() -> None:
@@ -126,6 +152,7 @@ def test_run_filtering_rejects_unknown_drop_turn_id() -> None:
                 case=case,
                 model_spec=ModelSpec(alias="openai", provider="openai", model="x"),
                 system_prompt="test",
+                prompt_version="v001",
             )
     finally:
         filter_module.call_llm_detailed = original
@@ -158,6 +185,7 @@ def test_run_filtering_rejects_duplicate_drop_turn_id() -> None:
                 case=case,
                 model_spec=ModelSpec(alias="openai", provider="openai", model="x"),
                 system_prompt="test",
+                prompt_version="v001",
             )
     finally:
         filter_module.call_llm_detailed = original

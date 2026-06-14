@@ -95,7 +95,7 @@ The LLM must return JSON matching:
 `results/{timestamp}_debug_{case_id}_{provider}.json`. Each cluster in the JSON
 includes `turns` with `turn_id`, `speaker` and `text` from the case transcript.
 Incomplete turn coverage prints a `WARNING` but still saves the result and exits `0`.
-A repair pass (`clustering_repair_v001.txt`) runs automatically when `missing_turn_ids`
+A repair pass (`clustering_repair_v002.py` by default; `clustering_repair_v001.txt` legacy) runs automatically when `missing_turn_ids`
 are detected (up to 2 passes). Repair assigns only to existing `topic_label` values.
 
 `make batch` writes timestamped JSON under `results/` for multiple cases/models.

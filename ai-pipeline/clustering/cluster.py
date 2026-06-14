@@ -5,8 +5,8 @@ from dataclasses import dataclass
 
 from common.llm_response import LlmResponse
 from common.providers import ModelSpec, call_llm_detailed
-from common.transcripts import TranscriptCase, build_turn_catalog, render_user_payload
-from clustering.lib import ClusteringResult, parse_clustering_result
+from common.transcripts import TranscriptCase, build_turn_catalog
+from clustering.lib import ClusteringResult, clustering_output_schema, parse_clustering_result, render_clustering_user_payload
 from clustering.repair import (
     ClusteringRepairPassRecord,
     DEFAULT_MAX_REPAIR_PASSES,
@@ -23,16 +23,25 @@ def run_clustering(
     case: TranscriptCase,
     model_spec: ModelSpec,
     system_prompt: str,
+    prompt_version: str = "v001",
 ) -> tuple[ClusteringResult, LlmResponse]:
-    user_payload = render_user_payload(case)
+    catalog = build_turn_catalog(case.transcript_json)
+    user_payload = render_clustering_user_payload(
+        case=case,
+        prompt_version=prompt_version,
+    )
+    output_schema = clustering_output_schema(
+        catalog,
+        prompt_version=prompt_version,
+    )
     llm_response = call_llm_detailed(
         provider=model_spec.provider,
         model=model_spec.model,
         system=system_prompt,
         user=user_payload,
+        output_schema=output_schema,
     )
     result = parse_clustering_result(llm_response.content)
-    catalog = build_turn_catalog(case.transcript_json)
     known_turn_ids = {item["turn_id"] for item in catalog}
     for cluster in result.clusters:
         for turn_id in cluster.turn_ids:
@@ -62,7 +71,9 @@ def run_clustering_with_repair(
     case: TranscriptCase,
     model_spec: ModelSpec,
     system_prompt: str,
+    prompt_version: str = "v001",
     repair_system_prompt: str | None = None,
+    repair_prompt_version: str = DEFAULT_REPAIR_PROMPT_VERSION,
     max_repair_passes: int = DEFAULT_MAX_REPAIR_PASSES,
     context_window: int = DEFAULT_REPAIR_CONTEXT_WINDOW,
     require_complete_coverage: bool = False,
@@ -73,18 +84,20 @@ def run_clustering_with_repair(
         case=case,
         model_spec=model_spec,
         system_prompt=system_prompt,
+        prompt_version=prompt_version,
     )
     initial_response_time_ms = int((time.perf_counter() - started_at) * 1000)
 
     resolved_repair_prompt = (
         repair_system_prompt
-        or load_clustering_repair_prompt(DEFAULT_REPAIR_PROMPT_VERSION)
+        or load_clustering_repair_prompt(repair_prompt_version)
     )
     repaired_result, repair_passes = repair_clustering_coverage(
         result=result,
         catalog=catalog,
         model_spec=model_spec,
         repair_system_prompt=resolved_repair_prompt,
+        repair_prompt_version=repair_prompt_version,
         max_repair_passes=max_repair_passes,
         context_window=context_window,
     )

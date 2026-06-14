@@ -4,7 +4,7 @@ import re
 from enum import StrEnum
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from common.templates import ClinicalTemplate
 
@@ -30,6 +30,20 @@ _LABEL_LINE_RE = re.compile(
 )
 _COLUMN_GAP_RE = re.compile(r"\S\s{2,}\S.*\s{2,}\S")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
+_DATE_ISO_RE = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
+_DATE_SLASH_RE = re.compile(r"\b(\d{2})/(\d{2})/(\d{4})\b")
+_DATE_DASH_RE = re.compile(r"\b(\d{2})-(\d{2})-(\d{4})\b")
+_DATE_MONTH_TEXT_RE = re.compile(
+    r"\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|"
+    r"octubre|noviembre|diciembre)\s+(?:de\s+)?(\d{4})\b",
+    re.IGNORECASE,
+)
+_DATE_RELATIVE_RE = re.compile(
+    r"\b(?:desde\s+)?hace\s+(\d+)\s+"
+    r"(día|días|semana|semanas|mes|meses|año|años)\b",
+    re.IGNORECASE,
+)
+_DATE_YEAR_IN_RE = re.compile(r"\ben\s+((?:19|20)\d{2})\b", re.IGNORECASE)
 
 PASTED_TOKEN_THRESHOLD = 220
 PASTED_LINE_THRESHOLD = 40
@@ -77,6 +91,7 @@ class Span(BaseModel):
     kind: SpanKind
     text: str
     flags: list[str] = Field(default_factory=list)
+    date_hint: str | None = None
 
 
 class FilterSpansResult(BaseModel):
@@ -87,18 +102,103 @@ class SpanCluster(BaseModel):
     id: str
     span_ids: list[str] = Field(default_factory=list)
     title: str | None = None
+    date_hints: list[str] = Field(default_factory=list)
+
+
+class ClusterClassifyAssignment(BaseModel):
+    cluster_id: str
+    section_ids: list[str] = Field(default_factory=list)
 
 
 class ClassifyClustersResult(BaseModel):
-    assignments: dict[str, list[str]] = Field(default_factory=dict)
+    assignments: list[ClusterClassifyAssignment] = Field(default_factory=list)
+
+    @classmethod
+    def _normalize_legacy_assignments_dict(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        assignments = data.get("assignments")
+        if isinstance(assignments, dict):
+            return {
+                **data,
+                "assignments": [
+                    {"cluster_id": cluster_id, "section_ids": section_ids}
+                    for cluster_id, section_ids in assignments.items()
+                ],
+            }
+        return data
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_assignments(cls, data: object) -> object:
+        return cls._normalize_legacy_assignments_dict(data)
+
+    def assignments_by_cluster_id(self) -> dict[str, list[str]]:
+        return {
+            assignment.cluster_id: list(assignment.section_ids)
+            for assignment in self.assignments
+        }
+
+    def dropped_cluster_ids(self) -> list[str]:
+        return [
+            assignment.cluster_id
+            for assignment in self.assignments
+            if not assignment.section_ids
+        ]
 
 
 class SectionAdapterResult(BaseModel):
     section_id: str
-    content: str = ""
+    brief: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_content_key(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        if "brief" in data:
+            return data
+        legacy_content = data.get("content")
+        if isinstance(legacy_content, str):
+            return {**data, "brief": legacy_content}
+        return data
 
 
 SectionContext = dict[str, str]
+
+
+def detect_date_hint(text: str) -> str | None:
+    normalized = text.strip()
+    if not normalized:
+        return None
+
+    iso_match = _DATE_ISO_RE.search(normalized)
+    if iso_match is not None:
+        return iso_match.group(0)
+
+    slash_match = _DATE_SLASH_RE.search(normalized)
+    if slash_match is not None:
+        day, month, year = slash_match.groups()
+        return f"{year}-{month}-{day}"
+
+    dash_match = _DATE_DASH_RE.search(normalized)
+    if dash_match is not None:
+        day, month, year = dash_match.groups()
+        return f"{year}-{month}-{day}"
+
+    month_match = _DATE_MONTH_TEXT_RE.search(normalized)
+    if month_match is not None:
+        return month_match.group(0)
+
+    relative_match = _DATE_RELATIVE_RE.search(normalized)
+    if relative_match is not None:
+        return relative_match.group(0)
+
+    year_match = _DATE_YEAR_IN_RE.search(normalized)
+    if year_match is not None:
+        return year_match.group(0)
+
+    return None
 
 
 def _token_count(text: str, *, encoding_name: str = DEFAULT_TOKEN_ENCODING) -> int:
@@ -220,23 +320,25 @@ def doctor_items_to_spans(
 ) -> list[Span]:
     allowed_ids = set(content_ids)
     spans: list[Span] = []
+    span_index = 0
     for item in items:
         if item.id not in allowed_ids:
             continue
+        span_index += 1
         spans.append(
             Span(
-                id=f"nota_medico_{item.id}",
+                id=str(span_index),
                 doc="nota_medico",
                 kind=SpanKind.LINE,
                 text=item.text,
+                date_hint=detect_date_hint(item.text),
             )
         )
     return spans
 
 
-def _next_span_id(doc: str, index: int) -> str:
-    safe_doc = re.sub(r"[^a-zA-Z0-9_]+", "_", doc).strip("_") or "doc"
-    return f"{safe_doc}_s{index:04d}"
+def _next_span_id(index: int) -> str:
+    return str(index)
 
 
 def _append_line_span(
@@ -249,10 +351,11 @@ def _append_line_span(
 ) -> int:
     spans.append(
         Span(
-            id=_next_span_id(doc, span_index),
+            id=_next_span_id(span_index),
             doc=doc,
             kind=kind,
             text=text,
+            date_hint=detect_date_hint(text),
         )
     )
     return span_index + 1
@@ -399,11 +502,12 @@ def build_spans_from_pdf(
             span_index += 1
             spans.append(
                 Span(
-                    id=_next_span_id(doc, span_index),
+                    id=_next_span_id(span_index),
                     doc=doc,
                     kind=_classify_line_kind(column_text),
                     text=column_text,
                     flags=["merged_columns"] if merged else [],
+                    date_hint=detect_date_hint(column_text),
                 )
             )
     return spans
@@ -411,13 +515,11 @@ def build_spans_from_pdf(
 
 def merge_spans(*span_lists: list[Span]) -> list[Span]:
     merged: list[Span] = []
-    seen_ids: set[str] = set()
+    next_id = 1
     for spans in span_lists:
         for span in spans:
-            if span.id in seen_ids:
-                raise ValueError(f"context_duplicate_span_id: {span.id!r}")
-            seen_ids.add(span.id)
-            merged.append(span)
+            merged.append(span.model_copy(update={"id": str(next_id)}))
+            next_id += 1
     return merged
 
 
@@ -430,8 +532,11 @@ def build_adapter_jobs(
         section_id: set() for section_id in allowed_section_ids
     }
 
-    for cluster_id, section_ids in classify_result.assignments.items():
-        for section_id in section_ids:
+    for assignment in classify_result.assignments:
+        if not assignment.section_ids:
+            continue
+        cluster_id = assignment.cluster_id
+        for section_id in assignment.section_ids:
             if section_id not in allowed_section_ids:
                 raise ValueError(f"context_unknown_section_id: {section_id!r}")
             if cluster_id in seen_per_section[section_id]:
@@ -456,6 +561,39 @@ def span_to_payload_item(span: Span) -> dict[str, object]:
     if span.flags:
         payload["flags"] = list(span.flags)
     return payload
+
+
+def cluster_to_payload_item(cluster: SpanCluster) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "id": cluster.id,
+        "span_ids": list(cluster.span_ids),
+    }
+    if cluster.title is not None:
+        payload["title"] = cluster.title
+    if cluster.date_hints:
+        payload["date_hints"] = list(cluster.date_hints)
+    return payload
+
+
+def propagate_cluster_date_hints(
+    clusters: list[SpanCluster],
+    spans: list[Span],
+) -> list[SpanCluster]:
+    spans_by_id = {span.id: span for span in spans}
+    enriched: list[SpanCluster] = []
+    for cluster in clusters:
+        date_hints: list[str] = []
+        seen_hints: set[str] = set()
+        for span_id in cluster.span_ids:
+            span = spans_by_id.get(span_id)
+            if span is None or span.date_hint is None:
+                continue
+            if span.date_hint in seen_hints:
+                continue
+            seen_hints.add(span.date_hint)
+            date_hints.append(span.date_hint)
+        enriched.append(cluster.model_copy(update={"date_hints": date_hints}))
+    return enriched
 
 
 def apply_span_drops(spans: list[Span], drop_ids: list[str]) -> list[Span]:
@@ -510,14 +648,21 @@ def audit_filter_spans_result(
 def audit_span_clusters(
     spans: list[Span],
     clusters: list[SpanCluster],
+    *,
+    require_complete_span_coverage: bool = False,
+    require_titles: bool = False,
 ) -> None:
     span_ids = {span.id for span in spans}
     seen_cluster_ids: set[str] = set()
+    assigned_span_ids: set[str] = set()
 
     for cluster in clusters:
         if cluster.id in seen_cluster_ids:
             raise ValueError(f"context_cluster_duplicate_id: {cluster.id!r}")
         seen_cluster_ids.add(cluster.id)
+
+        if require_titles and not (cluster.title and cluster.title.strip()):
+            raise ValueError(f"context_cluster_missing_title: {cluster.id!r}")
 
         seen_span_in_cluster: set[str] = set()
         for span_id in cluster.span_ids:
@@ -527,23 +672,44 @@ def audit_span_clusters(
                 raise ValueError(
                     f"context_cluster_duplicate_span_id: {cluster.id}:{span_id!r}"
                 )
+            if span_id in assigned_span_ids:
+                raise ValueError(
+                    f"context_cluster_duplicate_span_across_clusters: {span_id!r}"
+                )
             seen_span_in_cluster.add(span_id)
+            assigned_span_ids.add(span_id)
+
+    if require_complete_span_coverage:
+        missing_span_ids = span_ids - assigned_span_ids
+        if missing_span_ids:
+            raise ValueError(
+                f"context_cluster_missing_span_ids: {sorted(missing_span_ids)!r}"
+            )
 
 
 def audit_classify_clusters(
     clusters: list[SpanCluster],
     template: ClinicalTemplate,
     result: ClassifyClustersResult,
+    *,
+    require_complete_cluster_coverage: bool = False,
 ) -> None:
     cluster_ids = {cluster.id for cluster in clusters}
     allowed_section_ids = template.section_id_set()
+    seen_cluster_ids: set[str] = set()
 
-    for cluster_id, section_ids in result.assignments.items():
+    for assignment in result.assignments:
+        cluster_id = assignment.cluster_id
         if cluster_id not in cluster_ids:
             raise ValueError(f"context_classify_unknown_cluster_id: {cluster_id!r}")
+        if cluster_id in seen_cluster_ids:
+            raise ValueError(
+                f"context_classify_duplicate_cluster_id: {cluster_id!r}"
+            )
+        seen_cluster_ids.add(cluster_id)
 
         seen_sections: set[str] = set()
-        for section_id in section_ids:
+        for section_id in assignment.section_ids:
             if section_id not in allowed_section_ids:
                 raise ValueError(f"context_classify_unknown_section_id: {section_id!r}")
             if section_id in seen_sections:
@@ -552,6 +718,20 @@ def audit_classify_clusters(
                     f"{cluster_id}:{section_id!r}"
                 )
             seen_sections.add(section_id)
+
+    if require_complete_cluster_coverage:
+        missing_cluster_ids = sorted(cluster_ids - seen_cluster_ids)
+        if missing_cluster_ids:
+            raise ValueError(
+                "context_classify_missing_cluster_ids: "
+                f"{missing_cluster_ids!r}"
+            )
+        extra_cluster_ids = sorted(seen_cluster_ids - cluster_ids)
+        if extra_cluster_ids:
+            raise ValueError(
+                "context_classify_extra_cluster_ids: "
+                f"{extra_cluster_ids!r}"
+            )
 
 
 def audit_section_adapter_result(
@@ -570,6 +750,7 @@ __all__ = [
     "PASTED_HEADING_LINE_THRESHOLD",
     "PASTED_LINE_THRESHOLD",
     "PASTED_TOKEN_THRESHOLD",
+    "ClusterClassifyAssignment",
     "ClassifyClustersResult",
     "Directive",
     "DirectiveAction",
@@ -590,8 +771,11 @@ __all__ = [
     "build_adapter_jobs",
     "build_spans_from_pdf",
     "build_spans_from_text",
+    "cluster_to_payload_item",
+    "detect_date_hint",
     "doctor_items_to_spans",
     "merge_spans",
+    "propagate_cluster_date_hints",
     "span_to_payload_item",
     "split_doctor_items",
 ]
