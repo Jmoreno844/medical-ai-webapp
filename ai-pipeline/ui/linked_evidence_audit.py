@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from generation.evidence_markers import extract_all_marker_ids, strip_evidence_markers
+from document_pipeline_core.generation.evidence_markers import extract_all_marker_ids, strip_evidence_markers
 
 TWO_STEP_ROUTE = "two_step"
 PLANNER_STEP = "planner"

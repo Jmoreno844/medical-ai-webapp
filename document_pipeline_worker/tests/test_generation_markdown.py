@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.pipeline.generation.lib import (
+from document_pipeline_core.generation.lib import (
     normalize_section_generation_content,
     render_generated_section_markdown,
 )

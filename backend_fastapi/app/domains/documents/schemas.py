@@ -95,6 +95,19 @@ class ClinicalTemplateOut(BaseModel):
     sections: list[TemplateSectionOut] = Field(default_factory=list)
 
 
+class ExternalDocumentInputOut(BaseModel):
+    document_id: str
+    document_kind: str = "document"
+    document_date: str | None = None
+    content_markdown: str | None = None
+    content_pdf_gcs_uri: str | None = None
+
+
+class ContextInputsOut(BaseModel):
+    doctor_note_markdown: str | None = None
+    external_documents: list[ExternalDocumentInputOut] = Field(default_factory=list)
+
+
 class DocumentGenerationTaskPayload(BaseModel):
     process_id: str
     doctor_id: int
@@ -112,6 +125,7 @@ class DocumentGenerationWorkItemResponse(BaseModel):
     transcription_document_id: int
     doctor_template_id: int
     encounter_id: int
+    context_inputs: ContextInputsOut
     context_content: str
     transcription_content: str
     template_content: str

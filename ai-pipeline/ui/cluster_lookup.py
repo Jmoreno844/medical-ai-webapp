@@ -4,9 +4,10 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from classification.lib import ClusterCase, load_cluster_cases
+from document_pipeline_core.classification.lib import ClusterCase, load_cluster_cases
 from ui.bridge import clusters_from_clustering_result
-from ui.discovery import AI_PIPELINE_ROOT, load_result_json
+from harness.paths import AI_PIPELINE_ROOT
+from ui.discovery import load_result_json
 
 
 @dataclass(frozen=True, slots=True)

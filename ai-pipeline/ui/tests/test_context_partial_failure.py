@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from common.context_spans import ClassifyClustersResult, Span, SpanKind, TriageResult
-from common.llm_response import LlmResponse
-from context_pipeline.session import ContextLlmCall, ContextPipelinePartialError, ContextPipelineRun
+from document_pipeline_core.common.context_spans import ClassifyClustersResult, Span, SpanKind, TriageResult
+from document_pipeline_core.common.llm_response import LlmResponse
+from harness.context_session import ContextLlmCall, ContextPipelinePartialError, ContextPipelineRun
 from ui.context_runner import run_context_ad_hoc_pipeline_step
 from ui.e2e_pipeline import E2EStepFailed, run_e2e_step
 from ui.e2e_viewer import build_e2e_step_states, is_renderable_context_payload, resolve_e2e_pipeline_steps
@@ -89,7 +89,7 @@ def test_run_context_ad_hoc_pipeline_step_persists_partial_failure(
     monkeypatch.setattr("ui.context_runner.run_context_pipeline_ad_hoc", _raise_partial)
     monkeypatch.setattr("ui.runner._persist_results", _fake_persist)
     monkeypatch.setattr("ui.runner.apply_step_config_env", _noop_env)
-    monkeypatch.setattr("ui.context_runner.AI_PIPELINE_ROOT", tmp_path)
+    monkeypatch.setattr("harness.paths.AI_PIPELINE_ROOT", tmp_path)
 
     output = run_context_ad_hoc_pipeline_step(
         session_id="adhoc",

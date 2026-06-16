@@ -1,0 +1,398 @@
+from __future__ import annotations
+
+import json
+import os
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from pathlib import Path
+
+from pydantic import ValidationError
+
+from document_pipeline_core.common.context_spans import (
+    Directive,
+    SectionAdapterResult,
+    SectionEvidence,
+    Span,
+    SpanCluster,
+    audit_section_adapter_result,
+    build_section_evidence,
+    cluster_to_payload_item,
+    span_to_payload_item,
+)
+from document_pipeline_core.common.json_utils import extract_json_object
+from document_pipeline_core.common.llm_response import LlmResponse, summarize_llm_responses
+from document_pipeline_core.common.prompt_registry import (
+    is_py_prompt_version,
+    load_py_prompt_module,
+    py_system_prompt,
+)
+from document_pipeline_core.common.prompts import load_prompt as load_prompt_from_file
+from document_pipeline_core.common.prompts import prompt_file_path as resolve_prompt_file_path
+from document_pipeline_core.common.providers import ModelSpec, call_llm_detailed
+from document_pipeline_core.common.templates import (
+    ClinicalTemplate,
+    TemplateSection,
+    compose_section_guidelines,
+)
+
+MODULE_ROOT = Path(__file__).resolve().parent
+PROMPTS_DIR = MODULE_ROOT / "prompts"
+PROMPT_FILENAME_STEM = "section_adapter"
+PY_SECTION_ADAPTER_STEP = "context_section_adapter"
+PY_SECTION_ADAPTER_PROMPT_VERSIONS = frozenset({"v003"})
+DEFAULT_SECTION_CONCURRENCY = 0
+
+
+@dataclass(frozen=True, slots=True)
+class SectionAdapterRun:
+    section_id: str
+    cluster_ids: list[str]
+    result: SectionAdapterResult
+    llm_response: LlmResponse
+    response_time_ms: int
+
+
+@dataclass(frozen=True, slots=True)
+class SectionAdapterSessionRun:
+    section_runs: list[SectionAdapterRun]
+    section_context: dict[str, str]
+    section_evidence: SectionEvidence
+    total_response_time_ms: int
+    section_execution_mode: str
+    section_concurrency: int
+    llm_usage_summary: dict[str, object]
+
+
+def section_adapter_uses_py_prompt(prompt_version: str) -> bool:
+    return is_py_prompt_version(PY_SECTION_ADAPTER_STEP, prompt_version)
+
+
+def section_adapter_structured_output_enabled(prompt_version: str) -> bool:
+    return prompt_version.strip().lower() in PY_SECTION_ADAPTER_PROMPT_VERSIONS
+
+
+def section_adapter_output_schema(
+    *,
+    section_id: str,
+    prompt_version: str,
+) -> dict[str, object] | None:
+    if not section_adapter_structured_output_enabled(prompt_version):
+        return None
+    module = load_py_prompt_module(PY_SECTION_ADAPTER_STEP, prompt_version)
+    output_schema_fn = getattr(module, "output_schema", None)
+    if not callable(output_schema_fn):
+        raise ValueError(
+            f"section_adapter_py_prompt_missing_output_schema: {prompt_version}"
+        )
+    schema = output_schema_fn(section_id=section_id)
+    if not isinstance(schema, dict):
+        raise ValueError(
+            f"section_adapter_py_prompt_invalid_output_schema: {prompt_version}"
+        )
+    return schema
+
+
+def section_adapter_prompt_file_path(version: str) -> Path:
+    return resolve_prompt_file_path(
+        prompts_dir=PROMPTS_DIR,
+        filename_stem=PROMPT_FILENAME_STEM,
+        version=version,
+    )
+
+
+def load_section_adapter_prompt(version: str) -> str:
+    if section_adapter_uses_py_prompt(version):
+        return py_system_prompt(PY_SECTION_ADAPTER_STEP, version)
+    return load_prompt_from_file(
+        prompts_dir=PROMPTS_DIR,
+        filename_stem=PROMPT_FILENAME_STEM,
+        version=version,
+    )
+
+
+def section_adapter_prompt_reference(version: str) -> str:
+    if section_adapter_uses_py_prompt(version):
+        module_path = load_py_prompt_module(PY_SECTION_ADAPTER_STEP, version).__name__
+        return f"{module_path.replace('.', '/')}.py"
+    return str(section_adapter_prompt_file_path(version).relative_to(MODULE_ROOT))
+
+
+def prompt_file_path(version: str) -> Path:
+    return section_adapter_prompt_file_path(version)
+
+
+def load_prompt(version: str) -> str:
+    return load_section_adapter_prompt(version)
+
+
+def resolve_section_concurrency(raw: int | None = None) -> int:
+    if raw is not None:
+        return max(0, raw)
+    env_value = os.environ.get(
+        "CONTEXT_SECTION_ADAPTER_CONCURRENCY",
+        str(DEFAULT_SECTION_CONCURRENCY),
+    ).strip()
+    if not env_value:
+        return DEFAULT_SECTION_CONCURRENCY
+    return max(0, int(env_value))
+
+
+def _section_guidelines_text(section: TemplateSection) -> str:
+    return compose_section_guidelines(
+        section.generation.guidelines,
+        section.include,
+        section.boundaries,
+    )
+
+
+def render_section_adapter_payload(
+    *,
+    section: TemplateSection,
+    encounter_date: str | None,
+    document_date: str | None = None,
+    directives: list[Directive],
+    clusters: list[SpanCluster],
+    spans: list[Span],
+    prompt_version: str = "v001",
+) -> str:
+    section_guidelines = _section_guidelines_text(section)
+    directives_payload = [directive.model_dump(mode="json") for directive in directives]
+    clusters_payload = [cluster_to_payload_item(cluster) for cluster in clusters]
+    spans_payload = [span_to_payload_item(span) for span in spans]
+    if section_adapter_uses_py_prompt(prompt_version):
+        module = load_py_prompt_module(PY_SECTION_ADAPTER_STEP, prompt_version)
+        return module.render_user_payload(
+            section_id=section.section_id,
+            section_description=section.description,
+            section_guidelines=section_guidelines,
+            encounter_date=encounter_date,
+            document_date=document_date,
+            directives=directives_payload,
+            clusters=clusters_payload,
+            spans=spans_payload,
+        )
+    payload: dict[str, object] = {
+        "section_id": section.section_id,
+        "section_description": section.description,
+        "encounter_date": encounter_date,
+        "doc_date": document_date,
+        "directives": directives_payload,
+        "clusters": clusters_payload,
+        "spans": spans_payload,
+    }
+    if prompt_version.strip().lower() != "v001":
+        payload["section_guidelines"] = section_guidelines
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def parse_section_adapter_result(
+    raw: str,
+    *,
+    expected_section_id: str,
+) -> SectionAdapterResult:
+    payload = extract_json_object(raw)
+    try:
+        result = SectionAdapterResult.model_validate(payload)
+    except ValidationError as exc:
+        raise ValueError(f"section_adapter_invalid_result: {exc}") from exc
+    audit_section_adapter_result(expected_section_id, result)
+    return result
+
+
+def enrich_section_adapter_session_for_export(
+    section_context: dict[str, str],
+    *,
+    section_evidence: SectionEvidence | None = None,
+) -> dict[str, object]:
+    sections = [
+        {
+            "section_id": section_id,
+            "brief": brief,
+            "brief_chars": len(brief),
+        }
+        for section_id, brief in sorted(section_context.items())
+        if brief.strip()
+    ]
+    export: dict[str, object] = {
+        "section_context": dict(section_context),
+        "sections": sections,
+        "section_count": len(sections),
+    }
+    if section_evidence:
+        export["section_evidence"] = section_evidence
+    return export
+
+
+def _run_section_adapter_job(
+    *,
+    section: TemplateSection,
+    cluster_ids: list[str],
+    clusters_by_id: dict[str, SpanCluster],
+    spans_by_id: dict[str, Span],
+    encounter_date: str | None,
+    document_date: str | None,
+    directives: list[Directive],
+    model_spec: ModelSpec,
+    system_prompt: str,
+    prompt_version: str,
+) -> SectionAdapterRun:
+    clusters = [clusters_by_id[cluster_id] for cluster_id in cluster_ids]
+    span_ids: list[str] = []
+    for cluster in clusters:
+        for span_id in cluster.span_ids:
+            if span_id not in span_ids:
+                span_ids.append(span_id)
+    spans = [spans_by_id[span_id] for span_id in span_ids]
+    user_payload = render_section_adapter_payload(
+        section=section,
+        encounter_date=encounter_date,
+        document_date=document_date,
+        directives=directives,
+        clusters=clusters,
+        spans=spans,
+        prompt_version=prompt_version,
+    )
+    output_schema = section_adapter_output_schema(
+        section_id=section.section_id,
+        prompt_version=prompt_version,
+    )
+    started_at = time.perf_counter()
+    llm_response = call_llm_detailed(
+        provider=model_spec.provider,
+        model=model_spec.model,
+        system=system_prompt,
+        user=user_payload,
+        output_schema=output_schema,
+    )
+    response_time_ms = int((time.perf_counter() - started_at) * 1000)
+    result = parse_section_adapter_result(
+        llm_response.content,
+        expected_section_id=section.section_id,
+    )
+    return SectionAdapterRun(
+        section_id=section.section_id,
+        cluster_ids=cluster_ids,
+        result=result,
+        llm_response=llm_response,
+        response_time_ms=response_time_ms,
+    )
+
+
+def run_section_adapter_session(
+    *,
+    adapter_jobs: dict[str, list[str]],
+    clusters: list[SpanCluster],
+    spans: list[Span],
+    template: ClinicalTemplate,
+    encounter_date: str | None,
+    document_date: str | None = None,
+    directives: list[Directive],
+    model_spec: ModelSpec,
+    system_prompt: str,
+    prompt_version: str = "v001",
+    section_concurrency: int | None = None,
+) -> SectionAdapterSessionRun:
+    if not adapter_jobs:
+        return SectionAdapterSessionRun(
+            section_runs=[],
+            section_context={},
+            section_evidence={},
+            total_response_time_ms=0,
+            section_execution_mode="sequential",
+            section_concurrency=0,
+            llm_usage_summary={},
+        )
+
+    resolved_concurrency = resolve_section_concurrency(section_concurrency)
+    clusters_by_id = {cluster.id: cluster for cluster in clusters}
+    spans_by_id = {span.id: span for span in spans}
+    sections_by_id = {section.section_id: section for section in template.sections}
+    jobs = [
+        (section_id, cluster_ids)
+        for section_id, cluster_ids in adapter_jobs.items()
+        if cluster_ids
+    ]
+
+    use_parallel = len(jobs) > 1 and resolved_concurrency != 1
+    section_execution_mode = "parallel" if use_parallel else "sequential"
+    started_at = time.perf_counter()
+
+    def run_job(job: tuple[str, list[str]]) -> SectionAdapterRun:
+        section_id, cluster_ids = job
+        return _run_section_adapter_job(
+            section=sections_by_id[section_id],
+            cluster_ids=cluster_ids,
+            clusters_by_id=clusters_by_id,
+            spans_by_id=spans_by_id,
+            encounter_date=encounter_date,
+            document_date=document_date,
+            directives=directives,
+            model_spec=model_spec,
+            system_prompt=system_prompt,
+            prompt_version=prompt_version,
+        )
+
+    section_runs: list[SectionAdapterRun]
+    if use_parallel:
+        max_workers = (
+            len(jobs) if resolved_concurrency == 0 else min(len(jobs), resolved_concurrency)
+        )
+        runs_by_section: dict[str, SectionAdapterRun] = {}
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(run_job, job): job[0]
+                for job in jobs
+            }
+            for future in as_completed(futures):
+                section_run = future.result()
+                runs_by_section[section_run.section_id] = section_run
+        section_runs = [runs_by_section[section_id] for section_id, _ in jobs]
+    else:
+        section_runs = [run_job(job) for job in jobs]
+
+    total_response_time_ms = int((time.perf_counter() - started_at) * 1000)
+    section_context = {
+        section_run.section_id: section_run.result.brief.strip()
+        for section_run in section_runs
+        if section_run.result.brief.strip()
+    }
+    section_evidence = build_section_evidence(adapter_jobs, clusters_by_id, spans_by_id)
+    llm_usage_summary = summarize_llm_responses(
+        [section_run.llm_response for section_run in section_runs]
+    )
+    llm_usage_summary = {
+        **llm_usage_summary,
+        "section_execution_mode": section_execution_mode,
+        "section_concurrency": resolved_concurrency,
+    }
+    return SectionAdapterSessionRun(
+        section_runs=section_runs,
+        section_context=section_context,
+        section_evidence=section_evidence,
+        total_response_time_ms=total_response_time_ms,
+        section_execution_mode=section_execution_mode,
+        section_concurrency=resolved_concurrency,
+        llm_usage_summary=llm_usage_summary,
+    )
+
+
+__all__ = [
+    "DEFAULT_SECTION_CONCURRENCY",
+    "MODULE_ROOT",
+    "SectionAdapterRun",
+    "SectionAdapterSessionRun",
+    "enrich_section_adapter_session_for_export",
+    "load_prompt",
+    "load_section_adapter_prompt",
+    "parse_section_adapter_result",
+    "prompt_file_path",
+    "render_section_adapter_payload",
+    "resolve_section_concurrency",
+    "run_section_adapter_session",
+    "section_adapter_output_schema",
+    "section_adapter_prompt_file_path",
+    "section_adapter_prompt_reference",
+    "section_adapter_structured_output_enabled",
+    "section_adapter_uses_py_prompt",
+]

@@ -16,6 +16,7 @@ from app.domains.audit.service import actor_from_user, record_audit_event, recor
 from app.domains.auth.access import require_clinical_access
 from app.domains.auth.service import get_current_user
 from app.domains.documents.schemas import (
+    ContextInputsOut,
     DocumentGenerationTaskPayload,
     DocumentGenerationWorkItemResponse,
     DocumentGenerationWorkflowRequest,
@@ -317,6 +318,10 @@ async def get_document_pipeline_work_item(
         template_name=doctor_template.name,
     )
     context_content = doc_context.content_markdown.strip() or "No se agregó contexto."
+    context_inputs = ContextInputsOut(
+        doctor_note_markdown=context_content,
+        external_documents=[],
+    )
     callback_token = issue_generation_callback_token(
         user_id=payload.doctor_id,
         document_id=doc_new.id,
@@ -339,6 +344,7 @@ async def get_document_pipeline_work_item(
         transcription_document_id=doc_transcription.id,
         doctor_template_id=doctor_template.id,
         encounter_id=doc_new.encounter_id,
+        context_inputs=context_inputs,
         context_content=context_content,
         transcription_content=transcription_content,
         template_content=template_content,

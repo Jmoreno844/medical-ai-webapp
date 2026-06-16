@@ -7,9 +7,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from classification.lib import ClassificationValidationError
-from generation.lib import GenerationValidationError
-from ui.discovery import AI_PIPELINE_ROOT
+from document_pipeline_core.classification.lib import ClassificationValidationError
+from document_pipeline_core.generation.lib import GenerationValidationError
+from harness.paths import E2E_FAILED_RESULTS_DIR
 from ui.runner import PipelineRunOutput, StepConfig
 
 E2E_FULL_TEMPLATE_ID = "consulta_estructurada_v001"
@@ -22,8 +22,6 @@ E2E_STEP_ORDER: tuple[str, ...] = (
     "context_pipeline",
     "generation",
 )
-
-E2E_FAILED_RESULTS_DIR = AI_PIPELINE_ROOT / "e2e_runs" / "failed_steps"
 
 
 @dataclass(frozen=True, slots=True)

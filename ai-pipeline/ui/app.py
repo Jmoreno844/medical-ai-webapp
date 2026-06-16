@@ -2,19 +2,14 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import tempfile
 from pathlib import Path
 
 import streamlit as st
 
-AI_PIPELINE_ROOT = Path(__file__).resolve().parents[1]
-if str(AI_PIPELINE_ROOT) not in sys.path:
-    sys.path.insert(0, str(AI_PIPELINE_ROOT))
-
-from classification.lib import DEFAULT_CASES_INDEX, load_session_clusters  # noqa: E402
-from common.case_paths import TRANSCRIPT_CASES_INDEX  # noqa: E402
-from common.transcripts import TranscriptCase, build_turn_catalog  # noqa: E402
+from document_pipeline_core.classification.lib import load_session_clusters
+from document_pipeline_core.common.transcripts import TranscriptCase, build_turn_catalog
+from harness.paths import AI_PIPELINE_ROOT, CLUSTER_CASES_INDEX, TRANSCRIPT_CASES_INDEX
 from ui.bridge import (  # noqa: E402
     clusters_from_clustering_result,
     clusters_from_classification_record,
@@ -666,7 +661,7 @@ def _render_classification_page() -> None:
                 )
             session = sessions[session_labels.index(selected)]
             session_id = session.session_id
-            clusters = load_session_clusters(DEFAULT_CASES_INDEX, session_id)
+            clusters = load_session_clusters(CLUSTER_CASES_INDEX, session_id)
             st.caption(
                 f"{session.cluster_count} clusters del fixture `{session_id}` · "
                 f"template de clasificación: `{template_id}`"
@@ -809,7 +804,7 @@ def _render_generation_page() -> None:
                 if session_id:
                     try:
                         fixture_clusters = load_session_clusters(
-                            DEFAULT_CASES_INDEX,
+                            CLUSTER_CASES_INDEX,
                             session_id,
                         )
                         if assignments is not None:

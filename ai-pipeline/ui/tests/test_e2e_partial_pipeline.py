@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from classification.lib import ClassificationValidationError
+from document_pipeline_core.classification.lib import ClassificationValidationError
 from ui.e2e_pipeline import persist_failed_step_output, prior_output_paths
 from ui.e2e_runs import load_e2e_run, save_e2e_run
 from ui.e2e_viewer import build_e2e_step_states, generation_succeeded

@@ -15,7 +15,7 @@ def test_default_context_prompt_bundle_uses_per_substep_versions() -> None:
 
 
 def test_build_context_pipeline_prompt_bundle_resolves_prompts() -> None:
-    from context_pipeline.config import (
+    from document_pipeline_core.context_pipeline.config import (
         ContextPipelineConfig,
         build_context_pipeline_prompt_bundle,
     )
@@ -30,8 +30,8 @@ def test_run_context_ad_hoc_pipeline_step_exports_prompt_versions(
     tmp_path,
     monkeypatch,
 ) -> None:
-    from context_pipeline.session import ContextPipelineRun
-    from common.context_spans import ClassifyClustersResult, TriageResult
+    from harness.context_session import ContextPipelineRun
+    from document_pipeline_core.common.context_spans import ClassifyClustersResult, TriageResult
 
     bundle = _default_context_prompt_bundle()
 
@@ -63,7 +63,7 @@ def test_run_context_ad_hoc_pipeline_step_exports_prompt_versions(
 
     monkeypatch.setattr("ui.context_runner.run_context_pipeline_ad_hoc", _fake_ad_hoc)
     monkeypatch.setattr("ui.runner._persist_results", _fake_persist)
-    monkeypatch.setattr("ui.context_runner.AI_PIPELINE_ROOT", tmp_path)
+    monkeypatch.setattr("harness.paths.AI_PIPELINE_ROOT", tmp_path)
 
     from contextlib import contextmanager
 

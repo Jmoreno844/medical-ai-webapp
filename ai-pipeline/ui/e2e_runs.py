@@ -6,10 +6,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from ui.discovery import AI_PIPELINE_ROOT, load_result_json
+from harness.paths import E2E_RUNS_DIR
+from ui.discovery import load_result_json
 from ui.runner import PipelineRunOutput
 
-E2E_RUNS_DIR = AI_PIPELINE_ROOT / "e2e_runs"
 MANIFEST_VERSION = 1
 E2ERunStatus = Literal["complete", "failed"]
 

@@ -4,22 +4,28 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from classification.lib import load_cluster_cases
-from common.case_paths import (
+from document_pipeline_core.classification.lib import load_cluster_cases
+from document_pipeline_core.common.pipeline_steps import get_step_spec, list_registered_steps
+from document_pipeline_core.common.prompt_runtime import list_prompt_versions as runtime_list_prompt_versions
+from document_pipeline_core.common.prompt_runtime import resolve_prompt_version
+from document_pipeline_core.common.templates import DEFAULT_TEMPLATES_DIR, list_template_ids
+from document_pipeline_core.common.transcripts import TranscriptCase, build_turn_catalog, load_cases
+from document_pipeline_core.package_root import PACKAGE_ROOT
+
+from harness.context_cases import load_context_cases, select_context_case
+from harness.paths import (
+    AI_PIPELINE_ROOT,
     CLUSTER_CASES_INDEX,
     CONTEXT_CASES_INDEX,
     TRANSCRIPT_CASES_INDEX,
+    harness_results_dir,
 )
-from common.pipeline_steps import get_step_spec, list_registered_steps
-from common.prompt_runtime import list_prompt_versions as runtime_list_prompt_versions
-from common.prompt_runtime import resolve_prompt_version
-from common.templates import DEFAULT_TEMPLATES_DIR, list_template_ids
-from common.transcripts import TranscriptCase, build_turn_catalog, load_cases
-
-AI_PIPELINE_ROOT = Path(__file__).resolve().parents[1]
 
 _REGISTERED_STEPS = list_registered_steps(include_aliases=True)
-MODULE_DIRS = {step: get_step_spec(step).module_dir for step in _REGISTERED_STEPS}
+MODULE_DIRS = {
+    step: AI_PIPELINE_ROOT / get_step_spec(step).module_dir.relative_to(PACKAGE_ROOT)
+    for step in _REGISTERED_STEPS
+}
 PROMPT_STEMS = {step: get_step_spec(step).prompt_stem for step in _REGISTERED_STEPS}
 DEFAULT_PROMPT_VERSIONS = {
     step: get_step_spec(step).default_prompt_version for step in _REGISTERED_STEPS
@@ -158,15 +164,10 @@ def list_templates() -> list[str]:
 
 
 def list_context_cases() -> list[str]:
-    from context_pipeline.cases.lib import load_context_cases
-
-    index_path = CONTEXT_CASES_INDEX
-    return [case.id for case in load_context_cases(index_path)]
+    return [case.id for case in load_context_cases(CONTEXT_CASES_INDEX)]
 
 
 def list_context_case_document_files(context_case_id: str) -> list[str]:
-    from context_pipeline.cases.lib import load_context_cases, select_context_case
-
     case_meta = select_context_case(
         load_context_cases(CONTEXT_CASES_INDEX),
         case_id=context_case_id,
@@ -209,8 +210,7 @@ def _result_label(
 
 
 def list_results(step: str) -> list[ResultMeta]:
-    spec = get_step_spec(step)
-    results_dir = spec.results_dir
+    results_dir = harness_results_dir(step)
     if not results_dir.is_dir():
         return []
 
@@ -267,6 +267,8 @@ __all__ = [
     "TranscriptCaseMeta",
     "default_prompt_version",
     "list_classification_sessions",
+    "list_context_case_document_files",
+    "list_context_cases",
     "list_prompt_versions",
     "list_results",
     "list_templates",

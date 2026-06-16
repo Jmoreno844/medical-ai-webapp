@@ -10,67 +10,66 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from classification.batching import (
+from document_pipeline_core.classification.batching import (
     DEFAULT_INPUT_TOKEN_BUDGET,
     DEFAULT_TOKEN_ENCODING,
 )
-from classification.classify import run_classification_session
-from classification.lib import (
-    DEFAULT_CASES_INDEX,
+from document_pipeline_core.classification.classify import run_classification_session
+from document_pipeline_core.classification.lib import (
     ClusterCase,
     enrich_classification_batch_result_for_export,
     enrich_classification_session_result_for_export,
     format_classification_batch_output_for_detail,
     format_classification_output_for_detail,
 )
-from classification.lib import load_prompt as load_classification_prompt
-from classification.lib import prompt_file_path as classification_prompt_file_path
-from classification.templates import load_template
-from clustering.cluster import run_clustering_with_repair
-from clustering.lib import (
+from document_pipeline_core.classification.lib import load_prompt as load_classification_prompt
+from document_pipeline_core.classification.lib import prompt_file_path as classification_prompt_file_path
+from document_pipeline_core.classification.templates import load_template
+from document_pipeline_core.clustering.cluster import run_clustering_with_repair
+from document_pipeline_core.clustering.lib import (
     MODULE_ROOT as CLUSTERING_MODULE_ROOT,
 )
-from clustering.lib import (
+from document_pipeline_core.clustering.lib import (
     audit_turn_coverage,
     clustering_prompt_reference,
     enrich_clustering_result_for_export,
     format_clustering_output_for_detail,
 )
-from clustering.lib import (
+from document_pipeline_core.clustering.lib import (
     load_prompt as load_clustering_prompt,
 )
-from clustering.repair import (
+from document_pipeline_core.clustering.repair import (
     DEFAULT_REPAIR_PROMPT_VERSION,
     IncompleteTurnCoverageError,
     clustering_repair_prompt_reference,
 )
-from common.case_paths import CONTEXT_CASES_INDEX, TRANSCRIPT_CASES_INDEX
-from common.output_detail import normalize_output_detail
-from common.prompts import normalize_prompt_version
-from common.providers import (
+from harness.paths import AI_PIPELINE_ROOT, CLUSTER_CASES_INDEX, CONTEXT_CASES_INDEX, TRANSCRIPT_CASES_INDEX
+from document_pipeline_core.common.output_detail import normalize_output_detail
+from document_pipeline_core.common.prompts import normalize_prompt_version
+from document_pipeline_core.common.providers import (
     OPENAI_REASONING_EFFORT_ENV,
     ModelSpec,
     default_model_for_provider,
     normalize_provider_name,
     openai_model_supports_reasoning_effort,
 )
-from common.templates import DEFAULT_TEMPLATES_DIR
-from common.transcripts import TranscriptCase, build_turn_catalog
-from filtering.filter import run_filtering
-from filtering.lib import (
+from document_pipeline_core.common.templates import DEFAULT_TEMPLATES_DIR
+from document_pipeline_core.common.transcripts import TranscriptCase, build_turn_catalog
+from document_pipeline_core.filtering.filter import run_filtering
+from document_pipeline_core.filtering.lib import (
     MODULE_ROOT as FILTERING_MODULE_ROOT,
 )
-from filtering.lib import (
+from document_pipeline_core.filtering.lib import (
     audit_drop_turn_ids,
     enrich_filtering_result_for_export,
     filtering_prompt_reference,
     format_filtering_output_for_detail,
 )
-from filtering.lib import (
+from document_pipeline_core.filtering.lib import (
     load_prompt as load_filtering_prompt,
 )
-from generation.generate import run_generation_session
-from generation.lib import (
+from document_pipeline_core.generation.generate import run_generation_session
+from document_pipeline_core.generation.lib import (
     DEFAULT_SECTION_CONCURRENCY,
     ClusterAssignmentInput,
     enrich_generation_session_result_for_export,
@@ -83,7 +82,7 @@ from generation.lib import (
     load_section_evidence_from_record,
     load_transcript_directives_from_record,
 )
-from generation.lib import (
+from document_pipeline_core.generation.lib import (
     load_prompt as load_generation_prompt,
 )
 from ui.bridge import (
@@ -91,7 +90,6 @@ from ui.bridge import (
     clusters_from_clustering_result,
     drop_turn_ids_from_filtering_result,
 )
-from ui.discovery import AI_PIPELINE_ROOT
 
 OUTPUT_DETAIL = "compact"
 
@@ -407,7 +405,7 @@ def run_classification_step(
         "output_path": str(output_path),
         "session_id": session_id,
         "cluster_count": len(clusters),
-        "cases_file": str(DEFAULT_CASES_INDEX),
+        "cases_file": str(CLUSTER_CASES_INDEX),
         "clustering_result_file": clustering_result_file or "",
         "template_id": template_id,
         "template_file": str(DEFAULT_TEMPLATES_DIR / f"{template_id}.json"),
@@ -563,7 +561,7 @@ def run_generation_step(
         "output_path": str(output_path),
         "session_id": session_id,
         "cluster_count": len(clusters),
-        "cases_file": str(DEFAULT_CASES_INDEX),
+        "cases_file": str(CLUSTER_CASES_INDEX),
         "classification_result_file": classification_result_file or "",
         "claim_classification_result_file": claim_classification_result_file or "",
         "clustering_result_file": clustering_result_file or "",

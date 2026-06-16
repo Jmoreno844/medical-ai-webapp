@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from common.context_spans import (
+from document_pipeline_core.common.context_spans import (
     AmbiguousDirective,
     Directive,
     DirectiveScope,
     Span,
     SpanKind,
 )
-from context_pipeline.filter_audit import (
+from document_pipeline_core.context_pipeline.filter_audit import (
     document_span_payloads_after_stages,
     enrich_document_directive_filter_for_export,
 )

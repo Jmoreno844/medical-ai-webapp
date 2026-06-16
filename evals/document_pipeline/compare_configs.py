@@ -12,12 +12,25 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKER_ROOT = REPO_ROOT / "document_pipeline_worker"
 sys.path.insert(0, str(WORKER_ROOT))
-sys.path.insert(0, str(WORKER_ROOT / "app" / "pipeline"))
 
 from app.pipeline.config import PipelineConfig  # noqa: E402
-from app.pipeline.orchestrator import run_document_pipeline  # noqa: E402
-from app.pipeline.template_parser import parse_markdown_template  # noqa: E402
-from common.transcripts import TranscriptCase  # noqa: E402
+from app.pipeline.orchestrator import parse_context_inputs, run_document_pipeline  # noqa: E402
+from document_pipeline_core.common.templates import ClinicalTemplate, TemplateSection  # noqa: E402
+from document_pipeline_core.common.transcripts import TranscriptCase  # noqa: E402
+
+
+def _parse_markdown_template(*, template_content: str, template_id: str) -> ClinicalTemplate:
+    sections: list[TemplateSection] = []
+    for line in template_content.splitlines():
+        if line.startswith("## "):
+            heading = line.removeprefix("## ").strip()
+            section_id = heading.lower().replace(" ", "_")
+            sections.append(
+                TemplateSection(section_id=section_id, heading=heading, description="")
+            )
+    if not sections:
+        sections.append(TemplateSection(section_id="motivo", heading="Motivo", description=""))
+    return ClinicalTemplate(id=template_id, name=template_id, sections=sections)
 
 
 def _load_case(path: Path, case_id: str) -> tuple[TranscriptCase, str]:
@@ -39,7 +52,7 @@ def _run_once(
     template_markdown: str,
     config: PipelineConfig,
 ) -> dict[str, object]:
-    template = parse_markdown_template(
+    template = _parse_markdown_template(
         template_content=template_markdown,
         template_id=f"eval_{case.id}",
     )
@@ -48,7 +61,14 @@ def _run_once(
         session_id=case.id,
         template=template,
         transcript_json=case.transcript_json,
-        context_content="No se agregó contexto.",
+        context_inputs=parse_context_inputs(
+            {
+                "context_inputs": {
+                    "doctor_note_markdown": "No se agregó contexto.",
+                    "external_documents": [],
+                }
+            }
+        ),
         pipeline_config=config,
     )
     elapsed_ms = int((time.perf_counter() - started) * 1000)

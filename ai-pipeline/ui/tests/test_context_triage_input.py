@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from context_pipeline.cases.lib import DoctorNoteCase
+from harness.context_cases import DoctorNoteCase
 
 from ui.context_runner import _load_context_case_bundle
 

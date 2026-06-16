@@ -10,9 +10,9 @@ from app.backend_client import BackendClient
 from app.langsmith_tracing import LangSmithRun
 from app.observability import bind_log_context, log_event
 from app.pipeline.bridge import build_transcript_json
-from app.pipeline.orchestrator import PIPELINE_STEP_LABELS, run_document_pipeline
+from app.pipeline.orchestrator import PIPELINE_STEP_LABELS, parse_context_inputs, run_document_pipeline
 from app.settings import Settings
-from common.templates import ClinicalTemplate
+from document_pipeline_core.common.templates import ClinicalTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,7 @@ class Processor:
             raise ValueError("work_item_transcription_turns_missing")
         session_id = f"enc_{work_item['encounter_id']}"
         transcript_json = build_transcript_json(session_id=session_id, turns=turns_raw)
+        context_inputs = parse_context_inputs(work_item)
 
         with bind_log_context(
             process_id=process_id,
@@ -140,7 +141,7 @@ class Processor:
                                 session_id=session_id,
                                 template=template,
                                 transcript_json=transcript_json,
-                                context_content=str(work_item.get("context_content") or ""),
+                                context_inputs=context_inputs,
                                 pipeline_config=self.settings.pipeline_config,
                                 on_step_complete=on_step_complete,
                                 on_section_complete=on_section_complete,

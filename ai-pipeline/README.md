@@ -1,97 +1,28 @@
-# AI Pipeline
+# AI Pipeline — R&D Harness
 
-Local R&D harness for experimental AI pipeline steps. Not deployed to production.
+Streamlit UI and local tooling for experimenting with the clinical document pipeline.
 
-| Path | Purpose |
-|---|---|
-| `common/` | Shared providers, case loading, prompts, JSON utils |
-| `templates/` | Shared clinical document templates (classification + generation) |
-| `cases/` | Shared fixtures: transcripts, cluster classification cases, context docs |
-| `clustering/` | Group turns by clinical topic |
-| `filtering/` | Drop non-clinical turns (sparse `drop_turn_ids`) |
-| `classification/` | Assign pre-clustered turns to template sections |
-| `generation/` | Generate document section content from classified clusters |
-| `context_pipeline/` | Doctor notes + patient PDFs → claims → section routing |
-| `ui/` | Streamlit app for E2E or per-step runs with result inspection |
+**Clinical logic lives in** [`../shared/document_pipeline_core/`](../shared/document_pipeline_core/) — this folder is only the harness shell.
 
-## Two branches
+## What stays here
 
-**Transcript:** `filtering → clustering → classification → generation`
+| Path | Role |
+|------|------|
+| `ui/` | Streamlit app, runners, viewers |
+| `harness/` | Local paths, fixture loaders, session wiring over cases |
+| `cases/` | Transcript/context fixtures for R&D |
+| `e2e_runs/` | Saved E2E manifests |
+| `*/results/` | Per-step JSON outputs from harness runs |
 
-**Context (parallel):** triage → filter/cluster/classify → section_adapter → `section_context` at generation
+## What does **not** live here anymore
 
-See [`context_pipeline/README.md`](context_pipeline/README.md).
+Prompts, step implementations, orchestrators, and clinical tests are in `document_pipeline_core`. Import only via `document_pipeline_core.*`.
 
-**Contrato completo (I/O, prompts, plantillas):** [`docs/pipeline-contract.md`](docs/pipeline-contract.md).
-
-**Contrato completo (I/O, prompts, plantillas):** [`docs/pipeline-contract.md`](docs/pipeline-contract.md).
-
-## Setup
+## Dev
 
 ```bash
 cd ai-pipeline
-cp .env.local.example .env.local
-# Set API keys / GCP project as needed (see .env.local.example)
 uv sync --group dev --group ui
-# or: make sync-ui
+uv run pytest ui/tests harness/tests -q
+uv run streamlit run ui/app.py
 ```
-
-## Run a module
-
-Shared cases live in `cases/`:
-
-- `cases/index.json` + `cases/transcripts/` — full transcript fixtures (filtering, clustering)
-- `cases/cluster/` — per-cluster fixtures for classification (`case1/<topic_label>.json`)
-- `cases/context/` — doctor notes and PDF fixtures for the context pipeline
-
-From a module directory:
-
-```bash
-# Clustering
-cd clustering
-make debug CASE_ID=case1 PROVIDER=openai
-
-# Filtering (drop non-clinical turns)
-cd ../filtering
-make debug CASE_ID=case1 PROVIDER=gemini
-make batch MODELS=openai:gpt-5.4-mini,anthropic:claude-haiku-4-5-20251001
-
-# Classification (cluster → template sections)
-cd ../classification
-make debug CASE_ID=case2_dolor_rodilla PROVIDER=openai
-
-# Generation → section content
-cd ../generation
-make debug-session SESSION_ID=case1 \
-  CLASSIFICATION_RESULT=../classification/results/20260612T222321Z_session_case1_groq.json \
-  PROVIDER=openai
-
-# Context branch (optional, merges at generation with PROMPT_VERSION=v002)
-cd ../context_pipeline/decompose && make debug CASE_ID=case1
-cd ../extract && make debug CASE_ID=case1
-cd ../classify_claims && make debug-session CASE_ID=case1 \
-  DECOMPOSE_RESULT=../decompose/results/<file>.json \
-  EXTRACT_RESULT=../extract/results/<file>.json
-```
-
-## Streamlit UI
-
-**Use the project venv** — bare `streamlit run` outside `uv` will miss deps like `groq`.
-
-```bash
-cd ai-pipeline
-make ui
-# equivalent:
-# uv sync --group dev --group ui
-# uv run streamlit run ui/app.py
-```
-
-See [`ui/README.md`](ui/README.md) for details.
-
-Default models: OpenAI `gpt-5.4-mini`, Groq `qwen/qwen3-32b`, Gemini
-`gemini-2.5-flash` (Vertex AI), Anthropic `claude-haiku-4-5-20251001`.
-
-Cases must stay dummy or de-identified. Do not commit real clinical data.
-
-When a step stabilizes, extract production logic to a worker or `shared/` and keep
-this folder as a sandbox. Formal model comparison with judges belongs in `evals/`.

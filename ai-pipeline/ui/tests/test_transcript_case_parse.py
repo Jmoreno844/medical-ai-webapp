@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from common.transcripts import build_turn_catalog
+from document_pipeline_core.common.transcripts import build_turn_catalog
 from ui.discovery import parse_transcript_case_from_json
 
 

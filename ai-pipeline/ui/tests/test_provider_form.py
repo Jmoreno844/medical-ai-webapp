@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from common.providers import GROQ_CUSTOM_MODEL_LABEL
+from document_pipeline_core.common.providers import GROQ_CUSTOM_MODEL_LABEL
 from ui.components.provider_form import provider_model_widget_values
 
 

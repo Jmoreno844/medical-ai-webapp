@@ -6,9 +6,9 @@ from pathlib import Path
 
 import streamlit as st
 
-from context_pipeline.cases.lib import DoctorNoteCase, load_context_case, load_context_cases, select_context_case
-from common.case_paths import CONTEXT_CASES_INDEX
-from common.context_spans import split_doctor_items
+from harness.context_cases import DoctorNoteCase, load_context_case, load_context_cases, select_context_case
+from harness.paths import CONTEXT_CASES_INDEX
+from document_pipeline_core.common.context_spans import split_doctor_items
 from ui.components.result_picker import render_result_picker
 from ui.components.viewers import render_step_result
 from ui.discovery import list_context_cases, list_templates

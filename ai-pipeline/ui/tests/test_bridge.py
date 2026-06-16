@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from common.transcripts import build_turn_catalog, load_cases, select_cases
+from document_pipeline_core.common.transcripts import build_turn_catalog, load_cases, select_cases
 from ui.bridge import (
     apply_filtering_to_transcript,
     clusters_from_classification_record,
@@ -117,12 +117,13 @@ def test_fixtures_do_not_match_fresh_classification_cluster_ids() -> None:
     if not classification_path.is_file():
         pytest.skip("classification result fixture not available")
 
-    from classification.lib import DEFAULT_CASES_INDEX, load_session_clusters
+    from harness.paths import CLUSTER_CASES_INDEX
+    from document_pipeline_core.classification.lib import load_session_clusters
     from ui.bridge import assignment_cluster_ids_from_classification_record
 
     payload = json.loads(classification_path.read_text(encoding="utf-8"))
     assignment_ids = assignment_cluster_ids_from_classification_record(payload)
-    fixture_clusters = load_session_clusters(DEFAULT_CASES_INDEX, "case1")
+    fixture_clusters = load_session_clusters(CLUSTER_CASES_INDEX, "case1")
     missing = missing_assignment_cluster_ids(
         assignment_cluster_ids=assignment_ids,
         clusters=fixture_clusters,

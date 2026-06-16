@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from common.case_paths import CLUSTER_CASES_INDEX
+from harness.paths import CLUSTER_CASES_INDEX
 
 from ui.cluster_lookup import (
     cluster_turns_for_ids,

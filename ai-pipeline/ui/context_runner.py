@@ -5,17 +5,17 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from common.case_paths import CONTEXT_CASES_INDEX
-from common.context_spans import (
+from harness.paths import CONTEXT_CASES_INDEX
+from document_pipeline_core.common.context_spans import (
     build_adapter_jobs,
     document_preference_directives,
     split_doctor_items,
     span_to_payload_item,
 )
-from common.output_detail import normalize_output_detail
-from common.prompts import normalize_prompt_version
-from common.templates import DEFAULT_TEMPLATES_DIR, load_template
-from context_pipeline.cases.lib import (
+from document_pipeline_core.common.output_detail import normalize_output_detail
+from document_pipeline_core.common.prompts import normalize_prompt_version
+from document_pipeline_core.common.templates import DEFAULT_TEMPLATES_DIR, load_template
+from harness.context_cases import (
     ContextCase,
     ContextCaseMeta,
     DoctorNoteCase,
@@ -23,60 +23,60 @@ from context_pipeline.cases.lib import (
     load_context_cases,
     select_context_case,
 )
-from context_pipeline.classify_clusters.classify_clusters import run_classify_clusters
-from context_pipeline.classify_clusters.lib import enrich_classify_clusters_result_for_export
-from context_pipeline.classify_clusters.lib import load_prompt as load_classify_clusters_prompt
-from context_pipeline.classify_clusters.lib import (
+from document_pipeline_core.context_pipeline.classify_clusters.classify_clusters import run_classify_clusters
+from document_pipeline_core.context_pipeline.classify_clusters.lib import enrich_classify_clusters_result_for_export
+from document_pipeline_core.context_pipeline.classify_clusters.lib import load_prompt as load_classify_clusters_prompt
+from document_pipeline_core.context_pipeline.classify_clusters.lib import (
     classify_clusters_prompt_reference,
 )
-from context_pipeline.cluster_spans.cluster_spans import run_cluster_spans
-from context_pipeline.cluster_spans.lib import enrich_cluster_spans_result_for_export
-from context_pipeline.cluster_spans.lib import load_prompt as load_cluster_spans_prompt
-from context_pipeline.cluster_spans.lib import (
+from document_pipeline_core.context_pipeline.cluster_spans.cluster_spans import run_cluster_spans
+from document_pipeline_core.context_pipeline.cluster_spans.lib import enrich_cluster_spans_result_for_export
+from document_pipeline_core.context_pipeline.cluster_spans.lib import load_prompt as load_cluster_spans_prompt
+from document_pipeline_core.context_pipeline.cluster_spans.lib import (
     cluster_spans_prompt_reference,
 )
-from context_pipeline.document_directive_filter.document_directive_filter import (
+from document_pipeline_core.context_pipeline.document_directive_filter.document_directive_filter import (
     run_document_directive_filter,
 )
-from context_pipeline.document_directive_filter.lib import load_span_selector_prompt
-from context_pipeline.filter_audit import (
+from document_pipeline_core.context_pipeline.document_directive_filter.lib import load_span_selector_prompt
+from document_pipeline_core.context_pipeline.filter_audit import (
     document_span_payloads_after_stages,
     enrich_document_directive_filter_for_export,
 )
-from context_pipeline.filter_spans.lib import enrich_filter_spans_result_for_export
-from context_pipeline.filter_spans.lib import load_prompt as load_filter_spans_prompt
-from context_pipeline.filter_spans.lib import (
+from document_pipeline_core.context_pipeline.filter_spans.lib import enrich_filter_spans_result_for_export
+from document_pipeline_core.context_pipeline.filter_spans.lib import load_prompt as load_filter_spans_prompt
+from document_pipeline_core.context_pipeline.filter_spans.lib import (
     filter_spans_prompt_reference,
 )
-from context_pipeline.section_adapter.lib import (
+from document_pipeline_core.context_pipeline.section_adapter.lib import (
     enrich_section_adapter_session_for_export,
     run_section_adapter_session,
 )
-from context_pipeline.section_adapter.lib import load_prompt as load_section_adapter_prompt
-from context_pipeline.section_adapter.lib import (
+from document_pipeline_core.context_pipeline.section_adapter.lib import load_prompt as load_section_adapter_prompt
+from document_pipeline_core.context_pipeline.section_adapter.lib import (
     section_adapter_prompt_reference,
 )
-from context_pipeline.config import (
+from document_pipeline_core.context_pipeline.config import (
     ContextPipelineConfig,
     ContextPipelinePromptBundle,
     build_context_pipeline_prompt_bundle,
 )
-from context_pipeline.session import (
+from harness.context_session import (
     ContextPipelinePartialError,
     run_context_pipeline_ad_hoc,
     run_context_pipeline_session,
 )
-from context_pipeline.span_pool import (
+from document_pipeline_core.context_pipeline.span_pool import (
     ContextSpanPools,
     build_context_span_pools_from_case,
     filter_document_spans,
     merge_approved_and_filtered_document_spans,
 )
-from context_pipeline.triage.lib import enrich_triage_result_for_export
-from context_pipeline.triage.lib import load_prompt as load_triage_prompt
-from context_pipeline.triage.lib import triage_prompt_reference
-from context_pipeline.triage.triage import run_triage
-from ui.discovery import AI_PIPELINE_ROOT
+from document_pipeline_core.context_pipeline.triage.lib import enrich_triage_result_for_export
+from document_pipeline_core.context_pipeline.triage.lib import load_prompt as load_triage_prompt
+from document_pipeline_core.context_pipeline.triage.lib import triage_prompt_reference
+from document_pipeline_core.context_pipeline.triage.triage import run_triage
+from harness.paths import AI_PIPELINE_ROOT
 
 OUTPUT_DETAIL = "compact"
 _RUNTIME: tuple[object, ...] | None = None
@@ -155,7 +155,7 @@ def _load_context_case_bundle(
 
 
 def _spans_from_prior_record(record: dict[str, object]) -> list:
-    from common.context_spans import Span
+    from document_pipeline_core.common.context_spans import Span
 
     spans_raw = record.get("spans")
     if isinstance(spans_raw, list):
@@ -170,7 +170,7 @@ def _spans_from_prior_record(record: dict[str, object]) -> list:
 
 
 def _directives_from_prior_record(record: dict[str, object]):
-    from common.context_spans import Directive, TriageResult
+    from document_pipeline_core.common.context_spans import Directive, TriageResult
 
     triage = record.get("triage_result")
     if isinstance(triage, dict):
@@ -232,7 +232,7 @@ def _document_directive_filter_for_run(context_run: object) -> dict[str, object]
     )
     input_spans = filter_spans_document_spans
     if not input_spans and filter_result is not None:
-        from context_pipeline.filter_audit import spans_after_filter_spans
+        from document_pipeline_core.context_pipeline.filter_audit import spans_after_filter_spans
 
         input_spans = spans_after_filter_spans(document_spans, filter_result)
     output_spans = directive_filtered_document_spans or input_spans
@@ -492,7 +492,7 @@ def _build_context_span_pools_for_case(
     include_doctor_note: bool = True,
     include_documents: bool = True,
 ) -> ContextSpanPools:
-    from common.context_spans import DoctorItem, TriageResult
+    from document_pipeline_core.common.context_spans import DoctorItem, TriageResult
 
     cases_index = CONTEXT_CASES_INDEX
     case_meta = select_context_case(
@@ -754,7 +754,7 @@ def run_context_classify_clusters_step(
         clusters_list = clusters_raw.get("clusters", [])
     else:
         clusters_list = []
-    from common.context_spans import SpanCluster, propagate_cluster_date_hints
+    from document_pipeline_core.common.context_spans import SpanCluster, propagate_cluster_date_hints
 
     clusters = [
         SpanCluster.model_validate(item)
@@ -856,7 +856,7 @@ def run_context_section_adapter_step(
         if isinstance(clusters_raw, dict)
         else []
     )
-    from common.context_spans import ClassifyClustersResult, SpanCluster
+    from document_pipeline_core.common.context_spans import ClassifyClustersResult, SpanCluster
 
     clusters = [
         SpanCluster.model_validate(item)

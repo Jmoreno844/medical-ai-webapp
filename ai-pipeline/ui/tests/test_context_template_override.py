@@ -4,14 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from common.case_paths import CONTEXT_CASES_INDEX
-from context_pipeline.config import (
+from harness.paths import CONTEXT_CASES_INDEX
+from document_pipeline_core.context_pipeline.config import (
     ContextPipelineConfig,
     build_context_pipeline_prompt_bundle,
 )
-from common.context_spans import ClassifyClustersResult, TriageResult
-from common.templates import DEFAULT_TEMPLATES_DIR, load_template
-from context_pipeline.session import ContextPipelineRun, run_context_pipeline_session
+from document_pipeline_core.common.context_spans import ClassifyClustersResult, TriageResult
+from document_pipeline_core.common.templates import DEFAULT_TEMPLATES_DIR, load_template
+from harness.context_session import ContextPipelineRun, run_context_pipeline_session
 
 
 def _minimal_context_run(template_id: str) -> ContextPipelineRun:
@@ -56,7 +56,7 @@ def test_run_context_pipeline_session_uses_template_override(
         return _minimal_context_run(str(kwargs["template_id"]))
 
     monkeypatch.setattr(
-        "context_pipeline.session._run_context_pipeline_core",
+        "harness.context_session.run_context_pipeline_core",
         fake_core,
     )
 
@@ -98,7 +98,7 @@ def test_run_context_pipeline_step_exports_override_template_sections(
 
     monkeypatch.setattr("ui.runner._persist_results", _fake_persist)
     monkeypatch.setattr(
-        "ui.context_runner.AI_PIPELINE_ROOT",
+        "harness.paths.AI_PIPELINE_ROOT",
         tmp_path,
     )
 

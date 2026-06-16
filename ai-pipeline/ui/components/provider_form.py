@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from common.providers import (
+from document_pipeline_core.common.providers import (
     ALLOWED_PROVIDERS,
     DEFAULT_OPENAI_REASONING_EFFORT,
     GEMINI_MODEL_CHOICES,

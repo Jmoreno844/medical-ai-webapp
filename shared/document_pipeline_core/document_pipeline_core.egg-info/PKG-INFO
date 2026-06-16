@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: document-pipeline-core
+Version: 0.1.0
+Summary: Shared clinical document pipeline logic for production worker and R&D harness
+Requires-Python: >=3.11
+Requires-Dist: anthropic<1,>=0.49.0
+Requires-Dist: google-genai<2,>=1.16.0
+Requires-Dist: groq<1,>=0.22.0
+Requires-Dist: openai<3,>=1.99.9
+Requires-Dist: pydantic<3,>=2.10.0
+Requires-Dist: python-dotenv<2,>=1.0.1
+Requires-Dist: tiktoken<1,>=0.9.0
+Requires-Dist: pdfplumber<1,>=0.11.0

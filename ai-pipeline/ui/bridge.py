@@ -3,14 +3,14 @@ from __future__ import annotations
 import copy
 from pathlib import Path
 
-from classification.lib import ClusterCase
-from common.context_claims import (
+from document_pipeline_core.classification.lib import ClusterCase
+from document_pipeline_core.common.context_claims import (
     ClaimAssignment,
     ClinicalClaim,
     group_claims_by_section,
 )
-from common.transcripts import build_turn_catalog
-from generation.lib import load_section_context_from_record
+from document_pipeline_core.common.transcripts import build_turn_catalog
+from document_pipeline_core.generation.lib import load_section_context_from_record
 from ui.discovery import load_result_json
 
 

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import streamlit as st
 
-from common.cost_projection import CostProjectionSettings
-from common.model_pricing import ANTHROPIC_PRICING_SOURCE_URL, PRICING_SOURCE_URL
-from common.usage_cost import (
+from document_pipeline_core.common.cost_projection import CostProjectionSettings
+from document_pipeline_core.common.model_pricing import ANTHROPIC_PRICING_SOURCE_URL, PRICING_SOURCE_URL
+from document_pipeline_core.common.usage_cost import (
     UsageCostLine,
     format_usd,
     iter_e2e_usage_cost_lines,

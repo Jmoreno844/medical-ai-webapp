@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from generation.lib import GenerationValidationError
+from document_pipeline_core.generation.lib import GenerationValidationError
 from ui.e2e_pipeline import persist_failed_step_output
 from ui.e2e_viewer import extract_generation_failed_display
 from ui.runner import PipelineRunOutput, StepConfig

@@ -21,6 +21,10 @@ class FakeBackend:
             "transcription_document_id": payload["transcription_document_id"],
             "doctor_template_id": payload["doctor_template_id"],
             "encounter_id": 99,
+            "context_inputs": {
+                "doctor_note_markdown": "No se agregó contexto.",
+                "external_documents": [],
+            },
             "context_content": "No se agregó contexto.",
             "template": {
                 "id": "doctor_template_14",
