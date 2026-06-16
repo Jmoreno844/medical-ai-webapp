@@ -10,7 +10,7 @@ from classification.templates import load_template
 def _demo_cluster() -> dict[str, object]:
     cluster = ClusterCase(
         id="case1_demo",
-        template_id="consulta_estructurada_v002",
+        template_id="consulta_estructurada_v001",
         cluster_json={
             "topic_label": "demo",
             "turns": [{"turn_id": 0, "speaker": "PACIENTE", "text": "me duele el pecho"}],
@@ -25,7 +25,7 @@ def test_system_prompt_not_empty() -> None:
 
 
 def test_render_user_payload_emits_four_blocks() -> None:
-    template = load_template("consulta_estructurada_v002")
+    template = load_template("consulta_estructurada_v001")
     payload = render_user_payload(template=template, clusters=[_demo_cluster()])
     assert "<template_ref>" in payload
     assert "<template_classification_guidelines>" in payload
@@ -36,7 +36,7 @@ def test_render_user_payload_emits_four_blocks() -> None:
 
 
 def test_render_user_payload_clusters_json_valid() -> None:
-    template = load_template("consulta_estructurada_v002")
+    template = load_template("consulta_estructurada_v001")
     payload = render_user_payload(template=template, clusters=[_demo_cluster()])
     clusters_start = payload.index("<clusters>") + len("<clusters>\n")
     clusters_end = payload.index("</clusters>")
@@ -46,7 +46,7 @@ def test_render_user_payload_clusters_json_valid() -> None:
 
 
 def test_render_user_payload_sections_have_classification_guidelines() -> None:
-    template = load_template("consulta_estructurada_v002")
+    template = load_template("consulta_estructurada_v001")
     payload = render_user_payload(template=template, clusters=[_demo_cluster()])
     assert '<section id="signos_vitales">' in payload
     assert "Title: Signos vitales" in payload
@@ -57,7 +57,7 @@ def test_render_user_payload_sections_have_classification_guidelines() -> None:
 
 
 def test_output_schema_enum_matches_template_sections() -> None:
-    template = load_template("consulta_estructurada_v002")
+    template = load_template("consulta_estructurada_v001")
     schema = output_schema(template)
     enum_values = schema["properties"]["assignments"]["items"]["properties"][
         "section_ids"

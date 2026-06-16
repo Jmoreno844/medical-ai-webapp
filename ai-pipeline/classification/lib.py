@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from pydantic import BaseModel, Field, ValidationError
@@ -63,6 +63,7 @@ class BatchAssignmentAudit:
     extra_cluster_ids: list[str]
     duplicate_cluster_ids: list[str]
     invalid_section_cluster_ids: list[str]
+    invalid_section_assignments: list[dict[str, object]] = field(default_factory=list)
 
     @property
     def is_valid(self) -> bool:
@@ -82,7 +83,37 @@ class BatchAssignmentAudit:
             "extra_cluster_ids": self.extra_cluster_ids,
             "duplicate_cluster_ids": self.duplicate_cluster_ids,
             "invalid_section_cluster_ids": self.invalid_section_cluster_ids,
+            "invalid_section_assignments": self.invalid_section_assignments,
         }
+
+
+class ClassificationValidationError(ValueError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        raw_response: str | None = None,
+        classification_result: dict[str, object] | None = None,
+        batch_assignment_audit: dict[str, object] | None = None,
+        cluster_ids: list[str] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.raw_response = raw_response
+        self.classification_result = classification_result
+        self.batch_assignment_audit = batch_assignment_audit
+        self.cluster_ids = list(cluster_ids or [])
+
+    def diagnostics(self) -> dict[str, object]:
+        payload: dict[str, object] = {}
+        if self.raw_response is not None:
+            payload["raw_response"] = self.raw_response
+        if self.classification_result is not None:
+            payload["classification_result"] = self.classification_result
+        if self.batch_assignment_audit is not None:
+            payload["batch_assignment_audit"] = self.batch_assignment_audit
+        if self.cluster_ids:
+            payload["cluster_ids"] = self.cluster_ids
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -487,6 +518,7 @@ def audit_batch_assignments(
     extra_cluster_ids = sorted(assigned_set - expected_set)
 
     invalid_section_cluster_ids: list[str] = []
+    invalid_section_assignments: list[dict[str, object]] = []
     for assignment in result.assignments:
         section_audit = audit_section_ids(
             ClassificationResult(section_ids=assignment.section_ids),
@@ -494,6 +526,14 @@ def audit_batch_assignments(
         )
         if not section_audit.is_valid:
             invalid_section_cluster_ids.append(assignment.cluster_id)
+            invalid_section_assignments.append(
+                {
+                    "cluster_id": assignment.cluster_id,
+                    "assigned_section_ids": list(assignment.section_ids),
+                    "unknown_section_ids": list(section_audit.unknown_section_ids),
+                    "duplicate_section_ids": list(section_audit.duplicate_section_ids),
+                }
+            )
 
     return BatchAssignmentAudit(
         expected_cluster_ids=expected_cluster_ids,
@@ -502,6 +542,7 @@ def audit_batch_assignments(
         extra_cluster_ids=extra_cluster_ids,
         duplicate_cluster_ids=sorted(duplicate_cluster_ids),
         invalid_section_cluster_ids=sorted(invalid_section_cluster_ids),
+        invalid_section_assignments=invalid_section_assignments,
     )
 
 
@@ -726,6 +767,7 @@ __all__ = [
     "ClassificationBatchResult",
     "ClassificationResult",
     "ClassificationSessionResult",
+    "ClassificationValidationError",
     "ClusterAssignment",
     "ClusterCase",
     "SectionAudit",

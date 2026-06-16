@@ -56,3 +56,13 @@ def test_list_classification_prompt_versions_includes_v004() -> None:
     versions = list_prompt_versions("classification")
     assert "v003" in versions
     assert "v004" in versions
+
+
+def test_default_context_triage_prompt_version_is_v001() -> None:
+    assert DEFAULT_PROMPT_VERSIONS["context_triage"] == "v001"
+    assert default_prompt_version("context_triage") == "v001"
+
+
+def test_list_context_triage_prompt_versions_only_v001() -> None:
+    versions = list_prompt_versions("context_triage")
+    assert versions == ["v001"]

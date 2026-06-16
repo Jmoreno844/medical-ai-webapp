@@ -89,3 +89,37 @@ def test_call_anthropic_omits_output_config_without_schema() -> None:
 
     kwargs = mock_client.messages.create.call_args.kwargs
     assert "output_config" not in kwargs
+
+
+def test_call_openai_respects_json_mode_false_override() -> None:
+    with (
+        patch("openai.OpenAI") as mock_openai_cls,
+        patch(
+            "common.providers._require_api_key",
+            return_value="test-key",
+        ),
+        patch(
+            "common.providers.provider_runtime_config",
+            return_value=provider_runtime_config("openai"),
+        ),
+        patch(
+            "common.providers._resolve_openai_reasoning_effort",
+            return_value=({}, {}),
+        ),
+        patch(
+            "common.stream_timing._consume_chat_completion_stream",
+            return_value=LlmResponse(content="markdown body"),
+        ) as mock_stream,
+    ):
+        mock_openai_cls.return_value = MagicMock()
+
+        call_llm_detailed(
+            provider="openai",
+            model="gpt-4.1-mini",
+            system="system",
+            user="user",
+            json_mode=False,
+        )
+
+    kwargs = mock_stream.call_args.kwargs["kwargs"]
+    assert "response_format" not in kwargs

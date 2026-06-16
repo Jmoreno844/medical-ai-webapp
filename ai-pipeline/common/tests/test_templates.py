@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from common.templates import compose_section_guidelines, load_template
+from common.templates import compose_section_guidelines, load_template, resolve_generation_mode
 
 
 def test_load_template_splits_classification_and_generation_guidelines() -> None:
@@ -66,32 +66,38 @@ def test_outpatient_general_template_loads_with_seventeen_sections() -> None:
     assert template.section_by_id("comprension_plan") is not None
 
 
-def test_consulta_estructurada_template_loads_with_nine_sections() -> None:
+def test_consulta_estructurada_template_loads_with_ten_sections() -> None:
     template = load_template("consulta_estructurada_v001")
     assert template.id == "consulta_estructurada_v001"
-    assert len(template.sections) == 9
+    assert template.name == "Consulta estructurada (R&D) v1"
+    assert len(template.sections) == 10
     assert template.section_by_id("revision_sistemas") is not None
     assert template.section_by_id("analisis_y_plan") is not None
+    assert template.section_by_id("antecedentes_gineco_obstetricos") is not None
     signos = template.section_by_id("signos_vitales")
     assert signos is not None
-    assert "Presión arterial sistólica" in signos.generation.guidelines
-    assert signos.to_generation_payload()["guidelines"] == signos.generation.guidelines
-
-
-def test_consulta_estructurada_v002_loads_with_ten_sections() -> None:
-    template = load_template("consulta_estructurada_v002")
-    assert template.id == "consulta_estructurada_v002"
-    assert template.name == "Consulta estructurada (R&D) v2"
-    assert len(template.sections) == 10
-    assert template.section_by_id("antecedentes_gineco_obstetricos") is not None
+    signos_guidelines = signos.to_generation_payload()["guidelines"]
+    assert isinstance(signos_guidelines, str)
+    assert "Presión arterial sistólica" in signos_guidelines
     estudios = template.section_by_id("estudios_y_resultados")
     assert estudios is not None
     assert "ECG" in estudios.include
     assert "biopsia" in estudios.include
 
 
+def test_resolve_generation_mode_uses_template_field_or_fallback() -> None:
+    template = load_template("consulta_estructurada_v001")
+    motivo = template.section_by_id("motivo_consulta")
+    assert motivo is not None
+    assert resolve_generation_mode(motivo) == "short_single_field"
+
+    section = template.section_by_id("enfermedad_actual")
+    assert section is not None
+    assert resolve_generation_mode(section) == "narrative"
+
+
 def test_compose_section_guidelines_with_include_and_boundaries() -> None:
-    section = load_template("consulta_estructurada_v002").section_by_id("signos_vitales")
+    section = load_template("consulta_estructurada_v001").section_by_id("signos_vitales")
     assert section is not None
     guidelines = section.to_generation_payload()["guidelines"]
     assert isinstance(guidelines, str)

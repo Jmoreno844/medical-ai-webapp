@@ -26,7 +26,7 @@ def test_parse_section_adapter_result_accepts_legacy_content() -> None:
 
 
 def test_render_section_adapter_payload_v002_json() -> None:
-    template = load_template("consulta_estructurada_v002")
+    template = load_template("consulta_estructurada_v001")
     section = template.section_by_id("signos_vitales")
     assert section is not None
     payload = json.loads(
@@ -44,7 +44,7 @@ def test_render_section_adapter_payload_v002_json() -> None:
 
 
 def test_render_section_adapter_payload_v003_semantic_blocks() -> None:
-    template = load_template("consulta_estructurada_v002")
+    template = load_template("consulta_estructurada_v001")
     section = template.section_by_id("antecedentes")
     assert section is not None
     clusters = [

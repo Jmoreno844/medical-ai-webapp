@@ -18,6 +18,9 @@ PY_PROMPTS: dict[str, dict[str, str]] = {
     "clustering_repair": {
         "v002": "clustering.prompts.clustering_repair_prompt_v001",
     },
+    "context_triage": {
+        "v001": "context_pipeline.triage.prompts.triage_prompt_v001",
+    },
     "context_filter_spans": {
         "v002": "context_pipeline.filter_spans.prompts.filter_spans_prompt_v001",
     },
@@ -27,8 +30,20 @@ PY_PROMPTS: dict[str, dict[str, str]] = {
     "context_cluster_spans": {
         "v002": "context_pipeline.cluster_spans.prompts.cluster_spans_prompt_v001",
     },
+    "context_document_directive_filter": {
+        "v001": "context_pipeline.document_directive_filter.prompts.span_selector_prompt_v001",
+    },
     "context_section_adapter": {
         "v003": "context_pipeline.section_adapter.prompts.adapter_prompt_v001",
+    },
+    "generation_direct": {
+        "v001": "generation.prompts.direct.generation_direct_prompt_v001",
+    },
+    "generation_planner": {
+        "v001": "generation.prompts.two_step.section_planner_prompt_v001",
+    },
+    "generation_renderer": {
+        "v001": "generation.prompts.two_step.section_renderer_prompt_v001",
     },
 }
 

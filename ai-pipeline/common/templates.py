@@ -11,6 +11,29 @@ DEFAULT_TEMPLATES_DIR = AI_PIPELINE_ROOT / "templates"
 
 class StepGuidelines(BaseModel):
     guidelines: str = ""
+    mode: str = ""
+
+
+_SECTION_GENERATION_MODE_BY_ID: dict[str, str] = {
+    "motivo_consulta": "short_single_field",
+    "enfermedad_actual": "narrative",
+    "revision_sistemas": "items_by_system",
+    "antecedentes": "single_fields",
+    "antecedentes_gineco_obstetricos": "single_fields",
+    "signos_vitales": "single_fields",
+    "examen_fisico": "items_by_region",
+    "estudios_y_resultados": "structured_items",
+    "analisis_y_plan": "mixed_clinical_items",
+    "analisis_clinico": "mixed_clinical_items",
+    "identificacion": "single_fields",
+}
+
+
+def resolve_generation_mode(section: TemplateSection) -> str:
+    configured = section.generation.mode.strip()
+    if configured:
+        return configured
+    return _SECTION_GENERATION_MODE_BY_ID.get(section.section_id, "narrative")
 
 
 def compose_section_guidelines(
@@ -147,7 +170,7 @@ __all__ = [
     "StepGuidelines",
     "TemplateSection",
     "compose_section_guidelines",
-    "list_template_ids",
+    "resolve_generation_mode",
     "load_template",
     "template_file_path",
 ]

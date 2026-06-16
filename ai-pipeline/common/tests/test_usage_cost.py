@@ -41,6 +41,32 @@ def test_compute_usage_cost_usd_gpt_5_4_mini() -> None:
     assert output_cost == 4.50
 
 
+def test_compute_usage_cost_usd_claude_haiku_4_5() -> None:
+    input_cost, output_cost, pricing = compute_usage_cost_usd(
+        provider="anthropic",
+        model="claude-haiku-4-5-20251001",
+        usage=TokenUsage(input_tokens=1_000_000, output_tokens=1_000_000),
+    )
+    assert pricing is not None
+    assert input_cost == 1.00
+    assert output_cost == 5.00
+
+
+def test_compute_usage_cost_usd_claude_haiku_cache_read() -> None:
+    input_cost, _, pricing = compute_usage_cost_usd(
+        provider="anthropic",
+        model="claude-haiku-4-5",
+        usage=TokenUsage(
+            input_tokens=1_000_000,
+            output_tokens=0,
+            cached_input_tokens=1_000_000,
+        ),
+        billed_cached_input_tokens=1_000_000,
+    )
+    assert pricing is not None
+    assert input_cost == 0.10
+
+
 def test_compute_usage_cost_usd_no_cache_mode_ignores_reported_cached() -> None:
     input_cost, _, pricing = compute_usage_cost_usd(
         provider="openai",

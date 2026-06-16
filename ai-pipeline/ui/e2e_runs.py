@@ -4,12 +4,14 @@ import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 
 from ui.discovery import AI_PIPELINE_ROOT, load_result_json
 from ui.runner import PipelineRunOutput
 
 E2E_RUNS_DIR = AI_PIPELINE_ROOT / "e2e_runs"
 MANIFEST_VERSION = 1
+E2ERunStatus = Literal["complete", "failed"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +24,17 @@ class E2ERunMeta:
     template_id: str
     run_started_at: str
     include_context: bool
+    status: E2ERunStatus = "complete"
+    failed_step: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LoadedE2ERun:
+    manifest_path: Path
+    status: E2ERunStatus
+    failed_step: str | None
+    error_message: str | None
+    outputs: list[dict[str, object]]
 
 
 def _run_label(
@@ -31,14 +44,17 @@ def _run_label(
     session_id: str,
     template_id: str,
     include_context: bool,
+    status: E2ERunStatus,
+    failed_step: str | None,
 ) -> str:
     timestamp = run_started_at
     if "T" in run_started_at:
         timestamp = run_started_at.split("+")[0].replace(":", "").replace("-", "")[:15]
     context_suffix = " + context" if include_context else ""
-    return (
-        f"{timestamp} · {case_id} / {session_id} · {template_id}{context_suffix}"
-    )
+    base = f"{timestamp} · {case_id} / {session_id} · {template_id}{context_suffix}"
+    if status == "failed" and failed_step:
+        return f"{base} · failed at {failed_step}"
+    return base
 
 
 def _first_run_started_at(outputs: list[PipelineRunOutput]) -> str:
@@ -64,6 +80,9 @@ def save_e2e_run(
     template_id: str,
     include_context: bool = False,
     context_case_id: str | None = None,
+    status: E2ERunStatus = "complete",
+    failed_step: str | None = None,
+    error_message: str | None = None,
 ) -> Path:
     if not outputs:
         raise ValueError("e2e_run_outputs_empty")
@@ -81,6 +100,7 @@ def save_e2e_run(
     manifest: dict[str, object] = {
         "version": MANIFEST_VERSION,
         "run_id": run_id,
+        "status": status,
         "run_started_at": run_started_at,
         "run_finished_at": run_finished_at,
         "case_id": case_id,
@@ -88,6 +108,8 @@ def save_e2e_run(
         "template_id": template_id,
         "include_context": include_context,
         "context_case_id": context_case_id,
+        "failed_step": failed_step,
+        "error_message": error_message,
         "outputs": [
             {
                 "step": output.step,
@@ -127,12 +149,21 @@ def list_e2e_runs() -> list[E2ERunMeta]:
         template_id = payload.get("template_id")
         run_started_at = payload.get("run_started_at")
         include_context = payload.get("include_context")
+        status_raw = payload.get("status", "complete")
+        failed_step = payload.get("failed_step")
 
         if not all(
             isinstance(value, str)
             for value in (run_id, case_id, session_id, template_id, run_started_at)
         ):
             continue
+
+        status: E2ERunStatus = (
+            "failed" if status_raw == "failed" else "complete"
+        )
+        failed_step_str = (
+            failed_step if isinstance(failed_step, str) and failed_step.strip() else None
+        )
 
         metas.append(
             E2ERunMeta(
@@ -144,18 +175,26 @@ def list_e2e_runs() -> list[E2ERunMeta]:
                     session_id=session_id,
                     template_id=template_id,
                     include_context=bool(include_context),
+                    status=status,
+                    failed_step=failed_step_str,
                 ),
                 case_id=case_id,
                 session_id=session_id,
                 template_id=template_id,
                 run_started_at=run_started_at,
                 include_context=bool(include_context),
+                status=status,
+                failed_step=failed_step_str,
             )
         )
     return metas
 
 
 def load_e2e_run_outputs(manifest_path: Path) -> list[dict[str, object]]:
+    return load_e2e_run(manifest_path).outputs
+
+
+def load_e2e_run(manifest_path: Path) -> LoadedE2ERun:
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("e2e_manifest_must_be_object")
@@ -163,6 +202,19 @@ def load_e2e_run_outputs(manifest_path: Path) -> list[dict[str, object]]:
     outputs_raw = payload.get("outputs")
     if not isinstance(outputs_raw, list):
         raise ValueError("e2e_manifest_outputs_missing")
+
+    status_raw = payload.get("status", "complete")
+    status: E2ERunStatus = "failed" if status_raw == "failed" else "complete"
+    failed_step = payload.get("failed_step")
+    error_message = payload.get("error_message")
+    failed_step_str = (
+        failed_step if isinstance(failed_step, str) and failed_step.strip() else None
+    )
+    error_message_str = (
+        error_message
+        if isinstance(error_message, str) and error_message.strip()
+        else None
+    )
 
     clustering_output_path = ""
     for entry in outputs_raw:
@@ -203,13 +255,22 @@ def load_e2e_run_outputs(manifest_path: Path) -> list[dict[str, object]]:
 
     if not persisted:
         raise ValueError("e2e_manifest_outputs_empty")
-    return persisted
+    return LoadedE2ERun(
+        manifest_path=manifest_path,
+        status=status,
+        failed_step=failed_step_str,
+        error_message=error_message_str,
+        outputs=persisted,
+    )
 
 
 __all__ = [
     "E2E_RUNS_DIR",
     "E2ERunMeta",
+    "E2ERunStatus",
+    "LoadedE2ERun",
     "list_e2e_runs",
+    "load_e2e_run",
     "load_e2e_run_outputs",
     "save_e2e_run",
 ]

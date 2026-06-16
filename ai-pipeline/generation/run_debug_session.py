@@ -38,6 +38,7 @@ from generation.lib import (  # noqa: E402
     format_section_output_for_detail,
     format_session_debug_output,
     load_section_context_from_record,
+    load_section_evidence_from_record,
     load_classification_assignments,
     load_prompt,
     prompt_file_path,
@@ -137,10 +138,11 @@ def main() -> int:
     assignments = load_classification_assignments(classification_result_path)
     clusters = load_session_clusters(Path(args.cases), args.session_id)
     section_context = None
+    section_evidence = None
     if args.claim_classification_result:
-        section_context = load_section_context_from_record(
-            Path(args.claim_classification_result)
-        )
+        claim_path = Path(args.claim_classification_result)
+        section_context = load_section_context_from_record(claim_path)
+        section_evidence = load_section_evidence_from_record(claim_path)
     template_id = (
         args.template_id
         or template_id_from_classification_result(classification_result_path)
@@ -169,6 +171,8 @@ def main() -> int:
             system_prompt=system_prompt,
             section_concurrency=args.section_concurrency,
             section_context=section_context,
+            section_evidence=section_evidence,
+            prompt_version=prompt_version,
         )
     except Exception as exc:
         print(f"\nerror: {exc}")

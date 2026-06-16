@@ -98,11 +98,18 @@ def _generation_cacheable_tokens(
     label: str,
     include_template: bool,
 ) -> int:
-    from generation.lib import generation_prompt_file_path
+    from generation.lib import (
+        generation_direct_uses_py_prompt,
+        generation_prompt_file_path,
+        load_generation_direct_prompt,
+    )
 
     prompt_version = _prompt_version_from_record(result_record)
-    prompt_path = generation_prompt_file_path(prompt_version)
-    tokens = _count_prompt_file_tokens(str(prompt_path))
+    if generation_direct_uses_py_prompt(prompt_version):
+        tokens = count_text_tokens(load_generation_direct_prompt(prompt_version))
+    else:
+        prompt_path = generation_prompt_file_path(prompt_version)
+        tokens = _count_prompt_file_tokens(str(prompt_path))
 
     if not include_template:
         return tokens
@@ -204,6 +211,18 @@ def estimate_cacheable_input_tokens(
                         return count_text_tokens(load_filter_spans_prompt(prompt_version))
                     return _count_prompt_file_tokens(
                         str(filter_spans_prompt_file_path(prompt_version))
+                    )
+                if key == "triage":
+                    from context_pipeline.triage.lib import (
+                        load_triage_prompt,
+                        triage_uses_py_prompt,
+                        triage_prompt_file_path,
+                    )
+
+                    if triage_uses_py_prompt(prompt_version):
+                        return count_text_tokens(load_triage_prompt(prompt_version))
+                    return _count_prompt_file_tokens(
+                        str(triage_prompt_file_path(prompt_version))
                     )
                 if key == "classify_clusters":
                     from context_pipeline.classify_clusters.lib import (

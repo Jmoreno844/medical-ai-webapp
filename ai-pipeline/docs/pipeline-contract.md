@@ -24,15 +24,19 @@ flowchart TB
     DOC[PDF / texto]
     SD[split_doctor_items · código]
     TR[triage v001]
-    BS[build_spans · código]
+    AN[approved_note_spans · código]
+    BS[build_spans documentos · código]
     FS[filter_spans v002]
+    MERGE[merge]
     CS[cluster_spans v002]
     CC[classify_clusters v002]
     SA[section_adapter v003]
     DN --> SD --> TR
-    TR --> BS
+    TR --> AN
     DOC --> BS
-    BS --> FS --> CS --> CC --> SA
+    AN --> MERGE
+    BS --> FS --> MERGE
+    MERGE --> CS --> CC --> SA
   end
 
   TMPL[(ClinicalTemplate<br/>templates/*.json)]
@@ -77,8 +81,9 @@ Leyenda de columnas:
 | Etapa | LLM | Input (dominio) | User al modelo | Output parseado | Salida downstream |
 |-------|-----|-----------------|----------------|-----------------|-------------------|
 | split / build / merge | No | nota, PDF, texto | — | `DoctorItem[]`, `Span[]` pool | `Span[]` ids `"1"`…`"N"` |
-| triage | Sí | `DoctorItem[]` | JSON `{session_id, items[]}` | `TriageResult` → `{directives[], content_ids[], drop_ids[]}` | filtra qué items/spans construir |
-| filter_spans | Sí | `Span[]` + fechas + `Directive[]` | v001/v002: JSON (sin `date_hint` en spans) | `FilterSpansResult` → `{drop_ids: str[]}` | `Span[]` filtrados |
+| triage | Sí | `DoctorItem[]` + manifest (docs + secciones) | JSON `{session_id, manifest, items[]}` | `TriageResult` → `{directives[], content_ids[], drop_ids[]}` | filtra qué items/spans construir; directives por scope |
+| filter_spans | Sí | `Span[]` de **documentos** + fechas (sin directives) | v001/v002: JSON (sin `date_hint` en spans) | `FilterSpansResult` → `{drop_ids: str[]}` | `document_directive_filter` → merge con `approved_note_spans` |
+| document_directive_filter | Parcial | `Span[]` documentales + `Directive[]` documentales | selector v001: `{directive, spans}` | `keep_ids[]` / ignore determinístico | spans documentales finales antes de clustering |
 | cluster_spans | Sí | `Span[]` filtrados | v001: JSON `{spans}` · v002: `<spans>` + `<span id>` | `SpanCluster[]` → `{id, title, span_ids[]}` | clusters con `date_hints` propagados |
 | classify_clusters | Sí | `SpanCluster[]` + `Span[]` + plantilla + fechas | v001: JSON monolítico · v002: bloques semánticos | `ClassifyClustersResult` → `{assignments[{cluster_id, section_ids[]}]}` | `build_adapter_jobs()` → `{section_id: [cluster_id]}` |
 | section_adapter | Sí | job por sección + clusters + spans | v003: `<section>`, `<guidelines>`, `<input_json>` · v002: JSON | `SectionAdapterResult` → `{section_id, brief}` | `section_context: dict[str, str]` (brief por sección) |
@@ -104,7 +109,7 @@ Leyenda de columnas:
 | clustering repair | `clustering/prompts/clustering_repair_prompt_v001.py` (o `clustering_repair_v001.txt`) | **v002** | v001 (.txt); solo si faltan turnos tras clustering |
 | classification | `classification/prompts/classification_prompt_v001.py` (o `classification_v003.txt`) | **v004** | v001, v002, v003 (.txt) |
 | generation | `generation/prompts/generation_v003.txt` | **v003** | v001, v002 |
-| triage | `context_pipeline/triage/prompts/triage_v001.txt` | **v001** | — |
+| triage | `context_pipeline/triage/prompts/triage_prompt_v001.py` | **v001** | — |
 | filter_spans | `context_pipeline/filter_spans/prompts/filter_spans_prompt_v001.py` (o `filter_spans_v001.txt`) | **v002** | v001 (.txt) |
 | cluster_spans | `context_pipeline/cluster_spans/prompts/cluster_spans_prompt_v001.py` (o `cluster_spans_v001.txt`) | **v002** | v001 (.txt) |
 | classify_clusters | `context_pipeline/classify_clusters/prompts/classify_clusters_prompt_v001.py` (o `classify_clusters_v001.txt`) | **v002** | v001 (.txt) |
@@ -112,7 +117,7 @@ Leyenda de columnas:
 
 Los módulos `.py` usan sufijo `*_prompt_v001.py` (primer artefacto Python del paso). La clave de versión en UI/registry (`v002`, `v003`, `v004`) sigue alineada con el historial de `.txt` y no con el nombre del archivo.
 
-Plantillas disponibles: `minimal_outpatient_v001`, `outpatient_general_v001`, `consulta_estructurada_v001`, `consulta_estructurada_v002`.
+Plantillas disponibles: `minimal_outpatient_v001`, `outpatient_general_v001`, `consulta_estructurada_v001`.
 
 ---
 
@@ -356,7 +361,7 @@ Módulo `classification/prompts/classification_prompt_v001.py` → constante `SY
 
 ```
 <template_ref>
-id: consulta_estructurada_v002
+id: consulta_estructurada_v001
 allowed_section_ids: ["identificacion", "motivo_consulta", ...]
 </template_ref>
 
@@ -446,7 +451,7 @@ classification_guidelines: {compose_section_guidelines(...)}
     }
   ],
   "template_ref": {
-    "id": "consulta_estructurada_v002",
+    "id": "consulta_estructurada_v001",
     "allowed_section_ids": ["identificacion", "motivo_consulta", "..."]
   }
 }
@@ -559,10 +564,9 @@ Orquestación: `context_pipeline/session.py`.
 | Paso | Función | Input (dominio) | Output (dominio) |
 |------|---------|-----------------|------------------|
 | Split nota | `split_doctor_items()` | `str` (nota médico) | `tuple[DoctorItem[], is_pasted]` |
-| Build spans (nota) | `doctor_items_to_spans()` | `DoctorItem[]` filtrados por `content_ids` | `Span[]` |
-| Build spans (PDF) | `build_spans_from_pdf()` | `Path` PDF + `doc: str` | `Span[]` (`kind`, `flags?`) |
-| Build spans (texto) | `build_spans_from_text()` | `str` pegado + `doc: str` | `Span[]` |
-| Merge | `merge_spans()` | `Span[][]` | `Span[]` con ids `"1"`…`"N"` globales |
+| Build spans (nota) | `doctor_items_to_spans()` o `build_spans_from_text()` si `is_pasted` | `DoctorItem[]` + `content_ids` o nota pegada | `approved_note_spans` (no pasan por `filter_spans`) |
+| Build spans (PDF/texto doc) | `build_spans_from_pdf()` / `build_spans_from_text()` | paths / texto | `document_spans` → `filter_spans` |
+| Merge | `merge_approved_and_filtered_document_spans()` | `approved_note_spans` + documentos filtrados | `filtered_spans` con ids globales |
 | Apply drops | `apply_span_drops()` | `Span[]` + `drop_ids: str[]` | `Span[]` filtrados |
 | Propagate dates | `propagate_cluster_date_hints()` | `SpanCluster[]` + `Span[]` | `SpanCluster[]` con `date_hints[]` |
 | Adapter jobs | `build_adapter_jobs()` | `ClassifyClustersResult` + `section_id` set | `dict[section_id, list[cluster_id]]` |
@@ -588,29 +592,33 @@ Orquestación: `context_pipeline/session.py`.
 | | |
 |---|---|
 | **LLM** | Sí |
-| **Input (dominio)** | `DoctorItem[]` (segmentos de la nota) |
-| **User al modelo** | JSON `{session_id, items[{id, text}]}` |
+| **Input (dominio)** | `DoctorItem[]` (segmentos de la nota; `id` numérico `"1"`, `"2"`, …) |
+| **User al modelo** | bloque `<input_json>` con `{session_id, manifest{available_documents, template_section_ids}, items[{id, text}]}` |
 | **Output parseado** | `TriageResult` → `{directives[], content_ids[], drop_ids[]}` |
-| **Salida downstream** | filtra build de spans y guía filter_spans / adapter |
+| **Salida downstream** | `approved_note_spans` (bypass filter) + `document_directive_filter` / adapter / generation vía `directives` por scope |
 
-| | |
-|---|---|
-| **Prompt** | `triage_v001.txt` |
-| **User** | `{ "session_id", "items": [{ "id", "text" }] }` |
+| Versión | System | User | Structured output |
+|---------|--------|------|-------------------|
+| **v001** (default) | `triage_prompt_v001.py` → `SYSTEM_PROMPT` | `<input_json>` con `session_id`, `manifest`, `items` | Sí |
 
 **Output:**
 
 ```json
 {
   "directives": [
-    { "target": "epicrisis", "action": "limit_to", "hint": "solo neumonía" }
+    {
+      "scope": "document",
+      "action": "limit_source_to",
+      "target": "case2_epicrisis",
+      "topic": "neumonía"
+    }
   ],
-  "content_ids": ["m3", "m4"],
-  "drop_ids": ["m1"]
+  "content_ids": [3],
+  "drop_ids": [1, 2]
 }
 ```
 
-`DirectiveAction`: `use` | `limit_to` | `ignore`.
+`Directive` usa `scope` (`document` | `transcript` | `generation`) + `action` + campos opcionales (`target`, `topic`, `section_id`, `instruction`). Prohibido `transcript.ignore_source`. `transcript.limit_to_topic` requiere `section_id`.
 
 ---
 
@@ -619,10 +627,10 @@ Orquestación: `context_pipeline/session.py`.
 | | |
 |---|---|
 | **LLM** | Sí |
-| **Input (dominio)** | `Span[]` + `encounter_date?` + `document_date?` + `Directive[]` |
+| **Input (dominio)** | `Span[]` de documentos + `encounter_date?` + `document_date?` (filtro clínico general; sin directives de triage) |
 | **Output parseado** | `FilterSpansResult` → `{drop_ids: str[]}` |
-| **Post-proceso** | `apply_span_drops()` |
-| **Salida downstream** | `Span[]` filtrados → cluster_spans |
+| **Post-proceso** | `apply_span_drops()` solo sobre `document_spans` |
+| **Salida downstream** | `document_directive_filter` → merge con `approved_note_spans` → `cluster_spans` |
 
 | Versión | System | User | Structured output |
 |---------|--------|------|-------------------|
@@ -634,6 +642,24 @@ Orquestación: `context_pipeline/session.py`.
 ```json
 { "drop_ids": ["7"] }
 ```
+
+---
+
+### 6b. Document directive filter
+
+| | |
+|---|---|
+| **LLM** | Solo para `limit_source_to` y `exclude_topic` (selector de span IDs) |
+| **Input (dominio)** | `Span[]` ya filtrados clínicamente + `Directive[]` con `scope=document` |
+| **Determinístico** | `ignore_source` elimina todos los spans del documento resuelto |
+| **Selector** | devuelve `keep_ids[]` existentes; no reescribe texto |
+| **Ambiguo** | target documental no resuelto → no aplicar destructivamente; auditar |
+| **Preferencias** | `use_source` / `prefer_topic` no filtran aquí; van al adapter |
+| **Salida downstream** | spans documentales reducidos → merge con `approved_note_spans` |
+
+| Versión | System | User | Structured output |
+|---------|--------|------|-------------------|
+| **v001** (default) | `document_directive_filter/prompts/span_selector_prompt_v001.py` | `<input_json>` con `directive` + `spans` | Sí (`keep_ids`) |
 
 ---
 
@@ -774,27 +800,63 @@ Incluye: ...
 
 **Output legacy:** `{ "section_id", "content" }` — el parser normaliza `content` → `brief`.
 
+**Export adicional:** `section_evidence: dict[section_id, list[{id, doc, text, date_hint?}]]` — pool de spans por sección para auditoría en generation (sin LLM extra).
+
+---
+
+## Generation — dos rutas (v001 py-prompt)
+
+| Ruta | Módulos | Cuándo | LLM calls |
+|------|---------|--------|-----------|
+| **Directo** (`section_generator_direct`) | `prompts/direct/generation_direct_prompt_v001.py` | Toggle **Linked evidence** OFF | 1 |
+| **Two-step** (planner → renderer) | `prompts/two_step/section_planner_prompt_v001.py` → `prompts/two_step/section_renderer_prompt_v001.py` | Toggle **Linked evidence** ON (todas las secciones, v001) | 2 |
+
+En el harness Streamlit, runs `two_step` exportan por sección `generation_route`, `planner_items`, `planned_items_block` y `llm_responses[]` con `step` (`planner` / `renderer`) incluso en `output_detail=compact`. La UI ofrece toggle **Mostrar IDs de evidencia** y expander **Auditoría linked evidence** en Generation, Run E2E e Historial.
+
+- **Legacy v003** (`.txt` + JSON verboso) sigue disponible; opt-in por `prompt_version`.
+- **Directo (v001):** metadatos en bloques XML; `<input_json>` con `conversation_groups` + `context_brief`.
+- **Planner (two-step):** input en bloque `<evidence>`; output JSON mínimo `{"items":[{"text":"...","e":["t1","s2"]}]}` sin `section_id`.
+- **Renderer (two-step):** recibe `<planned_items>` renderizado (lista numerada con `evidence: id,...`) + `<generation_mode>`; produce Markdown final con markers `{{e:...}}`.
+- **Validación post-LLM:** planner valida IDs en `e[]`; renderer valida markers con `audit_evidence_markers`.
+- **Record export:** `generation_route`, `planner_items`, `planned_items_block`, `content` (con markers), `llm_responses[]`. Runs viejos pueden traer `draft_with_evidence` (texto libre); la UI lo trata como legado.
+
 ---
 
 ## E2E — cómo se encadenan (`ui/runner.run_e2e_pipeline`)
 
+`run_e2e_pipeline` devuelve `E2EPipelineResult` (`status`, `outputs`, `failed_step`, `error_message`, `manifest_path`).
+
+- **`status: complete`**: los cuatro pasos transcript terminaron bien.
+- **`status: failed`**: un paso falló; `outputs` conserva los pasos exitosos previos más un record sintético del paso fallido (`step_status: failed`). Los pasos posteriores no se ejecutan.
+
+Persistencia (`ui/e2e_runs.save_e2e_run` / `load_e2e_run`): el manifest guarda `status`, `failed_step`, `error_message` y `outputs[]` parciales. En historial, runs fallidos se etiquetan p. ej. `failed at classification`.
+
+Si falla `generation`, el error record incluye `section_id`, `generation_substep` (`direct` | `planner` | `renderer`), diagnóstico LLM y, en fallos de renderer, el output del planner. OpenAI: un retry automático ante `ai_pipeline_openai_empty_response` (`retry_count=1`).
+
+**Prompts/schemas:** metadata centralizada en `common/pipeline_steps.py` y runtime en `common/prompt_runtime.py`. El context pipeline compuesto usa `ContextPipelinePromptBundle` con versiones por subpaso (`context_pipeline/config.py`).
+
+**Anthropic structured output:** si el schema JSON incluye keywords no soportados (p. ej. `oneOf` en triage), el provider omite `output_config` y valida después con parse + Pydantic; `request_params` registra el fallback.
+
+**Run E2E full:** plantilla fija `consulta_estructurada_v001` (`E2E_FULL_TEMPLATE_ID`). Contexto extra opcional vía nota/PDF → `run_context_ad_hoc_pipeline_step` (step `context_ad_hoc_pipeline`). El mini E2E de contexto independiente sigue permitiendo otros templates.
+
 1. `filtering` → `drop_turn_ids`
 2. Transcript filtrado → `clustering` → clusters con turns
 3. Clusters + `template_id` → `classification` → `assignments`
-4. *(Opcional)* `context_pipeline` → JSON con `section_context`
+4. *(Opcional)* `context_ad_hoc_pipeline` → JSON con `section_context` (nota y/o PDF custom)
 5. `generation` por sección:
    - clusters asignados desde classification
    - `context` desde `load_section_context_from_record(claim_classification_result_file)`
+   - `section_evidence` desde `load_section_evidence_from_record` (mismo JSON)
 
 Parámetros típicos debug:
 
 ```bash
 # Solo transcript
 make -C classification debug-session SESSION_ID=case1 PROVIDER=openai \
-  PROMPT_VERSION=v003 TEMPLATE_ID=consulta_estructurada_v002
+  PROMPT_VERSION=v003 TEMPLATE_ID=consulta_estructurada_v001
 
 # Context + adapter v002
-# PROMPT_VERSION=v002 en section_adapter, TEMPLATE_ID=consulta_estructurada_v002
+# PROMPT_VERSION=v002 en section_adapter, TEMPLATE_ID=consulta_estructurada_v001
 ```
 
 ---
@@ -813,8 +875,8 @@ make -C classification debug-session SESSION_ID=case1 PROVIDER=openai \
 | filter_spans | Sí | `Span[]` + fechas + directivas | `FilterSpansResult` (`drop_ids: str[]`) | No |
 | cluster_spans | Sí | `Span[]` filtrados | `SpanCluster[]` | No |
 | classify_clusters | Sí | clusters + spans + plantilla | `ClassifyClustersResult` | No |
-| section_adapter | Sí | job por sección | `SectionAdapterResult` → `section_context` (briefs) | Preparatorio (`brief`) |
-| generation | Sí | sección + clusters + context | `{section_id, content}` | **Sí** (nota final) |
+| section_adapter | Sí | job por sección | `SectionAdapterResult` → `section_context` + `section_evidence` | Preparatorio (`brief`) |
+| generation | Sí | sección + clusters + context + evidence | `content` con markers `{{e:...}}`; export `planner_items` + `planned_items_block` | **Sí** (nota final) |
 
 ---
 
@@ -837,7 +899,7 @@ make -C classification debug-session SESSION_ID=case1 PROVIDER=openai \
 
 ## Notas
 
-- **TEMPLATE_ID por defecto en UI:** no es `consulta_estructurada_v002`; hay que pasarlo explícitamente en debug/E2E.
+- **TEMPLATE_ID por defecto en UI:** no es `consulta_estructurada_v001`; hay que pasarlo explícitamente en debug/E2E.
 - **Classification default:** `v004` (módulo `.py`); `v003` sigue disponible como `.txt`.
 - **Filtering / clustering default:** `v002` (módulo `.py`); `v001` sigue disponible como `.txt`.
 - **Rollout Fase 2:** context steps, generation y section_adapter migrarán al mismo patrón en PRs independientes.

@@ -7,6 +7,7 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from common.context_spans import Span, SpanCluster, audit_span_clusters
 from common.json_utils import extract_json_object
+from common.llm_response import LlmResponse
 from common.prompt_registry import is_py_prompt_version, load_py_prompt_module, py_system_prompt
 from common.prompts import load_prompt as load_prompt_from_file
 from common.prompts import prompt_file_path as resolve_prompt_file_path
@@ -135,9 +136,54 @@ def enrich_cluster_spans_result_for_export(
     }
 
 
+class ClusterSpansValidationError(ValueError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        raw_response: str | None = None,
+        llm_response: LlmResponse | None = None,
+        clusters: list[SpanCluster] | None = None,
+        missing_span_ids: list[str] | None = None,
+        missing_spans: list[dict[str, object]] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.raw_response = raw_response
+        self.llm_response = llm_response
+        self.clusters = list(clusters or [])
+        self.missing_span_ids = list(missing_span_ids or [])
+        self.missing_spans = list(missing_spans or [])
+
+    def diagnostics(self) -> dict[str, object]:
+        payload: dict[str, object] = {}
+        if self.raw_response is not None:
+            payload["raw_response"] = self.raw_response
+        if self.clusters:
+            payload["cluster_spans_result"] = enrich_cluster_spans_result_for_export(
+                self.clusters
+            )
+        if self.missing_span_ids:
+            payload["missing_span_ids"] = self.missing_span_ids
+        if self.missing_spans:
+            payload["missing_spans"] = self.missing_spans
+        return payload
+
+
+def missing_span_ids_from_clusters(
+    spans: list[Span],
+    clusters: list[SpanCluster],
+) -> list[str]:
+    span_ids = {span.id for span in spans}
+    assigned_span_ids = {
+        span_id for cluster in clusters for span_id in cluster.span_ids
+    }
+    return sorted(span_ids - assigned_span_ids)
+
+
 __all__ = [
     "MODULE_ROOT",
     "ClusterSpansResult",
+    "ClusterSpansValidationError",
     "audit_span_clusters",
     "cluster_spans_output_schema",
     "cluster_spans_prompt_file_path",
@@ -147,6 +193,7 @@ __all__ = [
     "enrich_cluster_spans_result_for_export",
     "load_cluster_spans_prompt",
     "load_prompt",
+    "missing_span_ids_from_clusters",
     "parse_cluster_spans_result",
     "prompt_file_path",
     "render_cluster_spans_payload",

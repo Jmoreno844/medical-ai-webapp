@@ -18,6 +18,7 @@ from classification.lib import (
     ClassificationBatchResult,
     ClassificationResult,
     ClassificationSessionResult,
+    ClassificationValidationError,
     ClusterCase,
     audit_batch_assignments,
     audit_section_ids,
@@ -179,8 +180,20 @@ def run_classification_batch(
         duplicate = assignment_audit.duplicate_cluster_ids[0]
         raise ValueError(f"classification_duplicate_cluster_id: {duplicate!r}")
     if assignment_audit.invalid_section_cluster_ids:
-        invalid = assignment_audit.invalid_section_cluster_ids[0]
-        raise ValueError(f"classification_invalid_section_ids: {invalid!r}")
+        invalid_assignment = assignment_audit.invalid_section_assignments[0]
+        cluster_id = str(invalid_assignment.get("cluster_id", ""))
+        unknown_section_ids = invalid_assignment.get("unknown_section_ids", [])
+        duplicate_section_ids = invalid_assignment.get("duplicate_section_ids", [])
+        raise ClassificationValidationError(
+            "classification_invalid_section_ids: "
+            f"cluster_id={cluster_id!r} "
+            f"unknown_section_ids={unknown_section_ids!r} "
+            f"duplicate_section_ids={duplicate_section_ids!r}",
+            raw_response=llm_response.content,
+            classification_result=result.model_dump(mode="json"),
+            batch_assignment_audit=assignment_audit.to_dict(),
+            cluster_ids=expected_cluster_ids,
+        )
     return result, llm_response, response_time_ms
 
 

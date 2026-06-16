@@ -3,7 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 from common.cost_projection import CostProjectionSettings
-from common.model_pricing import PRICING_SOURCE_URL
+from common.model_pricing import ANTHROPIC_PRICING_SOURCE_URL, PRICING_SOURCE_URL
 from common.usage_cost import (
     UsageCostLine,
     format_usd,
@@ -159,7 +159,8 @@ def render_e2e_cost_summary(outputs: list[dict[str, object]]) -> None:
     )
     st.caption(
         f"{pricing_note}"
-        f"Tarifas OpenAI: [{PRICING_SOURCE_URL}]({PRICING_SOURCE_URL})"
+        f"Tarifas OpenAI: [{PRICING_SOURCE_URL}]({PRICING_SOURCE_URL}) · "
+        f"Anthropic: [{ANTHROPIC_PRICING_SOURCE_URL}]({ANTHROPIC_PRICING_SOURCE_URL})"
     )
 
     total_cost = summary.get("total_cost_usd")
@@ -194,7 +195,8 @@ def render_e2e_cost_summary(outputs: list[dict[str, object]]) -> None:
     if summary.get("has_unpriced_lines"):
         st.info(
             "Algunas llamadas no tienen tarifa configurada para ese modelo "
-            "(solo OpenAI gpt-5.4 / mini / nano). Se muestran tokens igualmente."
+            "(OpenAI: gpt-5.4 / mini / nano; Anthropic: claude-haiku-4-5). "
+            "Se muestran tokens igualmente."
         )
 
     step_rows = _step_cost_rows(summary, multiplier=multiplier)

@@ -10,6 +10,24 @@ from common.llm_response import (
 )
 from common.usage_cost import parse_token_usage
 from ui.cluster_lookup import ClusterTurnsView, cluster_turns_from_generation_payload
+from ui.linked_evidence_audit import (
+    CONTENT_VIEW_APPLIED,
+    CONTENT_VIEW_SOURCE,
+    RENDERER_STEP,
+    display_generation_content,
+    format_cited_evidence_ids_caption,
+    is_legacy_two_step_section,
+    is_two_step_section_output,
+    planner_raw_output,
+    resolve_llm_response_by_step,
+)
+from ui.triage_audit import (
+    DISPOSITION_CONTENT,
+    DISPOSITION_DROPPED,
+    DISPOSITION_DROPPED_AND_CONTENT,
+    DISPOSITION_UNCLASSIFIED,
+    triage_item_disposition_rows,
+)
 from ui.latency import (
     clustering_has_split_latency,
     clustering_latency_ms,
@@ -463,6 +481,213 @@ def _render_generation_section_actions(
             )
 
 
+def _render_compact_llm_call_metadata(call_record: dict[str, object]) -> None:
+    usage = call_record.get("usage")
+    request_params = call_record.get("request_params")
+    if isinstance(usage, dict) and usage:
+        st.caption("**usage**")
+        st.json(usage)
+    if isinstance(request_params, dict) and request_params:
+        st.caption("**request_params**")
+        st.json(request_params)
+
+
+def _render_linked_evidence_audit(
+    *,
+    section_output: dict[str, object] | None,
+    final_content: str,
+    key_suffix: str,
+    section_id: str,
+    content_view_mode: str,
+    show_evidence_ids: bool,
+) -> None:
+    if not is_two_step_section_output(section_output):
+        return
+
+    with st.expander("Auditoría linked evidence", expanded=False):
+        if is_legacy_two_step_section(section_output):
+            st.info(
+                "Run legado sin artefactos de auditoría. "
+                "Re-ejecuta con **Linked evidence (two-step)** para ver planner y renderer."
+            )
+            return
+
+        if section_output is None:
+            return
+
+        planner_tab, renderer_tab = st.tabs(["Planner", "Renderer"])
+
+        llm_responses = section_output.get("llm_responses")
+
+        with planner_tab:
+            raw_content = planner_raw_output(section_output)
+            if raw_content.strip():
+                st.code(raw_content)
+            else:
+                st.caption("Sin output del planner.")
+
+        with renderer_tab:
+            if final_content.strip():
+                if content_view_mode == CONTENT_VIEW_SOURCE:
+                    st.code(final_content, language="markdown")
+                else:
+                    display_content = display_generation_content(
+                        final_content,
+                        content_view_mode=content_view_mode,
+                        show_evidence_ids=show_evidence_ids,
+                    )
+                    st.markdown(display_content)
+                    cited = format_cited_evidence_ids_caption(final_content)
+                    if cited:
+                        st.caption(cited)
+            else:
+                st.caption("Sin contenido final.")
+
+            renderer_call = resolve_llm_response_by_step(
+                llm_responses,
+                step=RENDERER_STEP,
+            )
+            if renderer_call is not None and content_view_mode == CONTENT_VIEW_APPLIED:
+                raw_content = renderer_call.get("content")
+                if (
+                    isinstance(raw_content, str)
+                    and raw_content.strip()
+                    and raw_content.strip() != final_content.strip()
+                ):
+                    st.markdown("**Raw response**")
+                    st.code(raw_content)
+                _render_compact_llm_call_metadata(renderer_call)
+            elif renderer_call is not None:
+                _render_compact_llm_call_metadata(renderer_call)
+
+
+def _render_generation_section_body(
+    *,
+    payload: dict[str, object],
+    section: dict[str, object],
+    section_index: int,
+    section_outputs_by_id: dict[str, dict[str, object]],
+    key_suffix: str,
+    content_view_mode: str,
+    show_evidence_ids: bool,
+    document_wrapper: bool = False,
+) -> None:
+    section_id = str(section.get("section_id", f"section_{section_index}"))
+    heading = section.get("heading", section_id)
+    content = section.get("content", "")
+    cluster_ids_raw = section.get("cluster_ids", [])
+    cluster_ids = (
+        [str(cluster_id) for cluster_id in cluster_ids_raw]
+        if isinstance(cluster_ids_raw, list)
+        else []
+    )
+    section_output = section_outputs_by_id.get(section_id)
+    content_text = content if isinstance(content, str) else ""
+
+    if document_wrapper and (not content_text.strip()):
+        return
+
+    _render_generation_section_actions(
+        payload=payload,
+        section_id=section_id,
+        heading=str(heading),
+        cluster_ids=cluster_ids,
+        section_output=section_output,
+        key_suffix=key_suffix,
+    )
+
+    if content_text.strip():
+        if content_view_mode == CONTENT_VIEW_SOURCE:
+            st.code(content_text, language="markdown")
+        else:
+            display_content = display_generation_content(
+                content_text,
+                content_view_mode=content_view_mode,
+                show_evidence_ids=show_evidence_ids,
+            )
+            st.markdown(display_content)
+    elif not document_wrapper:
+        st.caption("*(vacío)*")
+
+    _render_linked_evidence_audit(
+        section_output=section_output,
+        final_content=content_text,
+        key_suffix=f"{key_suffix}_{section_id}",
+        section_id=section_id,
+        content_view_mode=content_view_mode,
+        show_evidence_ids=show_evidence_ids,
+    )
+
+    if not document_wrapper:
+        st.markdown("")
+
+
+def _render_generation_document_sections(
+    payload: dict[str, object],
+    *,
+    key_suffix: str,
+    document_wrapper: bool = False,
+) -> None:
+    session_result = payload.get("generation_session_result")
+    if not isinstance(session_result, dict):
+        return
+
+    sections = session_result.get("sections")
+    if not isinstance(sections, list):
+        return
+
+    section_outputs_by_id = _section_outputs_by_id(payload)
+    has_two_step_sections = any(
+        is_two_step_section_output(section_outputs_by_id.get(str(section.get("section_id", ""))))
+        for section in sections
+        if isinstance(section, dict)
+    )
+
+    content_view_mode = st.radio(
+        "Vista del contenido",
+        options=[CONTENT_VIEW_APPLIED, CONTENT_VIEW_SOURCE],
+        index=0,
+        horizontal=True,
+        key=f"content_view_mode_{key_suffix}",
+        help=(
+            "Markdown aplicado renderiza el documento; "
+            "Markdown fuente muestra el string persistido tal cual."
+        ),
+    )
+
+    show_evidence_ids = False
+    if has_two_step_sections and content_view_mode == CONTENT_VIEW_APPLIED:
+        show_evidence_ids = st.checkbox(
+            "Mostrar IDs de evidencia",
+            value=False,
+            key=f"show_evidence_ids_{key_suffix}",
+            help="Muestra los markers inline {{e:...}} en el documento generado.",
+        )
+
+    if document_wrapper:
+        st.markdown(
+            '<div style="max-width:860px;margin:0 auto">',
+            unsafe_allow_html=True,
+        )
+
+    for index, section in enumerate(sections):
+        if not isinstance(section, dict):
+            continue
+        _render_generation_section_body(
+            payload=payload,
+            section=section,
+            section_index=index,
+            section_outputs_by_id=section_outputs_by_id,
+            key_suffix=key_suffix,
+            content_view_mode=content_view_mode,
+            show_evidence_ids=show_evidence_ids,
+            document_wrapper=document_wrapper,
+        )
+
+    if document_wrapper:
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
 def _render_section_source_turns_button(
     *,
     payload: dict[str, object],
@@ -729,8 +954,6 @@ def render_generation_result(payload: dict[str, object]) -> None:
         return
 
     key_suffix = str(abs(hash(json.dumps(payload, sort_keys=True, default=str))))
-    section_outputs_by_id = _section_outputs_by_id(payload)
-
     sections = session_result.get("sections")
     if isinstance(sections, list):
         filled = [
@@ -740,33 +963,12 @@ def render_generation_result(payload: dict[str, object]) -> None:
         ]
         st.metric("Secciones generadas", len(filled))
         st.divider()
-        for i, section in enumerate(sections):
-            if not isinstance(section, dict):
-                continue
-            section_id = str(section.get("section_id", f"section_{i}"))
-            heading = section.get("heading", section_id)
-            content = section.get("content", "")
-            cluster_ids_raw = section.get("cluster_ids", [])
-            cluster_ids = (
-                [str(cluster_id) for cluster_id in cluster_ids_raw]
-                if isinstance(cluster_ids_raw, list)
-                else []
-            )
 
-            _render_generation_section_actions(
-                payload=payload,
-                section_id=section_id,
-                heading=str(heading),
-                cluster_ids=cluster_ids,
-                section_output=section_outputs_by_id.get(section_id),
-                key_suffix=key_suffix,
-            )
-
-            if isinstance(content, str) and content.strip():
-                st.markdown(content)
-            else:
-                st.caption("*(vacío)*")
-            st.markdown("")
+    _render_generation_document_sections(
+        payload,
+        key_suffix=key_suffix,
+        document_wrapper=False,
+    )
 
     skipped = session_result.get("skipped_sections")
     if isinstance(skipped, list) and skipped:
@@ -789,53 +991,48 @@ def render_e2e_document(generation_record: dict[str, object]) -> None:
     key_suffix = str(
         abs(hash(json.dumps(generation_record, sort_keys=True, default=str)))
     )
-    section_outputs_by_id = _section_outputs_by_id(generation_record)
-
-    st.markdown(
-        '<div style="max-width:860px;margin:0 auto">',
-        unsafe_allow_html=True,
+    _render_generation_document_sections(
+        generation_record,
+        key_suffix=f"e2e_{key_suffix}",
+        document_wrapper=True,
     )
-    for i, section in enumerate(sections):
-        if not isinstance(section, dict):
-            continue
-        section_id = str(section.get("section_id", f"section_{i}"))
-        heading = section.get("heading", section_id)
-        content = section.get("content", "")
-        cluster_ids_raw = section.get("cluster_ids", [])
-        cluster_ids = (
-            [str(cluster_id) for cluster_id in cluster_ids_raw]
-            if isinstance(cluster_ids_raw, list)
-            else []
-        )
-        if not isinstance(content, str) or not content.strip():
-            continue
-
-        _render_generation_section_actions(
-            payload=generation_record,
-            section_id=section_id,
-            heading=str(heading),
-            cluster_ids=cluster_ids,
-            section_output=section_outputs_by_id.get(section_id),
-            key_suffix=f"e2e_{key_suffix}",
-        )
-
-        st.markdown(content)
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
-def _render_doctor_items_table(items_raw: object) -> None:
+def _id_text_rows(
+    items_raw: object,
+    *,
+    truncate_at: int | None = 120,
+) -> list[dict[str, object]]:
     if not isinstance(items_raw, list) or not items_raw:
-        st.info("Sin items.")
-        return
+        return []
     rows: list[dict[str, object]] = []
     for item in items_raw:
         if not isinstance(item, dict):
             continue
         text = str(item.get("text", ""))
-        if len(text) > 120:
-            text = text[:117] + "..."
+        if truncate_at is not None and len(text) > truncate_at:
+            text = text[: truncate_at - 3] + "..."
         rows.append({"id": item.get("id"), "text": text})
+    return rows
+
+
+def _render_id_text_table(
+    items_raw: object,
+    *,
+    title: str,
+    truncate_at: int | None = 120,
+    empty_message: str = "Sin items.",
+) -> None:
+    rows = _id_text_rows(items_raw, truncate_at=truncate_at)
+    st.markdown(f"**{title}**")
+    if not rows:
+        st.info(empty_message)
+        return
     st.dataframe(rows, use_container_width=True, hide_index=True)
+
+
+def _render_doctor_items_table(items_raw: object) -> None:
+    _render_id_text_table(items_raw, title="Items", truncate_at=120)
 
 
 def _normalize_spans_list(spans_raw: object) -> list[dict[str, object]]:
@@ -877,7 +1074,10 @@ def _dropped_spans_from_payload(payload: dict[str, object]) -> list[dict[str, ob
         if isinstance(raw_drop_ids, list):
             drop_ids = [str(span_id) for span_id in raw_drop_ids if span_id]
     if drop_ids:
-        return _spans_for_ids(drop_ids, _spans_by_id(payload.get("span_pool")))
+        pool_for_drops = payload.get("document_spans")
+        if not isinstance(pool_for_drops, list) or not pool_for_drops:
+            pool_for_drops = payload.get("span_pool")
+        return _spans_for_ids(drop_ids, _spans_by_id(pool_for_drops))
 
     span_pool = _normalize_spans_list(payload.get("span_pool"))
     kept_ids = {
@@ -935,45 +1135,151 @@ def _render_clusters_table(clusters_raw: object) -> None:
 
 
 def render_context_triage_result(payload: dict[str, object]) -> None:
-    is_pasted = payload.get("is_pasted")
-    if isinstance(is_pasted, bool):
-        st.metric("is_pasted", "sí" if is_pasted else "no")
+    doctor_items = payload.get("doctor_items")
     triage_result = payload.get("triage_result")
+    is_pasted = payload.get("is_pasted")
+
+    content_ids: list[object] = []
+    drop_ids: list[object] = []
+    directives: list[object] = []
     if isinstance(triage_result, dict):
-        directives = triage_result.get("directives")
-        if isinstance(directives, list):
-            st.markdown("**Directivas**")
-            st.dataframe(directives, use_container_width=True, hide_index=True)
-        st.caption(
-            f"content_ids: {triage_result.get('content_ids', [])} · "
-            f"drop_ids: {triage_result.get('drop_ids', [])}"
-        )
-    _render_doctor_items_table(payload.get("doctor_items"))
+        raw_content_ids = triage_result.get("content_ids")
+        raw_drop_ids = triage_result.get("drop_ids")
+        raw_directives = triage_result.get("directives")
+        if isinstance(raw_content_ids, list):
+            content_ids = raw_content_ids
+        if isinstance(raw_drop_ids, list):
+            drop_ids = raw_drop_ids
+        if isinstance(raw_directives, list):
+            directives = raw_directives
+
+    disposition_rows = triage_item_disposition_rows(
+        doctor_items,
+        content_ids=content_ids,
+        drop_ids=drop_ids,
+    )
+    content_count = sum(
+        1
+        for row in disposition_rows
+        if row["disposición"]
+        in (DISPOSITION_CONTENT, DISPOSITION_DROPPED_AND_CONTENT)
+    )
+    dropped_count = sum(
+        1
+        for row in disposition_rows
+        if row["disposición"]
+        in (DISPOSITION_DROPPED, DISPOSITION_DROPPED_AND_CONTENT)
+    )
+    unclassified_count = sum(
+        1
+        for row in disposition_rows
+        if row["disposición"] == DISPOSITION_UNCLASSIFIED
+    )
+
+    col_split, col_pasted, col_content, col_dropped = st.columns(4)
+    col_split.metric("Items tras split", len(disposition_rows))
+    if isinstance(is_pasted, bool):
+        col_pasted.metric("is_pasted", "sí" if is_pasted else "no")
+    else:
+        col_pasted.metric("is_pasted", "—")
+    col_content.metric("Contenido clínico", content_count)
+    col_dropped.metric("Descartados", dropped_count)
+
+    st.markdown("**Qué pasó con cada fragmento**")
+    if disposition_rows:
+        st.dataframe(disposition_rows, use_container_width=True, hide_index=True)
+        if dropped_count and directives:
+            st.caption(
+                "Un item **descartado** suele ser solo instrucción (p. ej. "
+                "«no uses la epicrisis»). Eso no va a `content_ids`, pero puede "
+                "generar una **directiva** sobre documentos abajo."
+            )
+        elif dropped_count and not directives:
+            st.caption(
+                "Los items **descartados** no siguen como contenido clínico "
+                "(`content_ids` vacío para esos IDs)."
+            )
+        if unclassified_count:
+            st.warning(
+                f"{unclassified_count} item(s) no aparecen ni en content_ids "
+                "ni en drop_ids."
+            )
+    else:
+        st.info("Sin `doctor_items` en el resultado.")
+
+    st.markdown("**Directivas sobre documentos / contexto**")
+    st.caption(
+        "Aplican a PDFs y fuentes externas en pasos posteriores "
+        "(filter_spans, adapter). No usan los mismos IDs que los fragmentos "
+        "de la nota."
+    )
+    if directives:
+        st.dataframe(directives, use_container_width=True, hide_index=True)
+    else:
+        st.caption("Sin directivas.")
+
     render_json_expander(payload)
 
 
 def render_context_filter_spans_result(payload: dict[str, object]) -> None:
-    filter_result = payload.get("filter_spans_result")
-    if isinstance(filter_result, dict):
-        drop_count = filter_result.get("drop_count")
-        kept = filter_result.get("kept_span_count")
-        if isinstance(drop_count, int):
-            st.metric("Spans descartados", drop_count)
-        if isinstance(kept, int):
-            st.metric("Spans conservados", kept)
+    from ui.filter_spans_audit import build_context_filter_spans_view
 
-    dropped_spans = _dropped_spans_from_payload(payload)
-    kept_spans = _normalize_spans_list(payload.get("filtered_spans"))
+    view = build_context_filter_spans_view(payload)
 
-    st.markdown("**Spans descartados**")
-    _render_spans_table(dropped_spans)
+    metric_cols = st.columns(4)
+    metric_cols[0].metric("Descartados por filter_spans", view["filter_drop_count"])
+    metric_cols[1].metric("Conservados tras filter_spans", view["filter_kept_count"])
+    metric_cols[2].metric("Descartados por directives", view["directive_drop_count"])
+    metric_cols[3].metric("Conservados tras directives", view["directive_kept_count"])
 
-    st.markdown("**Spans conservados**")
-    _render_spans_table(kept_spans)
+    if view["show_directive_no_applicable_caption"]:
+        st.caption("No hubo directives documentales aplicables.")
+
+    st.caption(
+        "`filter_spans` aplica filtro clínico general. "
+        "`document_directive_filter` aplica instrucciones documentales del triage. "
+        "La nota del médico no pasa por ninguno de los dos."
+    )
+
+    approved_note_spans = view["approved_note_spans"]
+    if approved_note_spans:
+        st.markdown("**Nota del médico (sin re-filtrar)**")
+        _render_spans_table(approved_note_spans)
+
+    document_input_spans = view["document_input_spans"]
+    if document_input_spans:
+        st.markdown("**Pool de documentos (entrada a filter_spans)**")
+        _render_spans_table(document_input_spans)
+
+    st.markdown("**Descartados por filter_spans**")
+    _render_spans_table(view["filter_dropped_spans"])
+
+    st.markdown("**Conservados tras filter_spans / entrada a directives**")
+    _render_spans_table(view["after_filter_spans"])
+
+    st.markdown("**Descartados por directives**")
+    _render_spans_table(view["directive_dropped_spans"])
+
+    st.markdown("**Documentos finales tras directives**")
+    _render_spans_table(view["after_directive_spans"])
+
+    st.markdown("**Spans tras merge (nota + documentos finales)**")
+    _render_spans_table(view["merged_spans"])
     render_json_expander(payload)
 
 
 def render_context_cluster_spans_result(payload: dict[str, object]) -> None:
+    missing_span_ids = payload.get("missing_span_ids")
+    missing_spans = payload.get("missing_spans")
+    if isinstance(missing_span_ids, list) and missing_span_ids:
+        st.warning(
+            "Spans no asignados a ningún cluster: "
+            + ", ".join(f"`{span_id}`" for span_id in missing_span_ids)
+        )
+    if isinstance(missing_spans, list) and missing_spans:
+        st.markdown("**Spans no clusterizados**")
+        _render_spans_table(missing_spans)
+
     cluster_result = payload.get("cluster_spans_result")
     clusters_raw: object = None
     if isinstance(cluster_result, dict):
@@ -1167,7 +1473,7 @@ def _render_pipeline_step_tab(
         isinstance(pipeline_error, str)
         and pipeline_error
         and stopped_after == step
-        and step == "filter_spans"
+        and step in {"filter_spans", "cluster_spans"}
     ):
         st.error(pipeline_error)
 

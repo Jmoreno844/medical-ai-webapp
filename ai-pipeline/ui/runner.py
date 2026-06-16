@@ -77,13 +77,14 @@ from generation.lib import (
     enrich_section_generation_result_for_export,
     format_generation_output_for_detail,
     format_section_output_for_detail,
+    format_two_step_llm_responses_for_export,
+    generation_prompt_reference,
     load_section_context_from_record,
+    load_section_evidence_from_record,
+    load_transcript_directives_from_record,
 )
 from generation.lib import (
     load_prompt as load_generation_prompt,
-)
-from generation.lib import (
-    prompt_file_path as generation_prompt_file_path,
 )
 from ui.bridge import (
     apply_filtering_to_transcript,
@@ -101,6 +102,7 @@ class StepConfig:
     model: str
     prompt_version: str
     openai_reasoning_effort: str | None = None
+    linked_evidence_two_step: bool = False
 
 
 @contextmanager
@@ -131,6 +133,8 @@ def _step_config_metadata(config: StepConfig) -> dict[str, object]:
         and openai_model_supports_reasoning_effort(config.model)
     ):
         metadata["openai_reasoning_effort"] = config.openai_reasoning_effort
+    if config.linked_evidence_two_step:
+        metadata["linked_evidence_two_step"] = True
     return metadata
 
 
@@ -445,7 +449,7 @@ def run_generation_step(
     model = model_spec.model
     template = load_template(template_id, templates_dir=DEFAULT_TEMPLATES_DIR)
     system_prompt = load_generation_prompt(prompt_version)
-    prompt_path = generation_prompt_file_path(prompt_version)
+    prompt_path_ref = generation_prompt_reference(prompt_version)
     run_started_at = datetime.now(UTC)
     results_dir = AI_PIPELINE_ROOT / "generation" / "results"
     output_path = results_dir / (
@@ -453,9 +457,14 @@ def run_generation_step(
     )
 
     section_context = None
+    section_evidence = None
+    transcript_directives = None
     if claim_classification_result_file:
-        section_context = load_section_context_from_record(
-            Path(claim_classification_result_file)
+        context_record_path = Path(claim_classification_result_file)
+        section_context = load_section_context_from_record(context_record_path)
+        section_evidence = load_section_evidence_from_record(context_record_path)
+        transcript_directives = load_transcript_directives_from_record(
+            context_record_path
         )
 
     with apply_step_config_env(config):
@@ -468,6 +477,10 @@ def run_generation_step(
             system_prompt=system_prompt,
             section_concurrency=DEFAULT_SECTION_CONCURRENCY,
             section_context=section_context,
+            section_evidence=section_evidence,
+            transcript_directives=transcript_directives,
+            prompt_version=prompt_version,
+            linked_evidence_two_step=config.linked_evidence_two_step,
         )
 
     cluster_ids_by_section = {
@@ -494,6 +507,7 @@ def run_generation_step(
             "cluster_ids": section_run.cluster_ids,
             "context_present": section_run.context_present,
             "context_chars": section_run.context_chars,
+            "generation_route": section_run.generation_route,
             "response_time_ms": section_run.response_time_ms,
             "generation_result": enrich_section_generation_result_for_export(
                 section_run.result,
@@ -508,6 +522,14 @@ def run_generation_step(
             "llm_usage": section_run.llm_usage,
             "llm_request_params": section_run.llm_request_params,
         }
+        if section_run.generation_route == "two_step":
+            if section_run.planner_items is not None:
+                section_entry["planner_items"] = section_run.planner_items
+            if section_run.planned_items_block is not None:
+                section_entry["planned_items_block"] = section_run.planned_items_block
+            section_entry["llm_responses"] = format_two_step_llm_responses_for_export(
+                section_run.llm_responses
+            )
         section_outputs.append(
             format_section_output_for_detail(section_entry, output_detail)
         )
@@ -550,7 +572,7 @@ def run_generation_step(
         "provider": provider,
         "model": model,
         "prompt_version": prompt_version,
-        "prompt_file": str(prompt_path.relative_to(AI_PIPELINE_ROOT / "generation")),
+        "prompt_file": prompt_path_ref,
         "output_detail": output_detail,
         **_step_config_metadata(config),
         **output_payload,
@@ -625,71 +647,134 @@ def run_e2e_pipeline(
     classification_config: StepConfig,
     generation_config: StepConfig,
     base_case: TranscriptCase | None = None,
-    context_case_id: str | None = None,
     context_config: StepConfig | None = None,
-    include_doctor_note: bool = True,
-    include_documents: bool = True,
-) -> list[PipelineRunOutput]:
+    context_doctor_note: str | None = None,
+    context_document_pdf_path: Path | None = None,
+    context_document_id: str = "uploaded_document",
+    context_encounter_date: str | None = None,
+    context_document_date: str | None = None,
+):
     from ui.discovery import load_transcript_case
+    from ui.e2e_pipeline import E2EPipelineResult, E2EStepFailed, run_e2e_step
 
     resolved_case = base_case or load_transcript_case(case_id)
     outputs: list[PipelineRunOutput] = []
 
-    filtering_output = run_filtering_step(case=resolved_case, config=filtering_config)
-    outputs.append(filtering_output)
-
-    clustering_case = transcript_case_from_filtering_result(
-        base_case=resolved_case,
-        filtering_record=filtering_output.result_record,
-    )
-    clustering_output = run_clustering_step(
-        case=clustering_case,
-        config=clustering_config,
-        require_complete_coverage=True,
-    )
-    outputs.append(clustering_output)
-
-    clusters = clusters_from_clustering_result(
-        clustering_output.result_record,
-        session_id=session_id,
-        template_id=template_id,
-    )
-    classification_output = run_classification_step(
-        session_id=session_id,
-        clusters=clusters,
-        template_id=template_id,
-        config=classification_config,
-        clustering_result_file=str(clustering_output.output_path),
-    )
-    outputs.append(classification_output)
-
-    assignments = assignments_from_classification_record(
-        classification_output.result_record
-    )
-
-    claim_classification_result_file: str | None = None
-    if context_case_id and context_config is not None:
-        context_output = run_context_pipeline_step(
-            context_case_id=context_case_id,
-            config=context_config,
-            include_doctor_note=include_doctor_note,
-            include_documents=include_documents,
+    try:
+        filtering_output = run_e2e_step(
+            step="filtering",
+            outputs=outputs,
+            config=filtering_config,
+            run_fn=lambda: run_filtering_step(
+                case=resolved_case,
+                config=filtering_config,
+            ),
+            case_id=resolved_case.id,
         )
-        outputs.append(context_output)
-        claim_classification_result_file = str(context_output.output_path)
+        outputs.append(filtering_output)
 
-    generation_output = run_generation_step(
-        session_id=session_id,
-        clusters=clusters,
-        assignments=assignments,
-        template_id=template_id,
-        config=generation_config,
-        classification_result_file=str(classification_output.output_path),
-        clustering_result_file=str(clustering_output.output_path),
-        claim_classification_result_file=claim_classification_result_file,
-    )
-    outputs.append(generation_output)
-    return outputs
+        clustering_case = transcript_case_from_filtering_result(
+            base_case=resolved_case,
+            filtering_record=filtering_output.result_record,
+        )
+        clustering_output = run_e2e_step(
+            step="clustering",
+            outputs=outputs,
+            config=clustering_config,
+            run_fn=lambda: run_clustering_step(
+                case=clustering_case,
+                config=clustering_config,
+                require_complete_coverage=True,
+            ),
+            case_id=resolved_case.id,
+        )
+        outputs.append(clustering_output)
+
+        clusters = clusters_from_clustering_result(
+            clustering_output.result_record,
+            session_id=session_id,
+            template_id=template_id,
+        )
+        classification_output = run_e2e_step(
+            step="classification",
+            outputs=outputs,
+            config=classification_config,
+            run_fn=lambda: run_classification_step(
+                session_id=session_id,
+                clusters=clusters,
+                template_id=template_id,
+                config=classification_config,
+                clustering_result_file=str(clustering_output.output_path),
+            ),
+            session_id=session_id,
+            case_id=resolved_case.id,
+        )
+        outputs.append(classification_output)
+
+        assignments = assignments_from_classification_record(
+            classification_output.result_record
+        )
+
+        claim_classification_result_file: str | None = None
+        has_custom_context = bool(
+            (context_doctor_note and context_doctor_note.strip())
+            or context_document_pdf_path is not None
+        )
+        if has_custom_context:
+            if context_config is None:
+                raise ValueError("e2e_custom_context_requires_config")
+            note_text = (
+                context_doctor_note.strip()
+                if context_doctor_note and context_doctor_note.strip()
+                else None
+            )
+            context_output = run_e2e_step(
+                step="context_ad_hoc_pipeline",
+                outputs=outputs,
+                config=context_config,
+                run_fn=lambda: run_context_ad_hoc_pipeline_step(
+                    session_id=session_id,
+                    template_id=template_id,
+                    config=context_config,
+                    doctor_note=note_text,
+                    document_pdf_path=context_document_pdf_path,
+                    document_id=context_document_id,
+                    encounter_date=context_encounter_date,
+                    document_date=context_document_date,
+                ),
+                session_id=session_id,
+                case_id=resolved_case.id,
+            )
+            outputs.append(context_output)
+            claim_classification_result_file = str(context_output.output_path)
+
+        generation_output = run_e2e_step(
+            step="generation",
+            outputs=outputs,
+            config=generation_config,
+            run_fn=lambda: run_generation_step(
+                session_id=session_id,
+                clusters=clusters,
+                assignments=assignments,
+                template_id=template_id,
+                config=generation_config,
+                classification_result_file=str(classification_output.output_path),
+                clustering_result_file=str(clustering_output.output_path),
+                claim_classification_result_file=claim_classification_result_file,
+            ),
+            session_id=session_id,
+            case_id=resolved_case.id,
+        )
+        outputs.append(generation_output)
+        return E2EPipelineResult(status="complete", outputs=outputs)
+    except E2EStepFailed as failed:
+        outputs.append(failed.failed_output)
+        return E2EPipelineResult(
+            status="failed",
+            outputs=outputs,
+            failed_step=failed.step,
+            error_message=failed.message,
+        )
 
 
 __all__ = [

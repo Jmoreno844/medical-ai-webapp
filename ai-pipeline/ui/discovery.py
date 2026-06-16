@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -11,59 +10,20 @@ from common.case_paths import (
     CONTEXT_CASES_INDEX,
     TRANSCRIPT_CASES_INDEX,
 )
-from common.prompt_registry import py_prompt_versions
+from common.pipeline_steps import get_step_spec, list_registered_steps
+from common.prompt_runtime import list_prompt_versions as runtime_list_prompt_versions
+from common.prompt_runtime import resolve_prompt_version
 from common.templates import DEFAULT_TEMPLATES_DIR, list_template_ids
 from common.transcripts import TranscriptCase, build_turn_catalog, load_cases
 
 AI_PIPELINE_ROOT = Path(__file__).resolve().parents[1]
 
-MODULE_DIRS = {
-    "filtering": AI_PIPELINE_ROOT / "filtering",
-    "clustering": AI_PIPELINE_ROOT / "clustering",
-    "classification": AI_PIPELINE_ROOT / "classification",
-    "generation": AI_PIPELINE_ROOT / "generation",
-    "context_triage": AI_PIPELINE_ROOT / "context_pipeline" / "triage",
-    "context_filter_spans": AI_PIPELINE_ROOT / "context_pipeline" / "filter_spans",
-    "context_cluster_spans": AI_PIPELINE_ROOT / "context_pipeline" / "cluster_spans",
-    "context_classify_clusters": (
-        AI_PIPELINE_ROOT / "context_pipeline" / "classify_clusters"
-    ),
-    "context_section_adapter": (
-        AI_PIPELINE_ROOT / "context_pipeline" / "section_adapter"
-    ),
-    "context_pipeline": AI_PIPELINE_ROOT / "context_pipeline" / "section_adapter",
-    "context_ad_hoc_pipeline": AI_PIPELINE_ROOT / "context_pipeline" / "section_adapter",
-}
-
-PROMPT_STEMS = {
-    "filtering": "filtering",
-    "clustering": "clustering",
-    "classification": "classification",
-    "generation": "generation",
-    "context_triage": "triage",
-    "context_filter_spans": "filter_spans",
-    "context_cluster_spans": "cluster_spans",
-    "context_classify_clusters": "classify_clusters",
-    "context_section_adapter": "section_adapter",
-    "context_pipeline": "section_adapter",
-    "context_ad_hoc_pipeline": "section_adapter",
-}
-
+_REGISTERED_STEPS = list_registered_steps(include_aliases=True)
+MODULE_DIRS = {step: get_step_spec(step).module_dir for step in _REGISTERED_STEPS}
+PROMPT_STEMS = {step: get_step_spec(step).prompt_stem for step in _REGISTERED_STEPS}
 DEFAULT_PROMPT_VERSIONS = {
-    "filtering": "v002",
-    "clustering": "v002",
-    "classification": "v004",
-    "generation": "v003",
-    "context_triage": "v001",
-    "context_filter_spans": "v002",
-    "context_cluster_spans": "v002",
-    "context_classify_clusters": "v002",
-    "context_section_adapter": "v003",
-    "context_pipeline": "v001",
-    "context_ad_hoc_pipeline": "v001",
+    step: get_step_spec(step).default_prompt_version for step in _REGISTERED_STEPS
 }
-
-PROMPT_VERSION_PATTERN = re.compile(r"^v\d{3}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,30 +175,11 @@ def list_context_case_document_files(context_case_id: str) -> list[str]:
 
 
 def list_prompt_versions(step: str) -> list[str]:
-    module_dir = MODULE_DIRS.get(step)
-    if module_dir is None:
-        raise ValueError(f"unknown_pipeline_step: {step}")
-    prompts_dir = module_dir / "prompts"
-    stem = PROMPT_STEMS[step]
-    if not prompts_dir.is_dir():
-        return [DEFAULT_PROMPT_VERSIONS[step]]
-    versions = sorted(
-        set(
-            path.stem.removeprefix(f"{stem}_")
-            for path in prompts_dir.glob(f"{stem}_v*.txt")
-            if PROMPT_VERSION_PATTERN.fullmatch(path.stem.removeprefix(f"{stem}_"))
-        )
-        | set(py_prompt_versions(step))
-    )
-    return versions or [DEFAULT_PROMPT_VERSIONS[step]]
+    return runtime_list_prompt_versions(step)
 
 
 def default_prompt_version(step: str) -> str:
-    versions = list_prompt_versions(step)
-    preferred = DEFAULT_PROMPT_VERSIONS.get(step)
-    if preferred in versions:
-        return preferred
-    return versions[0]
+    return resolve_prompt_version(step)
 
 
 def _result_label(
@@ -268,10 +209,8 @@ def _result_label(
 
 
 def list_results(step: str) -> list[ResultMeta]:
-    module_dir = MODULE_DIRS.get(step)
-    if module_dir is None:
-        raise ValueError(f"unknown_pipeline_step: {step}")
-    results_dir = module_dir / "results"
+    spec = get_step_spec(step)
+    results_dir = spec.results_dir
     if not results_dir.is_dir():
         return []
 

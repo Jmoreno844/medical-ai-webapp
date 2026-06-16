@@ -1,0 +1,20 @@
+{
+  "step_status": "failed",
+  "step": "context_ad_hoc_pipeline",
+  "run_mode": "e2e_failed_step",
+  "run_started_at": "2026-06-15T22:44:19.057509+00:00",
+  "run_finished_at": "2026-06-15T22:44:19.057519+00:00",
+  "error_type": "BadRequestError",
+  "error_message": "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': \"output_config.format.schema: Schema type 'oneOf' is not supported\"}, 'request_id': 'req_011Cc5rZQ8ctkVQZxxDYabHt'}",
+  "prior_output_paths": {
+    "filtering": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/filtering/results/20260615T224358Z_debug_case1_anthropic.json",
+    "clustering": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/clustering/results/20260615T224400Z_debug_case1_anthropic.json",
+    "classification": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/classification/results/20260615T224413Z_session_case1_anthropic.json"
+  },
+  "output_path": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/e2e_runs/failed_steps/20260615T224419Z_failed_context_ad_hoc_pipeline_case1.json",
+  "session_id": "case1",
+  "case_id": "case1",
+  "provider": "anthropic",
+  "model": "claude-haiku-4-5-20251001",
+  "prompt_version": "v001"
+}

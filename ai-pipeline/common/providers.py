@@ -9,9 +9,23 @@ from functools import lru_cache
 from groq import BadRequestError, Groq
 from openai import OpenAI
 
-from common.llm_response import LlmResponse, build_llm_response_from_message
+from common.llm_response import LlmResponse
 
 logger = logging.getLogger(__name__)
+
+ANTHROPIC_UNSUPPORTED_SCHEMA_KEYWORDS = frozenset(
+    {
+        "oneOf",
+        "anyOf",
+        "allOf",
+        "not",
+        "if",
+        "then",
+        "else",
+        "dependentRequired",
+        "dependentSchemas",
+    }
+)
 
 DEFAULT_GROQ_REASONING_EFFORT_QWEN = "default"
 DEFAULT_GROQ_REASONING_FORMAT_QWEN = "parsed"
@@ -539,6 +553,52 @@ def _call_gemini(
     return LlmResponse(content=content)
 
 
+def collect_unsupported_schema_keywords(
+    schema: object,
+    *,
+    provider: str,
+) -> list[str]:
+    if provider != "anthropic":
+        return []
+
+    found: set[str] = set()
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            min_items = node.get("minItems")
+            if isinstance(min_items, int) and min_items > 1:
+                found.add("minItems>1")
+            for key, value in node.items():
+                if key in ANTHROPIC_UNSUPPORTED_SCHEMA_KEYWORDS:
+                    found.add(key)
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(schema)
+    return sorted(found)
+
+
+def resolve_anthropic_structured_output(
+    output_schema: dict[str, object] | None,
+) -> tuple[dict[str, object] | None, dict[str, object]]:
+    if output_schema is None:
+        return None, {"structured_output_mode": "prompt_only"}
+
+    unsupported = collect_unsupported_schema_keywords(
+        output_schema,
+        provider="anthropic",
+    )
+    if unsupported:
+        return None, {
+            "structured_output_mode": "prompt_only",
+            "structured_output_provider_fallback": "anthropic_unsupported_schema",
+            "structured_output_unsupported_keywords": unsupported,
+        }
+    return output_schema, {"structured_output_mode": "json_schema"}
+
+
 def _call_anthropic(
     *,
     config: ProviderRuntimeConfig,
@@ -550,6 +610,10 @@ def _call_anthropic(
     from anthropic import Anthropic
 
     client = Anthropic(api_key=_require_api_key("anthropic"))
+    resolved_schema, structured_meta = resolve_anthropic_structured_output(
+        output_schema
+    )
+    request_params: dict[str, object] = dict(structured_meta)
     request_kwargs: dict[str, object] = {
         "model": model,
         "max_tokens": _resolve_max_output_tokens(config),
@@ -557,16 +621,16 @@ def _call_anthropic(
         "system": system,
         "messages": [{"role": "user", "content": user}],
     }
-    if output_schema is not None:
+    if resolved_schema is not None:
         request_kwargs["output_config"] = {
             "format": {
                 "type": "json_schema",
-                "schema": output_schema,
+                "schema": resolved_schema,
             }
         }
     response = client.messages.create(**request_kwargs)
     content = _anthropic_message_text(response)
-    return LlmResponse(content=content)
+    return LlmResponse(content=content, request_params=request_params)
 
 
 def call_llm_detailed(
@@ -576,11 +640,14 @@ def call_llm_detailed(
     system: str,
     user: str,
     output_schema: dict[str, object] | None = None,
+    json_mode: bool | None = None,
 ) -> LlmResponse:
     from common.llm_timing import attach_timing_if_missing
 
     config = provider_runtime_config(provider)
-    json_mode = _json_mode_enabled(config)
+    resolved_json_mode = (
+        json_mode if json_mode is not None else _json_mode_enabled(config)
+    )
     started_at = time.perf_counter()
 
     if config.provider == "openai":
@@ -591,7 +658,7 @@ def call_llm_detailed(
             model=model,
             system=system,
             user=user,
-            json_mode=json_mode,
+            json_mode=resolved_json_mode,
         )
         return attach_timing_if_missing(response, started_at=started_at)
 
@@ -601,7 +668,7 @@ def call_llm_detailed(
             model=model,
             system=system,
             user=user,
-            json_mode=json_mode,
+            json_mode=resolved_json_mode,
         )
         return attach_timing_if_missing(response, started_at=started_at)
 
@@ -616,7 +683,7 @@ def call_llm_detailed(
         return attach_timing_if_missing(response, started_at=started_at)
 
     client = Groq(api_key=_require_api_key("groq"))
-    if not json_mode:
+    if not resolved_json_mode:
         response = _call_groq(
             client=client,
             config=config,
@@ -665,6 +732,7 @@ def call_llm(
     system: str,
     user: str,
     output_schema: dict[str, object] | None = None,
+    json_mode: bool | None = None,
 ) -> str:
     return call_llm_detailed(
         provider=provider,
@@ -672,6 +740,7 @@ def call_llm(
         system=system,
         user=user,
         output_schema=output_schema,
+        json_mode=json_mode,
     ).content
 
 

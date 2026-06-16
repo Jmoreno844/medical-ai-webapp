@@ -45,7 +45,7 @@ def test_split_doctor_items_short_note() -> None:
         session_id="case1",
     )
     assert is_pasted is False
-    assert [item.id for item in items] == ["m1", "m2"]
+    assert [item.id for item in items] == ["1", "2"]
     assert items[0].text == "TA 138/88."
     assert items[1].text == "Paciente pálido."
 
@@ -58,10 +58,10 @@ def test_split_doctor_items_detects_pasted_by_tokens() -> None:
 
 def test_doctor_items_to_spans_filters_content_ids() -> None:
     items = [
-        DoctorItem(id="m1", text="Alergia a penicilina."),
-        DoctorItem(id="m2", text="Directiva ignorar epicrisis."),
+        DoctorItem(id="1", text="Alergia a penicilina."),
+        DoctorItem(id="2", text="Directiva ignorar epicrisis."),
     ]
-    spans = doctor_items_to_spans(items, ["m1"])
+    spans = doctor_items_to_spans(items, ["1"])
     assert len(spans) == 1
     assert spans[0].doc == "nota_medico"
     assert spans[0].kind == SpanKind.LINE
@@ -94,6 +94,14 @@ Fecha de toma: 2025-11-12"""
     texts = {span.text for span in result_lines}
     assert "Hemoglobina 9.8 g/dL" in texts
     assert "Hematocrito 30.1 %" in texts
+
+
+def test_build_spans_from_text_detects_result_with_out_of_range_marker() -> None:
+    text = "Glucosa en ayunas 112 ALTO mg/dL 70 - 99"
+    spans = build_spans_from_text(text, doc="labs", session_id="case1")
+    assert len(spans) == 1
+    assert spans[0].kind == SpanKind.RESULT_LINE
+    assert spans[0].text == text
 
 
 def test_build_spans_from_text_wrapped_prose_stays_single_paragraph() -> None:
@@ -166,8 +174,8 @@ def test_build_adapter_jobs_skips_dropped_clusters_with_empty_section_ids() -> N
 
 
 def test_audit_triage_result_rejects_unknown_id() -> None:
-    items = [DoctorItem(id="m1", text="contenido")]
-    result = TriageResult(content_ids=["m9"], drop_ids=[])
+    items = [DoctorItem(id="1", text="contenido")]
+    result = TriageResult(content_ids=["9"], drop_ids=[])
     with pytest.raises(ValueError, match="unknown_item_id"):
         audit_triage_result(items, result)
 

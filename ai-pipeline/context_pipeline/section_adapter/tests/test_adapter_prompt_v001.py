@@ -23,7 +23,13 @@ def test_render_user_payload_uses_section_guidelines_and_input_json() -> None:
         section_guidelines="Incluye:\n- alergias",
         encounter_date="2026-06-14",
         document_date="2024-03-01",
-        directives=[{"target": "epicrisis", "action": "use", "hint": None}],
+        directives=[
+            {
+                "scope": "document",
+                "action": "use_source",
+                "target": "epicrisis",
+            }
+        ],
         clusters=[{"id": "c1", "span_ids": ["1"], "date_hints": []}],
         spans=[{"id": "1", "doc": "epicrisis", "kind": "line", "text": "Alergia"}],
     )

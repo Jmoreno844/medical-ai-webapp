@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 import streamlit as st
 
+from context_pipeline.cases.lib import DoctorNoteCase, load_context_case, load_context_cases, select_context_case
+from common.case_paths import CONTEXT_CASES_INDEX
+from common.context_spans import split_doctor_items
 from ui.components.result_picker import render_result_picker
 from ui.components.viewers import render_step_result
 from ui.discovery import list_context_cases, list_templates
@@ -73,49 +77,107 @@ def render_context_step_header(step: str, subtitle: str = "") -> None:
     )
 
 
-def render_context_stepper_nav(active_step: str) -> str:
-    weights: list[float] = []
-    for index in range(len(CONTEXT_PIPELINE_STEPS)):
-        if index > 0:
-            weights.append(0.12)
-        weights.append(1.0)
-    cols = st.columns(weights)
-
-    selected = active_step
-    col_index = 0
-    for index, step in enumerate(CONTEXT_PIPELINE_STEPS):
-        if index > 0:
-            with cols[col_index]:
-                st.markdown(
-                    '<div style="text-align:center;color:#bbb;font-size:1.2rem;'
-                    'padding-top:0.45rem;">›</div>',
-                    unsafe_allow_html=True,
-                )
-            col_index += 1
-
-        meta = CONTEXT_STEP_META[step]
-        with cols[col_index]:
-            nav_label = meta.get("nav_label", meta["label"])
-            label = f"{meta['icon']} {nav_label}"
-            if st.button(
-                label,
-                key=f"context_nav_{step}",
-                type="primary" if step == active_step else "secondary",
-                use_container_width=True,
-            ):
-                selected = step
-        col_index += 1
-
-    st.markdown('<div style="margin-bottom:0.8rem;"></div>', unsafe_allow_html=True)
-    return selected
-
-
 def _render_context_case_selector(key: str) -> str:
     context_cases = list_context_cases()
     if not context_cases:
         st.warning("No hay cases de contexto en cases/context/")
         return ""
     return st.selectbox("Case de contexto", context_cases, key=key)
+
+
+@dataclass(frozen=True, slots=True)
+class TriageRunInput:
+    context_case_id: str | None
+    doctor_note_case: DoctorNoteCase | None
+    encounter_date: str | None
+
+
+def _render_triage_split_preview(
+    *,
+    note_text: str,
+    session_id: str,
+) -> None:
+    normalized = note_text.strip()
+    if not normalized:
+        return
+
+    doctor_items, is_pasted = split_doctor_items(normalized, session_id=session_id)
+    if not doctor_items:
+        st.caption("La nota no produjo segmentos tras `split_doctor_items`.")
+        return
+
+    st.markdown("**Vista previa del split**")
+    col_items, col_pasted = st.columns(2)
+    col_items.metric("Items", len(doctor_items))
+    col_pasted.metric("is_pasted", "sí" if is_pasted else "no")
+    rows = [{"id": item.id, "text": item.text} for item in doctor_items]
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+
+
+def _render_triage_input(key_prefix: str) -> TriageRunInput | None:
+    input_mode = st.radio(
+        "Fuente de la nota",
+        ["Case del repo", "Texto libre"],
+        horizontal=True,
+        key=f"{key_prefix}_input_mode",
+    )
+
+    if input_mode == "Case del repo":
+        context_case_id = _render_context_case_selector(f"{key_prefix}_case")
+        if not context_case_id:
+            return None
+        case_meta = select_context_case(
+            load_context_cases(CONTEXT_CASES_INDEX),
+            case_id=context_case_id,
+        )
+        context_case = load_context_case(case_meta, cases_dir=CONTEXT_CASES_INDEX.parent)
+        _render_triage_split_preview(
+            note_text=context_case.doctor_note.doctor_note,
+            session_id=case_meta.session_id,
+        )
+        return TriageRunInput(
+            context_case_id=context_case_id,
+            doctor_note_case=None,
+            encounter_date=None,
+        )
+
+    col_session, col_date = st.columns(2)
+    with col_session:
+        session_id = st.text_input(
+            "Session ID",
+            value="pasted_note",
+            key=f"{key_prefix}_session",
+        ).strip() or "pasted_note"
+    with col_date:
+        encounter_date = st.text_input(
+            "Fecha consulta (opcional)",
+            value="",
+            placeholder="2026-06-14",
+            key=f"{key_prefix}_encounter_date",
+        ).strip() or None
+
+    doctor_note = st.text_area(
+        "Nota del médico",
+        height=160,
+        placeholder=(
+            "No tomes casi nada de la epicrisis, solo neumonía. "
+            "Paciente alérgico a penicilina."
+        ),
+        key=f"{key_prefix}_doctor_note",
+    )
+    if doctor_note.strip():
+        _render_triage_split_preview(
+            note_text=doctor_note,
+            session_id=session_id,
+        )
+    return TriageRunInput(
+        context_case_id=None,
+        doctor_note_case=DoctorNoteCase(
+            session_id=session_id,
+            doctor_note=doctor_note,
+        ),
+        encounter_date=encounter_date,
+    )
 
 
 def _step_config_from_form(step: str, key_prefix: str) -> StepConfig:
@@ -171,17 +233,24 @@ def render_context_triage_page() -> None:
     with tab_inspect:
         _render_inspect_section("context_triage")
     with tab_run:
-        context_case_id = _render_context_case_selector("ctx_triage_case")
+        triage_input = _render_triage_input("ctx_triage")
         config = _step_config_from_form("context_triage", "ctx_triage_run")
         if st.button("▶ Ejecutar triage", type="primary", key="run_context_triage"):
-            if not context_case_id:
-                st.error("Case de contexto requerido.")
+            if triage_input is None:
+                st.error("Selecciona un case de contexto válido.")
+            elif (
+                triage_input.doctor_note_case is not None
+                and not triage_input.doctor_note_case.doctor_note.strip()
+            ):
+                st.error("Escribe la nota del médico o elige un case del repo.")
             else:
                 with st.spinner("Ejecutando triage..."):
                     try:
                         output = run_context_triage_step(
-                            context_case_id=context_case_id,
+                            context_case_id=triage_input.context_case_id,
                             config=config,
+                            doctor_note_case=triage_input.doctor_note_case,
+                            encounter_date=triage_input.encounter_date,
                         )
                         _persist_step_result("context_triage", output.result_record)
                         _persist_step_output_path(
@@ -518,16 +587,3 @@ def _render_ad_hoc_persisted_result() -> None:
             st.success(f"✓ Guardado en `{output_path}`")
     st.subheader("Resultados por paso")
     render_step_result("context_ad_hoc_pipeline", result)
-
-
-def render_context_branch_page(step_id: str) -> None:
-    if step_id == "context_triage":
-        render_context_triage_page()
-    elif step_id == "context_filter_spans":
-        render_context_filter_spans_page()
-    elif step_id == "context_cluster_spans":
-        render_context_cluster_spans_page()
-    elif step_id == "context_classify_clusters":
-        render_context_classify_clusters_page()
-    else:
-        render_context_section_adapter_page()

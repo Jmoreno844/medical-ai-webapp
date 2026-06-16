@@ -59,7 +59,7 @@ Initial templates in `../templates/`:
 |---|---|---|
 | `minimal_outpatient_v001` | 6 | Default en fixtures `cases/` |
 | `outpatient_general_v001` | 17 | Consulta externa general (v004 / producción) |
-| `consulta_estructurada_v001` | 9 | Subcampos estructurados (ROS, antecedentes, SV, EF) |
+| `consulta_estructurada_v001` | 10 | Subcampos estructurados (identificación, ROS, antecedentes, SV, EF, gineco-obstétricos) |
 
 Override path via `TEMPLATES_DIR` in the Makefile (default `../templates`).
 

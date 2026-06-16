@@ -179,3 +179,61 @@ def test_save_e2e_run_empty_outputs_raises() -> None:
             session_id="case1",
             template_id="soap_v1",
         )
+
+
+def test_load_e2e_run_outputs_preserves_generation_audit_fields(
+    e2e_runs_dir: Path,
+    tmp_path: Path,
+) -> None:
+    result_dir = tmp_path / "results"
+    started_at = "2026-06-13T16:54:59+00:00"
+    generation_path = result_dir / "generation.json"
+    generation_record = {
+        "run_started_at": started_at,
+        "section_outputs": [
+            {
+                "section_id": "motivo_consulta",
+                "generation_route": "two_step",
+                "planner_items": [{"text": "Cefalea.", "e": ["t0"]}],
+                "planned_items_block": "[1] Cefalea. evidence: t0",
+                "llm_responses": [
+                    {
+                        "step": "planner",
+                        "content": '{"items":[{"text":"Cefalea.","e":["t0"]}]}',
+                        "usage": {},
+                        "request_params": {},
+                    },
+                    {"step": "renderer", "content": "final", "usage": {}, "request_params": {}},
+                ],
+                "generation_result": {
+                    "section_id": "motivo_consulta",
+                    "content": "Cefalea. {{e:t0}}",
+                },
+            }
+        ],
+    }
+    _write_step_result(generation_path, generation_record)
+
+    outputs = [
+        _make_output(step="filtering", result_dir=result_dir, run_started_at=started_at),
+        _make_output(step="clustering", result_dir=result_dir, run_started_at=started_at),
+        _make_output(step="classification", result_dir=result_dir, run_started_at=started_at),
+        PipelineRunOutput(
+            step="generation",
+            result_record=generation_record,
+            output_path=generation_path,
+        ),
+    ]
+    manifest_path = save_e2e_run(
+        outputs=outputs,
+        case_id="case1",
+        session_id="case1",
+        template_id="soap_v1",
+    )
+
+    loaded = load_e2e_run_outputs(manifest_path)
+    generation_entry = next(entry for entry in loaded if entry["step"] == "generation")
+    section_output = generation_entry["result_record"]["section_outputs"][0]
+    assert section_output["generation_route"] == "two_step"
+    assert section_output["planner_items"][0]["e"] == ["t0"]
+    assert section_output["llm_responses"][0]["step"] == "planner"

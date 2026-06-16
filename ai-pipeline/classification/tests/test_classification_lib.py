@@ -94,8 +94,8 @@ def test_build_classification_system_prompt_includes_template_sections() -> None
     assert "Instrucciones base." in system_prompt
 
 
-def test_build_classification_system_prompt_v002_composes_include_boundaries() -> None:
-    template = load_template("consulta_estructurada_v002")
+def test_build_classification_system_prompt_v001_composes_include_boundaries() -> None:
+    template = load_template("consulta_estructurada_v001")
     system_prompt = build_classification_system_prompt("Instrucciones base.", template)
     assert "### signos_vitales" in system_prompt
     assert "Incluye:" in system_prompt
@@ -139,7 +139,7 @@ def test_classification_v004_uses_py_prompt_not_enriched_system() -> None:
 
 
 def test_render_batch_payload_v004_uses_model_facing_blocks() -> None:
-    template = load_template("consulta_estructurada_v002")
+    template = load_template("consulta_estructurada_v001")
     cluster = ClusterCase(
         id="case1_demo",
         template_id=template.id,

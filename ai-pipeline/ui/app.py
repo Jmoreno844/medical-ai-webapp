@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 import streamlit as st
@@ -26,6 +27,7 @@ from ui.components.provider_form import (  # noqa: E402
 )
 from ui.components.result_picker import render_result_picker  # noqa: E402
 from ui.components.viewers import (  # noqa: E402
+    render_context_pipeline_result,
     render_e2e_document,
     render_e2e_latency_summary,
     render_step_result,
@@ -33,14 +35,23 @@ from ui.components.viewers import (  # noqa: E402
 from ui.cost import render_e2e_cost_summary  # noqa: E402
 from ui.e2e_runs import (  # noqa: E402
     list_e2e_runs,
-    load_e2e_run_outputs,
+    load_e2e_run,
     save_e2e_run,
+)
+from ui.e2e_pipeline import E2E_FULL_TEMPLATE_ID  # noqa: E402
+from ui.e2e_viewer import (  # noqa: E402
+    E2E_TRANSCRIPT_STEPS,
+    build_e2e_step_states,
+    context_step_from_outputs,
+    extract_generation_failed_display,
+    generation_succeeded,
+    is_renderable_context_payload,
+    resolve_e2e_pipeline_steps,
 )
 from ui.latency import format_latency_ms, primary_latency_ms  # noqa: E402
 from ui.discovery import (  # noqa: E402
     list_classification_sessions,
     list_context_case_document_files,
-    list_context_cases,
     list_templates,
     list_transcript_cases,
     load_result_json,
@@ -49,8 +60,11 @@ from ui.discovery import (  # noqa: E402
 )
 from ui.context_pages import (  # noqa: E402
     render_context_ad_hoc_e2e_page,
-    render_context_branch_page,
-    render_context_stepper_nav,
+    render_context_classify_clusters_page,
+    render_context_cluster_spans_page,
+    render_context_filter_spans_page,
+    render_context_section_adapter_page,
+    render_context_triage_page,
 )
 from ui.runner import (  # noqa: E402
     PipelineRunOutput,
@@ -86,20 +100,6 @@ def _inject_css() -> None:
         <style>
         [data-testid="stSidebar"] { min-width:220px; max-width:260px; }
 
-        .pipeline-stepper {
-            display:flex; align-items:center; gap:0;
-            margin-bottom:1.2rem;
-        }
-        .pipeline-step {
-            display:flex; flex-direction:column; align-items:center;
-            padding:6px 14px; border-radius:6px;
-            font-size:0.78rem; font-weight:600;
-            white-space:nowrap; cursor:default;
-        }
-        .pipeline-step .p-icon { font-size:1.05rem; }
-        .pipeline-step .p-name { font-size:0.68rem; margin-top:1px; opacity:0.85; }
-        .pipeline-arrow { color:#bbb; font-size:1.1rem; padding:0 3px; flex-shrink:0; }
-
         .step-page-header {
             display:flex; align-items:center; gap:12px;
             padding:12px 16px; border-radius:8px; margin-bottom:1rem;
@@ -124,65 +124,6 @@ def _inject_css() -> None:
         """,
         unsafe_allow_html=True,
     )
-
-
-def _render_pipeline_stepper(active_step: str | None = None) -> None:
-    parts: list[str] = []
-    for i, step in enumerate(PIPELINE_STEPS):
-        meta = _STEP_META[step]
-        is_active = active_step is None or step == active_step
-        bg = meta["color"] if is_active else "#e8e8e8"
-        color = "#fff" if is_active else "#aaa"
-        parts.append(
-            f'<div class="pipeline-step" style="background:{bg};color:{color}">'
-            f'<span class="p-icon">{meta["icon"]}</span>'
-            f'<span class="p-name">{meta["label"]}</span>'
-            f"</div>"
-        )
-        if i < len(PIPELINE_STEPS) - 1:
-            parts.append('<span class="pipeline-arrow">›</span>')
-
-    st.markdown(
-        f'<div class="pipeline-stepper">{"".join(parts)}</div>',
-        unsafe_allow_html=True,
-    )
-
-
-def _render_pipeline_stepper_nav(active_step: str) -> str:
-    """Clickable stepper for paso-individual navigation; returns selected step id."""
-    weights: list[float] = []
-    for index in range(len(PIPELINE_STEPS)):
-        if index > 0:
-            weights.append(0.12)
-        weights.append(1.0)
-    cols = st.columns(weights)
-
-    selected = active_step
-    col_index = 0
-    for index, step in enumerate(PIPELINE_STEPS):
-        if index > 0:
-            with cols[col_index]:
-                st.markdown(
-                    '<div style="text-align:center;color:#bbb;font-size:1.2rem;'
-                    'padding-top:0.45rem;">›</div>',
-                    unsafe_allow_html=True,
-                )
-            col_index += 1
-
-        meta = _STEP_META[step]
-        with cols[col_index]:
-            label = f"{meta['icon']} {meta['label']}"
-            if st.button(
-                label,
-                key=f"pipeline_nav_{step}",
-                type="primary" if step == active_step else "secondary",
-                use_container_width=True,
-            ):
-                selected = step
-        col_index += 1
-
-    st.markdown('<div style="margin-bottom:0.8rem;"></div>', unsafe_allow_html=True)
-    return selected
 
 
 def _render_step_header(step: str, subtitle: str = "") -> None:
@@ -226,6 +167,29 @@ def _step_config_from_form(step: str, key_prefix: str) -> StepConfig:
         model=model,
         prompt_version=prompt_version,
         openai_reasoning_effort=openai_reasoning_effort,
+    )
+
+
+def _generation_config_from_form(key_prefix: str) -> StepConfig:
+    provider, model, prompt_version, openai_reasoning_effort = render_provider_form(
+        step="generation",
+        key_prefix=key_prefix,
+    )
+    linked_evidence_two_step = st.checkbox(
+        "Linked evidence (two-step)",
+        value=False,
+        key=f"{key_prefix}_linked_evidence_two_step",
+        help=(
+            "Requiere prompt v001. ON: todas las secciones usan planner→renderer "
+            "con evidence auditable (turnos tN y spans). OFF: directo (1 call), sin linking."
+        ),
+    )
+    return StepConfig(
+        provider=provider,
+        model=model,
+        prompt_version=prompt_version,
+        openai_reasoning_effort=openai_reasoning_effort,
+        linked_evidence_two_step=linked_evidence_two_step,
     )
 
 
@@ -275,18 +239,38 @@ def _render_persisted_step_result(step: str) -> None:
 
 def _session_outputs_from_persisted(
     persisted: list[dict[str, object]],
+    *,
+    status: str = "complete",
+    failed_step: str | None = None,
+    error_message: str | None = None,
+    manifest_path: str | None = None,
+    include_context: bool = False,
+    template_id: str | None = None,
 ) -> None:
     st.session_state["last_e2e_outputs"] = persisted
+    st.session_state["last_e2e_run_meta"] = {
+        "status": status,
+        "failed_step": failed_step,
+        "error_message": error_message,
+        "manifest_path": manifest_path,
+        "include_context": include_context,
+        "template_id": template_id or E2E_FULL_TEMPLATE_ID,
+    }
 
 
-def _persist_e2e_outputs(outputs: list[PipelineRunOutput]) -> None:
+def _persist_e2e_pipeline_result(result: object) -> Path | None:
+    from ui.e2e_pipeline import E2EPipelineResult
+
+    if not isinstance(result, E2EPipelineResult):
+        return None
+
     clustering_output_path = ""
-    for output in outputs:
+    for output in result.outputs:
         if output.step == "clustering":
             clustering_output_path = str(output.output_path)
 
     persisted: list[dict[str, object]] = []
-    for output in outputs:
+    for output in result.outputs:
         result_record = dict(output.result_record)
         if clustering_output_path and output.step in {
             "classification",
@@ -303,7 +287,18 @@ def _persist_e2e_outputs(outputs: list[PipelineRunOutput]) -> None:
                 "output_path": str(output.output_path),
             }
         )
-    _session_outputs_from_persisted(persisted)
+    _session_outputs_from_persisted(
+        persisted,
+        status=result.status,
+        failed_step=result.failed_step,
+        error_message=result.error_message,
+        include_context=any(
+            output.step in {"context_ad_hoc_pipeline", "context_pipeline"}
+            for output in result.outputs
+        ),
+        template_id=E2E_FULL_TEMPLATE_ID,
+    )
+    return result.manifest_path
 
 
 @st.fragment
@@ -324,8 +319,16 @@ def _render_e2e_history_tab() -> None:
 
     if st.button("Cargar run", type="primary", key="e2e_load_history"):
         try:
-            persisted = load_e2e_run_outputs(selected_run.path)
-            _session_outputs_from_persisted(persisted)
+            loaded = load_e2e_run(selected_run.path)
+            _session_outputs_from_persisted(
+                loaded.outputs,
+                status=loaded.status,
+                failed_step=loaded.failed_step,
+                error_message=loaded.error_message,
+                manifest_path=str(loaded.manifest_path),
+                include_context=selected_run.include_context,
+                template_id=selected_run.template_id,
+            )
             st.success("Run cargado.")
         except (OSError, ValueError, FileNotFoundError) as exc:
             st.error(str(exc))
@@ -337,6 +340,23 @@ def _render_persisted_e2e_results() -> None:
     if not isinstance(raw_outputs, list) or not raw_outputs:
         return
 
+    run_meta = st.session_state.get("last_e2e_run_meta")
+    status = "complete"
+    failed_step: str | None = None
+    error_message: str | None = None
+    include_context = False
+    if isinstance(run_meta, dict):
+        status_raw = run_meta.get("status")
+        if status_raw == "failed":
+            status = "failed"
+        failed_step_raw = run_meta.get("failed_step")
+        if isinstance(failed_step_raw, str) and failed_step_raw.strip():
+            failed_step = failed_step_raw
+        error_message_raw = run_meta.get("error_message")
+        if isinstance(error_message_raw, str) and error_message_raw.strip():
+            error_message = error_message_raw
+        include_context = bool(run_meta.get("include_context"))
+
     outputs_by_step: dict[str, dict[str, object]] = {}
     for entry in raw_outputs:
         if not isinstance(entry, dict):
@@ -344,6 +364,23 @@ def _render_persisted_e2e_results() -> None:
         step = entry.get("step")
         if isinstance(step, str):
             outputs_by_step[step] = entry
+
+    pipeline_steps = resolve_e2e_pipeline_steps(
+        outputs_by_step,
+        include_context=include_context,
+    )
+    step_states = build_e2e_step_states(
+        pipeline_steps=pipeline_steps,
+        outputs_by_step=outputs_by_step,
+        status=status,
+        failed_step=failed_step,
+    )
+
+    if status == "failed":
+        st.error(
+            f"Pipeline falló en `{failed_step or 'paso desconocido'}`"
+            + (f": {error_message}" if error_message else "")
+        )
 
     generation_entry = outputs_by_step.get("generation")
     generation_record = (
@@ -359,19 +396,75 @@ def _render_persisted_e2e_results() -> None:
             "🔍 Filtering",
             "🗂 Clustering",
             "🏷 Classification",
+            "📝 Contexto",
             "📄 Generation",
         ]
     )
 
     with tabs[0]:
-        if isinstance(generation_record, dict):
+        if generation_succeeded(step_states) and isinstance(generation_record, dict):
             render_e2e_document(generation_record)
+        elif status == "failed":
+            st.info("Documento final no disponible: generation no se ejecutó.")
 
     with tabs[1]:
         render_e2e_cost_summary(raw_outputs)
 
-    for index, step_name in enumerate(PIPELINE_STEPS):
-        with tabs[index + 2]:
+    context_step_key = context_step_from_outputs(outputs_by_step)
+    with tabs[5]:
+        if context_step_key:
+            context_entry = outputs_by_step.get(context_step_key)
+            context_state = step_states.get(context_step_key, "not_executed")
+            if context_state == "skipped":
+                st.info("Paso no ejecutado.")
+            elif isinstance(context_entry, dict):
+                output_path = context_entry.get("output_path")
+                result_record = context_entry.get("result_record")
+                if isinstance(output_path, str) and output_path:
+                    st.caption(f"📁 `{output_path}`")
+                if context_state == "failed" and isinstance(result_record, dict):
+                    st.error(
+                        str(result_record.get("error_message", "Error en contexto."))
+                    )
+                    with st.expander("Detalle del error", expanded=False):
+                        error_detail = {
+                            key: result_record[key]
+                            for key in (
+                                "error_type",
+                                "error_message",
+                                "failed_step",
+                                "stopped_after_step",
+                                "pipeline_error",
+                                "missing_span_ids",
+                                "raw_response",
+                            )
+                            if key in result_record
+                        }
+                        if error_detail:
+                            st.json(error_detail)
+                        else:
+                            st.json(result_record)
+                    if is_renderable_context_payload(result_record):
+                        render_context_pipeline_result(result_record)
+                elif isinstance(result_record, dict):
+                    render_context_pipeline_result(result_record)
+            else:
+                st.info("Sin contexto extra.")
+        else:
+            st.info("Sin contexto extra.")
+
+    transcript_step_tabs = {
+        "filtering": tabs[2],
+        "clustering": tabs[3],
+        "classification": tabs[4],
+        "generation": tabs[6],
+    }
+    for step_name in E2E_TRANSCRIPT_STEPS:
+        with transcript_step_tabs[step_name]:
+            step_state = step_states.get(step_name, "not_executed")
+            if step_state == "skipped":
+                st.info("Paso no ejecutado.")
+                continue
             entry = outputs_by_step.get(step_name)
             if not isinstance(entry, dict):
                 st.info(f"Sin resultado para {step_name}.")
@@ -380,6 +473,49 @@ def _render_persisted_e2e_results() -> None:
             result_record = entry.get("result_record")
             if isinstance(output_path, str) and output_path:
                 st.caption(f"📁 `{output_path}`")
+            if step_state == "failed" and isinstance(result_record, dict):
+                if step_name == "generation":
+                    display = extract_generation_failed_display(result_record)
+                    section_id = display.get("section_id", "desconocida")
+                    substep = display.get("generation_substep", "desconocido")
+                    st.error(
+                        str(
+                            result_record.get("error_message", "Error en generation.")
+                        )
+                    )
+                    st.markdown(
+                        f"**Sección:** `{section_id}` · "
+                        f"**Subpaso:** `{substep}`"
+                    )
+                    provider = display.get("provider")
+                    model = display.get("model")
+                    prompt_version = display.get("prompt_version")
+                    if provider or model or prompt_version:
+                        st.caption(
+                            " · ".join(
+                                part
+                                for part in (
+                                    f"provider: `{provider}`" if provider else "",
+                                    f"model: `{model}`" if model else "",
+                                    f"prompt: `{prompt_version}`"
+                                    if prompt_version
+                                    else "",
+                                )
+                                if part
+                            )
+                        )
+                    if substep == "renderer" and display.get("planner_items"):
+                        with st.expander("Planner output", expanded=True):
+                            if display.get("planned_items_block"):
+                                st.text(str(display["planned_items_block"]))
+                            st.json(display.get("planner_items"))
+                else:
+                    st.error(
+                        str(result_record.get("error_message", "Error en el paso."))
+                    )
+                with st.expander("Detalle del error", expanded=True):
+                    st.json(result_record)
+                continue
             if isinstance(result_record, dict):
                 render_step_result(step_name, result_record)
 
@@ -403,12 +539,14 @@ def _render_filtering_page() -> None:
         _render_inspect_section("filtering")
 
     with tab_run:
+        with st.expander("⚙️ Configuración", expanded=False):
+            config = _step_config_from_form("filtering", "filtering_run")
+
         cases = list_transcript_cases()
         case_labels = [f"{case.case_id}  ({case.turn_count} turns)" for case in cases]
         selected_label = st.selectbox("Transcript case", case_labels, key="filter_case")
         case_id = cases[case_labels.index(selected_label)].case_id
 
-        config = _step_config_from_form("filtering", "filtering_run")
         if st.button("▶ Ejecutar filtering", type="primary", key="run_filtering"):
             with st.spinner("Ejecutando filtering..."):
                 try:
@@ -432,6 +570,9 @@ def _render_clustering_page() -> None:
         _render_inspect_section("clustering")
 
     with tab_run:
+        with st.expander("⚙️ Configuración", expanded=False):
+            config = _step_config_from_form("clustering", "clustering_run")
+
         input_mode = st.radio(
             "Fuente de input",
             ["Transcript case", "Resultado de filtering"],
@@ -467,7 +608,6 @@ def _render_clustering_page() -> None:
                     f"Transcript filtrado de `{filter_case_id}` ({filter_meta.label})"
                 )
 
-        config = _step_config_from_form("clustering", "clustering_run")
         if st.button("▶ Ejecutar clustering", type="primary", key="run_clustering"):
             if case is None:
                 st.error("Selecciona un input válido.")
@@ -491,6 +631,9 @@ def _render_classification_page() -> None:
         _render_inspect_section("classification")
 
     with tab_run:
+        with st.expander("⚙️ Configuración", expanded=False):
+            config = _step_config_from_form("classification", "classification_run")
+
         input_mode = st.radio(
             "Fuente de clusters",
             ["Fixtures (cases/cluster)", "Resultado de clustering"],
@@ -559,7 +702,6 @@ def _render_classification_page() -> None:
             else:
                 clustering_result_path = ""
 
-        config = _step_config_from_form("classification", "classification_run")
         if st.button(
             "▶ Ejecutar classification", type="primary", key="run_classification"
         ):
@@ -594,6 +736,9 @@ def _render_generation_page() -> None:
         _render_inspect_section("generation")
 
     with tab_run:
+        with st.expander("⚙️ Configuración", expanded=False):
+            config = _generation_config_from_form("generation_run")
+
         class_meta = render_result_picker(
             step="classification",
             key="gen_class_result",
@@ -745,7 +890,6 @@ def _render_generation_page() -> None:
                 str(context_meta.path) if context_meta is not None else None
             )
 
-        config = _step_config_from_form("generation", "generation_run")
         if st.button("▶ Ejecutar generation", type="primary", key="run_generation"):
             if (
                 clusters is None
@@ -776,18 +920,15 @@ def _render_generation_page() -> None:
 
 
 
-def _render_e2e_page() -> None:
-    st.markdown("## 🩺 Pipeline end-to-end")
-    _render_pipeline_stepper(active_step=None)
+def _render_e2e_run_page() -> None:
+    st.markdown("## ▶️ Pipeline end-to-end")
+    _render_e2e_run_tab()
 
-    tab_run, tab_history = st.tabs(["▶ Ejecutar", "📂 Historial"])
 
-    with tab_history:
-        _render_e2e_history_tab()
-        _render_persisted_e2e_results()
-
-    with tab_run:
-        _render_e2e_run_tab()
+def _render_e2e_history_page() -> None:
+    st.markdown("## 🕘 Historial")
+    _render_e2e_history_tab()
+    _render_persisted_e2e_results()
 
 
 def _render_e2e_run_tab() -> None:
@@ -801,6 +942,8 @@ def _render_e2e_run_tab() -> None:
     pasted_case = None
     case_id = ""
     turn_count = 0
+
+    template_id = E2E_FULL_TEMPLATE_ID
 
     if case_source == "Case del repo":
         col_case, col_session, col_template = st.columns([2, 1.5, 1.5])
@@ -822,8 +965,13 @@ def _render_e2e_run_tab() -> None:
                 key="e2e_session_id",
             )
         with col_template:
-            templates = list_templates()
-            template_id = st.selectbox("Template", templates, key="e2e_template")
+            st.text_input(
+                "Template",
+                value=template_id,
+                disabled=True,
+                key="e2e_template_fixed",
+            )
+            st.caption(f"Plantilla fija: `{template_id}`")
     else:
         col_session, col_template = st.columns([1.5, 1.5])
         pasted_json = st.text_area(
@@ -886,83 +1034,110 @@ def _render_e2e_run_tab() -> None:
                 key="e2e_session_id",
             )
         with col_template:
-            templates = list_templates()
-            template_id = st.selectbox("Template", templates, key="e2e_template")
-
-    st.markdown("---")
-    st.markdown("**Atajo: provider/modelo para todos los pasos**")
-    shared_provider, shared_model, shared_effort = render_shared_provider_controls(
-        key_prefix="e2e_shared",
-    )
-    if st.button(
-        "Aplicar a todos los pasos",
-        type="secondary",
-        key="e2e_apply_shared",
-        help="Copia provider, modelo y thinking level a filtering, clustering, "
-        "classification y generation.",
-    ):
-        _apply_e2e_shared_to_all_steps(
-            provider=shared_provider,
-            model=shared_model,
-            openai_reasoning_effort=shared_effort,
-        )
-        st.rerun()
-
-    if not _e2e_step_configs_initialized():
-        _apply_e2e_shared_to_all_steps(
-            provider=shared_provider,
-            model=shared_model,
-            openai_reasoning_effort=shared_effort,
-        )
-
-    st.markdown("---")
-    st.markdown("**Configuración por paso**")
-    col1, col2 = st.columns(2)
-    with col1:
-        with st.expander("🔍 Filtering", expanded=False):
-            filtering_config = _step_config_from_form("filtering", "e2e_filtering")
-        with st.expander("🏷 Classification", expanded=False):
-            classification_config = _step_config_from_form(
-                "classification",
-                "e2e_classification",
+            st.text_input(
+                "Template",
+                value=template_id,
+                disabled=True,
+                key="e2e_template_fixed_pasted",
             )
-    with col2:
-        with st.expander("🗂 Clustering", expanded=False):
-            clustering_config = _step_config_from_form("clustering", "e2e_clustering")
-        with st.expander("📄 Generation", expanded=False):
-            generation_config = _step_config_from_form("generation", "e2e_generation")
+            st.caption(f"Plantilla fija: `{template_id}`")
 
-    with st.expander("📝 Contexto externo (opcional)", expanded=False):
+    with st.expander("⚙️ Configuración", expanded=False):
+        shared_provider, shared_model, shared_effort = render_shared_provider_controls(
+            key_prefix="e2e_shared",
+        )
+        if st.button(
+            "Aplicar a todos los pasos",
+            type="secondary",
+            key="e2e_apply_shared",
+            help="Copia provider, modelo y thinking level a filtering, clustering, "
+            "classification y generation.",
+        ):
+            _apply_e2e_shared_to_all_steps(
+                provider=shared_provider,
+                model=shared_model,
+                openai_reasoning_effort=shared_effort,
+            )
+            st.rerun()
+
+        if not _e2e_step_configs_initialized():
+            _apply_e2e_shared_to_all_steps(
+                provider=shared_provider,
+                model=shared_model,
+                openai_reasoning_effort=shared_effort,
+            )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            with st.expander("🔍 Filtering", expanded=False):
+                filtering_config = _step_config_from_form("filtering", "e2e_filtering")
+            with st.expander("🏷 Classification", expanded=False):
+                classification_config = _step_config_from_form(
+                    "classification",
+                    "e2e_classification",
+                )
+        with col2:
+            with st.expander("🗂 Clustering", expanded=False):
+                clustering_config = _step_config_from_form("clustering", "e2e_clustering")
+            with st.expander("📄 Generation", expanded=False):
+                generation_config = _generation_config_from_form("e2e_generation")
+
+    with st.expander("📝 Contexto extra (opcional)", expanded=False):
         st.caption(
-            "Información fuera del audio: nota libre del médico y/o documentos "
-            "previos del paciente. Se enruta a secciones antes de generation."
+            "Nota libre del médico y/o PDF del paciente. Se procesa con el pipeline "
+            "ad hoc de contexto y alimenta generation vía section_context."
         )
-        include_doctor_note = st.checkbox(
-            "Nota libre del médico",
+        include_context = st.checkbox(
+            "Usar contexto extra",
             value=False,
-            key="e2e_include_doctor_note",
+            key="e2e_include_custom_context",
         )
-        include_documents = st.checkbox(
-            "Documentos previos del paciente (PDF, labs…)",
-            value=False,
-            key="e2e_include_documents",
-        )
-        include_context = include_doctor_note or include_documents
-        context_case_id = case_id
+        context_doctor_note = ""
+        context_document_id = "uploaded_document"
+        context_encounter_date: str | None = None
+        context_document_date: str | None = None
+        uploaded_pdf = None
         context_config = _step_config_from_form("context_pipeline", "e2e_context")
         if include_context:
-            context_cases = list_context_cases()
-            if context_cases:
-                context_case_id = st.selectbox(
-                    "Case de contexto",
-                    context_cases,
-                    index=context_cases.index(case_id)
-                    if case_id in context_cases
-                    else 0,
-                    key="e2e_context_case",
+            context_doctor_note = st.text_area(
+                "Nota del médico",
+                height=140,
+                placeholder=(
+                    "No tomes casi nada de la epicrisis, solo neumonía. "
+                    "Paciente alérgico a penicilina."
+                ),
+                key="e2e_context_doctor_note",
+            )
+            uploaded_pdf = st.file_uploader(
+                "Documento PDF",
+                type=["pdf"],
+                key="e2e_context_pdf",
+            )
+            context_document_id = (
+                st.text_input(
+                    "document_id",
+                    value="uploaded_document",
+                    key="e2e_context_document_id",
+                ).strip()
+                or "uploaded_document"
+            )
+            col_encounter, col_doc_date = st.columns(2)
+            with col_encounter:
+                encounter_raw = st.text_input(
+                    "Fecha consulta (YYYY-MM-DD, opcional)",
+                    value="",
+                    placeholder="2026-06-14",
+                    key="e2e_context_encounter_date",
                 )
-            else:
-                st.warning("No hay cases de contexto en cases/context/")
+                context_encounter_date = encounter_raw.strip() or None
+            with col_doc_date:
+                doc_date_raw = st.text_input(
+                    "Fecha documento (opcional)",
+                    value="",
+                    placeholder="2025-10-15",
+                    key="e2e_context_document_date",
+                )
+                context_document_date = doc_date_raw.strip() or None
 
     st.markdown("")
     if st.button("▶ Ejecutar pipeline completo", type="primary", key="run_e2e"):
@@ -984,9 +1159,29 @@ def _render_e2e_run_tab() -> None:
             resolved_case_id = case_id
             pasted_case = None
 
-        with st.status("Ejecutando pipeline...", expanded=True) as status:
-            try:
-                outputs = run_e2e_pipeline(
+        if include_context:
+            note_text = context_doctor_note.strip() if context_doctor_note else ""
+            if not note_text and uploaded_pdf is None:
+                st.error(
+                    "Con contexto extra activo, escribe una nota del médico, "
+                    "sube un PDF, o ambos."
+                )
+                return
+
+        pdf_path: Path | None = None
+        temp_pdf_file = None
+        try:
+            if include_context and uploaded_pdf is not None:
+                temp_pdf_file = tempfile.NamedTemporaryFile(
+                    suffix=".pdf",
+                    delete=False,
+                )
+                temp_pdf_file.write(uploaded_pdf.getvalue())
+                temp_pdf_file.close()
+                pdf_path = Path(temp_pdf_file.name)
+
+            with st.status("Ejecutando pipeline...", expanded=True) as status:
+                pipeline_result = run_e2e_pipeline(
                     case_id=resolved_case_id,
                     session_id=session_id.strip(),
                     template_id=template_id,
@@ -995,34 +1190,53 @@ def _render_e2e_run_tab() -> None:
                     classification_config=classification_config,
                     generation_config=generation_config,
                     base_case=pasted_case,
-                    context_case_id=context_case_id if include_context else None,
                     context_config=context_config if include_context else None,
-                    include_doctor_note=include_doctor_note,
-                    include_documents=include_documents,
+                    context_doctor_note=context_doctor_note if include_context else None,
+                    context_document_pdf_path=pdf_path,
+                    context_document_id=context_document_id,
+                    context_encounter_date=context_encounter_date,
+                    context_document_date=context_document_date,
                 )
-                for output in outputs:
-                    latency = primary_latency_ms(
-                        output.step,
-                        output.result_record,
-                    )
-                    st.write(
-                        f"✓ {output.step}: {format_latency_ms(latency)}"
-                    )
-                status.update(label="✓ Pipeline completado", state="complete")
-                _persist_e2e_outputs(outputs)
+                for output in pipeline_result.outputs:
+                    result_record = output.result_record
+                    step_status = result_record.get("step_status")
+                    if step_status == "failed":
+                        st.write(
+                            f"✗ {output.step}: "
+                            f"{result_record.get('error_message', 'error')}"
+                        )
+                        continue
+                    latency = primary_latency_ms(output.step, result_record)
+                    st.write(f"✓ {output.step}: {format_latency_ms(latency)}")
+
                 manifest_path = save_e2e_run(
-                    outputs=outputs,
+                    outputs=pipeline_result.outputs,
                     case_id=resolved_case_id,
                     session_id=session_id.strip(),
                     template_id=template_id,
                     include_context=include_context,
-                    context_case_id=context_case_id if include_context else None,
+                    status=pipeline_result.status,
+                    failed_step=pipeline_result.failed_step,
+                    error_message=pipeline_result.error_message,
                 )
-                st.caption(f"Run guardado en `{manifest_path}`")
-            except Exception as exc:
-                status.update(label="✗ Error en pipeline", state="error")
-                st.error(str(exc))
-                return
+                _persist_e2e_pipeline_result(pipeline_result)
+                meta = st.session_state.get("last_e2e_run_meta")
+                if isinstance(meta, dict):
+                    meta["manifest_path"] = str(manifest_path)
+                    meta["include_context"] = include_context
+
+                if pipeline_result.status == "failed":
+                    status.update(
+                        label=f"✗ Falló en {pipeline_result.failed_step}",
+                        state="error",
+                    )
+                    st.error(pipeline_result.error_message or "Error en pipeline.")
+                else:
+                    status.update(label="✓ Pipeline completado", state="complete")
+                    st.caption(f"Run guardado en `{manifest_path}`")
+        finally:
+            if temp_pdf_file is not None:
+                Path(temp_pdf_file.name).unlink(missing_ok=True)
 
     _render_persisted_e2e_results()
 
@@ -1033,64 +1247,80 @@ def main() -> None:
 
     st.sidebar.markdown("## 🩺 AI Pipeline")
     st.sidebar.caption("R&D harness")
-    st.sidebar.divider()
-
-    mode = st.sidebar.radio(
-        "Modo",
-        ["End-to-end", "Paso individual"],
-        key="nav_mode",
-    )
-
-    st.sidebar.divider()
     _check_env_sidebar()
 
-    if mode == "End-to-end":
-        _render_e2e_page()
-        return
-
-    branch = st.sidebar.radio(
-        "Rama",
-        ["Transcript", "Contexto externo"],
-        key="nav_branch",
+    nav = st.navigation(
+        {
+            "End-to-end": [
+                st.Page(
+                    _render_e2e_run_page,
+                    title="Run E2E",
+                    icon="▶️",
+                    default=True,
+                ),
+                st.Page(
+                    _render_e2e_history_page,
+                    title="Historial",
+                    icon="🕘",
+                ),
+            ],
+            "Transcript": [
+                st.Page(
+                    _render_filtering_page,
+                    title="Filtering",
+                    icon="🔍",
+                ),
+                st.Page(
+                    _render_clustering_page,
+                    title="Clustering",
+                    icon="🗂",
+                ),
+                st.Page(
+                    _render_classification_page,
+                    title="Classification",
+                    icon="🏷",
+                ),
+                st.Page(
+                    _render_generation_page,
+                    title="Generation",
+                    icon="📄",
+                ),
+            ],
+            "Contexto externo": [
+                st.Page(
+                    render_context_ad_hoc_e2e_page,
+                    title="Mini E2E",
+                    icon="⚡",
+                ),
+                st.Page(
+                    render_context_triage_page,
+                    title="Triage",
+                    icon="🩺",
+                ),
+                st.Page(
+                    render_context_filter_spans_page,
+                    title="Filter spans",
+                    icon="🔎",
+                ),
+                st.Page(
+                    render_context_cluster_spans_page,
+                    title="Cluster spans",
+                    icon="🧩",
+                ),
+                st.Page(
+                    render_context_classify_clusters_page,
+                    title="Classify",
+                    icon="🏷",
+                ),
+                st.Page(
+                    render_context_section_adapter_page,
+                    title="Section adapter",
+                    icon="🔗",
+                ),
+            ],
+        }
     )
-
-    if branch == "Contexto externo":
-        context_mode = st.sidebar.radio(
-            "Modo contexto",
-            ["Mini E2E ad-hoc", "Pasos individuales"],
-            key="nav_context_mode",
-        )
-
-        if context_mode == "Mini E2E ad-hoc":
-            render_context_ad_hoc_e2e_page()
-            return
-
-        if "nav_context_step_id" not in st.session_state:
-            from ui.context_pages import CONTEXT_PIPELINE_STEPS
-
-            st.session_state.nav_context_step_id = CONTEXT_PIPELINE_STEPS[0]
-
-        context_step_id = render_context_stepper_nav(
-            st.session_state.nav_context_step_id
-        )
-        st.session_state.nav_context_step_id = context_step_id
-        render_context_branch_page(context_step_id)
-        return
-
-    if "nav_step_id" not in st.session_state:
-        st.session_state.nav_step_id = "filtering"
-
-    step_id = _render_pipeline_stepper_nav(st.session_state.nav_step_id)
-    st.session_state.nav_step_id = step_id
-
-    if step_id == "filtering":
-        _render_filtering_page()
-    elif step_id == "clustering":
-        _render_clustering_page()
-    elif step_id == "classification":
-        _render_classification_page()
-    else:
-        _render_generation_page()
+    nav.run()
 
 
 if __name__ == "__main__":

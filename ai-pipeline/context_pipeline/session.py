@@ -1,41 +1,59 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from common.context_spans import (
+    AmbiguousDirective,
     ClassifyClustersResult,
     Directive,
     DoctorItem,
     FilterSpansResult,
     SectionContext,
+    SectionEvidence,
     Span,
     SpanCluster,
     TriageResult,
-    apply_span_drops,
     build_adapter_jobs,
-    build_spans_from_pdf,
-    build_spans_from_text,
-    doctor_items_to_spans,
-    merge_spans,
+    document_preference_directives,
     propagate_cluster_date_hints,
     split_doctor_items,
 )
 from common.llm_response import LlmResponse
 from common.providers import ModelSpec
 from common.templates import ClinicalTemplate, load_template
+from context_pipeline.config import ContextPipelinePromptBundle
 from context_pipeline.cases.lib import (
     ContextCase,
     load_context_case,
     load_context_cases,
-    load_document_text,
     select_context_case,
 )
 from context_pipeline.classify_clusters.classify_clusters import run_classify_clusters
 from context_pipeline.cluster_spans.cluster_spans import run_cluster_spans
-from context_pipeline.filter_spans.filter_spans import run_filter_spans
+from context_pipeline.cluster_spans.lib import ClusterSpansValidationError
+from context_pipeline.document_directive_filter.document_directive_filter import (
+    run_document_directive_filter,
+)
 from context_pipeline.section_adapter.lib import run_section_adapter_session
+from context_pipeline.span_pool import (
+    ContextSpanPools,
+    build_context_span_pools_ad_hoc,
+    build_context_span_pools_from_case,
+    filter_document_spans,
+    merge_approved_and_filtered_document_spans,
+)
 from context_pipeline.triage.triage import run_triage
+
+
+def _document_ids_from_spans(spans: list[Span]) -> list[str]:
+    return sorted(
+        {
+            span.doc
+            for span in spans
+            if span.doc and span.doc != "nota_medico"
+        }
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +62,24 @@ class ContextLlmCall:
     provider: str
     model: str
     llm_response: LlmResponse
+
+
+class ContextPipelinePartialError(Exception):
+    def __init__(
+        self,
+        message: str,
+        *,
+        failed_step: str,
+        partial_run: "ContextPipelineRun",
+        diagnostics: dict[str, object] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.failed_step = failed_step
+        self.partial_run = partial_run
+        self.diagnostics = dict(diagnostics or {})
+
+    def diagnostics_payload(self) -> dict[str, object]:
+        return dict(self.diagnostics)
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,64 +91,22 @@ class ContextPipelineRun:
     is_pasted: bool
     triage_result: TriageResult
     directives: list[Directive]
+    approved_note_spans: list[Span]
+    document_spans: list[Span]
     span_pool: list[Span]
     filtered_spans: list[Span]
     clusters: list[SpanCluster]
     classify_result: ClassifyClustersResult
     adapter_jobs: dict[str, list[str]]
     section_context: SectionContext
+    section_evidence: SectionEvidence
     llm_calls: list[ContextLlmCall]
     filter_result: FilterSpansResult | None = None
+    filter_spans_document_spans: list[Span] = field(default_factory=list)
+    directive_filtered_document_spans: list[Span] = field(default_factory=list)
+    ambiguous_directives: list[AmbiguousDirective] = field(default_factory=list)
     stopped_after_step: str | None = None
     pipeline_error: str | None = None
-
-
-def _build_span_pool(
-    *,
-    context_case: ContextCase,
-    cases_dir: Path,
-    doctor_items: list[DoctorItem],
-    triage_result: TriageResult,
-    is_pasted: bool,
-    include_doctor_note: bool,
-    include_documents: bool,
-) -> list[Span]:
-    span_lists: list[list[Span]] = []
-
-    if include_doctor_note:
-        if is_pasted:
-            span_lists.append(
-                build_spans_from_text(
-                    context_case.doctor_note.doctor_note,
-                    doc="nota_medico",
-                    session_id=context_case.meta.session_id,
-                )
-            )
-        else:
-            span_lists.append(
-                doctor_items_to_spans(doctor_items, triage_result.content_ids)
-            )
-
-    if include_documents:
-        for fixture in context_case.document_fixtures:
-            source_path = (cases_dir / fixture.source_file).resolve()
-            if source_path.suffix.lower() == ".pdf":
-                spans = build_spans_from_pdf(
-                    source_path,
-                    doc=fixture.document_id,
-                    session_id=context_case.meta.session_id,
-                )
-            else:
-                spans = build_spans_from_text(
-                    load_document_text(fixture, cases_dir=cases_dir),
-                    doc=fixture.document_id,
-                    session_id=context_case.meta.session_id,
-                )
-            span_lists.append(spans)
-
-    if not span_lists:
-        return []
-    return merge_spans(*span_lists)
 
 
 def _primary_document_date(context_case: ContextCase) -> str | None:
@@ -130,12 +124,17 @@ def _partial_pipeline_run(
     doctor_items: list[DoctorItem],
     is_pasted: bool,
     triage_result: TriageResult,
+    span_pools: ContextSpanPools,
     span_pool: list[Span],
     filter_result: FilterSpansResult,
     filtered_spans: list[Span],
     stopped_after_step: str,
     pipeline_error: str,
     llm_calls: list[ContextLlmCall],
+    ambiguous_directives: list[AmbiguousDirective] | None = None,
+    filter_spans_document_spans: list[Span] | None = None,
+    directive_filtered_document_spans: list[Span] | None = None,
+    clusters: list[SpanCluster] | None = None,
 ) -> ContextPipelineRun:
     return ContextPipelineRun(
         session_id=session_id,
@@ -145,58 +144,23 @@ def _partial_pipeline_run(
         is_pasted=is_pasted,
         triage_result=triage_result,
         directives=triage_result.directives,
+        approved_note_spans=span_pools.approved_note_spans,
+        document_spans=span_pools.document_spans,
         span_pool=span_pool,
         filtered_spans=filtered_spans,
-        clusters=[],
+        clusters=list(clusters or []),
         classify_result=ClassifyClustersResult(),
         adapter_jobs={},
         section_context={},
+        section_evidence={},
         llm_calls=llm_calls,
         filter_result=filter_result,
+        filter_spans_document_spans=list(filter_spans_document_spans or []),
+        directive_filtered_document_spans=list(directive_filtered_document_spans or []),
+        ambiguous_directives=list(ambiguous_directives or []),
         stopped_after_step=stopped_after_step,
         pipeline_error=pipeline_error,
     )
-
-
-def _build_ad_hoc_span_pool(
-    *,
-    session_id: str,
-    doctor_note: str | None,
-    doctor_items: list[DoctorItem],
-    triage_result: TriageResult,
-    is_pasted: bool,
-    include_doctor_note: bool,
-    document_pdf_path: Path | None,
-    document_id: str,
-) -> list[Span]:
-    span_lists: list[list[Span]] = []
-
-    if include_doctor_note and doctor_note and doctor_note.strip():
-        if is_pasted:
-            span_lists.append(
-                build_spans_from_text(
-                    doctor_note.strip(),
-                    doc="nota_medico",
-                    session_id=session_id,
-                )
-            )
-        else:
-            span_lists.append(
-                doctor_items_to_spans(doctor_items, triage_result.content_ids)
-            )
-
-    if document_pdf_path is not None:
-        span_lists.append(
-            build_spans_from_pdf(
-                document_pdf_path,
-                doc=document_id,
-                session_id=session_id,
-            )
-        )
-
-    if not span_lists:
-        return []
-    return merge_spans(*span_lists)
 
 
 def _run_context_pipeline_core(
@@ -209,43 +173,62 @@ def _run_context_pipeline_core(
     doctor_items: list[DoctorItem],
     is_pasted: bool,
     triage_result: TriageResult,
-    span_pool: list[Span],
+    span_pools: ContextSpanPools,
     model_spec: ModelSpec,
-    filter_spans_prompt: str,
-    filter_spans_prompt_version: str = "v001",
-    cluster_spans_prompt: str,
-    cluster_spans_prompt_version: str = "v001",
-    classify_clusters_prompt: str,
-    classify_clusters_prompt_version: str = "v001",
-    section_adapter_prompt: str,
-    section_adapter_prompt_version: str = "v001",
+    prompt_bundle: ContextPipelinePromptBundle,
     llm_calls: list[ContextLlmCall],
 ) -> ContextPipelineRun:
+    span_pool = span_pools.span_pool
     if not span_pool:
         raise ValueError(
             "context_pipeline_requires_at_least_one_span_source: "
             "provide doctor note and/or document"
         )
 
-    filter_result, filter_response = run_filter_spans(
+    filtered_documents = filter_document_spans(
+        document_spans=span_pools.document_spans,
         encounter_date=encounter_date,
         document_date=document_date,
-        directives=triage_result.directives,
-        spans=span_pool,
+        directives=[],
         model_spec=model_spec,
-        system_prompt=filter_spans_prompt,
-        prompt_version=filter_spans_prompt_version,
+        system_prompt=prompt_bundle.filter_spans.system_prompt,
+        prompt_version=prompt_bundle.filter_spans.prompt_version,
     )
-    llm_calls.append(
-        ContextLlmCall(
-            label="filter_spans",
-            provider=model_spec.provider,
-            model=model_spec.model,
-            llm_response=filter_response,
+    if filtered_documents.llm_response is not None:
+        llm_calls.append(
+            ContextLlmCall(
+                label="filter_spans",
+                provider=model_spec.provider,
+                model=model_spec.model,
+                llm_response=filtered_documents.llm_response,
+            )
         )
+
+    available_documents = _document_ids_from_spans(span_pools.document_spans)
+    directive_filter_outcome, directive_filter_responses = run_document_directive_filter(
+        spans=filtered_documents.filtered_document_spans,
+        directives=triage_result.directives,
+        available_documents=available_documents,
+        model_spec=model_spec,
+        system_prompt=prompt_bundle.document_directive_filter.system_prompt,
+        prompt_version=prompt_bundle.document_directive_filter.prompt_version,
     )
-    filtered_spans = apply_span_drops(span_pool, filter_result.drop_ids)
+    for index, llm_response in enumerate(directive_filter_responses, start=1):
+        llm_calls.append(
+            ContextLlmCall(
+                label=f"document_directive_filter:{index}",
+                provider=model_spec.provider,
+                model=model_spec.model,
+                llm_response=llm_response,
+            )
+        )
+
+    filtered_spans = merge_approved_and_filtered_document_spans(
+        approved_note_spans=span_pools.approved_note_spans,
+        filtered_document_spans=directive_filter_outcome.spans,
+    )
     if not filtered_spans:
+        filter_result = filtered_documents.filter_result or FilterSpansResult(drop_ids=[])
         return _partial_pipeline_run(
             session_id=session_id,
             template_id=template_id,
@@ -253,20 +236,59 @@ def _run_context_pipeline_core(
             doctor_items=doctor_items,
             is_pasted=is_pasted,
             triage_result=triage_result,
+            span_pools=span_pools,
             span_pool=span_pool,
             filter_result=filter_result,
             filtered_spans=filtered_spans,
-            stopped_after_step="filter_spans",
+            ambiguous_directives=directive_filter_outcome.ambiguous_directives,
+            filter_spans_document_spans=filtered_documents.filtered_document_spans,
+            directive_filtered_document_spans=directive_filter_outcome.spans,
+            stopped_after_step="document_directive_filter",
             pipeline_error="context_pipeline_no_spans_after_filter",
             llm_calls=llm_calls,
         )
 
-    clusters, cluster_response = run_cluster_spans(
-        spans=filtered_spans,
-        model_spec=model_spec,
-        system_prompt=cluster_spans_prompt,
-        prompt_version=cluster_spans_prompt_version,
-    )
+    try:
+        clusters, cluster_response = run_cluster_spans(
+            spans=filtered_spans,
+            model_spec=model_spec,
+            system_prompt=prompt_bundle.cluster_spans.system_prompt,
+            prompt_version=prompt_bundle.cluster_spans.prompt_version,
+        )
+    except ClusterSpansValidationError as exc:
+        if exc.llm_response is not None:
+            llm_calls.append(
+                ContextLlmCall(
+                    label="cluster_spans",
+                    provider=model_spec.provider,
+                    model=model_spec.model,
+                    llm_response=exc.llm_response,
+                )
+            )
+        raise ContextPipelinePartialError(
+            str(exc),
+            failed_step="cluster_spans",
+            partial_run=_partial_pipeline_run(
+                session_id=session_id,
+                template_id=template_id,
+                encounter_date=encounter_date,
+                doctor_items=doctor_items,
+                is_pasted=is_pasted,
+                triage_result=triage_result,
+                span_pools=span_pools,
+                span_pool=span_pool,
+                filter_result=filtered_documents.filter_result,
+                filtered_spans=filtered_spans,
+                ambiguous_directives=directive_filter_outcome.ambiguous_directives,
+                filter_spans_document_spans=filtered_documents.filtered_document_spans,
+                directive_filtered_document_spans=directive_filter_outcome.spans,
+                clusters=exc.clusters,
+                stopped_after_step="cluster_spans",
+                pipeline_error=str(exc),
+                llm_calls=llm_calls,
+            ),
+            diagnostics=exc.diagnostics(),
+        ) from exc
     llm_calls.append(
         ContextLlmCall(
             label="cluster_spans",
@@ -282,10 +304,10 @@ def _run_context_pipeline_core(
         clusters=clusters,
         spans=filtered_spans,
         model_spec=model_spec,
-        system_prompt=classify_clusters_prompt,
+        system_prompt=prompt_bundle.classify_clusters.system_prompt,
         encounter_date=encounter_date,
         document_date=document_date,
-        prompt_version=classify_clusters_prompt_version,
+        prompt_version=prompt_bundle.classify_clusters.prompt_version,
     )
     llm_calls.append(
         ContextLlmCall(
@@ -304,10 +326,10 @@ def _run_context_pipeline_core(
         template=template,
         encounter_date=encounter_date,
         document_date=document_date,
-        directives=triage_result.directives,
+        directives=document_preference_directives(triage_result.directives),
         model_spec=model_spec,
-        system_prompt=section_adapter_prompt,
-        prompt_version=section_adapter_prompt_version,
+        system_prompt=prompt_bundle.section_adapter.system_prompt,
+        prompt_version=prompt_bundle.section_adapter.prompt_version,
     )
     for section_run in adapter_session.section_runs:
         llm_calls.append(
@@ -327,14 +349,20 @@ def _run_context_pipeline_core(
         is_pasted=is_pasted,
         triage_result=triage_result,
         directives=triage_result.directives,
+        approved_note_spans=span_pools.approved_note_spans,
+        document_spans=span_pools.document_spans,
         span_pool=span_pool,
         filtered_spans=filtered_spans,
         clusters=clusters,
         classify_result=classify_result,
         adapter_jobs=adapter_jobs,
         section_context=adapter_session.section_context,
+        section_evidence=adapter_session.section_evidence,
         llm_calls=llm_calls,
-        filter_result=filter_result,
+        filter_result=filtered_documents.filter_result,
+        filter_spans_document_spans=filtered_documents.filtered_document_spans,
+        directive_filtered_document_spans=directive_filter_outcome.spans,
+        ambiguous_directives=directive_filter_outcome.ambiguous_directives,
     )
 
 
@@ -344,15 +372,7 @@ def run_context_pipeline_ad_hoc(
     template_id: str,
     templates_dir: Path,
     model_spec: ModelSpec,
-    triage_prompt: str,
-    filter_spans_prompt: str,
-    filter_spans_prompt_version: str = "v001",
-    cluster_spans_prompt: str,
-    cluster_spans_prompt_version: str = "v001",
-    classify_clusters_prompt: str,
-    classify_clusters_prompt_version: str = "v001",
-    section_adapter_prompt: str,
-    section_adapter_prompt_version: str = "v001",
+    prompt_bundle: ContextPipelinePromptBundle,
     doctor_note: str | None = None,
     document_pdf_path: Path | None = None,
     document_id: str = "uploaded_document",
@@ -366,6 +386,8 @@ def run_context_pipeline_ad_hoc(
 
     template = load_template(template_id, templates_dir=templates_dir)
     llm_calls: list[ContextLlmCall] = []
+    available_documents = [document_id] if has_document else []
+    template_section_ids = [section.section_id for section in template.sections]
 
     doctor_items: list[DoctorItem] = []
     is_pasted = False
@@ -382,7 +404,10 @@ def run_context_pipeline_ad_hoc(
             session_id=session_id,
             items=doctor_items,
             model_spec=model_spec,
-            system_prompt=triage_prompt,
+            system_prompt=prompt_bundle.triage.system_prompt,
+            prompt_version=prompt_bundle.triage.prompt_version,
+            available_documents=available_documents,
+            template_section_ids=template_section_ids,
         )
         llm_calls.append(
             ContextLlmCall(
@@ -393,7 +418,7 @@ def run_context_pipeline_ad_hoc(
             )
         )
 
-    span_pool = _build_ad_hoc_span_pool(
+    span_pools = build_context_span_pools_ad_hoc(
         session_id=session_id,
         doctor_note=doctor_note.strip() if has_note else None,
         doctor_items=doctor_items,
@@ -413,16 +438,9 @@ def run_context_pipeline_ad_hoc(
         doctor_items=doctor_items,
         is_pasted=is_pasted,
         triage_result=triage_result,
-        span_pool=span_pool,
+        span_pools=span_pools,
         model_spec=model_spec,
-        filter_spans_prompt=filter_spans_prompt,
-        filter_spans_prompt_version=filter_spans_prompt_version,
-        cluster_spans_prompt=cluster_spans_prompt,
-        cluster_spans_prompt_version=cluster_spans_prompt_version,
-        classify_clusters_prompt=classify_clusters_prompt,
-        classify_clusters_prompt_version=classify_clusters_prompt_version,
-        section_adapter_prompt=section_adapter_prompt,
-        section_adapter_prompt_version=section_adapter_prompt_version,
+        prompt_bundle=prompt_bundle,
         llm_calls=llm_calls,
     )
 
@@ -433,22 +451,22 @@ def run_context_pipeline_session(
     cases_index: Path,
     templates_dir: Path,
     model_spec: ModelSpec,
-    triage_prompt: str,
-    filter_spans_prompt: str,
-    filter_spans_prompt_version: str = "v001",
-    cluster_spans_prompt: str,
-    cluster_spans_prompt_version: str = "v001",
-    classify_clusters_prompt: str,
-    classify_clusters_prompt_version: str = "v001",
-    section_adapter_prompt: str,
-    section_adapter_prompt_version: str = "v001",
+    prompt_bundle: ContextPipelinePromptBundle,
     include_doctor_note: bool = True,
     include_documents: bool = True,
+    template_id_override: str | None = None,
 ) -> ContextPipelineRun:
     case_meta = select_context_case(load_context_cases(cases_index), case_id=case_id)
     context_case = load_context_case(case_meta, cases_dir=cases_index.parent)
-    template = load_template(case_meta.template_id, templates_dir=templates_dir)
+    resolved_template_id = template_id_override or case_meta.template_id
+    template = load_template(resolved_template_id, templates_dir=templates_dir)
     llm_calls: list[ContextLlmCall] = []
+    available_documents = (
+        [fixture.document_id for fixture in context_case.document_fixtures]
+        if include_documents
+        else []
+    )
+    template_section_ids = [section.section_id for section in template.sections]
 
     doctor_items, is_pasted = split_doctor_items(
         context_case.doctor_note.doctor_note,
@@ -463,7 +481,10 @@ def run_context_pipeline_session(
             session_id=case_meta.session_id,
             items=doctor_items,
             model_spec=model_spec,
-            system_prompt=triage_prompt,
+            system_prompt=prompt_bundle.triage.system_prompt,
+            prompt_version=prompt_bundle.triage.prompt_version,
+            available_documents=available_documents,
+            template_section_ids=template_section_ids,
         )
         llm_calls.append(
             ContextLlmCall(
@@ -474,7 +495,7 @@ def run_context_pipeline_session(
             )
         )
 
-    span_pool = _build_span_pool(
+    span_pools = build_context_span_pools_from_case(
         context_case=context_case,
         cases_dir=cases_index.parent,
         doctor_items=doctor_items,
@@ -487,28 +508,22 @@ def run_context_pipeline_session(
     return _run_context_pipeline_core(
         session_id=case_meta.session_id,
         template=template,
-        template_id=case_meta.template_id,
+        template_id=resolved_template_id,
         encounter_date=case_meta.encounter_date,
         document_date=_primary_document_date(context_case),
         doctor_items=doctor_items,
         is_pasted=is_pasted,
         triage_result=triage_result,
-        span_pool=span_pool,
+        span_pools=span_pools,
         model_spec=model_spec,
-        filter_spans_prompt=filter_spans_prompt,
-        filter_spans_prompt_version=filter_spans_prompt_version,
-        cluster_spans_prompt=cluster_spans_prompt,
-        cluster_spans_prompt_version=cluster_spans_prompt_version,
-        classify_clusters_prompt=classify_clusters_prompt,
-        classify_clusters_prompt_version=classify_clusters_prompt_version,
-        section_adapter_prompt=section_adapter_prompt,
-        section_adapter_prompt_version=section_adapter_prompt_version,
+        prompt_bundle=prompt_bundle,
         llm_calls=llm_calls,
     )
 
 
 __all__ = [
     "ContextLlmCall",
+    "ContextPipelinePartialError",
     "ContextPipelineRun",
     "run_context_pipeline_ad_hoc",
     "run_context_pipeline_session",

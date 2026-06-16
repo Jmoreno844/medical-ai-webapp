@@ -149,6 +149,37 @@ def test_normalize_section_generation_content_strips_duplicate_heading() -> None
     )
 
 
+def test_normalize_section_generation_content_demotes_internal_headings() -> None:
+    content = """### Cardiopulmonar
+Refiere cansancio al subir escaleras. {{e:t1}}
+
+### Abdominal
+Niega náuseas y vómito. {{e:t2,t3}}"""
+    assert (
+        normalize_section_generation_content(content, heading="Revisión por sistemas")
+        == "Cardiopulmonar: Refiere cansancio al subir escaleras. {{e:t1}}\n\n"
+        "Abdominal: Niega náuseas y vómito. {{e:t2,t3}}"
+    )
+
+
+def test_normalize_section_generation_content_demotes_heading_before_bullet() -> None:
+    content = """### Neurológico
+- Niega mareo franco. {{e:t4}}"""
+    assert (
+        normalize_section_generation_content(content, heading="Revisión por sistemas")
+        == "- Neurológico: Niega mareo franco. {{e:t4}}"
+    )
+
+
+def test_normalize_section_generation_content_merges_label_heading_with_colon() -> None:
+    content = """### Cardiopulmonar:
+Niega tos. {{e:t5}}"""
+    assert (
+        normalize_section_generation_content(content, heading="Revisión por sistemas")
+        == "Cardiopulmonar: Niega tos. {{e:t5}}"
+    )
+
+
 def test_render_generated_section_markdown_skips_empty_sections() -> None:
     assert (
         render_generated_section_markdown(

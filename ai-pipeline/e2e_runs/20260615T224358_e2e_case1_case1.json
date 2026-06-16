@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "run_id": "20260615T224358",
+  "status": "failed",
+  "run_started_at": "2026-06-15T22:43:58.339329+00:00",
+  "run_finished_at": "2026-06-15T22:44:19.059282+00:00",
+  "case_id": "case1",
+  "session_id": "case1",
+  "template_id": "consulta_estructurada_v001",
+  "include_context": true,
+  "context_case_id": null,
+  "failed_step": "context_ad_hoc_pipeline",
+  "error_message": "Error code: 400 - {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': \"output_config.format.schema: Schema type 'oneOf' is not supported\"}, 'request_id': 'req_011Cc5rZQ8ctkVQZxxDYabHt'}",
+  "outputs": [
+    {
+      "step": "filtering",
+      "output_path": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/filtering/results/20260615T224358Z_debug_case1_anthropic.json"
+    },
+    {
+      "step": "clustering",
+      "output_path": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/clustering/results/20260615T224400Z_debug_case1_anthropic.json"
+    },
+    {
+      "step": "classification",
+      "output_path": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/classification/results/20260615T224413Z_session_case1_anthropic.json"
+    },
+    {
+      "step": "context_ad_hoc_pipeline",
+      "output_path": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/e2e_runs/failed_steps/20260615T224419Z_failed_context_ad_hoc_pipeline_case1.json"
+    }
+  ]
+}

@@ -12,19 +12,29 @@ from pydantic import ValidationError
 from common.context_spans import (
     Directive,
     SectionAdapterResult,
+    SectionEvidence,
     Span,
     SpanCluster,
     audit_section_adapter_result,
+    build_section_evidence,
     cluster_to_payload_item,
     span_to_payload_item,
 )
 from common.json_utils import extract_json_object
 from common.llm_response import LlmResponse, summarize_llm_responses
-from common.prompt_registry import is_py_prompt_version, load_py_prompt_module, py_system_prompt
+from common.prompt_registry import (
+    is_py_prompt_version,
+    load_py_prompt_module,
+    py_system_prompt,
+)
 from common.prompts import load_prompt as load_prompt_from_file
 from common.prompts import prompt_file_path as resolve_prompt_file_path
 from common.providers import ModelSpec, call_llm_detailed
-from common.templates import ClinicalTemplate, TemplateSection, compose_section_guidelines
+from common.templates import (
+    ClinicalTemplate,
+    TemplateSection,
+    compose_section_guidelines,
+)
 
 MODULE_ROOT = Path(__file__).resolve().parent
 PROMPTS_DIR = MODULE_ROOT / "prompts"
@@ -47,6 +57,7 @@ class SectionAdapterRun:
 class SectionAdapterSessionRun:
     section_runs: list[SectionAdapterRun]
     section_context: dict[str, str]
+    section_evidence: SectionEvidence
     total_response_time_ms: int
     section_execution_mode: str
     section_concurrency: int
@@ -191,6 +202,8 @@ def parse_section_adapter_result(
 
 def enrich_section_adapter_session_for_export(
     section_context: dict[str, str],
+    *,
+    section_evidence: SectionEvidence | None = None,
 ) -> dict[str, object]:
     sections = [
         {
@@ -201,11 +214,14 @@ def enrich_section_adapter_session_for_export(
         for section_id, brief in sorted(section_context.items())
         if brief.strip()
     ]
-    return {
+    export: dict[str, object] = {
         "section_context": dict(section_context),
         "sections": sections,
         "section_count": len(sections),
     }
+    if section_evidence:
+        export["section_evidence"] = section_evidence
+    return export
 
 
 def _run_section_adapter_job(
@@ -281,6 +297,7 @@ def run_section_adapter_session(
         return SectionAdapterSessionRun(
             section_runs=[],
             section_context={},
+            section_evidence={},
             total_response_time_ms=0,
             section_execution_mode="sequential",
             section_concurrency=0,
@@ -340,6 +357,7 @@ def run_section_adapter_session(
         for section_run in section_runs
         if section_run.result.brief.strip()
     }
+    section_evidence = build_section_evidence(adapter_jobs, clusters_by_id, spans_by_id)
     llm_usage_summary = summarize_llm_responses(
         [section_run.llm_response for section_run in section_runs]
     )
@@ -351,6 +369,7 @@ def run_section_adapter_session(
     return SectionAdapterSessionRun(
         section_runs=section_runs,
         section_context=section_context,
+        section_evidence=section_evidence,
         total_response_time_ms=total_response_time_ms,
         section_execution_mode=section_execution_mode,
         section_concurrency=resolved_concurrency,

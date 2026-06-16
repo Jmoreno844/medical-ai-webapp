@@ -1,0 +1,23 @@
+{
+  "step_status": "failed",
+  "step": "generation",
+  "run_mode": "e2e_failed_step",
+  "run_started_at": "2026-06-15T22:08:35.103047+00:00",
+  "run_finished_at": "2026-06-15T22:08:35.103056+00:00",
+  "error_type": "ValueError",
+  "error_message": "ai_pipeline_openai_empty_response",
+  "prior_output_paths": {
+    "filtering": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/filtering/results/20260615T220812Z_debug_case1_openai.json",
+    "clustering": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/clustering/results/20260615T220814Z_debug_case1_openai.json",
+    "classification": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/classification/results/20260615T220818Z_session_case1_openai.json",
+    "context_pipeline": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/context_pipeline/section_adapter/results/20260615T220821Z_context_case1_openai.json"
+  },
+  "output_path": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/e2e_runs/failed_steps/20260615T220835Z_failed_generation_case1.json",
+  "session_id": "case1",
+  "case_id": "case1",
+  "provider": "openai",
+  "model": "gpt-5.4-mini",
+  "prompt_version": "v001",
+  "openai_reasoning_effort": "none",
+  "linked_evidence_two_step": true
+}

@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "run_id": "20260615T223747",
+  "status": "failed",
+  "run_started_at": "2026-06-15T22:37:47.890255+00:00",
+  "run_finished_at": "2026-06-15T22:38:08.158222+00:00",
+  "case_id": "case1",
+  "session_id": "case1",
+  "template_id": "consulta_estructurada_v001",
+  "include_context": true,
+  "context_case_id": null,
+  "failed_step": "generation",
+  "error_message": "generation_planner_missing_evidence",
+  "outputs": [
+    {
+      "step": "filtering",
+      "output_path": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/filtering/results/20260615T223747Z_debug_case1_openai.json"
+    },
+    {
+      "step": "clustering",
+      "output_path": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/clustering/results/20260615T223749Z_debug_case1_openai.json"
+    },
+    {
+      "step": "classification",
+      "output_path": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/classification/results/20260615T223753Z_session_case1_openai.json"
+    },
+    {
+      "step": "context_ad_hoc_pipeline",
+      "output_path": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/context_pipeline/section_adapter/results/20260615T223755Z_adhoc_case1_openai.json"
+    },
+    {
+      "step": "generation",
+      "output_path": "/home/juan/Desktop/code/Proyecto_AI_Medico/github_medical_web_app/ai-pipeline/e2e_runs/failed_steps/20260615T223808Z_failed_generation_case1.json"
+    }
+  ]
+}

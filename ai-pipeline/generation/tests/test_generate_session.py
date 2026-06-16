@@ -66,7 +66,7 @@ def test_run_generation_session_runs_sections_in_parallel(
                 section_id=job.section_id,
                 content=f"contenido {job.section_id}",
             ),
-            llm_response=LlmResponse(content="{}"),
+            llm_responses=[LlmResponse(content="{}")],
             raw_response="{}",
             response_time_ms=200,
         )
@@ -116,7 +116,7 @@ def test_run_generation_session_skips_sections_without_clusters(
                 section_id=job.section_id,
                 content="texto",
             ),
-            llm_response=LlmResponse(content="{}"),
+            llm_responses=[LlmResponse(content="{}")],
             raw_response="{}",
             response_time_ms=10,
         )

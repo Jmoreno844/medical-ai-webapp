@@ -7,7 +7,7 @@ from common.cost_projection import (
     effective_cached_input_tokens,
     estimate_cacheable_input_tokens,
 )
-from common.model_pricing import ModelPricing, lookup_openai_model_pricing, normalize_model_id
+from common.model_pricing import ModelPricing, lookup_model_pricing, normalize_model_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,10 +84,7 @@ def compute_usage_cost_usd(
     usage: TokenUsage,
     billed_cached_input_tokens: int | None = None,
 ) -> tuple[float, float, ModelPricing | None]:
-    if provider.strip().lower() != "openai":
-        return 0.0, 0.0, None
-
-    pricing = lookup_openai_model_pricing(model)
+    pricing = lookup_model_pricing(provider=provider, model=model)
     if pricing is None:
         return 0.0, 0.0, None
 

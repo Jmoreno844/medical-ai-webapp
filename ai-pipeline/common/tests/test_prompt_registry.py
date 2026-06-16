@@ -83,6 +83,15 @@ def test_load_py_prompt_module_unknown_raises() -> None:
         load_py_prompt_module("classification", "v999")
 
 
+def test_py_prompt_versions_includes_context_triage_v001() -> None:
+    assert "v001" in py_prompt_versions("context_triage")
+
+
+def test_load_py_prompt_module_context_triage_v001() -> None:
+    module = load_py_prompt_module("context_triage", "v001")
+    assert module.__name__ == "context_pipeline.triage.prompts.triage_prompt_v001"
+
+
 def test_py_prompt_versions_includes_context_cluster_spans_v002() -> None:
     assert "v002" in py_prompt_versions("context_cluster_spans")
 

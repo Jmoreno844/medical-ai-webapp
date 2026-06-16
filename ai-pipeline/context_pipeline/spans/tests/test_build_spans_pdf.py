@@ -57,3 +57,23 @@ def test_build_spans_from_pdf_keeps_single_column_lines(tmp_path: Path) -> None:
     result_lines = [s for s in spans if s.kind == SpanKind.RESULT_LINE]
     assert len(result_lines) == 2
     assert all(not s.flags for s in spans)
+
+
+def test_build_spans_from_pdf_recombines_lab_label_value_and_range_columns(
+    tmp_path: Path,
+) -> None:
+    pdf_path = tmp_path / "cmp.pdf"
+    write_columnar_pdf(
+        pdf_path,
+        rows=[
+            [(50, "Potasio"), (220, "4.3 mmol/L"), (380, "3.5 - 5.1")],
+            [(50, "ALT (TGP)"), (220, "31 U/L"), (380, "7 - 56")],
+        ],
+    )
+
+    spans = build_spans_from_pdf(pdf_path, doc="cmp", session_id="case")
+
+    assert len(spans) == 2
+    assert spans[0].text == "Potasio 4.3 mmol/L 3.5 - 5.1"
+    assert spans[1].text == "ALT (TGP) 31 U/L 7 - 56"
+    assert all(span.kind == SpanKind.RESULT_LINE for span in spans)
