@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 from functools import lru_cache
-from pathlib import Path
+
+from document_pipeline_core.package_root import DEFAULT_TEMPLATES_DIR
 
 from app.domains.documents.schemas import (
     ClinicalTemplateOut,
@@ -12,9 +13,7 @@ from app.domains.documents.schemas import (
 
 TEMPLATE_ID = "consulta_estructurada_v001"
 TEMPLATE_NAME = "Consulta estructurada"
-TEMPLATE_PATH = (
-    Path(__file__).resolve().parent / "templates" / f"{TEMPLATE_ID}.json"
-)
+TEMPLATE_PATH = DEFAULT_TEMPLATES_DIR / f"{TEMPLATE_ID}.json"
 
 
 @lru_cache(maxsize=1)

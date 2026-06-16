@@ -1,11 +1,10 @@
 from __future__ import annotations
-
-import time
 from types import SimpleNamespace
 from typing import Any
 
 from document_pipeline_core.common.llm_response import (
     LlmResponse,
+    OpenAIEmptyResponseError,
     build_llm_response_from_message,
     normalize_usage,
 )
@@ -25,6 +24,8 @@ def _consume_openai_responses_stream(
     from document_pipeline_core.common.llm_response import build_llm_response_from_openai_responses
 
     collector = StreamTimingCollector()
+    output_parts: list[str] = []
+    reasoning_parts: list[str] = []
     with client.responses.stream(**kwargs) as stream:
         for event in stream:
             event_type = getattr(event, "type", "") or ""
@@ -32,17 +33,32 @@ def _consume_openai_responses_stream(
                 delta = getattr(event, "delta", None)
                 if _event_has_text(delta):
                     collector.note_reasoning_delta()
+                    reasoning_parts.append(str(delta))
                 continue
             if event_type == "response.output_text.delta":
                 delta = getattr(event, "delta", None)
                 if _event_has_text(delta):
                     collector.note_output_delta()
+                    output_parts.append(str(delta))
         response = stream.get_final_response()
 
-    llm_response = build_llm_response_from_openai_responses(
-        response=response,
-        request_params=request_metadata,
-    )
+    try:
+        llm_response = build_llm_response_from_openai_responses(
+            response=response,
+            request_params=request_metadata,
+        )
+    except OpenAIEmptyResponseError as exc:
+        partial_content = "".join(output_parts).strip() or exc.partial_content
+        partial_thinking = "".join(reasoning_parts).strip() or exc.partial_thinking
+        raise OpenAIEmptyResponseError(
+            partial_content=partial_content,
+            partial_thinking=partial_thinking,
+            output_item_types=exc.output_item_types,
+            message_statuses=exc.message_statuses,
+            response_status=exc.response_status,
+            response_error=exc.response_error,
+            response_incomplete_details=exc.response_incomplete_details,
+        ) from exc
     return LlmResponse(
         content=llm_response.content,
         thinking=llm_response.thinking,

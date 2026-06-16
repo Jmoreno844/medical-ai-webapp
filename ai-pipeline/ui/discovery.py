@@ -6,9 +6,14 @@ from pathlib import Path
 
 from document_pipeline_core.classification.lib import load_cluster_cases
 from document_pipeline_core.common.pipeline_steps import get_step_spec, list_registered_steps
+from document_pipeline_core.common.prompt_registry import py_prompt_versions
 from document_pipeline_core.common.prompt_runtime import list_prompt_versions as runtime_list_prompt_versions
 from document_pipeline_core.common.prompt_runtime import resolve_prompt_version
-from document_pipeline_core.common.templates import DEFAULT_TEMPLATES_DIR, list_template_ids
+from document_pipeline_core.common.templates import (
+    DEFAULT_TEMPLATES_DIR,
+    list_template_ids,
+    template_supports_hybrid_generation_by_id,
+)
 from document_pipeline_core.common.transcripts import TranscriptCase, build_turn_catalog, load_cases
 from document_pipeline_core.package_root import PACKAGE_ROOT
 
@@ -179,6 +184,69 @@ def list_prompt_versions(step: str) -> list[str]:
     return runtime_list_prompt_versions(step)
 
 
+def list_harness_prompt_versions(step: str) -> list[str]:
+    spec = get_step_spec(step)
+    py_versions = py_prompt_versions(spec.registry_step)
+    if py_versions:
+        return py_versions
+    return list_prompt_versions(step)
+
+
+def default_harness_prompt_version(step: str) -> str:
+    versions = list_harness_prompt_versions(step)
+    preferred = default_prompt_version(step)
+    return preferred if preferred in versions else versions[0]
+
+
+def list_generation_prompt_versions(*, generation_route: str) -> list[str]:
+    normalized = generation_route.strip().lower()
+    if normalized == "two_step":
+        planner = set(py_prompt_versions("generation_planner"))
+        renderer = set(py_prompt_versions("generation_renderer"))
+        shared = sorted(planner & renderer)
+        if shared:
+            return shared
+        return sorted(planner or renderer)
+    if normalized == "cluster_planner":
+        planner = set(py_prompt_versions("generation_cluster_planner"))
+        renderer = set(py_prompt_versions("generation_cluster_renderer"))
+        shared = sorted(planner & renderer)
+        if shared:
+            return shared
+        return sorted(planner or renderer)
+    if normalized == "direct_with_evidence":
+        return sorted(py_prompt_versions("generation_direct_with_evidence"))
+    if normalized == "hybrid":
+        direct_evidence = set(py_prompt_versions("generation_direct_with_evidence"))
+        cluster_planner = set(py_prompt_versions("generation_cluster_planner"))
+        cluster_renderer = set(py_prompt_versions("generation_cluster_renderer"))
+        shared_cluster = cluster_planner & cluster_renderer
+        shared = sorted(direct_evidence & shared_cluster)
+        if shared:
+            return shared
+        return sorted(direct_evidence or shared_cluster)
+    return ["v001"]
+
+
+def template_supports_hybrid(template_id: str) -> bool:
+    return template_supports_hybrid_generation_by_id(template_id)
+
+
+def list_generation_prompt_versions_legacy(*, linked_evidence_two_step: bool) -> list[str]:
+    route = "two_step" if linked_evidence_two_step else "direct"
+    return list_generation_prompt_versions(generation_route=route)
+
+
+def default_generation_prompt_version(*, generation_route: str) -> str:
+    return list_generation_prompt_versions(generation_route=generation_route)[0]
+
+
+def default_generation_prompt_version_legacy(*, linked_evidence_two_step: bool) -> str:
+    return default_generation_prompt_version(
+        generation_route="two_step" if linked_evidence_two_step else "direct",
+    )
+
+
 def default_prompt_version(step: str) -> str:
     return resolve_prompt_version(step)
 
@@ -265,10 +333,15 @@ __all__ = [
     "PROMPT_STEMS",
     "ResultMeta",
     "TranscriptCaseMeta",
+    "default_generation_prompt_version",
+    "default_harness_prompt_version",
     "default_prompt_version",
     "list_classification_sessions",
     "list_context_case_document_files",
     "list_context_cases",
+    "list_generation_prompt_versions",
+    "list_harness_prompt_versions",
+    "template_supports_hybrid",
     "list_prompt_versions",
     "list_results",
     "list_templates",

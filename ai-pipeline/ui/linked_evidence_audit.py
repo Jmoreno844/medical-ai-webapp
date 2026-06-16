@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from document_pipeline_core.generation.evidence_markers import extract_all_marker_ids, strip_evidence_markers
 
+CLUSTER_PLANNER_ROUTE = "cluster_planner"
+DIRECT_WITH_EVIDENCE_ROUTE = "direct_with_evidence"
 TWO_STEP_ROUTE = "two_step"
 PLANNER_STEP = "planner"
 RENDERER_STEP = "renderer"
@@ -20,6 +22,39 @@ def section_generation_route(section_output: dict[str, object] | None) -> str | 
 
 def is_two_step_section_output(section_output: dict[str, object] | None) -> bool:
     return section_generation_route(section_output) == TWO_STEP_ROUTE
+
+
+def is_direct_with_evidence_section_output(
+    section_output: dict[str, object] | None,
+) -> bool:
+    return section_generation_route(section_output) == DIRECT_WITH_EVIDENCE_ROUTE
+
+
+def section_uses_inline_evidence_markers(
+    section_output: dict[str, object] | None,
+) -> bool:
+    route = section_generation_route(section_output)
+    return route in {
+        TWO_STEP_ROUTE,
+        DIRECT_WITH_EVIDENCE_ROUTE,
+        CLUSTER_PLANNER_ROUTE,
+    }
+
+
+def is_cluster_planner_section_output(section_output: dict[str, object] | None) -> bool:
+    return section_generation_route(section_output) == CLUSTER_PLANNER_ROUTE
+
+
+def has_cluster_planner_audit_data(section_output: dict[str, object] | None) -> bool:
+    if not is_cluster_planner_section_output(section_output):
+        return False
+    cluster_runs = section_output.get("cluster_planner_runs")
+    renderer_raw = section_output.get("renderer_raw_response")
+    combined = section_output.get("combined_cluster_plans_block")
+    has_runs = isinstance(cluster_runs, list) and bool(cluster_runs)
+    has_renderer = isinstance(renderer_raw, str) and bool(renderer_raw.strip())
+    has_combined = isinstance(combined, str) and bool(combined.strip())
+    return has_runs or has_renderer or has_combined
 
 
 def has_linked_evidence_audit_data(section_output: dict[str, object] | None) -> bool:
@@ -99,6 +134,7 @@ def planner_raw_output(section_output: dict[str, object] | None) -> str:
 
 
 __all__ = [
+    "CLUSTER_PLANNER_ROUTE",
     "CONTENT_VIEW_APPLIED",
     "CONTENT_VIEW_SOURCE",
     "PLANNER_STEP",
@@ -106,9 +142,14 @@ __all__ = [
     "TWO_STEP_ROUTE",
     "display_generation_content",
     "format_cited_evidence_ids_caption",
+    "has_cluster_planner_audit_data",
     "has_linked_evidence_audit_data",
+    "is_cluster_planner_section_output",
     "is_legacy_two_step_section",
     "is_two_step_section_output",
+    "DIRECT_WITH_EVIDENCE_ROUTE",
+    "is_direct_with_evidence_section_output",
+    "section_uses_inline_evidence_markers",
     "planner_raw_output",
     "resolve_llm_response_by_step",
     "section_generation_route",

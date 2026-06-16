@@ -16,10 +16,13 @@ from ui.linked_evidence_audit import (
     RENDERER_STEP,
     display_generation_content,
     format_cited_evidence_ids_caption,
+    has_cluster_planner_audit_data,
+    is_cluster_planner_section_output,
     is_legacy_two_step_section,
     is_two_step_section_output,
     planner_raw_output,
     resolve_llm_response_by_step,
+    section_uses_inline_evidence_markers,
 )
 from ui.triage_audit import (
     DISPOSITION_CONTENT,
@@ -61,6 +64,48 @@ _SECTION_COLORS = [
 
 def _cluster_color(index: int) -> str:
     return _CLUSTER_COLORS[index % len(_CLUSTER_COLORS)]
+
+
+def _format_turn_speaker_label(turn: dict[str, object]) -> str:
+    speaker = turn.get("speaker", "?")
+    turn_id = turn.get("turn_id", "")
+    speaker_label = str(speaker)
+    if turn_id != "":
+        speaker_label = f"{speaker_label} · turn {turn_id}"
+    return speaker_label
+
+
+def _cluster_turn_dicts(turns: object) -> list[dict[str, object]]:
+    if not isinstance(turns, list):
+        return []
+    return [turn for turn in turns if isinstance(turn, dict)]
+
+
+def _cluster_turn_scroll_height(turn_count: int) -> int:
+    if turn_count <= 3:
+        return max(140, turn_count * 80)
+    return min(480, max(260, turn_count * 44))
+
+
+def _render_cluster_turn_blocks(
+    turns: list[dict[str, object]],
+    *,
+    scroll_height: int | None = None,
+) -> None:
+    if not turns:
+        st.caption("(sin turnos)")
+        return
+
+    def _body() -> None:
+        for turn in turns:
+            st.markdown(f"**{_format_turn_speaker_label(turn)}**")
+            st.write(str(turn.get("text", "")))
+
+    if scroll_height is not None:
+        with st.container(height=scroll_height):
+            _body()
+    else:
+        _body()
 
 
 def _section_color(index: int) -> str:
@@ -184,15 +229,18 @@ def _render_section_source_turns_content(
                 "`clustering_result_file` (re-ejecuta el pipeline o enlaza el JSON de clustering)."
             )
             continue
-        for turn in cluster.turns:
-            speaker = turn.get("speaker", "?")
-            text = turn.get("text", "")
-            turn_id = turn.get("turn_id", "")
-            speaker_label = str(speaker)
-            if turn_id != "":
-                speaker_label = f"{speaker_label} · turn {turn_id}"
-            st.markdown(f"**{speaker_label}**")
-            st.write(str(text))
+        turn_dicts = [
+            {
+                "speaker": turn.get("speaker", "?"),
+                "text": turn.get("text", ""),
+                "turn_id": turn.get("turn_id", ""),
+            }
+            for turn in cluster.turns
+        ]
+        _render_cluster_turn_blocks(
+            turn_dicts,
+            scroll_height=_cluster_turn_scroll_height(len(turn_dicts)),
+        )
 
 
 def _section_outputs_by_id(payload: dict[str, object]) -> dict[str, dict[str, object]]:
@@ -561,6 +609,72 @@ def _render_linked_evidence_audit(
                 _render_compact_llm_call_metadata(renderer_call)
 
 
+def _render_cluster_planner_audit(
+    *,
+    section_output: dict[str, object] | None,
+    final_content: str,
+    content_view_mode: str,
+    show_evidence_ids: bool,
+) -> None:
+    if not is_cluster_planner_section_output(section_output):
+        return
+    if section_output is None or not has_cluster_planner_audit_data(section_output):
+        return
+
+    with st.expander("Auditoría cluster planner", expanded=False):
+        planners_tab, renderer_tab = st.tabs(
+            ["Planners por cluster", "Renderer final"],
+        )
+
+        with planners_tab:
+            cluster_runs = section_output.get("cluster_planner_runs")
+            if not isinstance(cluster_runs, list) or not cluster_runs:
+                st.caption("Sin planners por cluster.")
+            else:
+                for cluster_run in cluster_runs:
+                    if not isinstance(cluster_run, dict):
+                        continue
+                    cluster_id = str(cluster_run.get("cluster_id", "?"))
+                    topic_label = cluster_run.get("topic_label")
+                    label = cluster_id
+                    if isinstance(topic_label, str) and topic_label.strip():
+                        label = f"{label} — {topic_label.strip()}"
+                    with st.expander(label, expanded=False):
+                        planner_items = cluster_run.get("planner_items")
+                        if isinstance(planner_items, list) and planner_items:
+                            st.dataframe(planner_items, use_container_width=True)
+                        raw_response = cluster_run.get("raw_response")
+                        if isinstance(raw_response, str) and raw_response.strip():
+                            st.caption("Raw planner")
+                            st.code(raw_response)
+
+        with renderer_tab:
+            if section_output.get("renderer_skipped"):
+                st.caption(
+                    "Renderer final omitido: sin items planificados y sin contexto "
+                    "extra para la sección."
+                )
+            if final_content.strip():
+                if content_view_mode == CONTENT_VIEW_SOURCE:
+                    st.code(final_content, language="markdown")
+                else:
+                    display_content = display_generation_content(
+                        final_content,
+                        content_view_mode=content_view_mode,
+                        show_evidence_ids=show_evidence_ids,
+                    )
+                    st.markdown(display_content)
+                    cited = format_cited_evidence_ids_caption(final_content)
+                    if cited:
+                        st.caption(cited)
+            else:
+                st.caption("Sin contenido final.")
+            renderer_raw = section_output.get("renderer_raw_response")
+            if isinstance(renderer_raw, str) and renderer_raw.strip():
+                st.caption("Raw renderer")
+                st.code(renderer_raw, language="markdown")
+
+
 def _render_generation_section_body(
     *,
     payload: dict[str, object],
@@ -596,8 +710,14 @@ def _render_generation_section_body(
         key_suffix=key_suffix,
     )
 
+    heading_text = str(heading)
+    if not document_wrapper:
+        st.markdown(f"## {heading_text}")
+
     if content_text.strip():
         if content_view_mode == CONTENT_VIEW_SOURCE:
+            if document_wrapper:
+                st.markdown(f"## {heading_text}")
             st.code(content_text, language="markdown")
         else:
             display_content = display_generation_content(
@@ -605,7 +725,10 @@ def _render_generation_section_body(
                 content_view_mode=content_view_mode,
                 show_evidence_ids=show_evidence_ids,
             )
-            st.markdown(display_content)
+            if document_wrapper:
+                st.markdown(f"## {heading_text}\n\n{display_content}")
+            else:
+                st.markdown(display_content)
     elif not document_wrapper:
         st.caption("*(vacío)*")
 
@@ -614,6 +737,12 @@ def _render_generation_section_body(
         final_content=content_text,
         key_suffix=f"{key_suffix}_{section_id}",
         section_id=section_id,
+        content_view_mode=content_view_mode,
+        show_evidence_ids=show_evidence_ids,
+    )
+    _render_cluster_planner_audit(
+        section_output=section_output,
+        final_content=content_text,
         content_view_mode=content_view_mode,
         show_evidence_ids=show_evidence_ids,
     )
@@ -637,8 +766,10 @@ def _render_generation_document_sections(
         return
 
     section_outputs_by_id = _section_outputs_by_id(payload)
-    has_two_step_sections = any(
-        is_two_step_section_output(section_outputs_by_id.get(str(section.get("section_id", ""))))
+    has_inline_evidence_sections = any(
+        section_uses_inline_evidence_markers(
+            section_outputs_by_id.get(str(section.get("section_id", "")))
+        )
         for section in sections
         if isinstance(section, dict)
     )
@@ -656,7 +787,7 @@ def _render_generation_document_sections(
     )
 
     show_evidence_ids = False
-    if has_two_step_sections and content_view_mode == CONTENT_VIEW_APPLIED:
+    if has_inline_evidence_sections and content_view_mode == CONTENT_VIEW_APPLIED:
         show_evidence_ids = st.checkbox(
             "Mostrar IDs de evidencia",
             value=False,
@@ -709,6 +840,97 @@ def _render_section_source_turns_button(
         )
 
 
+def _filtering_disposition_label(disposition: object) -> str:
+    labels = {
+        "code_protected": "Protegido por código",
+        "model_kept": "Elegible, conservado por modelo",
+        "model_dropped": "Elegible, descartado por modelo",
+        "kept": "Conservado",
+    }
+    if isinstance(disposition, str):
+        return labels.get(disposition, disposition)
+    return "—"
+
+
+def _render_filtering_disposition_sections(decisions: list[dict[str, object]]) -> None:
+    grouped: dict[str, list[dict[str, object]]] = {
+        "code_protected": [],
+        "model_kept": [],
+        "model_dropped": [],
+    }
+    for decision in decisions:
+        if not isinstance(decision, dict):
+            continue
+        disposition = decision.get("disposition")
+        if disposition in grouped:
+            grouped[str(disposition)].append(decision)
+
+    if not any(grouped.values()):
+        return
+
+    tab_protected, tab_kept, tab_dropped = st.tabs(
+        [
+            f"Protegidos por código ({len(grouped['code_protected'])})",
+            f"Elegibles conservados ({len(grouped['model_kept'])})",
+            f"Elegibles descartados ({len(grouped['model_dropped'])})",
+        ]
+    )
+
+    with tab_protected:
+        if grouped["code_protected"]:
+            st.dataframe(
+                [
+                    {
+                        "turn_id": row.get("turn_id"),
+                        "speaker": row.get("speaker"),
+                        "protection_reason": row.get("protection_reason"),
+                        "text": row.get("text"),
+                    }
+                    for row in grouped["code_protected"]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("Ningún turno quedó protegido por código.")
+
+    with tab_kept:
+        if grouped["model_kept"]:
+            st.dataframe(
+                [
+                    {
+                        "turn_id": row.get("turn_id"),
+                        "speaker": row.get("speaker"),
+                        "text": row.get("text"),
+                    }
+                    for row in grouped["model_kept"]
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("Ningún turno elegible fue conservado por el modelo.")
+
+    with tab_dropped:
+        if grouped["model_dropped"]:
+            for decision in grouped["model_dropped"]:
+                speaker = decision.get("speaker", "?")
+                text = decision.get("text", "")
+                turn_id = decision.get("turn_id", "")
+                st.markdown(
+                    '<div style="border-left:3px solid #F44336;'
+                    'padding:2px 10px;margin-top:8px">',
+                    unsafe_allow_html=True,
+                )
+                speaker_label = str(speaker)
+                if turn_id != "":
+                    speaker_label = f"{speaker_label} · turn {turn_id}"
+                st.markdown(f"**{speaker_label}**")
+                st.write(str(text))
+        else:
+            st.caption("El modelo no descartó turnos elegibles.")
+
+
 def _render_dropped_turns(decisions: list[dict[str, object]]) -> None:
     dropped = [
         decision
@@ -747,26 +969,77 @@ def render_filtering_result(payload: dict[str, object]) -> None:
     drop_count = filtering_result.get("drop_count")
     total = payload.get("turn_count")
 
-    cols = st.columns(3)
+    cols = st.columns(6)
     cols[0].metric(
-        "Turnos conservados",
-        keep_count if keep_count is not None else "—",
+        "Protegidos (código)",
+        filtering_result.get("protected_count", "—"),
     )
     cols[1].metric(
-        "Turnos descartados",
-        drop_count if drop_count is not None else "—",
-        delta=None if drop_count is None else f"-{drop_count}" if drop_count else None,
-        delta_color="inverse" if drop_count else "off",
+        "Elegibles conservados",
+        filtering_result.get("model_kept_count", "—"),
     )
-    cols[2].metric("Total", total if total is not None else "—")
+    cols[2].metric(
+        "Elegibles descartados",
+        filtering_result.get("model_dropped_count", "—"),
+    )
+    cols[3].metric(
+        "Total elegibles",
+        filtering_result.get("eligible_count", "—"),
+    )
+    cols[4].metric(
+        "Conservados finales",
+        keep_count if keep_count is not None else "—",
+    )
+    cols[5].metric("Total turnos", total if total is not None else "—")
+
+    payload_mode = filtering_result.get("filtering_payload_mode")
+    if isinstance(payload_mode, str) and payload_mode:
+        st.caption(f"Modo de payload: `{payload_mode}`")
+
+    if filtering_result.get("llm_skipped"):
+        st.info("LLM omitido: no había turnos elegibles para descarte.")
 
     decisions = filtering_result.get("decisions")
-    if isinstance(decisions, list) and decisions:
-        _render_dropped_turns(decisions)
-        with st.expander(f"Decisiones ({len(decisions)})"):
-            st.dataframe(decisions, use_container_width=True)
-    elif not (isinstance(drop_turn_ids, list) and drop_turn_ids):
-        st.success("No se descartaron turnos.")
+    has_disposition = (
+        isinstance(decisions, list)
+        and any(
+            isinstance(decision, dict) and "disposition" in decision
+            for decision in decisions
+        )
+    )
+    if has_disposition and isinstance(decisions, list):
+        _render_filtering_disposition_sections(decisions)
+        with st.expander("Tabla completa de decisiones"):
+            st.dataframe(
+                [
+                    {
+                        **decision,
+                        "disposition_label": _filtering_disposition_label(
+                            decision.get("disposition")
+                        ),
+                    }
+                    for decision in decisions
+                    if isinstance(decision, dict)
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+    else:
+        st.warning(
+            "Este resultado no incluye metadata de protección por código. "
+            "Vuelve a ejecutar filtering con v002 actual."
+        )
+        protected_turns = filtering_result.get("protected_turns")
+        if isinstance(protected_turns, list) and protected_turns:
+            with st.expander(f"Turnos protegidos ({len(protected_turns)})"):
+                st.dataframe(protected_turns, use_container_width=True, hide_index=True)
+
+        if isinstance(decisions, list) and decisions:
+            _render_dropped_turns(decisions)
+            with st.expander(f"Decisiones ({len(decisions)})"):
+                st.dataframe(decisions, use_container_width=True)
+        elif not (isinstance(drop_turn_ids, list) and drop_turn_ids):
+            st.success("No se descartaron turnos.")
 
     render_json_expander(payload)
 
@@ -895,10 +1168,11 @@ def render_clustering_result(payload: dict[str, object]) -> None:
                 f'border-radius:2px;margin-bottom:8px"></div>',
                 unsafe_allow_html=True,
             )
-            if isinstance(turns, list) and turns:
-                st.dataframe(turns, use_container_width=True)
-            else:
-                st.caption("(sin turnos)")
+            turn_dicts = _cluster_turn_dicts(turns)
+            _render_cluster_turn_blocks(
+                turn_dicts,
+                scroll_height=_cluster_turn_scroll_height(len(turn_dicts)),
+            )
 
     render_json_expander(payload)
 

@@ -58,6 +58,11 @@ def test_persist_failed_generation_output_includes_diagnostics(
         context_present=False,
         context_chars=0,
         prompt_version="v001",
+        partial_response="Paciente con dolor torácico...",
+        partial_thinking="plan parcial",
+        response_output_item_types=["reasoning", "message"],
+        response_message_statuses=["incomplete"],
+        response_status="incomplete",
         retry_count=1,
     )
     failed = persist_failed_step_output(
@@ -69,6 +74,8 @@ def test_persist_failed_generation_output_includes_diagnostics(
     )
     assert failed.result_record["section_id"] == "motivo_consulta"
     assert failed.result_record["generation_substep"] == "direct"
+    assert failed.result_record["partial_response"] == "Paciente con dolor torácico..."
+    assert failed.result_record["response_status"] == "incomplete"
     assert failed.result_record["retry_count"] == 1
 
 

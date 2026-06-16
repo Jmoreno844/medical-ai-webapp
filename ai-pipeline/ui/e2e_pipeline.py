@@ -103,6 +103,8 @@ def persist_failed_step_output(
         result_record["prompt_version"] = config.prompt_version
         if config.openai_reasoning_effort is not None:
             result_record["openai_reasoning_effort"] = config.openai_reasoning_effort
+        if config.generation_route:
+            result_record["generation_route"] = config.generation_route
         if config.linked_evidence_two_step:
             result_record["linked_evidence_two_step"] = True
 

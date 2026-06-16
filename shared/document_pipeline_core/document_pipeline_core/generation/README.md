@@ -51,6 +51,7 @@ make debug-session \
 | Env var | Default | Meaning |
 |---|---|---|
 | `GENERATION_SECTION_CONCURRENCY` | `0` | `0` = all sections in parallel; `1` = sequential; `N` = cap workers |
+| `GENERATION_CLUSTER_PLANNER_CONCURRENCY` | `0` | `cluster_planner` route only: `0` = all cluster subplanners in parallel per section; `1` = sequential; `N` = cap workers |
 
 Sections are generated when they have transcript clusters **or** classified enrichment claims (e.g. `examen_fisico` from doctor note only).
 

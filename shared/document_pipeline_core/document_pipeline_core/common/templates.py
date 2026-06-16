@@ -11,6 +11,7 @@ from document_pipeline_core.package_root import CORE_PACKAGE_ROOT, DEFAULT_TEMPL
 class StepGuidelines(BaseModel):
     guidelines: str = ""
     mode: str = ""
+    preferred_route: str = ""
 
 
 _SECTION_GENERATION_MODE_BY_ID: dict[str, str] = {
@@ -132,6 +133,38 @@ class ClinicalTemplate(BaseModel):
 
 ClassificationTemplate = ClinicalTemplate
 
+HYBRID_GENERATION_TEMPLATE_IDS = frozenset({"consulta_estructurada_v001"})
+SECTION_GENERATION_PREFERRED_ROUTES = frozenset(
+    {"direct_with_evidence", "cluster_planner"},
+)
+
+
+def template_supports_hybrid_generation(template: ClinicalTemplate) -> bool:
+    if template.id not in HYBRID_GENERATION_TEMPLATE_IDS:
+        return False
+    if not template.sections:
+        return False
+    for section in template.sections:
+        preferred_route = section.generation.preferred_route.strip()
+        if preferred_route not in SECTION_GENERATION_PREFERRED_ROUTES:
+            return False
+    return True
+
+
+def template_supports_hybrid_generation_by_id(
+    template_id: str,
+    *,
+    templates_dir: Path = DEFAULT_TEMPLATES_DIR,
+) -> bool:
+    normalized = template_id.strip()
+    if not normalized:
+        return False
+    try:
+        template = load_template(normalized, templates_dir=templates_dir)
+    except (FileNotFoundError, ValueError):
+        return False
+    return template_supports_hybrid_generation(template)
+
 
 def template_file_path(*, templates_dir: Path, template_id: str) -> Path:
     normalized = template_id.strip()
@@ -169,7 +202,11 @@ __all__ = [
     "StepGuidelines",
     "TemplateSection",
     "compose_section_guidelines",
+    "HYBRID_GENERATION_TEMPLATE_IDS",
     "resolve_generation_mode",
+    "SECTION_GENERATION_PREFERRED_ROUTES",
+    "template_supports_hybrid_generation",
+    "template_supports_hybrid_generation_by_id",
     "load_template",
     "template_file_path",
 ]

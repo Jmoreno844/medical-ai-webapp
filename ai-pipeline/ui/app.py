@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+_AI_PIPELINE_ROOT = Path(__file__).resolve().parents[1]
+if str(_AI_PIPELINE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_AI_PIPELINE_ROOT))
+
 import json
 import os
 import tempfile
@@ -45,8 +52,13 @@ from ui.e2e_viewer import (  # noqa: E402
 )
 from ui.latency import format_latency_ms, primary_latency_ms  # noqa: E402
 from ui.discovery import (  # noqa: E402
+    default_generation_prompt_version,
+    default_harness_prompt_version,
     list_classification_sessions,
     list_context_case_document_files,
+    list_generation_prompt_versions,
+    list_harness_prompt_versions,
+    template_supports_hybrid,
     list_templates,
     list_transcript_cases,
     load_result_json,
@@ -153,9 +165,12 @@ def _check_env_sidebar() -> None:
 
 
 def _step_config_from_form(step: str, key_prefix: str) -> StepConfig:
+    harness_versions = list_harness_prompt_versions(step)
     provider, model, prompt_version, openai_reasoning_effort = render_provider_form(
         step=step,
         key_prefix=key_prefix,
+        prompt_versions=harness_versions,
+        default_prompt_version_override=default_harness_prompt_version(step),
     )
     return StepConfig(
         provider=provider,
@@ -165,26 +180,76 @@ def _step_config_from_form(step: str, key_prefix: str) -> StepConfig:
     )
 
 
-def _generation_config_from_form(key_prefix: str) -> StepConfig:
+GENERATION_ROUTE_LABELS: dict[str, str] = {
+    "direct": "Directo",
+    "direct_with_evidence": "Directo + evidence ids",
+    "two_step": "Linked evidence (two-step)",
+    "cluster_planner": "Planner por cluster + renderer final",
+    "hybrid": "Híbrido por sección",
+}
+
+
+def generation_route_labels_for_template(template_id: str | None) -> dict[str, str]:
+    labels = {
+        route: label
+        for route, label in GENERATION_ROUTE_LABELS.items()
+        if route != "hybrid"
+    }
+    if template_id and template_supports_hybrid(template_id):
+        labels["hybrid"] = GENERATION_ROUTE_LABELS["hybrid"]
+    return labels
+
+
+def _generation_config_from_form(
+    key_prefix: str,
+    *,
+    template_id: str | None = None,
+) -> StepConfig:
+    route_labels_map = generation_route_labels_for_template(template_id)
+    route_labels = list(route_labels_map.values())
+    generation_route_by_label = {
+        label: route for route, label in route_labels_map.items()
+    }
+    selected_label = st.radio(
+        "Ruta de generación",
+        route_labels,
+        horizontal=False,
+        key=f"{key_prefix}_generation_route_label",
+    )
+    generation_route = generation_route_by_label[selected_label]
+    generation_prompt_versions = list_generation_prompt_versions(
+        generation_route=generation_route,
+    )
+    route_help = {
+        "direct": "1 call por sección, sin linked evidence.",
+        "direct_with_evidence": (
+            "1 call por sección con markers inline {{e:...}} en el contenido final."
+        ),
+        "two_step": "Planner + renderer con markers {{e:...}} (2 calls por sección).",
+        "cluster_planner": (
+            "1 planner por cluster clasificado + renderer final limpio por sección."
+        ),
+        "hybrid": (
+            "Por sección: direct_with_evidence o cluster_planner según la plantilla."
+        ),
+    }[generation_route]
     provider, model, prompt_version, openai_reasoning_effort = render_provider_form(
         step="generation",
         key_prefix=key_prefix,
-    )
-    linked_evidence_two_step = st.checkbox(
-        "Linked evidence (two-step)",
-        value=False,
-        key=f"{key_prefix}_linked_evidence_two_step",
-        help=(
-            "Requiere prompt v001. ON: todas las secciones usan planner→renderer "
-            "con evidence auditable (turnos tN y spans). OFF: directo (1 call), sin linking."
+        prompt_versions=generation_prompt_versions,
+        default_prompt_version_override=default_generation_prompt_version(
+            generation_route=generation_route,
         ),
+        prompt_version_help=route_help,
+        prompt_version_key_suffix=f"_{generation_route}",
     )
     return StepConfig(
         provider=provider,
         model=model,
         prompt_version=prompt_version,
         openai_reasoning_effort=openai_reasoning_effort,
-        linked_evidence_two_step=linked_evidence_two_step,
+        generation_route=generation_route,
+        linked_evidence_two_step=generation_route == "two_step",
     )
 
 
@@ -731,9 +796,6 @@ def _render_generation_page() -> None:
         _render_inspect_section("generation")
 
     with tab_run:
-        with st.expander("⚙️ Configuración", expanded=False):
-            config = _generation_config_from_form("generation_run")
-
         class_meta = render_result_picker(
             step="classification",
             key="gen_class_result",
@@ -760,6 +822,13 @@ def _render_generation_page() -> None:
             assignments = assignments_from_classification_record(classification_record)
             st.caption(f"Session `{session_id}` · template `{template_id}`")
 
+        with st.expander("⚙️ Configuración", expanded=False):
+            config = _generation_config_from_form(
+                "generation_run",
+                template_id=template_id or None,
+            )
+
+        if class_meta is not None:
             try:
                 clusters, linked_clustering_path = clusters_from_classification_record(
                     classification_record
@@ -1075,7 +1144,10 @@ def _render_e2e_run_tab() -> None:
             with st.expander("🗂 Clustering", expanded=False):
                 clustering_config = _step_config_from_form("clustering", "e2e_clustering")
             with st.expander("📄 Generation", expanded=False):
-                generation_config = _generation_config_from_form("e2e_generation")
+                generation_config = _generation_config_from_form(
+                    "e2e_generation",
+                    template_id=template_id,
+                )
 
     with st.expander("📝 Contexto extra (opcional)", expanded=False):
         st.caption(

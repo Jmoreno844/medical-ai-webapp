@@ -26,3 +26,5 @@ uv sync --group dev --group ui
 uv run pytest ui/tests harness/tests -q
 uv run streamlit run ui/app.py
 ```
+
+Run Streamlit from `ai-pipeline/` (or any cwd — `ui/app.py` bootstraps the project root on `sys.path`).

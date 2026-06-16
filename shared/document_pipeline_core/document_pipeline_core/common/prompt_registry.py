@@ -40,6 +40,25 @@ PY_PROMPTS: dict[str, dict[str, str]] = {
     },
     "generation_direct": {
         "v001": f"{_CORE}.generation.prompts.direct.generation_direct_prompt_v001",
+        "v002": f"{_CORE}.generation.prompts.direct.generation_direct_prompt_v001",
+    },
+    "generation_direct_with_evidence": {
+        "v001": (
+            f"{_CORE}.generation.prompts.direct."
+            "generation_direct_with_evidence_prompt_v001"
+        ),
+    },
+    "generation_cluster_planner": {
+        "v001": (
+            f"{_CORE}.generation.prompts.cluster_planner_route."
+            "cluster_planner_prompt_v001"
+        ),
+    },
+    "generation_cluster_renderer": {
+        "v001": (
+            f"{_CORE}.generation.prompts.cluster_planner_route."
+            "cluster_renderer_prompt_v001"
+        ),
     },
     "generation_planner": {
         "v001": f"{_CORE}.generation.prompts.two_step.section_planner_prompt_v001",

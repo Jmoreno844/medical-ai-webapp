@@ -11,6 +11,8 @@ _SETTINGS_TO_ENV: tuple[tuple[str, str], ...] = (
     ("VERTEX_AI_LOCATION", "vertex_ai_location"),
     ("GCP_REGION", "gcp_region"),
     ("ANTHROPIC_API_KEY", "anthropic_api_key"),
+    ("OPENAI_API_KEY", "openai_api_key"),
+    ("OPENAI_MODEL", "openai_model"),
 )
 
 

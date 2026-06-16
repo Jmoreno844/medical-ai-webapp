@@ -105,7 +105,7 @@ def test_build_usage_cost_line_cache_projection_lowers_input_cost() -> None:
         model="gpt-5.4-mini",
         usage={"input_tokens": 20_000, "output_tokens": 500},
         settings=CostProjectionSettings(use_cache_pricing=False),
-        result_record={"prompt_version": "v001"},
+        result_record={"prompt_version": "v002"},
     )
     with_cache = build_usage_cost_line(
         step="filtering",
@@ -114,7 +114,7 @@ def test_build_usage_cost_line_cache_projection_lowers_input_cost() -> None:
         model="gpt-5.4-mini",
         usage={"input_tokens": 20_000, "output_tokens": 500},
         settings=CostProjectionSettings(use_cache_pricing=True),
-        result_record={"prompt_version": "v001"},
+        result_record={"prompt_version": "v002"},
     )
     assert no_cache is not None
     assert with_cache is not None

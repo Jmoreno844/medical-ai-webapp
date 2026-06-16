@@ -253,6 +253,10 @@ def render_provider_form(
     model: str | None = None,
     prompt_version: str | None = None,
     openai_reasoning_effort: str | None = None,
+    prompt_versions: list[str] | None = None,
+    default_prompt_version_override: str | None = None,
+    prompt_version_help: str | None = None,
+    prompt_version_key_suffix: str = "",
 ) -> tuple[str, str, str, str | None]:
     normalized_provider = normalize_provider_name(provider or ALLOWED_PROVIDERS[0])
     provider_index = (
@@ -276,11 +280,14 @@ def render_provider_form(
             key_prefix=key_prefix,
         )
 
-    prompt_versions = list_prompt_versions(step)
-    preferred = prompt_version or default_prompt_version(step)
-    prompt_index = (
-        prompt_versions.index(preferred) if preferred in prompt_versions else 0
+    versions = prompt_versions if prompt_versions is not None else list_prompt_versions(step)
+    preferred = (
+        prompt_version
+        or default_prompt_version_override
+        or default_prompt_version(step)
     )
+    prompt_index = versions.index(preferred) if preferred in versions else 0
+    prompt_key = f"{key_prefix}_prompt{prompt_version_key_suffix}"
 
     default_model = default_model_for_provider(selected_provider)
     model_for_effort = selected_model or default_model
@@ -289,16 +296,26 @@ def render_provider_form(
         and openai_model_supports_reasoning_effort(model_for_effort)
     )
 
+    def _render_prompt_field() -> str:
+        if len(versions) == 1:
+            only_version = versions[0]
+            st.caption(f"Prompt: **{only_version}**")
+            if prompt_version_help:
+                st.caption(prompt_version_help)
+            return only_version
+        return st.selectbox(
+            "Prompt version",
+            options=versions,
+            index=prompt_index,
+            help=prompt_version_help,
+            key=prompt_key,
+        )
+
     selected_openai_reasoning_effort = None
     if supports_effort:
         col_prompt, col_effort = st.columns(2)
         with col_prompt:
-            selected_prompt = st.selectbox(
-                "Prompt version",
-                options=prompt_versions,
-                index=prompt_index,
-                key=f"{key_prefix}_prompt",
-            )
+            selected_prompt = _render_prompt_field()
         with col_effort:
             selected_openai_reasoning_effort = _render_openai_reasoning_effort_field(
                 model=model_for_effort,
@@ -306,12 +323,7 @@ def render_provider_form(
                 openai_reasoning_effort=openai_reasoning_effort,
             )
     else:
-        selected_prompt = st.selectbox(
-            "Prompt version",
-            options=prompt_versions,
-            index=prompt_index,
-            key=f"{key_prefix}_prompt",
-        )
+        selected_prompt = _render_prompt_field()
 
     return (
         selected_provider,

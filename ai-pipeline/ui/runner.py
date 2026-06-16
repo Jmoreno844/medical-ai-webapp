@@ -17,18 +17,15 @@ from document_pipeline_core.classification.batching import (
 from document_pipeline_core.classification.classify import run_classification_session
 from document_pipeline_core.classification.lib import (
     ClusterCase,
+    classification_prompt_reference,
     enrich_classification_batch_result_for_export,
     enrich_classification_session_result_for_export,
     format_classification_batch_output_for_detail,
     format_classification_output_for_detail,
 )
 from document_pipeline_core.classification.lib import load_prompt as load_classification_prompt
-from document_pipeline_core.classification.lib import prompt_file_path as classification_prompt_file_path
 from document_pipeline_core.classification.templates import load_template
 from document_pipeline_core.clustering.cluster import run_clustering_with_repair
-from document_pipeline_core.clustering.lib import (
-    MODULE_ROOT as CLUSTERING_MODULE_ROOT,
-)
 from document_pipeline_core.clustering.lib import (
     audit_turn_coverage,
     clustering_prompt_reference,
@@ -43,7 +40,13 @@ from document_pipeline_core.clustering.repair import (
     IncompleteTurnCoverageError,
     clustering_repair_prompt_reference,
 )
-from harness.paths import AI_PIPELINE_ROOT, CLUSTER_CASES_INDEX, CONTEXT_CASES_INDEX, TRANSCRIPT_CASES_INDEX
+from harness.paths import (
+    AI_PIPELINE_ROOT,
+    CLUSTER_CASES_INDEX,
+    CONTEXT_CASES_INDEX,
+    TRANSCRIPT_CASES_INDEX,
+    harness_results_dir,
+)
 from document_pipeline_core.common.output_detail import normalize_output_detail
 from document_pipeline_core.common.prompts import normalize_prompt_version
 from document_pipeline_core.common.providers import (
@@ -56,9 +59,6 @@ from document_pipeline_core.common.providers import (
 from document_pipeline_core.common.templates import DEFAULT_TEMPLATES_DIR
 from document_pipeline_core.common.transcripts import TranscriptCase, build_turn_catalog
 from document_pipeline_core.filtering.filter import run_filtering
-from document_pipeline_core.filtering.lib import (
-    MODULE_ROOT as FILTERING_MODULE_ROOT,
-)
 from document_pipeline_core.filtering.lib import (
     audit_drop_turn_ids,
     enrich_filtering_result_for_export,
@@ -77,8 +77,10 @@ from document_pipeline_core.generation.lib import (
     format_generation_output_for_detail,
     format_section_output_for_detail,
     format_two_step_llm_responses_for_export,
+    generation_prompt_files_for_route,
     generation_prompt_reference,
     load_section_context_from_record,
+    resolve_generation_route,
     load_section_evidence_from_record,
     load_transcript_directives_from_record,
 )
@@ -100,6 +102,7 @@ class StepConfig:
     model: str
     prompt_version: str
     openai_reasoning_effort: str | None = None
+    generation_route: str = "direct"
     linked_evidence_two_step: bool = False
 
 
@@ -131,9 +134,22 @@ def _step_config_metadata(config: StepConfig) -> dict[str, object]:
         and openai_model_supports_reasoning_effort(config.model)
     ):
         metadata["openai_reasoning_effort"] = config.openai_reasoning_effort
-    if config.linked_evidence_two_step:
+    resolved_route = _resolved_generation_route(config)
+    metadata["generation_route"] = resolved_route
+    if resolved_route == "two_step":
         metadata["linked_evidence_two_step"] = True
     return metadata
+
+
+def _resolved_generation_route(config: StepConfig) -> str:
+    if (
+        config.generation_route
+        and config.generation_route.strip() not in {"", "direct"}
+    ):
+        return resolve_generation_route(generation_route=config.generation_route)
+    return resolve_generation_route(
+        linked_evidence_two_step=config.linked_evidence_two_step,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,7 +197,7 @@ def run_filtering_step(
     prompt_path = filtering_prompt_reference(prompt_version)
     catalog = build_turn_catalog(case.transcript_json)
     run_started_at = datetime.now(UTC)
-    results_dir = FILTERING_MODULE_ROOT / "results"
+    results_dir = harness_results_dir("filtering")
     output_path = (
         results_dir
         / f"{run_started_at.strftime('%Y%m%dT%H%M%SZ')}_debug_{case.id}_{provider}.json"
@@ -189,7 +205,7 @@ def run_filtering_step(
 
     with apply_step_config_env(config):
         started_at = time.perf_counter()
-        result, llm_response = run_filtering(
+        result, llm_response, diagnostics = run_filtering(
             case=case,
             model_spec=model_spec,
             system_prompt=system_prompt,
@@ -201,7 +217,11 @@ def run_filtering_step(
         {
             "provider": provider,
             "model": model,
-            "filtering_result": enrich_filtering_result_for_export(result, catalog),
+            "filtering_result": enrich_filtering_result_for_export(
+                result,
+                catalog,
+                diagnostics=diagnostics,
+            ),
             "drop_audit": drop_audit.to_dict(),
             "raw_response": llm_response.content,
         },
@@ -249,7 +269,7 @@ def run_clustering_step(
     prompt_path = clustering_prompt_reference(prompt_version)
     catalog = build_turn_catalog(case.transcript_json)
     run_started_at = datetime.now(UTC)
-    results_dir = CLUSTERING_MODULE_ROOT / "results"
+    results_dir = harness_results_dir("clustering")
     output_path = (
         results_dir
         / f"{run_started_at.strftime('%Y%m%dT%H%M%SZ')}_debug_{case.id}_{provider}.json"
@@ -338,7 +358,7 @@ def run_classification_step(
     model = model_spec.model
     template = load_template(template_id, templates_dir=DEFAULT_TEMPLATES_DIR)
     system_prompt = load_classification_prompt(prompt_version)
-    prompt_path = classification_prompt_file_path(prompt_version)
+    prompt_path = classification_prompt_reference(prompt_version)
     run_started_at = datetime.now(UTC)
     results_dir = AI_PIPELINE_ROOT / "classification" / "results"
     output_path = results_dir / (
@@ -412,9 +432,7 @@ def run_classification_step(
         "provider": provider,
         "model": model,
         "prompt_version": prompt_version,
-        "prompt_file": str(
-            prompt_path.relative_to(AI_PIPELINE_ROOT / "classification")
-        ),
+        "prompt_file": prompt_path,
         "output_detail": output_detail,
         "input_token_budget": DEFAULT_INPUT_TOKEN_BUDGET,
         "token_encoding": DEFAULT_TOKEN_ENCODING,
@@ -446,8 +464,17 @@ def run_generation_step(
     provider = model_spec.provider
     model = model_spec.model
     template = load_template(template_id, templates_dir=DEFAULT_TEMPLATES_DIR)
+    resolved_generation_route = _resolved_generation_route(config)
     system_prompt = load_generation_prompt(prompt_version)
     prompt_path_ref = generation_prompt_reference(prompt_version)
+    prompt_files: dict[str, str] | None
+    if resolved_generation_route == "hybrid":
+        prompt_files = None
+    else:
+        prompt_files = generation_prompt_files_for_route(
+            resolved_generation_route,
+            prompt_version,
+        )
     run_started_at = datetime.now(UTC)
     results_dir = AI_PIPELINE_ROOT / "generation" / "results"
     output_path = results_dir / (
@@ -479,6 +506,7 @@ def run_generation_step(
             transcript_directives=transcript_directives,
             prompt_version=prompt_version,
             linked_evidence_two_step=config.linked_evidence_two_step,
+            generation_route=resolved_generation_route,
         )
 
     cluster_ids_by_section = {
@@ -520,6 +548,8 @@ def run_generation_step(
             "llm_usage": section_run.llm_usage,
             "llm_request_params": section_run.llm_request_params,
         }
+        if section_run.prompt_files is not None:
+            section_entry["prompt_files"] = section_run.prompt_files
         if section_run.generation_route == "two_step":
             if section_run.planner_items is not None:
                 section_entry["planner_items"] = section_run.planner_items
@@ -528,6 +558,18 @@ def run_generation_step(
             section_entry["llm_responses"] = format_two_step_llm_responses_for_export(
                 section_run.llm_responses
             )
+        elif section_run.generation_route == "cluster_planner":
+            if section_run.cluster_planner_runs is not None:
+                section_entry["cluster_planner_runs"] = section_run.cluster_planner_runs
+            if section_run.combined_cluster_plans_block is not None:
+                section_entry["combined_cluster_plans_block"] = (
+                    section_run.combined_cluster_plans_block
+                )
+            if section_run.renderer_raw_response is not None:
+                section_entry["renderer_raw_response"] = (
+                    section_run.renderer_raw_response
+                )
+            section_entry["renderer_skipped"] = section_run.renderer_skipped
         section_outputs.append(
             format_section_output_for_detail(section_entry, output_detail)
         )
@@ -570,11 +612,15 @@ def run_generation_step(
         "provider": provider,
         "model": model,
         "prompt_version": prompt_version,
-        "prompt_file": prompt_path_ref,
         "output_detail": output_detail,
         **_step_config_metadata(config),
         **output_payload,
     }
+    if prompt_files is not None:
+        result_record["prompt_files"] = prompt_files
+        result_record["prompt_file"] = prompt_path_ref
+    elif resolved_generation_route != "hybrid":
+        result_record["prompt_file"] = prompt_path_ref
     _persist_results(output_path, result_record)
     return PipelineRunOutput(
         step="generation",

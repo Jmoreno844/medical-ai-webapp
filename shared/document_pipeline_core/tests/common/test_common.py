@@ -74,6 +74,11 @@ def test_provider_runtime_config_uses_provider_specific_limit_param() -> None:
 
 def test_default_models_and_provider_aliases() -> None:
     assert normalize_provider_name("google") == "gemini"
+    assert normalize_provider_name("google_vertex") == "gemini"
+    assert normalize_provider_name("google_genai") == "gemini"
+    assert normalize_provider_name("anthropic_api") == "anthropic"
+    assert normalize_provider_name("anthropic_vertex") == "anthropic"
+    assert default_model_for_provider("google_vertex") == DEFAULT_GEMINI_MODEL
     assert default_model_for_provider("gemini") == DEFAULT_GEMINI_MODEL
     assert default_model_for_provider("anthropic") == DEFAULT_ANTHROPIC_MODEL
     assert GEMINI_MODEL_CHOICES == (

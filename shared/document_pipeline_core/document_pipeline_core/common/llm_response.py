@@ -38,6 +38,48 @@ class LlmResponse:
         return payload
 
 
+class OpenAIEmptyResponseError(ValueError):
+    def __init__(
+        self,
+        *,
+        partial_content: str | None = None,
+        partial_thinking: str | None = None,
+        output_item_types: list[str] | None = None,
+        message_statuses: list[str] | None = None,
+        response_status: str | None = None,
+        response_error: dict[str, object] | None = None,
+        response_incomplete_details: dict[str, object] | None = None,
+    ) -> None:
+        super().__init__("ai_pipeline_openai_empty_response")
+        self.partial_content = partial_content
+        self.partial_thinking = partial_thinking
+        self.output_item_types = list(output_item_types or [])
+        self.message_statuses = list(message_statuses or [])
+        self.response_status = response_status
+        self.response_error = dict(response_error or {})
+        self.response_incomplete_details = dict(response_incomplete_details or {})
+
+    def diagnostics(self) -> dict[str, object]:
+        payload: dict[str, object] = {}
+        if self.partial_content:
+            payload["partial_response"] = self.partial_content
+        if self.partial_thinking:
+            payload["partial_thinking"] = self.partial_thinking
+        if self.output_item_types:
+            payload["response_output_item_types"] = self.output_item_types
+        if self.message_statuses:
+            payload["response_message_statuses"] = self.message_statuses
+        if self.response_status:
+            payload["response_status"] = self.response_status
+        if self.response_error:
+            payload["response_error"] = self.response_error
+        if self.response_incomplete_details:
+            payload["response_incomplete_details"] = (
+                self.response_incomplete_details
+            )
+        return payload
+
+
 def split_thinking_from_content(raw: str) -> tuple[str, str | None]:
     matches = list(_THINK_BLOCK_PATTERN.finditer(raw))
     if not matches:
@@ -58,6 +100,18 @@ def normalize_usage(usage: object | None) -> dict[str, object]:
         if isinstance(dumped, dict):
             return dict(dumped)
     return {}
+
+
+def _normalize_model_dict(value: object | None) -> dict[str, object]:
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return dict(value)
+    if hasattr(value, "model_dump"):
+        dumped = value.model_dump()
+        if isinstance(dumped, dict):
+            return dict(dumped)
+    return {"value": str(value)}
 
 
 def extract_message_thinking(message: object) -> tuple[str | None, str | None]:
@@ -91,9 +145,13 @@ def build_llm_response_from_openai_responses(
     output = getattr(response, "output", None) or []
     thinking_parts: list[str] = []
     content_parts: list[str] = []
+    output_item_types: list[str] = []
+    message_statuses: list[str] = []
 
     for item in output:
         item_type = getattr(item, "type", None)
+        if isinstance(item_type, str) and item_type:
+            output_item_types.append(item_type)
         if item_type == "reasoning":
             summary = getattr(item, "summary", None) or []
             for part in summary:
@@ -111,6 +169,9 @@ def build_llm_response_from_openai_responses(
             continue
 
         blocks = getattr(item, "content", None) or []
+        status = getattr(item, "status", None)
+        if isinstance(status, str) and status:
+            message_statuses.append(status)
         for block in blocks:
             text = getattr(block, "text", None)
             if isinstance(text, str) and text.strip():
@@ -121,7 +182,21 @@ def build_llm_response_from_openai_responses(
     thinking_source = "openai.responses.reasoning.summary" if thinking else None
 
     if not content.strip():
-        raise ValueError("ai_pipeline_openai_empty_response")
+        raise OpenAIEmptyResponseError(
+            partial_content=None,
+            partial_thinking=thinking,
+            output_item_types=output_item_types,
+            message_statuses=message_statuses,
+            response_status=(
+                getattr(response, "status", None)
+                if isinstance(getattr(response, "status", None), str)
+                else None
+            ),
+            response_error=_normalize_model_dict(getattr(response, "error", None)),
+            response_incomplete_details=_normalize_model_dict(
+                getattr(response, "incomplete_details", None)
+            ),
+        )
 
     merged_params = dict(request_params or {})
     merged_params["openai_api"] = "responses"

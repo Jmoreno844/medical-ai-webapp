@@ -81,7 +81,8 @@ def test_load_py_prompt_module_classification_v004() -> None:
 def test_py_system_prompt_classification_v004() -> None:
     prompt = py_system_prompt("classification", "v004")
     assert "# Identity" in prompt
-    assert "JSON only" in prompt or "JSON" in prompt
+    assert "Eres un clasificador de clusters clínicos" in prompt
+    assert "JSON" in prompt
 
 
 def test_load_py_prompt_module_unknown_raises() -> None:
@@ -123,3 +124,25 @@ def test_load_py_prompt_module_context_section_adapter_v003() -> None:
         module.__name__
         == "document_pipeline_core.context_pipeline.section_adapter.prompts.adapter_prompt_v001"
     )
+
+
+def test_py_prompt_versions_includes_generation_direct_v002() -> None:
+    assert "v002" in py_prompt_versions("generation_direct")
+
+
+def test_load_py_prompt_module_generation_direct_v002() -> None:
+    module = load_py_prompt_module("generation_direct", "v002")
+    assert (
+        module.__name__
+        == "document_pipeline_core.generation.prompts.direct.generation_direct_prompt_v001"
+    )
+
+
+def test_load_py_prompt_module_generation_direct_with_evidence_v001() -> None:
+    module = load_py_prompt_module("generation_direct_with_evidence", "v001")
+    assert module.__name__.endswith("generation_direct_with_evidence_prompt_v001")
+
+
+def test_load_py_prompt_module_generation_cluster_planner_v001() -> None:
+    module = load_py_prompt_module("generation_cluster_planner", "v001")
+    assert "cluster_planner_route" in module.__name__

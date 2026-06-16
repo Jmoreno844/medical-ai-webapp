@@ -49,12 +49,38 @@ MODULE_ROOT = Path(__file__).resolve().parent
 PROMPTS_DIR = MODULE_ROOT / "prompts"
 PROMPT_FILENAME_STEM = "generation"
 PY_GENERATION_DIRECT_STEP = "generation_direct"
+PY_GENERATION_DIRECT_WITH_EVIDENCE_STEP = "generation_direct_with_evidence"
 PY_GENERATION_PLANNER_STEP = "generation_planner"
 PY_GENERATION_RENDERER_STEP = "generation_renderer"
-PY_GENERATION_PROMPT_VERSIONS = frozenset({"v001"})
+PY_GENERATION_CLUSTER_PLANNER_STEP = "generation_cluster_planner"
+PY_GENERATION_CLUSTER_RENDERER_STEP = "generation_cluster_renderer"
+PY_GENERATION_PROMPT_VERSIONS = frozenset({"v001", "v002"})
+GENERATION_ROUTE_DIRECT = "direct"
+GENERATION_ROUTE_DIRECT_WITH_EVIDENCE = "direct_with_evidence"
+GENERATION_ROUTE_TWO_STEP = "two_step"
+GENERATION_ROUTE_CLUSTER_PLANNER = "cluster_planner"
+GENERATION_ROUTE_HYBRID = "hybrid"
+GENERATION_ROUTES = frozenset(
+    {
+        GENERATION_ROUTE_DIRECT,
+        GENERATION_ROUTE_DIRECT_WITH_EVIDENCE,
+        GENERATION_ROUTE_TWO_STEP,
+        GENERATION_ROUTE_CLUSTER_PLANNER,
+        GENERATION_ROUTE_HYBRID,
+    }
+)
+SECTION_EXECUTION_ROUTES = frozenset(
+    {
+        GENERATION_ROUTE_DIRECT,
+        GENERATION_ROUTE_DIRECT_WITH_EVIDENCE,
+        GENERATION_ROUTE_TWO_STEP,
+        GENERATION_ROUTE_CLUSTER_PLANNER,
+    }
+)
 DEFAULT_CLASSIFICATION_CASES_INDEX = CLUSTER_CASES_INDEX
 DEFAULT_TEMPLATES_DIR = CORE_PACKAGE_ROOT / "templates"
 DEFAULT_SECTION_CONCURRENCY = 0
+DEFAULT_CLUSTER_PLANNER_CONCURRENCY = 0
 
 _HEADING_LINE_RE = re.compile(r"^(#{1,6})\s*(.+)$")
 _BULLET_LINE_RE = re.compile(r"^(-\s+)(.+)$")
@@ -155,7 +181,15 @@ class GenerationValidationError(ValueError):
         planned_items_block: str | None = None,
         planner_response: str | None = None,
         raw_response: str | None = None,
+        partial_response: str | None = None,
+        partial_thinking: str | None = None,
+        response_output_item_types: list[str] | None = None,
+        response_message_statuses: list[str] | None = None,
+        response_status: str | None = None,
+        response_error: dict[str, object] | None = None,
+        response_incomplete_details: dict[str, object] | None = None,
         retry_count: int | None = None,
+        cluster_id: str | None = None,
     ) -> None:
         super().__init__(message)
         self.section_id = section_id
@@ -176,7 +210,29 @@ class GenerationValidationError(ValueError):
         self.planned_items_block = planned_items_block
         self.planner_response = planner_response
         self.raw_response = raw_response
+        self.partial_response = partial_response
+        self.partial_thinking = partial_thinking
+        self.response_output_item_types = (
+            list(response_output_item_types)
+            if response_output_item_types is not None
+            else None
+        )
+        self.response_message_statuses = (
+            list(response_message_statuses)
+            if response_message_statuses is not None
+            else None
+        )
+        self.response_status = response_status
+        self.response_error = (
+            dict(response_error) if response_error is not None else None
+        )
+        self.response_incomplete_details = (
+            dict(response_incomplete_details)
+            if response_incomplete_details is not None
+            else None
+        )
         self.retry_count = retry_count
+        self.cluster_id = cluster_id
 
     def diagnostics(self) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -206,8 +262,26 @@ class GenerationValidationError(ValueError):
             payload["planner_response"] = self.planner_response
         if self.raw_response is not None:
             payload["raw_response"] = self.raw_response
+        if self.partial_response is not None:
+            payload["partial_response"] = self.partial_response
+        if self.partial_thinking is not None:
+            payload["partial_thinking"] = self.partial_thinking
+        if self.response_output_item_types is not None:
+            payload["response_output_item_types"] = self.response_output_item_types
+        if self.response_message_statuses is not None:
+            payload["response_message_statuses"] = self.response_message_statuses
+        if self.response_status is not None:
+            payload["response_status"] = self.response_status
+        if self.response_error is not None:
+            payload["response_error"] = self.response_error
+        if self.response_incomplete_details is not None:
+            payload["response_incomplete_details"] = (
+                self.response_incomplete_details
+            )
         if self.retry_count is not None:
             payload["retry_count"] = self.retry_count
+        if self.cluster_id is not None:
+            payload["cluster_id"] = self.cluster_id
         return payload
 
 
@@ -572,13 +646,74 @@ def _section_guidelines_text(section: TemplateSection) -> str:
     )
 
 
+def resolve_generation_route(
+    *,
+    generation_route: str | None = None,
+    linked_evidence_two_step: bool = False,
+) -> str:
+    if generation_route is not None and generation_route.strip():
+        normalized = generation_route.strip().lower()
+        if normalized not in GENERATION_ROUTES:
+            raise ValueError(f"generation_unknown_route: {normalized!r}")
+        return normalized
+    if linked_evidence_two_step:
+        return GENERATION_ROUTE_TWO_STEP
+    return GENERATION_ROUTE_DIRECT
+
+
+def resolve_section_generation_route(
+    *,
+    requested_route: str,
+    section: TemplateSection,
+) -> str:
+    if requested_route == GENERATION_ROUTE_HYBRID:
+        preferred_route = section.generation.preferred_route.strip()
+        if preferred_route not in SECTION_EXECUTION_ROUTES:
+            raise ValueError(
+                "generation_hybrid_missing_preferred_route: "
+                f"{section.section_id!r}"
+            )
+        return preferred_route
+    if requested_route not in SECTION_EXECUTION_ROUTES:
+        raise ValueError(f"generation_unknown_execution_route: {requested_route!r}")
+    return requested_route
+
+
+def section_route_uses_inline_evidence_markers(route: str) -> bool:
+    return route in {
+        GENERATION_ROUTE_TWO_STEP,
+        GENERATION_ROUTE_DIRECT_WITH_EVIDENCE,
+    }
+
+
 def should_use_two_step_generation(
     job: SectionGenerationJob,
     *,
     linked_evidence_two_step: bool = False,
+    generation_route: str | None = None,
 ) -> bool:
     _ = job
-    return linked_evidence_two_step
+    return (
+        resolve_generation_route(
+            generation_route=generation_route,
+            linked_evidence_two_step=linked_evidence_two_step,
+        )
+        == GENERATION_ROUTE_TWO_STEP
+    )
+
+
+def should_use_cluster_planner_generation(
+    *,
+    generation_route: str | None = None,
+    linked_evidence_two_step: bool = False,
+) -> bool:
+    return (
+        resolve_generation_route(
+            generation_route=generation_route,
+            linked_evidence_two_step=linked_evidence_two_step,
+        )
+        == GENERATION_ROUTE_CLUSTER_PLANNER
+    )
 
 
 def generation_direct_uses_py_prompt(prompt_version: str) -> bool:
@@ -600,6 +735,17 @@ def generation_direct_output_schema(
     return module.output_schema(section_id=section_id)
 
 
+def generation_direct_with_evidence_output_schema(
+    *,
+    section_id: str,
+    prompt_version: str,
+) -> dict[str, object] | None:
+    if not is_py_prompt_version(PY_GENERATION_DIRECT_WITH_EVIDENCE_STEP, prompt_version):
+        return None
+    module = load_py_prompt_module(PY_GENERATION_DIRECT_WITH_EVIDENCE_STEP, prompt_version)
+    return module.output_schema(section_id=section_id)
+
+
 def generation_planner_output_schema(
     *,
     allowed_evidence_ids: list[str],
@@ -608,6 +754,17 @@ def generation_planner_output_schema(
     if not generation_structured_output_enabled(prompt_version):
         return None
     module = load_py_prompt_module(PY_GENERATION_PLANNER_STEP, prompt_version)
+    return module.output_schema(allowed_evidence_ids=allowed_evidence_ids)
+
+
+def generation_cluster_planner_output_schema(
+    *,
+    allowed_evidence_ids: list[str],
+    prompt_version: str,
+) -> dict[str, object] | None:
+    if not is_py_prompt_version(PY_GENERATION_CLUSTER_PLANNER_STEP, prompt_version):
+        return None
+    module = load_py_prompt_module(PY_GENERATION_CLUSTER_PLANNER_STEP, prompt_version)
     return module.output_schema(allowed_evidence_ids=allowed_evidence_ids)
 
 
@@ -621,12 +778,75 @@ def load_generation_direct_prompt(version: str) -> str:
     )
 
 
+def load_generation_direct_with_evidence_prompt(version: str) -> str:
+    return py_system_prompt(PY_GENERATION_DIRECT_WITH_EVIDENCE_STEP, version)
+
+
 def load_generation_planner_prompt(version: str) -> str:
     return py_system_prompt(PY_GENERATION_PLANNER_STEP, version)
 
 
 def load_generation_renderer_prompt(version: str) -> str:
     return py_system_prompt(PY_GENERATION_RENDERER_STEP, version)
+
+
+def load_generation_cluster_planner_prompt(version: str) -> str:
+    return py_system_prompt(PY_GENERATION_CLUSTER_PLANNER_STEP, version)
+
+
+def load_generation_cluster_renderer_prompt(version: str) -> str:
+    return py_system_prompt(PY_GENERATION_CLUSTER_RENDERER_STEP, version)
+
+
+def _prompt_module_reference(step: str, version: str) -> str:
+    module_path = load_py_prompt_module(step, version).__name__
+    return f"{module_path.replace('.', '/')}.py"
+
+
+def generation_planner_prompt_reference(version: str) -> str:
+    return _prompt_module_reference(PY_GENERATION_PLANNER_STEP, version)
+
+
+def generation_renderer_prompt_reference(version: str) -> str:
+    return _prompt_module_reference(PY_GENERATION_RENDERER_STEP, version)
+
+
+def generation_direct_with_evidence_prompt_reference(version: str) -> str:
+    return _prompt_module_reference(PY_GENERATION_DIRECT_WITH_EVIDENCE_STEP, version)
+
+
+def generation_cluster_planner_prompt_reference(version: str) -> str:
+    return _prompt_module_reference(PY_GENERATION_CLUSTER_PLANNER_STEP, version)
+
+
+def generation_cluster_renderer_prompt_reference(version: str) -> str:
+    return _prompt_module_reference(PY_GENERATION_CLUSTER_RENDERER_STEP, version)
+
+
+def generation_prompt_files_for_route(
+    route: str,
+    version: str,
+) -> dict[str, str]:
+    normalized = resolve_generation_route(generation_route=route)
+    if normalized == GENERATION_ROUTE_TWO_STEP:
+        return {
+            "planner": generation_planner_prompt_reference(version),
+            "renderer": generation_renderer_prompt_reference(version),
+        }
+    if normalized == GENERATION_ROUTE_CLUSTER_PLANNER:
+        return {
+            "cluster_planner": generation_cluster_planner_prompt_reference(version),
+            "cluster_renderer": generation_cluster_renderer_prompt_reference(version),
+        }
+    if normalized == GENERATION_ROUTE_DIRECT_WITH_EVIDENCE:
+        return {
+            "direct_with_evidence": generation_direct_with_evidence_prompt_reference(
+                version
+            ),
+        }
+    if normalized == GENERATION_ROUTE_HYBRID:
+        return {}
+    return {"direct": generation_prompt_reference(version)}
 
 
 def render_transcript_constraints_block(constraints: list[Directive]) -> str:
@@ -676,6 +896,141 @@ def render_renderer_payload(
         template_guidelines=template.generation.guidelines,
         planned_items_block=planned_items_block,
     )
+
+
+def cluster_topic_label(cluster: ClusterCase) -> str:
+    topic_label = cluster.cluster_json.get("topic_label")
+    if isinstance(topic_label, str) and topic_label.strip():
+        return topic_label.strip()
+    return cluster.id
+
+
+def render_cluster_transcript_block(cluster: ClusterCase) -> str:
+    lines: list[str] = []
+    for turn in build_cluster_turns(cluster.cluster_json):
+        role = _speaker_to_role_key(str(turn["speaker"]))
+        turn_id = f"t{turn['turn_id']}"
+        lines.append(f"[{turn_id}] {role}: {turn['text']}")
+    if not lines:
+        return "(sin turnos)"
+    return "\n".join(lines)
+
+
+def collect_cluster_allowed_evidence_id_set(cluster: ClusterCase) -> set[str]:
+    allowed: set[str] = set()
+    for turn in build_cluster_turns(cluster.cluster_json):
+        allowed.add(f"t{turn['turn_id']}")
+    return allowed
+
+
+def render_cluster_planner_payload(
+    *,
+    job: SectionGenerationJob,
+    template: ClinicalTemplate,
+    cluster: ClusterCase,
+    prompt_version: str,
+) -> str:
+    module = load_py_prompt_module(PY_GENERATION_CLUSTER_PLANNER_STEP, prompt_version)
+    return module.render_user_payload(
+        section_id=job.section.section_id,
+        section_description=job.section.description,
+        section_guidelines=_section_guidelines_text(job.section),
+        template_guidelines=template.generation.guidelines,
+        cluster_id=cluster.id,
+        topic_label=cluster_topic_label(cluster),
+        cluster_transcript_block=render_cluster_transcript_block(cluster),
+        transcript_constraints_block=render_transcript_constraints_block(
+            job.transcript_constraints
+        ),
+    )
+
+
+def render_cluster_renderer_payload(
+    job: SectionGenerationJob,
+    template: ClinicalTemplate,
+    *,
+    prompt_version: str,
+    cluster_plans_block: str,
+) -> str:
+    module = load_py_prompt_module(PY_GENERATION_CLUSTER_RENDERER_STEP, prompt_version)
+    return module.render_user_payload(
+        section_id=job.section.section_id,
+        section_name=job.section.heading,
+        section_description=job.section.description,
+        section_guidelines=_section_guidelines_text(job.section),
+        generation_mode=resolve_generation_mode(job.section),
+        template_guidelines=template.generation.guidelines,
+        cluster_plans_block=cluster_plans_block,
+        context_brief=job.context,
+    )
+
+
+def render_combined_cluster_plans_block(
+    cluster_runs: list[dict[str, object]],
+) -> str:
+    if not cluster_runs:
+        return "(sin planes por cluster)"
+    blocks: list[str] = []
+    for run in cluster_runs:
+        cluster_id = run.get("cluster_id")
+        topic_label = run.get("topic_label")
+        planned_items_block = run.get("planned_items_block")
+        if not isinstance(cluster_id, str) or not cluster_id.strip():
+            continue
+        header = f"### {cluster_id.strip()}"
+        if isinstance(topic_label, str) and topic_label.strip():
+            header = f"{header} — {topic_label.strip()}"
+        body = (
+            planned_items_block.strip()
+            if isinstance(planned_items_block, str) and planned_items_block.strip()
+            else "(sin items planificados)"
+        )
+        blocks.append(f"{header}\n{body}")
+    if not blocks:
+        return "(sin planes por cluster)"
+    return "\n\n".join(blocks)
+
+
+def cluster_planner_runs_have_planned_items(
+    cluster_planner_runs: list[dict[str, object]],
+) -> bool:
+    for run in cluster_planner_runs:
+        planner_items = run.get("planner_items")
+        if isinstance(planner_items, list) and planner_items:
+            return True
+    return False
+
+
+def cluster_planner_run_to_export(
+    *,
+    cluster_id: str,
+    topic_label: str,
+    planner_items: list[dict[str, object]],
+    planned_items_block: str,
+    llm_response: object,
+    response_time_ms: int,
+) -> dict[str, object]:
+    content = getattr(llm_response, "content", "")
+    thinking = getattr(llm_response, "thinking", None)
+    thinking_source = getattr(llm_response, "thinking_source", None)
+    usage = getattr(llm_response, "usage", {})
+    request_params = getattr(llm_response, "request_params", {})
+    return {
+        "cluster_id": cluster_id,
+        "topic_label": topic_label,
+        "planner_items": planner_items,
+        "planned_items_block": planned_items_block,
+        "raw_response": content if isinstance(content, str) else "",
+        "response_time_ms": response_time_ms,
+        "thinking": thinking if isinstance(thinking, str) else None,
+        "thinking_source": (
+            thinking_source if isinstance(thinking_source, str) else None
+        ),
+        "llm_usage": dict(usage) if isinstance(usage, dict) else {},
+        "llm_request_params": (
+            dict(request_params) if isinstance(request_params, dict) else {}
+        ),
+    }
 
 
 def audit_planner_item_evidence(
@@ -732,6 +1087,29 @@ def generation_prompt_reference(version: str) -> str:
         module_path = load_py_prompt_module(PY_GENERATION_DIRECT_STEP, version).__name__
         return f"{module_path.replace('.', '/')}.py"
     return str(generation_prompt_file_path(version).relative_to(MODULE_ROOT))
+
+
+def render_direct_with_evidence_payload(
+    job: SectionGenerationJob,
+    template: ClinicalTemplate,
+    *,
+    prompt_version: str,
+) -> str:
+    module = load_py_prompt_module(PY_GENERATION_DIRECT_WITH_EVIDENCE_STEP, prompt_version)
+    return module.render_user_payload(
+        section_id=job.section.section_id,
+        section_description=job.section.description,
+        section_guidelines=_section_guidelines_text(job.section),
+        template_guidelines=template.generation.guidelines,
+        conversation_groups=clusters_to_conversation_groups(
+            job.clusters,
+            include_turn_ids=True,
+        ),
+        context_brief=job.context,
+        transcript_constraints_block=render_transcript_constraints_block(
+            job.transcript_constraints
+        ),
+    )
 
 
 def render_direct_payload(
@@ -958,6 +1336,11 @@ def format_section_output_for_detail(
         "planner_items",
         "planned_items_block",
         "draft_with_evidence",
+        "cluster_planner_runs",
+        "combined_cluster_plans_block",
+        "renderer_raw_response",
+        "renderer_skipped",
+        "prompt_files",
         "llm_responses",
         "thinking_source",
         "llm_usage",
@@ -1038,6 +1421,7 @@ __all__ = [
     "DEFAULT_CLASSIFICATION_CASES_INDEX",
     "DEFAULT_OUTPUT_DETAIL",
     "DEFAULT_PROMPT_VERSION",
+    "DEFAULT_CLUSTER_PLANNER_CONCURRENCY",
     "DEFAULT_SECTION_CONCURRENCY",
     "DEFAULT_TEMPLATES_DIR",
     "MODULE_ROOT",

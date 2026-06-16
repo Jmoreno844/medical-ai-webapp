@@ -70,10 +70,20 @@ def test_consulta_estructurada_template_loads_with_ten_sections() -> None:
     template = load_template("consulta_estructurada_v001")
     assert template.id == "consulta_estructurada_v001"
     assert template.name == "Consulta estructurada (R&D) v1"
+    assert "función clínica dentro de la conversación" in template.classification.guidelines
     assert len(template.sections) == 10
     assert template.section_by_id("revision_sistemas") is not None
     assert template.section_by_id("analisis_y_plan") is not None
     assert template.section_by_id("antecedentes_gineco_obstetricos") is not None
+    enfermedad_actual = template.section_by_id("enfermedad_actual")
+    assert enfermedad_actual is not None
+    assert "exposición reciente" in enfermedad_actual.classification.guidelines
+    revision_sistemas = template.section_by_id("revision_sistemas")
+    assert revision_sistemas is not None
+    assert "preferir enfermedad_actual" in revision_sistemas.classification.guidelines
+    antecedentes = template.section_by_id("antecedentes")
+    assert antecedentes is not None
+    assert "agua/hielo" in antecedentes.classification.guidelines
     signos = template.section_by_id("signos_vitales")
     assert signos is not None
     signos_guidelines = signos.to_generation_payload()["guidelines"]
@@ -83,6 +93,8 @@ def test_consulta_estructurada_template_loads_with_ten_sections() -> None:
     assert estudios is not None
     assert "ECG" in estudios.include
     assert "biopsia" in estudios.include
+    assert "Exámenes solicitados" not in estudios.include
+    assert "órdenes nuevas" in estudios.boundaries
 
 
 def test_resolve_generation_mode_uses_template_field_or_fallback() -> None:

@@ -11,9 +11,6 @@ from document_pipeline_core.common.prompts import (
     DEFAULT_PROMPT_VERSION,
 )
 from document_pipeline_core.common.prompts import (
-    load_prompt as load_prompt_from_file,
-)
-from document_pipeline_core.common.prompts import (
     prompt_file_path as resolve_prompt_file_path,
 )
 from document_pipeline_core.common.case_paths import TRANSCRIPT_CASES_INDEX
@@ -26,6 +23,7 @@ from document_pipeline_core.common.prompt_runtime import (
 )
 from document_pipeline_core.common.prompt_registry import load_py_prompt_module
 from document_pipeline_core.common.transcripts import TranscriptCase, build_turn_catalog, render_user_payload
+from document_pipeline_core.filtering.protection import FilteringRunDiagnostics, TurnProtectionResult
 
 CORE_PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 MODULE_ROOT = Path(__file__).resolve().parent
@@ -50,7 +48,16 @@ def filtering_output_schema(
     catalog: list[dict[str, object]],
     *,
     prompt_version: str,
+    drop_eligible_turn_ids: list[int] | None = None,
 ) -> dict[str, object] | None:
+    if filtering_uses_py_prompt(prompt_version):
+        module = load_py_prompt_module("filtering", prompt_version)
+        eligible = (
+            list(drop_eligible_turn_ids)
+            if drop_eligible_turn_ids is not None
+            else []
+        )
+        return module.output_schema(drop_eligible_turn_ids=eligible)
     turn_ids = [int(item["turn_id"]) for item in catalog]
     return build_output_schema("filtering", prompt_version, turn_ids=turn_ids)
 
@@ -59,11 +66,12 @@ def render_filtering_user_payload(
     *,
     case: TranscriptCase,
     prompt_version: str,
+    protection: TurnProtectionResult | None = None,
 ) -> str:
     catalog = build_turn_catalog(case.transcript_json)
     if filtering_uses_py_prompt(prompt_version):
         module = load_py_prompt_module("filtering", prompt_version)
-        return module.render_user_payload(turns=catalog)
+        return module.render_user_payload(turns=catalog, protection=protection)
     return render_user_payload(case)
 
 
@@ -182,11 +190,98 @@ def expand_filtering_decisions(
     }
 
 
+def augment_filtering_decisions_with_protection(
+    decisions: list[dict[str, object]],
+    *,
+    drop_turn_ids: list[int],
+    protected_keep_reasons: dict[int, str],
+    drop_eligible_turn_ids: list[int],
+) -> tuple[list[dict[str, object]], dict[str, int]]:
+    drop_set = set(drop_turn_ids)
+    eligible_set = set(drop_eligible_turn_ids)
+    model_kept_count = 0
+    model_dropped_count = 0
+    augmented: list[dict[str, object]] = []
+
+    for decision in decisions:
+        if not isinstance(decision, dict):
+            continue
+        turn_id = int(decision["turn_id"])
+        row = dict(decision)
+        protection_reason = protected_keep_reasons.get(turn_id)
+        if protection_reason is not None:
+            row["disposition"] = "code_protected"
+            row["protection_reason"] = protection_reason
+            row["can_drop"] = False
+        elif turn_id in drop_set:
+            row["disposition"] = "model_dropped"
+            row["protection_reason"] = None
+            row["can_drop"] = True
+            model_dropped_count += 1
+        elif turn_id in eligible_set:
+            row["disposition"] = "model_kept"
+            row["protection_reason"] = None
+            row["can_drop"] = True
+            model_kept_count += 1
+        else:
+            row["disposition"] = "kept"
+            row["protection_reason"] = None
+            row["can_drop"] = None
+        augmented.append(row)
+
+    summary = {
+        "model_kept_count": model_kept_count,
+        "model_dropped_count": model_dropped_count,
+    }
+    return augmented, summary
+
+
 def enrich_filtering_result_for_export(
     result: FilteringResult,
     catalog: list[dict[str, object]],
+    *,
+    diagnostics: FilteringRunDiagnostics | None = None,
 ) -> dict[str, object]:
-    return expand_filtering_decisions(result, catalog)
+    export = expand_filtering_decisions(result, catalog)
+    if diagnostics is None:
+        return export
+
+    turn_by_id = {int(item["turn_id"]): item for item in catalog}
+    protected_turns: list[dict[str, object]] = []
+    for turn_id, reason in sorted(diagnostics.protected_keep_reasons.items()):
+        turn = turn_by_id.get(turn_id)
+        protected_turns.append(
+            {
+                "turn_id": turn_id,
+                "reason": reason,
+                "speaker": turn.get("speaker") if turn is not None else None,
+                "text": turn.get("text") if turn is not None else None,
+            }
+        )
+
+    export.update(
+        {
+            "drop_eligible_turn_ids": list(diagnostics.drop_eligible_turn_ids),
+            "protected_keep_reasons": {
+                str(turn_id): reason
+                for turn_id, reason in diagnostics.protected_keep_reasons.items()
+            },
+            "protected_turns": protected_turns,
+            "eligible_count": diagnostics.eligible_count,
+            "protected_count": diagnostics.protected_count,
+            "filtering_payload_mode": diagnostics.filtering_payload_mode,
+            "llm_skipped": diagnostics.llm_skipped,
+        }
+    )
+    augmented_decisions, disposition_summary = augment_filtering_decisions_with_protection(
+        export["decisions"],
+        drop_turn_ids=export["drop_turn_ids"],
+        protected_keep_reasons=diagnostics.protected_keep_reasons,
+        drop_eligible_turn_ids=diagnostics.drop_eligible_turn_ids,
+    )
+    export["decisions"] = augmented_decisions
+    export.update(disposition_summary)
+    return export
 
 
 def format_filtering_output_for_detail(
@@ -265,6 +360,7 @@ __all__ = [
     "FilteringCase",
     "FilteringResult",
     "audit_drop_turn_ids",
+    "augment_filtering_decisions_with_protection",
     "enrich_filtering_result_for_export",
     "expand_filtering_decisions",
     "format_debug_output",

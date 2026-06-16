@@ -123,6 +123,16 @@ _register(
         "generation",
         "v001",
         py_prompt_step="generation_direct",
+        structured_output_versions=frozenset({"v001", "v002"}),
+    )
+)
+_register(
+    _spec(
+        "generation_direct_with_evidence",
+        ("generation",),
+        "generation_direct_with_evidence",
+        "v001",
+        py_prompt_step="generation_direct_with_evidence",
         structured_output_versions=frozenset({"v001"}),
     )
 )
@@ -143,6 +153,26 @@ _register(
         "section_renderer",
         "v001",
         py_prompt_step="generation_renderer",
+        structured_output_versions=frozenset(),
+    )
+)
+_register(
+    _spec(
+        "generation_cluster_planner",
+        ("generation",),
+        "cluster_planner_route",
+        "v001",
+        py_prompt_step="generation_cluster_planner",
+        structured_output_versions=frozenset({"v001"}),
+    )
+)
+_register(
+    _spec(
+        "generation_cluster_renderer",
+        ("generation",),
+        "cluster_planner_route",
+        "v001",
+        py_prompt_step="generation_cluster_renderer",
         structured_output_versions=frozenset(),
     )
 )

@@ -19,6 +19,7 @@ from document_pipeline_core.common.prompts import (
 )
 from document_pipeline_core.common.case_paths import CLUSTER_CASES_INDEX
 from document_pipeline_core.common.prompt_registry import is_py_prompt_version, load_py_prompt_module, py_system_prompt
+from document_pipeline_core.common.prompt_runtime import prompt_reference as runtime_prompt_reference
 from document_pipeline_core.common.templates import ClinicalTemplate as ClassificationTemplate
 from document_pipeline_core.common.templates import compose_section_guidelines
 
@@ -321,6 +322,10 @@ PY_CLASSIFICATION_PROMPT_VERSIONS = frozenset({"v004"})
 
 def classification_uses_py_prompt(prompt_version: str) -> bool:
     return is_py_prompt_version("classification", prompt_version)
+
+
+def classification_prompt_reference(version: str) -> str:
+    return runtime_prompt_reference("classification", version)
 
 
 def classification_structured_output_enabled(prompt_version: str) -> bool:
@@ -776,6 +781,7 @@ __all__ = [
     "classification_structured_output_enabled",
     "classification_uses_enriched_system_prompt",
     "classification_uses_py_prompt",
+    "classification_prompt_reference",
     "format_template_for_classification_system",
     "prepare_classification_prompts",
     "template_ref_for_classification_user",

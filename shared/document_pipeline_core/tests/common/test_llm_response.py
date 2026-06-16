@@ -4,6 +4,7 @@ import pytest
 
 from document_pipeline_core.common.llm_response import (
     LlmResponse,
+    OpenAIEmptyResponseError,
     build_llm_response_from_message,
     build_llm_response_from_openai_responses,
     output_token_breakdown_from_usage,
@@ -71,15 +72,37 @@ class FakeOutputText:
 
 
 class FakeOutputMessage:
-    def __init__(self, text: str) -> None:
+    def __init__(self, text: str, *, status: str = "completed") -> None:
         self.type = "message"
         self.content = [FakeOutputText(text)]
+        self.status = status
+
+
+class FakeIncompleteDetails:
+    def model_dump(self) -> dict[str, object]:
+        return {"reason": "max_output_tokens"}
+
+
+class FakeErrorDetails:
+    def model_dump(self) -> dict[str, object]:
+        return {"code": "empty_output"}
 
 
 class FakeResponsesPayload:
-    def __init__(self, *, output: list[object], usage: dict[str, object] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        output: list[object],
+        usage: dict[str, object] | None = None,
+        status: str | None = None,
+        error: object | None = None,
+        incomplete_details: object | None = None,
+    ) -> None:
         self.output = output
         self.usage = usage
+        self.status = status
+        self.error = error
+        self.incomplete_details = incomplete_details
 
 
 def test_build_llm_response_from_openai_responses_extracts_summary() -> None:
@@ -97,6 +120,32 @@ def test_build_llm_response_from_openai_responses_extracts_summary() -> None:
     assert response.thinking == "plan de seccion"
     assert response.thinking_source == "openai.responses.reasoning.summary"
     assert response.request_params["openai_api"] == "responses"
+
+
+def test_build_llm_response_from_openai_responses_raises_diagnostics_when_empty() -> None:
+    with pytest.raises(OpenAIEmptyResponseError) as exc_info:
+        build_llm_response_from_openai_responses(
+            response=FakeResponsesPayload(
+                output=[
+                    FakeReasoningItem(summary=[FakeSummary("plan parcial")]),
+                    FakeOutputMessage("", status="incomplete"),
+                ],
+                status="incomplete",
+                error=FakeErrorDetails(),
+                incomplete_details=FakeIncompleteDetails(),
+            ),
+            request_params={"reasoning_effort": "low"},
+        )
+
+    exc = exc_info.value
+    assert str(exc) == "ai_pipeline_openai_empty_response"
+    assert exc.partial_content is None
+    assert exc.partial_thinking == "plan parcial"
+    assert exc.output_item_types == ["reasoning", "message"]
+    assert exc.message_statuses == ["incomplete"]
+    assert exc.response_status == "incomplete"
+    assert exc.response_error == {"code": "empty_output"}
+    assert exc.response_incomplete_details == {"reason": "max_output_tokens"}
 
 
 def test_build_llm_response_from_groq_message_reasoning_field() -> None:

@@ -46,7 +46,13 @@ DEFAULT_OPENAI_REASONING_EFFORT = "none"
 OPENAI_REASONING_EFFORT_ENV = "OPENAI_REASONING_EFFORT"
 
 ALLOWED_PROVIDERS = ("openai", "groq", "gemini", "anthropic")
-PROVIDER_ALIASES = {"google": "gemini"}
+PROVIDER_ALIASES = {
+    "google": "gemini",
+    "google_vertex": "gemini",
+    "google_genai": "gemini",
+    "anthropic_api": "anthropic",
+    "anthropic_vertex": "anthropic",
+}
 
 DEFAULT_OPENAI_MODEL = "gpt-5.4-mini"
 OPENAI_MODEL_CHOICES = (

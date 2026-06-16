@@ -10,6 +10,8 @@ class Settings(BaseWorkerSettings, PipelineConfig):
     port: int = Field(default=8092, alias="PORT")
     log_level: str = Field(default="INFO", alias="DOCUMENT_PIPELINE_LOG_LEVEL")
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
+    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    openai_model: str | None = Field(default=None, alias="OPENAI_MODEL")
     llm_max_concurrent: int = Field(
         default=4,
         validation_alias=AliasChoices(

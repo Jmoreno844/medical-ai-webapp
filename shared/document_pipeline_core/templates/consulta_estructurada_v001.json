@@ -3,7 +3,7 @@
   "name": "Consulta estructurada (R&D) v1",
   "document_kind": "document",
   "classification": {
-    "guidelines": "Plantilla de consulta ambulatoria con campos estructurados por sección. Ante la duda, asigna a la sección más específica soportada por el texto. Un cluster puede mapear a varias secciones si el contenido es transversal. Distingue: síntomas referidos o negados fuera del cuadro principal (revision_sistemas) vs evolución del problema activo (enfermedad_actual); antecedentes crónicos o hábitos (antecedentes) vs antecedentes ginecológicos u obstétricos (antecedentes_gineco_obstetricos) vs hallazgos objetivos del médico en exploración (examen_fisico); mediciones tomadas en consulta (signos_vitales) vs valores referidos por el paciente en casa (enfermedad_actual); resultados o estudios de laboratorio, imagen, ECG, ecografía, radiografía, TAC/RM, endoscopia, biopsia, cultivos o pruebas rápidas con fecha o valor (estudios_y_resultados) vs interpretación, diagnósticos, plan terapéutico u órdenes (analisis_y_plan). No inventes secciones fuera de la plantilla."
+    "guidelines": "Plantilla de consulta ambulatoria con campos estructurados por sección. Clasifica cada cluster según su función clínica dentro de la conversación, no solo según el sistema corporal mencionado. Regla de precedencia: si el cluster caracteriza, contextualiza, corrige, descarta o amplía el problema activo por el que consulta el paciente, asigna enfermedad_actual como sección primaria, incluso si el contenido parece revisión por sistemas. revision_sistemas se usa solo para síntomas o negaciones exploradas por sistemas que no forman parte de la evolución, caracterización, diferenciales o contexto directo del cuadro principal. Un cluster puede mapear a varias secciones si mezcla tipos de información; en ese caso conserva enfermedad_actual cuando una parte del contenido pertenece al cuadro activo. Motivo_consulta se reserva para la razón principal de consulta o el disparador de la visita, sin narrativa extensa; si el cluster incluye datos de evolución o gravedad, también asigna enfermedad_actual. Antecedentes se reserva para condiciones crónicas, remotas, hábitos, medicación habitual, antecedentes familiares o exposiciones habituales. No clasifiques como antecedentes las exposiciones recientes exploradas por el cuadro actual, como viaje, finca, agua, animales, picaduras o heridas recientes; esas van en enfermedad_actual, salvo que se describan como hábitos crónicos. Medicamentos: medicación fija o habitual va en antecedentes; medicamentos usados durante el cuadro actual, automedicación reciente o tratamientos previos con respuesta van en enfermedad_actual; si además reflejan un patrón habitual o farmacológico relevante, puede asignarse también antecedentes. Distingue mediciones tomadas en consulta (signos_vitales) de valores referidos por paciente en casa (enfermedad_actual). Hallazgos objetivos del profesional durante exploración van en examen_fisico. Estudios realizados, resultados disponibles o pendientes van en estudios_y_resultados; órdenes, decisiones terapéuticas, diagnósticos, diferenciales, educación y seguimiento van en analisis_y_plan. No inventes secciones fuera de la plantilla."
   },
   "generation": {
     "guidelines": "Redacta en Markdown clínico con encabezado ## y subcampos en formato Etiqueta: valor. No uses listas con viñetas. Incluye solo campos sustentados por la fuente asignada. Omite subcampos sin contenido; no escribas marcadores como no disponible o sin información. No inventes datos clínicos. Diferencia información referida por paciente o acompañante, hallazgos del profesional, interpretación explícita del profesional y decisiones tomadas. Si un dato tiene una sección más específica, no lo dupliques en una sección general. Los antecedentes gineco-obstétricos van en su sección dedicada, no en antecedentes generales. Los resultados de estudios ginecológicos con fecha o valor van en estudios_y_resultados. Si no hay evidencia suficiente para la sección, devuelve content vacío."
@@ -20,7 +20,8 @@
       },
       "generation": {
         "guidelines": "",
-        "mode": "single_fields"
+        "mode": "single_fields",
+        "preferred_route": "direct_with_evidence"
       }
     },
     {
@@ -34,7 +35,8 @@
       },
       "generation": {
         "guidelines": "",
-        "mode": "short_single_field"
+        "mode": "short_single_field",
+        "preferred_route": "direct_with_evidence"
       }
     },
     {
@@ -44,11 +46,12 @@
       "include": "Evolución del cuadro actual: inicio, duración, localización, características, intensidad, factores relacionados, síntomas asociados, tratamientos previos, respuesta y correcciones del relato. Incluir valores medidos en casa referidos por el paciente. Campo Enfermedad actual: narrativa cronológica del problema activo referido por paciente o acompañante.",
       "boundaries": "No incluir hallazgos de examen físico, signos vitales medidos en consulta, antecedentes crónicos, interpretación médica ni plan. No repetir el motivo de consulta como subtítulo.",
       "classification": {
-        "guidelines": ""
+        "guidelines": "Asignar aquí todo cluster que contribuya a la historia del problema activo: síntomas principales, síntomas asociados, negaciones relevantes, duración, localización, intensidad, desencadenantes, progresión, correcciones del relato, exposición reciente, automedicación durante el cuadro, respuesta a tratamientos y datos referidos por paciente o acompañante que expliquen por qué consulta. Incluye negativos si fueron preguntados para caracterizar o descartar diagnósticos relacionados con el cuadro actual."
       },
       "generation": {
         "guidelines": "",
-        "mode": "narrative"
+        "mode": "narrative",
+        "preferred_route": "cluster_planner"
       }
     },
     {
@@ -58,11 +61,12 @@
       "include": "Síntomas adicionales o negaciones sistemáticas por aparato o sistema que no son la evolución central del cuadro actual. Incluir solo subcampos con contenido explícito, en formato Etiqueta: valor. Subcampos posibles: Cabeza y cuello, Órganos de los sentidos, Cardiopulmonar, Abdominal, Genitourinario, Osteomuscular, Piel y anexos, Neurológico.",
       "boundaries": "No crear revisión completa por sistemas ni negativos no mencionados.",
       "classification": {
-        "guidelines": ""
+        "guidelines": "Usar solo para síntomas o negaciones por sistemas que son adicionales y no centrales al problema activo. No usar revision_sistemas cuando el dato modifica la interpretación del cuadro actual, caracteriza el síntoma principal, evalúa un diferencial directo o corrige información previa relevante. Si hay duda entre revision_sistemas y enfermedad_actual, preferir enfermedad_actual."
       },
       "generation": {
         "guidelines": "",
-        "mode": "items_by_system"
+        "mode": "items_by_system",
+        "preferred_route": "cluster_planner"
       }
     },
     {
@@ -72,11 +76,12 @@
       "include": "Hábitos de sueño, alimentación y actividad física; antecedentes patológicos, farmacológicos, alérgicos, quirúrgicos, familiares y toxicológicos; medicación habitual no formulada en esta consulta. Incluir solo subcampos con contenido explícito, en formato Etiqueta: valor. Subcampos posibles: Hábitos de sueño, Hábitos alimentarios, Hábitos de actividad física, Antecedentes patológicos, Antecedentes farmacológicos, Antecedentes alérgicos, Antecedentes quirúrgicos, Antecedentes familiares, Antecedentes toxicológicos. En medicación incluir solo componentes explícitos (nombre, dosis, vía, frecuencia).",
       "boundaries": "Los antecedentes ginecológicos u obstétricos van en antecedentes_gineco_obstetricos. No incluir motivo de consulta ni plan terapéutico actual.",
       "classification": {
-        "guidelines": ""
+        "guidelines": "Usar para condiciones previas, crónicas o remotas, hábitos, medicación habitual, alergias, cirugías, familiares y tóxicos. No usar para exposiciones puntuales recientes investigadas dentro del cuadro actual, como viaje, finca, agua/hielo, animales, mosquitos o heridas recientes. No usar para automedicación tomada como respuesta al episodio actual, salvo que también represente un patrón habitual o farmacológico relevante."
       },
       "generation": {
         "guidelines": "",
-        "mode": "single_fields"
+        "mode": "single_fields",
+        "preferred_route": "direct_with_evidence"
       }
     },
     {
@@ -90,7 +95,8 @@
       },
       "generation": {
         "guidelines": "",
-        "mode": "single_fields"
+        "mode": "single_fields",
+        "preferred_route": "direct_with_evidence"
       }
     },
     {
@@ -104,7 +110,8 @@
       },
       "generation": {
         "guidelines": "",
-        "mode": "single_fields"
+        "mode": "single_fields",
+        "preferred_route": "direct_with_evidence"
       }
     },
     {
@@ -118,21 +125,23 @@
       },
       "generation": {
         "guidelines": "",
-        "mode": "items_by_region"
+        "mode": "items_by_region",
+        "preferred_route": "direct_with_evidence"
       }
     },
     {
       "section_id": "estudios_y_resultados",
       "heading": "Resultados de laboratorio y pruebas diagnósticas",
       "description": "Exámenes de laboratorio, imágenes y pruebas con resultados o estado.",
-      "include": "Laboratorios, imágenes, ECG, ecografía, radiografía, TAC/RM, endoscopia, biopsia/patología, cultivos, pruebas rápidas, procedimientos diagnósticos, resultados con valores, estudios pendientes o resultados de registros previos discutidos en la consulta. Campos posibles: Exámenes solicitados, Exámenes realizados, Resultados disponibles, Resultados pendientes, Procedimientos diagnósticos. Indicar valores literales cuando consten.",
-      "boundaries": "Distinguir solicitado, realizado, pendiente o condicionado. La interpretación clínica de resultados va en analisis_y_plan, no aquí.",
+      "include": "Laboratorios, imágenes, ECG, ecografía, radiografía, TAC/RM, endoscopia, biopsia/patología, cultivos, pruebas rápidas, procedimientos diagnósticos, estudios realizados, resultados disponibles, resultados pendientes o resultados de registros previos discutidos en la consulta. Campos posibles: Exámenes realizados, Resultados disponibles, Resultados pendientes, Procedimientos diagnósticos. Indicar valores literales cuando consten.",
+      "boundaries": "Distinguir realizado, pendiente o condicionado. No incluir órdenes nuevas ni interpretación clínica. Las órdenes nuevas de laboratorio, imagen o ECG van en analisis_y_plan.",
       "classification": {
         "guidelines": ""
       },
       "generation": {
         "guidelines": "",
-        "mode": "structured_items"
+        "mode": "structured_items",
+        "preferred_route": "direct_with_evidence"
       }
     },
     {
@@ -146,7 +155,8 @@
       },
       "generation": {
         "guidelines": "",
-        "mode": "mixed_clinical_items"
+        "mode": "mixed_clinical_items",
+        "preferred_route": "cluster_planner"
       }
     }
   ]

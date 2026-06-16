@@ -106,10 +106,11 @@ def run_transcript_pipeline(
 
     filtering_spec = build_model_spec(filtering_config)
     filtering_prompt = load_system_prompt("filtering", filtering_config.prompt_version)
-    filtering_result, filtering_llm = run_filtering(
+    filtering_result, filtering_llm, _filtering_diagnostics = run_filtering(
         case=base_case,
         model_spec=filtering_spec,
         system_prompt=filtering_prompt,
+        prompt_version=filtering_config.prompt_version,
     )
     llm_calls.append(("filtering", filtering_llm))
 

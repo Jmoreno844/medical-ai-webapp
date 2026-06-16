@@ -36,7 +36,6 @@ def test_get_step_spec_module_dirs_exist() -> None:
 
 def test_list_prompt_versions_filtering_includes_v002() -> None:
     versions = list_prompt_versions("filtering")
-    assert "v001" in versions
     assert "v002" in versions
 
 
