@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import streamlit as st
+
 E2E_CONTEXT_STEP_KEYS: tuple[str, ...] = (
     "context_ad_hoc_pipeline",
     "context_pipeline",
@@ -94,14 +96,28 @@ def extract_generation_failed_display(
         "section_heading",
         "generation_substep",
         "generation_route",
+        "cluster_id",
         "provider",
         "model",
         "prompt_version",
         "error_message",
         "retry_count",
+        "partial_response",
+        "partial_thinking",
+        "response_status",
     ):
         value = result_record.get(key)
         if value is not None and value != "":
+            display[key] = value
+
+    for key in (
+        "response_output_item_types",
+        "response_message_statuses",
+        "response_error",
+        "response_incomplete_details",
+    ):
+        value = result_record.get(key)
+        if value:
             display[key] = value
 
     substep = result_record.get("generation_substep")
@@ -111,6 +127,82 @@ def extract_generation_failed_display(
             if value is not None:
                 display[key] = value
     return display
+
+
+def render_generation_failure_details(result_record: dict[str, object]) -> None:
+    display = extract_generation_failed_display(result_record)
+    error_message = result_record.get("error_message", "Error en generation.")
+    st.error(str(error_message))
+
+    section_id = display.get("section_id")
+    substep = display.get("generation_substep")
+    cluster_id = display.get("cluster_id")
+    detail_parts: list[str] = []
+    if section_id:
+        detail_parts.append(f"**Sección:** `{section_id}`")
+    if substep:
+        detail_parts.append(f"**Subpaso:** `{substep}`")
+    if cluster_id:
+        detail_parts.append(f"**Cluster:** `{cluster_id}`")
+    if detail_parts:
+        st.markdown(" · ".join(detail_parts))
+
+    provider = display.get("provider")
+    model = display.get("model")
+    prompt_version = display.get("prompt_version")
+    generation_route = display.get("generation_route")
+    retry_count = display.get("retry_count")
+    if provider or model or prompt_version or generation_route or retry_count is not None:
+        st.caption(
+            " · ".join(
+                part
+                for part in (
+                    f"provider: `{provider}`" if provider else "",
+                    f"model: `{model}`" if model else "",
+                    f"prompt: `{prompt_version}`" if prompt_version else "",
+                    f"route: `{generation_route}`" if generation_route else "",
+                    f"retry: `{retry_count}`" if retry_count is not None else "",
+                )
+                if part
+            )
+        )
+
+    partial_response = display.get("partial_response")
+    response_status = display.get("response_status")
+    if partial_response or response_status:
+        st.warning(
+            "OpenAI devolvió una respuesta incompleta o parcial antes de fallar."
+        )
+    if response_status:
+        st.caption(f"response_status: `{response_status}`")
+    if partial_response:
+        st.caption("Salida parcial capturada")
+        st.code(str(partial_response), language="markdown")
+
+    partial_meta = {
+        key: display[key]
+        for key in (
+            "response_output_item_types",
+            "response_message_statuses",
+            "response_error",
+            "response_incomplete_details",
+        )
+        if key in display
+    }
+    if partial_meta:
+        with st.expander("Diagnóstico OpenAI", expanded=False):
+            st.json(partial_meta)
+    if display.get("partial_thinking"):
+        with st.expander("Thinking parcial", expanded=False):
+            st.code(str(display["partial_thinking"]))
+    if substep == "renderer" and display.get("planner_items"):
+        with st.expander("Planner output", expanded=True):
+            if display.get("planned_items_block"):
+                st.text(str(display["planned_items_block"]))
+            st.json(display.get("planner_items"))
+
+    with st.expander("Detalle del error", expanded=False):
+        st.json(result_record)
 
 
 def is_renderable_context_payload(result_record: dict[str, object]) -> bool:
@@ -137,6 +229,7 @@ __all__ = [
     "context_step_from_outputs",
     "extract_generation_failed_display",
     "generation_succeeded",
+    "render_generation_failure_details",
     "is_renderable_context_payload",
     "resolve_e2e_pipeline_steps",
 ]

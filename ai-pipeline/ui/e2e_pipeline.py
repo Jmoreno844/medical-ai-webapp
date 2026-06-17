@@ -51,7 +51,7 @@ def prior_output_paths(outputs: list[PipelineRunOutput]) -> dict[str, str]:
     return {output.step: str(output.output_path) for output in outputs}
 
 
-def _exception_diagnostics(exc: BaseException) -> dict[str, object]:
+def exception_diagnostics(exc: BaseException) -> dict[str, object]:
     diagnostics_fn = getattr(exc, "diagnostics", None)
     if callable(diagnostics_fn):
         payload = diagnostics_fn()
@@ -62,6 +62,29 @@ def _exception_diagnostics(exc: BaseException) -> dict[str, object]:
     if isinstance(exc, GenerationValidationError):
         return exc.diagnostics()
     return {}
+
+
+def build_generation_failure_record(
+    exc: BaseException,
+    *,
+    config: StepConfig | None = None,
+) -> dict[str, object]:
+    record: dict[str, object] = {
+        "step_status": "failed",
+        "step": "generation",
+        "error_type": type(exc).__name__,
+        "error_message": str(exc),
+    }
+    if config is not None:
+        record["provider"] = config.provider
+        record["model"] = config.model
+        record["prompt_version"] = config.prompt_version
+        if config.openai_reasoning_effort is not None:
+            record["openai_reasoning_effort"] = config.openai_reasoning_effort
+        if config.generation_route:
+            record["generation_route"] = config.generation_route
+    record.update(exception_diagnostics(exc))
+    return record
 
 
 def persist_failed_step_output(
@@ -108,7 +131,7 @@ def persist_failed_step_output(
         if config.linked_evidence_two_step:
             result_record["linked_evidence_two_step"] = True
 
-    result_record.update(_exception_diagnostics(exc))
+    result_record.update(exception_diagnostics(exc))
 
     output_path.write_text(
         json.dumps(result_record, indent=2, ensure_ascii=False) + "\n",
@@ -165,6 +188,8 @@ __all__ = [
     "E2E_STEP_ORDER",
     "E2EPipelineResult",
     "E2EStepFailed",
+    "build_generation_failure_record",
+    "exception_diagnostics",
     "persist_failed_step_output",
     "prior_output_paths",
     "run_e2e_step",

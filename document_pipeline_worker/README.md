@@ -20,7 +20,7 @@ Backend local default: `DOCUMENT_PIPELINE_WORKER_BASE_URL=http://localhost:8092`
 
 Per-step settings via `PIPELINE_*` env vars (see `app/pipeline/config.py`). Defaults align with the shared core registry (`filtering v002`, `clustering v002`, `classification v004`, context sub-steps v001–v003, generation `direct`).
 
-- `PIPELINE_GENERATION_ROUTE=direct|two_step` (production default: `direct`)
+- `PIPELINE_GENERATION_ROUTE=direct|two_step|cluster_planner|direct_with_evidence|hybrid` — **fallback** for templates that do not declare hybrid section routes. Templates with hybrid support (today: `consulta_estructurada_v001`) always run with `generation_route=hybrid` and each section follows its `generation.preferred_route` from the template JSON.
 - Context sub-step prompt versions: `PIPELINE_CONTEXT_*_PROMPT_VERSION`
 
 ## Work item contract

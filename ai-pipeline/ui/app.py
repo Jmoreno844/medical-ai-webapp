@@ -26,6 +26,7 @@ from ui.components.provider_form import (  # noqa: E402
     apply_provider_model_to_widgets,
     render_provider_form,
     render_shared_provider_controls,
+    step_config_from_session_state,
 )
 from ui.components.result_picker import render_result_picker  # noqa: E402
 from ui.components.viewers import (  # noqa: E402
@@ -40,14 +41,14 @@ from ui.e2e_runs import (  # noqa: E402
     load_e2e_run,
     save_e2e_run,
 )
-from ui.e2e_pipeline import E2E_FULL_TEMPLATE_ID  # noqa: E402
+from ui.e2e_pipeline import E2E_FULL_TEMPLATE_ID, build_generation_failure_record  # noqa: E402
 from ui.e2e_viewer import (  # noqa: E402
     E2E_TRANSCRIPT_STEPS,
     build_e2e_step_states,
     context_step_from_outputs,
-    extract_generation_failed_display,
     generation_succeeded,
     is_renderable_context_payload,
+    render_generation_failure_details,
     resolve_e2e_pipeline_steps,
 )
 from ui.latency import format_latency_ms, primary_latency_ms  # noqa: E402
@@ -166,17 +167,18 @@ def _check_env_sidebar() -> None:
 
 def _step_config_from_form(step: str, key_prefix: str) -> StepConfig:
     harness_versions = list_harness_prompt_versions(step)
-    provider, model, prompt_version, openai_reasoning_effort = render_provider_form(
+    default_override = default_harness_prompt_version(step)
+    render_provider_form(
         step=step,
         key_prefix=key_prefix,
         prompt_versions=harness_versions,
-        default_prompt_version_override=default_harness_prompt_version(step),
+        default_prompt_version_override=default_override,
     )
-    return StepConfig(
-        provider=provider,
-        model=model,
-        prompt_version=prompt_version,
-        openai_reasoning_effort=openai_reasoning_effort,
+    return step_config_from_session_state(
+        step,
+        key_prefix,
+        prompt_versions=harness_versions,
+        default_prompt_version_override=default_override,
     )
 
 
@@ -233,7 +235,7 @@ def _generation_config_from_form(
             "Por sección: direct_with_evidence o cluster_planner según la plantilla."
         ),
     }[generation_route]
-    provider, model, prompt_version, openai_reasoning_effort = render_provider_form(
+    render_provider_form(
         step="generation",
         key_prefix=key_prefix,
         prompt_versions=generation_prompt_versions,
@@ -243,13 +245,41 @@ def _generation_config_from_form(
         prompt_version_help=route_help,
         prompt_version_key_suffix=f"_{generation_route}",
     )
-    return StepConfig(
-        provider=provider,
-        model=model,
-        prompt_version=prompt_version,
-        openai_reasoning_effort=openai_reasoning_effort,
+    return _generation_config_from_session_state(
+        key_prefix,
+        template_id=template_id,
+    )
+
+
+def _generation_config_from_session_state(
+    key_prefix: str,
+    *,
+    template_id: str | None = None,
+) -> StepConfig:
+    route_labels_map = generation_route_labels_for_template(template_id)
+    route_labels = list(route_labels_map.values())
+    generation_route_by_label = {
+        label: route for route, label in route_labels_map.items()
+    }
+    selected_label = st.session_state.get(
+        f"{key_prefix}_generation_route_label",
+        route_labels[0],
+    )
+    if selected_label not in generation_route_by_label:
+        selected_label = route_labels[0]
+    generation_route = generation_route_by_label[selected_label]
+    generation_prompt_versions = list_generation_prompt_versions(
         generation_route=generation_route,
-        linked_evidence_two_step=generation_route == "two_step",
+    )
+    return step_config_from_session_state(
+        "generation",
+        key_prefix,
+        prompt_versions=generation_prompt_versions,
+        default_prompt_version_override=default_generation_prompt_version(
+            generation_route=generation_route,
+        ),
+        prompt_version_key_suffix=f"_{generation_route}",
+        generation_route=generation_route,
     )
 
 
@@ -535,46 +565,13 @@ def _render_persisted_e2e_results() -> None:
                 st.caption(f"📁 `{output_path}`")
             if step_state == "failed" and isinstance(result_record, dict):
                 if step_name == "generation":
-                    display = extract_generation_failed_display(result_record)
-                    section_id = display.get("section_id", "desconocida")
-                    substep = display.get("generation_substep", "desconocido")
-                    st.error(
-                        str(
-                            result_record.get("error_message", "Error en generation.")
-                        )
-                    )
-                    st.markdown(
-                        f"**Sección:** `{section_id}` · "
-                        f"**Subpaso:** `{substep}`"
-                    )
-                    provider = display.get("provider")
-                    model = display.get("model")
-                    prompt_version = display.get("prompt_version")
-                    if provider or model or prompt_version:
-                        st.caption(
-                            " · ".join(
-                                part
-                                for part in (
-                                    f"provider: `{provider}`" if provider else "",
-                                    f"model: `{model}`" if model else "",
-                                    f"prompt: `{prompt_version}`"
-                                    if prompt_version
-                                    else "",
-                                )
-                                if part
-                            )
-                        )
-                    if substep == "renderer" and display.get("planner_items"):
-                        with st.expander("Planner output", expanded=True):
-                            if display.get("planned_items_block"):
-                                st.text(str(display["planned_items_block"]))
-                            st.json(display.get("planner_items"))
+                    render_generation_failure_details(result_record)
                 else:
                     st.error(
                         str(result_record.get("error_message", "Error en el paso."))
                     )
-                with st.expander("Detalle del error", expanded=True):
-                    st.json(result_record)
+                    with st.expander("Detalle del error", expanded=True):
+                        st.json(result_record)
                 continue
             if isinstance(result_record, dict):
                 render_step_result(step_name, result_record)
@@ -600,7 +597,7 @@ def _render_filtering_page() -> None:
 
     with tab_run:
         with st.expander("⚙️ Configuración", expanded=False):
-            config = _step_config_from_form("filtering", "filtering_run")
+            _step_config_from_form("filtering", "filtering_run")
 
         cases = list_transcript_cases()
         case_labels = [f"{case.case_id}  ({case.turn_count} turns)" for case in cases]
@@ -610,9 +607,17 @@ def _render_filtering_page() -> None:
         if st.button("▶ Ejecutar filtering", type="primary", key="run_filtering"):
             with st.spinner("Ejecutando filtering..."):
                 try:
+                    run_config = step_config_from_session_state(
+                        "filtering",
+                        "filtering_run",
+                        prompt_versions=list_harness_prompt_versions("filtering"),
+                        default_prompt_version_override=default_harness_prompt_version(
+                            "filtering"
+                        ),
+                    )
                     output = run_filtering_step(
                         case=load_transcript_case(case_id),
-                        config=config,
+                        config=run_config,
                     )
                     _persist_step_result("filtering", output.result_record)
                     _persist_step_output_path("filtering", str(output.output_path))
@@ -631,7 +636,7 @@ def _render_clustering_page() -> None:
 
     with tab_run:
         with st.expander("⚙️ Configuración", expanded=False):
-            config = _step_config_from_form("clustering", "clustering_run")
+            _step_config_from_form("clustering", "clustering_run")
 
         input_mode = st.radio(
             "Fuente de input",
@@ -674,7 +679,15 @@ def _render_clustering_page() -> None:
                 return
             with st.spinner("Ejecutando clustering..."):
                 try:
-                    output = run_clustering_step(case=case, config=config)
+                    run_config = step_config_from_session_state(
+                        "clustering",
+                        "clustering_run",
+                        prompt_versions=list_harness_prompt_versions("clustering"),
+                        default_prompt_version_override=default_harness_prompt_version(
+                            "clustering"
+                        ),
+                    )
+                    output = run_clustering_step(case=case, config=run_config)
                     _persist_step_result("clustering", output.result_record)
                     _persist_step_output_path("clustering", str(output.output_path))
                 except Exception as exc:
@@ -692,7 +705,7 @@ def _render_classification_page() -> None:
 
     with tab_run:
         with st.expander("⚙️ Configuración", expanded=False):
-            config = _step_config_from_form("classification", "classification_run")
+            _step_config_from_form("classification", "classification_run")
 
         input_mode = st.radio(
             "Fuente de clusters",
@@ -770,11 +783,19 @@ def _render_classification_page() -> None:
                 return
             with st.spinner("Ejecutando classification..."):
                 try:
+                    run_config = step_config_from_session_state(
+                        "classification",
+                        "classification_run",
+                        prompt_versions=list_harness_prompt_versions("classification"),
+                        default_prompt_version_override=default_harness_prompt_version(
+                            "classification"
+                        ),
+                    )
                     output = run_classification_step(
                         session_id=session_id.strip(),
                         clusters=clusters,
                         template_id=template_id,
-                        config=config,
+                        config=run_config,
                         clustering_result_file=clustering_result_path or None,
                     )
                     _persist_step_result("classification", output.result_record)
@@ -823,7 +844,7 @@ def _render_generation_page() -> None:
             st.caption(f"Session `{session_id}` · template `{template_id}`")
 
         with st.expander("⚙️ Configuración", expanded=False):
-            config = _generation_config_from_form(
+            _generation_config_from_form(
                 "generation_run",
                 template_id=template_id or None,
             )
@@ -965,12 +986,16 @@ def _render_generation_page() -> None:
                 return
             with st.spinner("Ejecutando generation..."):
                 try:
+                    run_config = _generation_config_from_session_state(
+                        "generation_run",
+                        template_id=template_id or None,
+                    )
                     output = run_generation_step(
                         session_id=session_id,
                         clusters=clusters,
                         assignments=assignments,
                         template_id=template_id,
-                        config=config,
+                        config=run_config,
                         classification_result_file=classification_path,
                         clustering_result_file=clustering_result_path or None,
                         claim_classification_result_file=context_result_path,
@@ -978,7 +1003,11 @@ def _render_generation_page() -> None:
                     _persist_step_result("generation", output.result_record)
                     _persist_step_output_path("generation", str(output.output_path))
                 except Exception as exc:
-                    st.error(str(exc))
+                    failed_record = build_generation_failure_record(
+                        exc,
+                        config=run_config,
+                    )
+                    render_generation_failure_details(failed_record)
 
         _render_persisted_step_result("generation")
 
@@ -1134,17 +1163,14 @@ def _render_e2e_run_tab() -> None:
         col1, col2 = st.columns(2)
         with col1:
             with st.expander("🔍 Filtering", expanded=False):
-                filtering_config = _step_config_from_form("filtering", "e2e_filtering")
+                _step_config_from_form("filtering", "e2e_filtering")
             with st.expander("🏷 Classification", expanded=False):
-                classification_config = _step_config_from_form(
-                    "classification",
-                    "e2e_classification",
-                )
+                _step_config_from_form("classification", "e2e_classification")
         with col2:
             with st.expander("🗂 Clustering", expanded=False):
-                clustering_config = _step_config_from_form("clustering", "e2e_clustering")
+                _step_config_from_form("clustering", "e2e_clustering")
             with st.expander("📄 Generation", expanded=False):
-                generation_config = _generation_config_from_form(
+                _generation_config_from_form(
                     "e2e_generation",
                     template_id=template_id,
                 )
@@ -1164,8 +1190,8 @@ def _render_e2e_run_tab() -> None:
         context_encounter_date: str | None = None
         context_document_date: str | None = None
         uploaded_pdf = None
-        context_config = _step_config_from_form("context_pipeline", "e2e_context")
         if include_context:
+            _step_config_from_form("context_pipeline", "e2e_context")
             context_doctor_note = st.text_area(
                 "Nota del médico",
                 height=140,
@@ -1248,6 +1274,42 @@ def _render_e2e_run_tab() -> None:
                 pdf_path = Path(temp_pdf_file.name)
 
             with st.status("Ejecutando pipeline...", expanded=True) as status:
+                filtering_config = step_config_from_session_state(
+                    "filtering",
+                    "e2e_filtering",
+                    prompt_versions=list_harness_prompt_versions("filtering"),
+                    default_prompt_version_override=default_harness_prompt_version(
+                        "filtering"
+                    ),
+                )
+                clustering_config = step_config_from_session_state(
+                    "clustering",
+                    "e2e_clustering",
+                    prompt_versions=list_harness_prompt_versions("clustering"),
+                    default_prompt_version_override=default_harness_prompt_version(
+                        "clustering"
+                    ),
+                )
+                classification_config = step_config_from_session_state(
+                    "classification",
+                    "e2e_classification",
+                    prompt_versions=list_harness_prompt_versions("classification"),
+                    default_prompt_version_override=default_harness_prompt_version(
+                        "classification"
+                    ),
+                )
+                generation_config = _generation_config_from_session_state(
+                    "e2e_generation",
+                    template_id=template_id,
+                )
+                context_config = step_config_from_session_state(
+                    "context_pipeline",
+                    "e2e_context",
+                    prompt_versions=list_harness_prompt_versions("context_pipeline"),
+                    default_prompt_version_override=default_harness_prompt_version(
+                        "context_pipeline"
+                    ),
+                )
                 pipeline_result = run_e2e_pipeline(
                     case_id=resolved_case_id,
                     session_id=session_id.strip(),

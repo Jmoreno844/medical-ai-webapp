@@ -136,7 +136,7 @@
       "include": "Laboratorios, imágenes, ECG, ecografía, radiografía, TAC/RM, endoscopia, biopsia/patología, cultivos, pruebas rápidas, procedimientos diagnósticos, estudios realizados, resultados disponibles, resultados pendientes o resultados de registros previos discutidos en la consulta. Campos posibles: Exámenes realizados, Resultados disponibles, Resultados pendientes, Procedimientos diagnósticos. Indicar valores literales cuando consten.",
       "boundaries": "Distinguir realizado, pendiente o condicionado. No incluir órdenes nuevas ni interpretación clínica. Las órdenes nuevas de laboratorio, imagen o ECG van en analisis_y_plan.",
       "classification": {
-        "guidelines": ""
+        "guidelines": "Usar esta sección solo para estudios ya realizados, resultados disponibles, resultados pendientes, estado explícito de un estudio o revisión de estudios previos discutidos en la consulta. Si el cluster menciona valores, hallazgos, reportes, normalidad/anormalidad, pendiente de resultado o que un estudio ya fue hecho, clasificar aquí. No usar esta sección para la decisión de pedir, indicar, ordenar, mandar, solicitar o planear un estudio nuevo, aunque se mencione ECG, laboratorios, imágenes u otro procedimiento; eso va en analisis_y_plan. Si un cluster mezcla una orden nueva con un resultado previo, un resultado pendiente o el estado de un estudio ya existente, puede asignarse a ambas secciones solo si ambos tipos de contenido están explícitos."
       },
       "generation": {
         "guidelines": "",
@@ -151,7 +151,7 @@
       "include": "Impresión o análisis del médico, diagnósticos o diferenciales, medicamentos formulados, órdenes de laboratorio o imagen, recomendaciones, educación al paciente, signos de alarma y seguimiento. Subcampos posibles: Análisis clínico, Diagnósticos, Plan terapéutico, Medicamentos formulados, Exámenes / órdenes, Recomendaciones y educación, Signos de alarma, Control y seguimiento. Solo interpretación, diagnósticos y decisiones expresadas por el profesional.",
       "boundaries": "No convertir síntomas en diagnósticos. Una opción condicional no es plan activo.",
       "classification": {
-        "guidelines": ""
+        "guidelines": "Usar esta sección para interpretación clínica y decisiones activas del profesional: análisis, diagnósticos, diferenciales, tratamiento, recomendaciones, educación, seguimiento y órdenes nuevas de estudios o procedimientos. Si el cluster expresa que se indicó, pidió, ordenó, mandó, decidió realizar o planeó solicitar un ECG, laboratorio, imagen o procedimiento diagnóstico nuevo, clasificar aquí aunque todavía no exista resultado. No usar esta sección solo por mencionar el nombre de un estudio si lo que se describe realmente es un resultado, hallazgo, estado pendiente o estudio ya realizado; eso va en estudios_y_resultados. Si un cluster mezcla una decisión clínica u orden nueva con resultados explícitos ya disponibles o pendientes, puede asignarse a ambas secciones solo si ambos contenidos están expresados de forma diferenciable."
       },
       "generation": {
         "guidelines": "",

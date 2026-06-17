@@ -28,7 +28,11 @@ PIPELINE_STEPS = (
 class PipelineConfig(BaseSettings):
     """Production pipeline config aligned with shared document_pipeline_core registry."""
 
-    model_config = SettingsConfigDict(env_file=".env.local", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env.local",
+        extra="ignore",
+        populate_by_name=True,
+    )
 
     filtering_provider: str = Field(default="google_vertex", alias="PIPELINE_FILTERING_PROVIDER")
     filtering_model: str = Field(default="", alias="PIPELINE_FILTERING_MODEL")

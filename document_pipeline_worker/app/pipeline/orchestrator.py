@@ -15,6 +15,10 @@ from document_pipeline_core.orchestrators.document_pipeline import (
 )
 
 from app.pipeline.config import PipelineConfig
+from app.pipeline.generation_route import (
+    ResolvedGenerationRoute,
+    resolve_effective_generation_route,
+)
 
 
 PIPELINE_STEP_LABELS: dict[str, str] = {
@@ -71,6 +75,10 @@ def run_document_pipeline(
     on_section_complete: Callable[[str, str, str], None] | None = None,
 ) -> PipelineRunResult:
     pipeline_config.validate_context_substeps()
+    resolved_route = resolve_effective_generation_route(
+        template=template,
+        pipeline_config=pipeline_config,
+    )
     context_config = ContextPipelineConfig.with_defaults(
         pipeline_config.context_prompt_versions()
     )
@@ -85,7 +93,7 @@ def run_document_pipeline(
         context_config=context_config,
         context_model=_to_step_model(pipeline_config, "context"),
         generation_config=_to_step_model(pipeline_config, "generation"),
-        generation_route=pipeline_config.generation_route,
+        generation_route=resolved_route.effective_generation_route,
         context_enabled=pipeline_config.context_enabled,
         section_concurrency=pipeline_config.generation_section_concurrency,
         on_step_complete=on_step_complete,
@@ -97,11 +105,23 @@ def run_document_pipeline(
             PipelineStepResult(
                 step=item.step,
                 duration_ms=item.duration_ms,
-                metadata=item.metadata,
+                metadata=_enrich_step_metadata(item.step, item.metadata, resolved_route),
             )
             for item in core_result.step_results
         ],
     )
+
+
+def _enrich_step_metadata(
+    step: str,
+    metadata: dict[str, object],
+    resolved_route: ResolvedGenerationRoute,
+) -> dict[str, object]:
+    if step != "generation":
+        return metadata
+    enriched = dict(metadata)
+    enriched.update(resolved_route.metadata())
+    return enriched
 
 
 __all__ = [

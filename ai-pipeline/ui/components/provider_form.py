@@ -17,6 +17,97 @@ from document_pipeline_core.common.providers import (
 from ui.discovery import default_prompt_version, list_prompt_versions
 
 
+def _provider_widget_index(key_prefix: str, fallback_provider: str) -> int:
+    provider_key = f"{key_prefix}_provider"
+    current = st.session_state.get(provider_key)
+    if isinstance(current, str):
+        normalized = normalize_provider_name(current)
+        if normalized in ALLOWED_PROVIDERS:
+            return ALLOWED_PROVIDERS.index(normalized)
+    fallback = normalize_provider_name(fallback_provider)
+    if fallback in ALLOWED_PROVIDERS:
+        return ALLOWED_PROVIDERS.index(fallback)
+    return 0
+
+
+def model_from_session_state(key_prefix: str, provider: str) -> str:
+    normalized = normalize_provider_name(provider)
+    default_model = default_model_for_provider(normalized)
+
+    if normalized == "openai":
+        value = st.session_state.get(f"{key_prefix}_openai_model")
+    elif normalized == "gemini":
+        value = st.session_state.get(f"{key_prefix}_gemini_model")
+    elif normalized == "groq":
+        choice = st.session_state.get(f"{key_prefix}_groq_model_choice")
+        if choice == GROQ_CUSTOM_MODEL_LABEL:
+            value = st.session_state.get(f"{key_prefix}_groq_model_custom")
+        else:
+            value = choice
+    else:
+        value = st.session_state.get(f"{key_prefix}_model")
+
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return default_model
+
+
+def openai_reasoning_effort_from_session_state(
+    key_prefix: str,
+    *,
+    provider: str,
+    model: str,
+) -> str | None:
+    normalized = normalize_provider_name(provider)
+    if normalized != "openai" or not openai_model_supports_reasoning_effort(model):
+        return None
+    effort = st.session_state.get(f"{key_prefix}_openai_reasoning_effort")
+    if isinstance(effort, str) and effort.strip():
+        return effort.strip().lower()
+    return DEFAULT_OPENAI_REASONING_EFFORT
+
+
+def step_config_from_session_state(
+    step: str,
+    key_prefix: str,
+    *,
+    prompt_versions: list[str] | None = None,
+    default_prompt_version_override: str | None = None,
+    prompt_version_key_suffix: str = "",
+    generation_route: str = "direct",
+) -> "StepConfig":
+    from ui.runner import StepConfig
+
+    provider_key = f"{key_prefix}_provider"
+    provider = normalize_provider_name(
+        str(st.session_state.get(provider_key, ALLOWED_PROVIDERS[0]))
+    )
+    model = model_from_session_state(key_prefix, provider)
+    versions = prompt_versions if prompt_versions is not None else list_prompt_versions(step)
+    preferred = (
+        default_prompt_version_override
+        or default_prompt_version(step)
+    )
+    prompt_key = f"{key_prefix}_prompt{prompt_version_key_suffix}"
+    prompt_raw = st.session_state.get(prompt_key, preferred)
+    prompt_version = str(prompt_raw) if prompt_raw is not None else preferred
+    if prompt_version not in versions and versions:
+        prompt_version = preferred if preferred in versions else versions[0]
+
+    return StepConfig(
+        provider=provider,
+        model=model,
+        prompt_version=prompt_version,
+        openai_reasoning_effort=openai_reasoning_effort_from_session_state(
+            key_prefix,
+            provider=provider,
+            model=model,
+        ),
+        generation_route=generation_route,
+        linked_evidence_two_step=generation_route == "two_step",
+    )
+
+
 def _render_model_field(
     *,
     provider: str,
@@ -202,24 +293,22 @@ def render_shared_provider_controls(
     model: str | None = None,
     openai_reasoning_effort: str | None = None,
 ) -> tuple[str, str, str | None]:
-    normalized_provider = normalize_provider_name(provider or ALLOWED_PROVIDERS[0])
-    provider_index = (
-        ALLOWED_PROVIDERS.index(normalized_provider)
-        if normalized_provider in ALLOWED_PROVIDERS
-        else 0
-    )
+    fallback_provider = normalize_provider_name(provider or ALLOWED_PROVIDERS[0])
+    provider_key = f"{key_prefix}_provider"
+    if provider_key not in st.session_state:
+        st.session_state[provider_key] = fallback_provider
 
     col_provider, col_model = st.columns([1, 2])
     with col_provider:
         selected_provider = st.selectbox(
             "Provider",
             options=list(ALLOWED_PROVIDERS),
-            index=provider_index,
+            index=_provider_widget_index(key_prefix, fallback_provider),
             help=(
                 "Atajo para copiar provider/modelo a los 4 pasos. "
                 "Cada paso sigue siendo editable abajo."
             ),
-            key=f"{key_prefix}_provider",
+            key=provider_key,
         )
     with col_model:
         selected_model = _render_model_field(
@@ -258,20 +347,18 @@ def render_provider_form(
     prompt_version_help: str | None = None,
     prompt_version_key_suffix: str = "",
 ) -> tuple[str, str, str, str | None]:
-    normalized_provider = normalize_provider_name(provider or ALLOWED_PROVIDERS[0])
-    provider_index = (
-        ALLOWED_PROVIDERS.index(normalized_provider)
-        if normalized_provider in ALLOWED_PROVIDERS
-        else 0
-    )
+    fallback_provider = normalize_provider_name(provider or ALLOWED_PROVIDERS[0])
+    provider_key = f"{key_prefix}_provider"
+    if provider_key not in st.session_state:
+        st.session_state[provider_key] = fallback_provider
 
     col_provider, col_model = st.columns([1, 2])
     with col_provider:
         selected_provider = st.selectbox(
             "Provider",
             options=list(ALLOWED_PROVIDERS),
-            index=provider_index,
-            key=f"{key_prefix}_provider",
+            index=_provider_widget_index(key_prefix, fallback_provider),
+            key=provider_key,
         )
     with col_model:
         selected_model = _render_model_field(

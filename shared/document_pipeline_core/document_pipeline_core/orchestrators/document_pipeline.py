@@ -290,11 +290,18 @@ def run_document_pipeline_v2(
         section_evidence=section_evidence,
         prompt_version=generation_config.prompt_version,
         linked_evidence_two_step=linked_evidence_two_step,
+        generation_route=generation_route,
     )
+    section_routes = {
+        section_run.section_id: section_run.generation_route
+        for section_run in generation_run.section_runs
+    }
     _record_step(
         "generation",
         {
             "route": generation_route,
+            "effective_generation_route": generation_route,
+            "section_routes": section_routes,
             "prompt_version": generation_config.prompt_version,
             "section_count": len(generation_run.session_result.sections),
         },

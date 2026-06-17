@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from document_pipeline_core.generation.lib import GenerationValidationError
-from ui.e2e_pipeline import persist_failed_step_output
+from ui.e2e_pipeline import build_generation_failure_record, persist_failed_step_output
 from ui.e2e_viewer import extract_generation_failed_display
 from ui.runner import PipelineRunOutput, StepConfig
 
@@ -161,6 +161,28 @@ def test_run_e2e_pipeline_partial_on_generation_failure(
     assert failed_record["retry_count"] == 1
 
 
+def test_build_generation_failure_record_from_validation_error() -> None:
+    exc = GenerationValidationError(
+        "ai_pipeline_openai_empty_response",
+        section_id="motivo_consulta",
+        section_heading="Motivo de consulta",
+        generation_route="cluster_planner",
+        generation_substep="cluster_renderer",
+        cluster_id="case1_cluster_a",
+        prompt_version="v001",
+        partial_response="Paciente con dolor torácico...",
+        response_status="incomplete",
+        retry_count=1,
+    )
+    record = build_generation_failure_record(exc, config=_step_config())
+    assert record["section_id"] == "motivo_consulta"
+    assert record["generation_substep"] == "cluster_renderer"
+    assert record["cluster_id"] == "case1_cluster_a"
+    assert record["partial_response"] == "Paciente con dolor torácico..."
+    assert record["response_status"] == "incomplete"
+    assert record["provider"] == "openai"
+
+
 def test_extract_generation_failed_display_renderer_planner_output() -> None:
     record = {
         "section_id": "motivo_consulta",
@@ -176,3 +198,21 @@ def test_extract_generation_failed_display_renderer_planner_output() -> None:
     assert display["section_id"] == "motivo_consulta"
     assert display["generation_substep"] == "renderer"
     assert display["planner_items"] == [{"text": "Cefalea.", "e": ["t0"]}]
+
+
+def test_extract_generation_failed_display_openai_partial_response() -> None:
+    record = {
+        "section_id": "motivo_consulta",
+        "generation_substep": "cluster_renderer",
+        "error_message": "ai_pipeline_openai_empty_response",
+        "partial_response": "Paciente con dolor torácico...",
+        "partial_thinking": "plan parcial",
+        "response_status": "incomplete",
+        "response_output_item_types": ["reasoning", "message"],
+        "response_message_statuses": ["incomplete"],
+    }
+    display = extract_generation_failed_display(record)
+    assert display["partial_response"] == "Paciente con dolor torácico..."
+    assert display["partial_thinking"] == "plan parcial"
+    assert display["response_status"] == "incomplete"
+    assert display["response_output_item_types"] == ["reasoning", "message"]
